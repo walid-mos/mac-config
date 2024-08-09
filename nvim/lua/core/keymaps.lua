@@ -8,7 +8,7 @@ local keymap = vim.keymap.set
 local opts = { noremap = true, silent = true }
 
 -- Open explorer menu Netrw's with only <leader>- key
--- keymap('n', '<leader>-', ":Telescope file_browser path=%:p:h select_buffer=true<CR>", { desc = 'Open file explorer' })
+keymap('n', '<leader>-', ":Telescope file_browser path=%:p:h select_buffer=true<CR>", { desc = 'Open file explorer' })
 
 -- Buffer
 keymap("n", "<C-n>", ":bn<CR>")

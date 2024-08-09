@@ -1,3 +1,16 @@
+local cfg = {
+    background = {
+        light = "latte",
+        dark = "frappe"
+    },
+    term_colors = true,
+    integrations = {
+        telescope = true,
+        mason = true,
+    },
+    flavour = "auto"
+}
+
 return {
   {
     "catppuccin/nvim",
@@ -5,7 +18,9 @@ return {
     name = "catppuccin",
     priority = 1000,
     config = function()
-      vim.cmd.colorscheme "catppuccin-frappe"
+      require('catppuccin').setup()
+
+      vim.cmd.colorscheme "catppuccin"
     end
   }
 }

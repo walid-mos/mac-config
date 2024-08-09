@@ -1,5 +1,4 @@
 local on_attach = function(client, bufnr)
-    -- for LSP related items. It sets the mode, buffer and description for us each time.
     local nmap = function(keys, func, desc)
         if desc then
             desc = 'LSP: ' .. desc

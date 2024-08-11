@@ -11,7 +11,6 @@ local cfg = {
     defaults = {
         file_ignore_patterns = {
             '.git/',
-            'node_modules/',
             'pnpm%-lock.yaml',
             'yarn.lock',
             'package%-lock.json',
@@ -37,7 +36,6 @@ local cfg = {
     },
     extensions = {
         file_browser = {
-            -- disables netrw and use telescope-file-browser in its place
             hijack_netrw = true,
             initial_mode = "normal",
             no_ignore = true,

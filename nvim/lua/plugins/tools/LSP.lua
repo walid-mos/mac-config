@@ -18,15 +18,13 @@ local on_attach = function(client, bufnr)
     nmap('<leader>ds', require('telescope.builtin').lsp_document_symbols, '[D]ocument [S]ymbols')
     nmap('<leader>ws', require('telescope.builtin').lsp_dynamic_workspace_symbols, '[W]orkspace [S]ymbols')
 
-    -- See `:help K` for why this keymap
     nmap('K', vim.lsp.buf.hover, 'Hover Documentation')
-    nmap('<leader>ck', vim.lsp.buf.signature_help, 'Signature Documentation')
 
     -- nmap('<leader>cf', ':%!npx prettier --stdin-filepath %<CR>', '[F]ormat file (Prettier)')
 
-    -- if client.supports_method "textDocument/inlayHint" then
-    --     vim.lsp.inlay_hint.enable(bufnr, true)
-    -- end
+    if client.supports_method "textDocument/inlayHint" then
+        vim.lsp.inlay_hint.enable(true, {bufnr})
+    end
 end
 
 local common_capabilities = function()
@@ -34,38 +32,39 @@ local common_capabilities = function()
     return capabilities
 end
 
--- local initialize_diagnostics = function()
---     local icons = require('ui.icons')
---     local default_diagnostic_config = {
---         signs = {
---             active = true,
---             values = {
---                 { name = "DiagnosticSignError", text = icons.diagnostics.Error },
---                 { name = "DiagnosticSignWarn",  text = icons.diagnostics.Warning },
---                 { name = "DiagnosticSignHint",  text = icons.diagnostics.Hint },
---                 { name = "DiagnosticSignInfo",  text = icons.diagnostics.Information },
---             },
---         },
---         virtual_text = false,
---         update_in_insert = false,
---         underline = true,
---         severity_sort = true,
---         float = {
---             focusable = true,
---             style = "minimal",
---             border = "rounded",
---             source = "always",
---             header = "",
---             prefix = "",
---         },
---     }
---
---     vim.diagnostic.config(default_diagnostic_config)
---
---     for _, sign in ipairs(vim.tbl_get(vim.diagnostic.config(), "signs", "values") or {}) do
---         vim.fn.sign_define(sign.name, { texthl = sign.name, text = sign.text, numhl = sign.name })
---     end
--- end
+local initialize_diagnostics = function()
+    local icons = require('ui.icons')
+    local default_diagnostic_config = {
+        signs = {
+            active = true,
+            values = {
+                { name = "DiagnosticSignError", text = icons.diagnostics.Error },
+                { name = "DiagnosticSignWarn",  text = icons.diagnostics.Warning },
+                { name = "DiagnosticSignHint",  text = icons.diagnostics.Hint },
+                { name = "DiagnosticSignInfo",  text = icons.diagnostics.Information },
+            },
+        },
+        virtual_text = false,
+        update_in_insert = false,
+        underline = true,
+        severity_sort = true,
+        float = {
+            focusable = true,
+            style = "minimal",
+            border = "rounded",
+            source = "always",
+            header = "",
+            prefix = "",
+        },
+    }
+
+    vim.diagnostic.config(default_diagnostic_config)
+
+    ---@diagnostic disable-next-line: param-type-mismatch
+    for _, sign in ipairs(vim.tbl_get(vim.diagnostic.config(), "signs", "values") or {}) do
+        vim.fn.sign_define(sign.name, { texthl = sign.name, text = sign.text, numhl = sign.name })
+    end
+end
 
 return {
     'neovim/nvim-lspconfig',
@@ -82,7 +81,7 @@ return {
 
         require('mason').setup()
         require('mason-lspconfig').setup()
-        -- initialize_diagnostics()
+        initialize_diagnostics()
 
         local servers = {
             rust_analyzer = {},

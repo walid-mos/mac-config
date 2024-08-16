@@ -1,1 +1,11 @@
+# Ignore everything
+/*
+
+# Files / Folder to not ignore
+# Need "!/" to work
+# Add "/" at the end for folders
+!/.config/
+
+# Ignore again files / folders
+.config/raycast/extensions/
 .DS_Store

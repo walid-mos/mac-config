@@ -1,26 +1,26 @@
 local cfg = {
-    background = {
-        light = "latte",
-        dark = "frappe"
-    },
-    term_colors = true,
-    integrations = {
-        telescope = true,
-        mason = true,
-    },
-    flavour = "auto"
+	background = {
+		light = "latte",
+		dark = "frappe",
+	},
+	term_colors = true,
+	integrations = {
+		telescope = true,
+		mason = true,
+	},
+	flavour = "auto",
 }
 
 return {
-  {
-    "catppuccin/nvim",
-    lazy = false,
-    name = "catppuccin",
-    priority = 1000,
-    config = function()
-      require('catppuccin').setup()
+	{
+		"catppuccin/nvim",
+		lazy = false,
+		name = "catppuccin",
+		priority = 1000,
+		config = function()
+			require("catppuccin").setup(cfg)
 
-      vim.cmd.colorscheme "catppuccin"
-    end
-  }
+			vim.cmd.colorscheme("catppuccin")
+		end,
+	},
 }

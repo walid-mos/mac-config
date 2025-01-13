@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Logging
-log_file="/tmp/starship_theme.log"
+log_file="$TMPDIR/starship_theme.log"
 echo "$(date): Script exécuté" >> "$log_file"
 
 # Chemin vers le fichier de configuration Starship

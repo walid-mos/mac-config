@@ -1,7 +1,7 @@
 "$schema" = 'https://starship.rs/config-schema.json'
 
 ################# Starship setup ###################
-palette = "catppuccin_mocha"
+palette = "catppuccin_latte"
 add_newline = true
 
 format = """

@@ -110,6 +110,9 @@ return {
 			},
 		}
 
+		-- C3 LSP WIP
+		require("lspconfig").c3_lsp.setup({})
+
 		mason_lspconfig.setup_handlers({
 			function(server_name)
 				local opts = {
@@ -124,6 +127,7 @@ return {
 				end
 
 				if server_name == "lua_ls" then
+					---@diagnostic disable-next-line: missing-fields
 					require("neodev").setup({})
 				end
 

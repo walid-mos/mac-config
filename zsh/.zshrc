@@ -35,6 +35,11 @@ if [ -f ~/.config/zsh/aliases ]; then
     source ~/.config/zsh/aliases
 fi
 
+
+if [ -f ~/.zsh_local_aliases ]; then
+    source ~/.zsh_local_aliases
+fi
+
 source $ZSH/oh-my-zsh.sh
 eval "$(starship init zsh)"
 export STARSHIP_CONFIG=~/.config/starship/starship.toml

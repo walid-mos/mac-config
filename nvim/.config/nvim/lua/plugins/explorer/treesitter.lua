@@ -9,6 +9,7 @@ vim.filetype.add({
 local cfg = {
 	ensure_installed = {
 		"c",
+		"c3",
 		"cpp",
 		"go",
 		"lua",
@@ -88,6 +89,7 @@ return {
 	config = function()
 		require("nvim-treesitter.configs").setup(cfg)
 		local parser_config = require("nvim-treesitter.parsers").get_parser_configs()
+		---@diagnostic disable-next-line: inject-field
 		parser_config.c3 = {
 			install_info = {
 				url = "https://github.com/c3lang/tree-sitter-c3",

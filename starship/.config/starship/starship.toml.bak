@@ -10,6 +10,7 @@ $os\
 $status\
 $directory\
 $git_branch\
+$git_state\
 $git_status\
 $fill\
 $golang\
@@ -58,6 +59,9 @@ read_only_style = ''
 [git_branch]
 format = '[─](fg:current_line)[](fg:green)[$symbol](fg:primary bg:green)[](fg:green bg:box)[ $branch(:$remote_branch)](fg:foreground bg:box)'
 symbol = ''
+
+[git_state]
+format = '\([$state( $progress_current/$progress_total)]($style)\)'
 
 [git_status]
 format = '[$all_status](fg:green bg:box)[](fg:box)'

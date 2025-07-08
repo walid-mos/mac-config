@@ -1,8 +1,0 @@
-window-theme = system
-
-background-opacity = 0.95
-background-blur-radius = 15
-
-theme = dark:catppuccin-frappe, light:catppuccin-latte 
-
-cursor-style = bar

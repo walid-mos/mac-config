@@ -8,6 +8,11 @@ fi
 if [ -f ~/.config/zsh/aliases ]; then
     source ~/.config/zsh/aliases
 fi
+
+
+if [ -f ~/.config/zsh/secret_env ]; then
+    source ~/.config/zsh/secret_env
+fi
 # CONFIG end
 
 

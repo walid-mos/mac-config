@@ -10,8 +10,3 @@ window-width = 260
 
 window-padding-x = 5
 window-padding-y = 2
-
-keybind = alt+left=unbind
-keybind = alt+right=unbind
-
-keybind = cmd+k=unbind

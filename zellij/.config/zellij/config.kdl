@@ -113,11 +113,15 @@ keybinds clear-defaults=true {
             SwitchToMode "normal"
         }
     }
-    shared_except "locked" {
+    shared {
         bind "Alt n" { NewPane; }
         bind "Alt N" { NewTab; }
         bind "Alt x" { CloseFocus; SwitchToMode "normal"; }
         bind "Alt X" { CloseTab; SwitchToMode "normal"; }
+        bind "Alt [" { GoToPreviousTab; }
+        bind "Alt ]" { GoToNextTab; }
+    }
+    shared_except "locked" {
         bind "Alt h" { MoveFocusOrTab "left"; }
         bind "Alt j" { MoveFocus "down"; }
         bind "Alt k" { MoveFocus "up"; }
@@ -127,8 +131,6 @@ keybinds clear-defaults=true {
         bind "Alt +" { Resize "Increase"; }
         bind "Alt -" { Resize "Decrease"; }
         bind "Alt =" { Resize "Increase"; }
-        bind "Alt [" { GoToPreviousTab; }
-        bind "Alt ]" { GoToNextTab; }
         bind "Alt f" { ToggleFloatingPanes; }
         bind "Ctrl q" { Quit; }
     }
@@ -233,12 +235,18 @@ plugins {
     welcome-screen location="zellij:session-manager" {
         welcome_screen true
     }
+    autolock location="https://github.com/fresh2dev/zellij-autolock/releases/latest/download/zellij-autolock.wasm" {
+        is_enabled true
+        triggers "nvim|vim|v|nv"  // Lock when any open these programs open. They are expected to unlock themselves when closed (e.g., using zellij.vim plugin).
+        watch_triggers "fzf|zoxide|atuin|atac"  // Lock when any of these open and monitor until closed.
+    }
 }
 
 // Plugins to load in the background when a new session starts
 // eg. "file:/path/to/my-plugin.wasm"
 // eg. "https://example.com/my-plugin.wasm"
 load_plugins {
+    autolock
 }
  
 // Use a simplified UI without special fonts (arrow glyphs)

@@ -1,0 +1,15 @@
+{
+  "diagnostics": {
+    "globals": ["vim"]
+  },
+  "runtime": {
+    "version": "LuaJIT"
+  },
+  "workspace": {
+    "checkThirdParty": false,
+    "library": ["${3rd}/luv/library"]
+  },
+  "telemetry": {
+    "enable": false
+  }
+}

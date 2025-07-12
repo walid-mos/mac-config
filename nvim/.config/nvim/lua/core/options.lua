@@ -40,7 +40,7 @@ vim.opt.writebackup = false -- if a file is being edited by another program (or 
 
 -- autoread file if updated
 vim.opt.autoread = true
-vim.cmd [[autocmd FocusGained,BufEnter * checktime]]
+vim.cmd [[autocmd FocusGained,BufEnter * silent! checktime]]
 
 -- use number of spaces to insert <Tab>
 vim.opt.expandtab = true

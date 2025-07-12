@@ -24,10 +24,10 @@ keymap("n", "[l", ":lprev<CR>", opts)
 
 -- Normal
 -- Better window navigation
-keymap("n", "<C-h>", "<C-w>h", opts)
-keymap("n", "<C-j>", "<C-w>j", opts)
-keymap("n", "<C-l>", "<C-w>l", opts)
-keymap("n", "<C-k>", "<C-w>k", opts)
+keymap("n", "<A-h>", "<C-w>h", opts)
+keymap("n", "<A-j>", "<C-w>j", opts)
+keymap("n", "<A-k>", "<C-w>k", opts)
+keymap("n", "<A-l>", "<C-w>l", opts)
 keymap("n", "ss", ":vsplit<CR>", opts)
 keymap("n", "sv", ":split<CR>", opts)
 
@@ -79,8 +79,8 @@ keymap("n", "*", "*zz", opts)
 keymap("n", "#", "#zz", opts)
 
 -- Easier start and endline
-keymap({ "n", "o", "x" }, "<A-h>", "^", opts)
-keymap({ "n", "o", "x" }, "<A-l>", "g_", opts)
+keymap({ "n", "o", "x" }, "<leader>h", "^", opts)
+keymap({ "n", "o", "x" }, "<leader>l", "g_", opts)
 
 -- Remove line ending
 keymap({ "n", "i" }, "<S-A-j>", ":join<CR>", opts)

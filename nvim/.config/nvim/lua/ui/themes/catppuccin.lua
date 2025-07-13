@@ -8,7 +8,7 @@ local cfg = {
 		telescope = true,
 		mason = true,
 	},
-	flavour = "auto",
+	flavour = "latte",
 }
 
 return {

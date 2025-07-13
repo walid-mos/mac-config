@@ -6,7 +6,7 @@ macos-option-as-alt = left
 macos-titlebar-style = transparent
 
 window-height = 70
-window-width = 260
+window-width = 320
 
 window-padding-x = 5
 window-padding-y = 2

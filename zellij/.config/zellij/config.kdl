@@ -1,6 +1,7 @@
 keybinds clear-defaults=true {
     normal {
         unbind "Super K"
+        unbind "Shift Enter"
     }
     locked {
         bind "Ctrl g" { SwitchToMode "normal"; }
@@ -24,6 +25,7 @@ keybinds clear-defaults=true {
         bind "w" { ToggleFloatingPanes; SwitchToMode "normal"; }
         bind "z" { TogglePaneFrames; SwitchToMode "normal"; }
         bind "r" { SwitchToMode "renamepane"; PaneNameInput 0; }
+        bind "x" { CloseFocus; SwitchToMode "normal"; }
     }
     shared_except "locked" "tab" {
         bind "Ctrl t" { SwitchToMode "tab"; }
@@ -52,7 +54,7 @@ keybinds clear-defaults=true {
         bind "s" { ToggleActiveSyncTab; SwitchToMode "normal"; }
         bind "x" { CloseTab; SwitchToMode "normal"; }
     }
-    shared_except "locked" "resize" {
+    shared_except "locked" "resize" "session" {
         bind "Ctrl r" { SwitchToMode "resize"; }
     }
     resize {
@@ -138,20 +140,11 @@ keybinds clear-defaults=true {
         bind "Alt f" { ToggleFloatingPanes; }
         bind "Ctrl q" { Quit; }
     }
-    shared_except "locked" "scroll" "search" "tmux" {
-        bind "Ctrl b" { SwitchToMode "tmux"; }
-    }
-    shared_except "locked" "scroll" "search" {
-        bind "Ctrl x" { SwitchToMode "scroll"; }
-    }
     shared_except "normal" "locked" "entersearch" {
         bind "enter" { SwitchToMode "normal"; }
     }
     shared_except "normal" "locked" "entersearch" "renametab" "renamepane" {
         bind "esc" { SwitchToMode "normal"; }
-    }
-    shared_among "pane" "tmux" {
-        bind "x" { CloseFocus; SwitchToMode "normal"; }
     }
     renametab {
         bind "esc" { UndoRenameTab; SwitchToMode "tab"; }
@@ -161,26 +154,6 @@ keybinds clear-defaults=true {
     }
     renamepane {
         bind "esc" { UndoRenamePane; SwitchToMode "pane"; }
-    }
-    shared_among "session" "tmux" {
-        bind "d" { Detach; }
-    }
-    tmux {
-        bind "space" { NextSwapLayout; }
-        bind "\"" { NewPane "down"; SwitchToMode "normal"; }
-        bind "%" { NewPane "right"; SwitchToMode "normal"; }
-        bind "," { SwitchToMode "renametab"; }
-        bind "[" { SwitchToMode "scroll"; }
-        bind "Ctrl b" { Write 2; SwitchToMode "normal"; }
-        bind "c" { NewTab; SwitchToMode "normal"; }
-        bind "h" { MoveFocus "left"; SwitchToMode "normal"; }
-        bind "j" { MoveFocus "down"; SwitchToMode "normal"; }
-        bind "k" { MoveFocus "up"; SwitchToMode "normal"; }
-        bind "l" { MoveFocus "right"; SwitchToMode "normal"; }
-        bind "n" { GoToNextTab; SwitchToMode "normal"; }
-        bind "o" { FocusNextPane; }
-        bind "p" { GoToPreviousTab; SwitchToMode "normal"; }
-        bind "z" { ToggleFocusFullscreen; SwitchToMode "normal"; }
     }
 }
 
@@ -390,7 +363,7 @@ copy_on_select true
 // (Requires restart)
 // Default: true (if the host terminal supports it)
 // 
-// support_kitty_keyboard_protocol false
+support_kitty_keyboard_protocol false
  
 // Whether to stack panes when resizing beyond a certain size
 // Default: true

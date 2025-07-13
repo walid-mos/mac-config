@@ -1,4 +1,5 @@
 config-file = globals
+config-file = keys
 config-file = fonts
 config-file = theme
  

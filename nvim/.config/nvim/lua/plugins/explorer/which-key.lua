@@ -1,13 +1,11 @@
 local keys = {
     {'<leader>c', name = '[C]ode'},
     {'<leader>d', name = '[D]ocument' },
-    {'<leader>l', name = '[L]SP' },
     {'<leader>r', name = '[R]ename' },
     {'<leader>s', name = '[S]earch' },
     {'<leader>w', name = '[W]orkspace' },
     {'<leader>m', name = '[M]ulticursor' },
     {'<leader>b', name = '[B]uffers' },
-    -- {'<leader>h', name = '[H]arpoon' },
 } 
 
 local cfg = {

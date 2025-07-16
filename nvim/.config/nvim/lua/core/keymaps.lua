@@ -13,7 +13,7 @@ keymap('n', '<leader>-', ":Telescope file_browser path=%:p:h select_buffer=true<
 -- Buffer
 keymap("n", "<leader>bn", ":bn<CR>", { desc = 'Next buffer' })
 keymap("n", "<leader>bp", ":bp<CR>", { desc = 'Prev buffer' })
-keymap("n", "<leader>c", ":bd<CR>", { desc = 'Close current buffer' })
+keymap("n", "<leader>C", ":bd<CR>", { desc = 'Close current buffer' })
 keymap("n", "<leader><tab>", "<C-^>", { desc = 'Switch to last buffer' })
 
 -- Quickfix
@@ -79,8 +79,8 @@ keymap("n", "*", "*zz", opts)
 keymap("n", "#", "#zz", opts)
 
 -- Easier start and endline
-keymap({ "n", "o", "x" }, "<leader>h", "^", opts)
-keymap({ "n", "o", "x" }, "<leader>l", "g_", opts)
+keymap({ "n", "o", "x" }, "<leader>h", "^", { desc = 'Line start' })
+keymap({ "n", "o", "x" }, "<leader>l", "g_", { desc = 'Line end' })
 
 -- Remove line ending
 keymap({ "n", "i" }, "<S-A-j>", ":join<CR>", opts)
@@ -88,7 +88,7 @@ keymap({ "n", "i" }, "<S-A-j>", ":join<CR>", opts)
 -- tailwind bearable to work with
 keymap({ "n", "x" }, "j", "gj", opts)
 keymap({ "n", "x" }, "k", "gk", opts)
-keymap("n", "<leader>w", ":lua vim.wo.wrap = not vim.wo.wrap<CR>", opts)
+-- keymap("n", "<leader>w", ":lua vim.wo.wrap = not vim.wo.wrap<CR>", opts)
 
 
 -- Yank and paste from multiple files / buffers

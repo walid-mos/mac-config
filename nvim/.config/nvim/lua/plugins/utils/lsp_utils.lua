@@ -27,15 +27,15 @@ local common_capabilities = function ()
 end
 
 local initialize_diagnostics = function()
-	local icons = require("ui.icons")
+    local icons = require("ui.icons")
     local config = {
         signs = {
             active = true,
             values = {
                 { name = "DiagnosticSignError", text = icons.diagnostics.Error },
-				{ name = "DiagnosticSignWarn", text = icons.diagnostics.Warning },
-				{ name = "DiagnosticSignHint", text = icons.diagnostics.Hint },
-				{ name = "DiagnosticSignInfo", text = icons.diagnostics.Information },
+                { name = "DiagnosticSignWarn", text = icons.diagnostics.Warning },
+                { name = "DiagnosticSignHint", text = icons.diagnostics.Hint },
+                { name = "DiagnosticSignInfo", text = icons.diagnostics.Information },
             },
         },
         virtual_text = false,

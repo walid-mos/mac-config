@@ -1,4 +1,15 @@
 -- === Table des serveurs et settings ===
+local mason_servers = {
+    "lua_ls",
+    "cssls",
+    "html",
+    "ts_ls",
+    "pyright",
+    "bashls",
+    "jsonls",
+    "rust_analyzer",
+}
+
 local servers = {
     rust_analyzer = {},
     ts_ls = {
@@ -59,7 +70,7 @@ local mason_handlers = {
             opts.settings.Lua.workspace.library = vim.api.nvim_get_runtime_file("", true)
         end
         if server_name == "eslint" then
-            opts.on_attach = function(_, bufnr)
+            opts.on_attach = function(client, bufnr)
                 vim.api.nvim_create_autocmd("BufWritePre", {
                     buffer = bufnr,
                     command = "EslintFixAll",
@@ -87,19 +98,15 @@ return {
         local mason_lspconfig = require("mason-lspconfig")
 
         mason_lspconfig.setup({
+            ensure_installed = mason_servers,
             handlers = mason_handlers
         })
 
-        lsp_utils.initialize_diagnostics()
+        -- Setup des serveurs déjà installés
+        for _, server in ipairs(mason_lspconfig.get_installed_servers()) do
+            mason_handlers[1](server)
+        end
 
-        -- Force keymaps on LSP attach
-        vim.api.nvim_create_autocmd("LspAttach", {
-            group = vim.api.nvim_create_augroup("UserLspConfig", {}),
-            callback = function(ev)
-                local bufnr = ev.buf
-                local client = vim.lsp.get_client_by_id(ev.data.client_id)
-                lsp_utils.on_attach(client, bufnr)
-            end,
-        })
+        lsp_utils.initialize_diagnostics()
     end,
 }

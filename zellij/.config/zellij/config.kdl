@@ -1,7 +1,6 @@
 keybinds clear-defaults=true {
     normal {
         unbind "Super K"
-        unbind "Shift Enter"
     }
     locked {
         bind "Ctrl g" { SwitchToMode "normal"; }
@@ -54,11 +53,11 @@ keybinds clear-defaults=true {
         bind "s" { ToggleActiveSyncTab; SwitchToMode "normal"; }
         bind "x" { CloseTab; SwitchToMode "normal"; }
     }
-    shared_except "locked" "resize" "session" {
-        bind "Ctrl r" { SwitchToMode "resize"; }
+    shared_except "locked" "resize" {
+        bind "Ctrl n" { SwitchToMode "resize"; }
     }
     resize {
-        bind "Ctrl r" { SwitchToMode "normal"; }
+        bind "Ctrl n" { SwitchToMode "normal"; }
         bind "H" { Resize "Decrease left"; }
         bind "J" { Resize "Decrease down"; }
         bind "K" { Resize "Decrease up"; }
@@ -137,7 +136,6 @@ keybinds clear-defaults=true {
         bind "Alt +" { Resize "Increase"; }
         bind "Alt -" { Resize "Decrease"; }
         bind "Alt =" { Resize "Increase"; }
-        bind "Alt f" { ToggleFloatingPanes; }
         bind "Ctrl q" { Quit; }
     }
     shared_except "normal" "locked" "entersearch" {

@@ -7,6 +7,9 @@ alias cdstow="cd ~/.stow_repository/"
 
 alias c="tput reset"
 
+alias gf="git fetch --prune"
+alias gs="git switch"
+alias gpl="git pull --all"
 alias ga="git add"
 alias gc="git commit"
 alias gr="git rebase"

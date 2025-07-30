@@ -1,21 +1,3 @@
-# CONFIG
-if [[ -n $SSH_CONNECTION ]]; then
-  export EDITOR='vim'
-else
-  export EDITOR='nvim'
-fi
-
-if [ -f ~/.config/zsh/aliases ]; then
-    source ~/.config/zsh/aliases
-fi
-
-
-if [ -f ~/.config/zsh/secret_env ]; then
-    source ~/.config/zsh/secret_env
-fi
-# CONFIG end
-
-
 # ENV 
 export ZSH="$HOME/.config/zsh/.oh-my-zsh"
 export ZSH_COMPDUMP="$HOME/.cache/zsh/.zcompdump-$HOST-$ZSH_VERSION"
@@ -41,6 +23,24 @@ if [ -f ~/.config/starship/starship_theme.sh ]; then
   source ~/.config/starship/starship_theme.sh
 fi
 # SOURCES end
+
+
+# CONFIG
+if [[ -n $SSH_CONNECTION ]]; then
+  export EDITOR='vim'
+else
+  export EDITOR='nvim'
+fi
+
+if [ -f ~/.config/zsh/aliases ]; then
+    source ~/.config/zsh/aliases
+fi
+
+
+if [ -f ~/.config/zsh/secret_env ]; then
+    source ~/.config/zsh/secret_env
+fi
+# CONFIG end
 
 
 # PNPM

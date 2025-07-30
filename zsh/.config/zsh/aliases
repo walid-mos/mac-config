@@ -11,6 +11,9 @@ alias c="tput reset"
 unalias gf 2>/dev/null
 unalias gl 2>/dev/null
 
+# Force override oh-my-zsh gl alias
+alias gl="git log --oneline --graph --decorate --all"
+
 # Git fetch with prune and cleanup of gone branches
 gf() {
     echo "Fetching with prune..."
@@ -28,8 +31,7 @@ gf() {
     fi
 }
 
-# Git log with pretty graph
-alias gl="git log --oneline --graph --decorate --all"
+# (gl already defined above to override oh-my-zsh)
 
 # Other git aliases
 alias gs="git switch"

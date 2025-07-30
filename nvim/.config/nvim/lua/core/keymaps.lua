@@ -103,8 +103,41 @@ keymap('n', '<leader>cf', function()
         return
     end
     
-    -- Move to right pane 
-    vim.fn.system("zellij action move-focus right")
+    -- Find Claude pane in current tab (optimized but working version)
+    local function find_claude_pane()
+        -- Get initial state ONCE
+        local initial_clients = vim.fn.system("zellij action list-clients")
+        local initial_nvim_pane = initial_clients:match("(%S+)%s+nvim")
+        
+        -- Cycle through panes until we find Claude or come back to nvim
+        for i = 1, 20 do  -- Max 20 panes (garde-fou)
+            vim.fn.system("zellij action focus-next-pane")
+            
+            -- Only check if we found Claude by testing list-clients ONCE per pane
+            local clients = vim.fn.system("zellij action list-clients")
+            
+            -- If we found Claude, we're done!
+            if clients:find("claude") then
+                vim.notify("Found Claude in pane " .. i .. "!")
+                return true
+            end
+            
+            -- Quick check: if we're back to nvim pane, we've cycled through all panes
+            local current_nvim_pane = clients:match("(%S+)%s+nvim")
+            if current_nvim_pane == initial_nvim_pane and i > 1 then
+                vim.notify("Cycled back to nvim, Claude not found in tab")
+                return false
+            end
+        end
+        
+        vim.notify("Reached max panes (20), Claude not found")
+        return false
+    end
+    
+    if not find_claude_pane() then
+        -- Fallback: just move right
+        vim.fn.system("zellij action move-focus right")
+    end
     
     -- Send the file path using temp file
     local temp_file = '/tmp/nvim_claude_file'
@@ -127,8 +160,8 @@ keymap('x', '<leader>cs', function()
     vim.cmd('normal! "zy')
     local selected_text = vim.fn.getreg('z')
     
-    -- Exit visual mode
-    vim.cmd('normal! \\<Esc>')
+    -- Exit visual mode properly
+    vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<Esc>', true, false, true), 'n', false)
     
     if selected_text == '' then
         print('No text selected')
@@ -142,8 +175,41 @@ keymap('x', '<leader>cs', function()
         file:write(selected_text)
         file:close()
         
-        -- Move to right pane
-        vim.fn.system('zellij action move-focus right')
+        -- Find Claude pane in current tab (optimized but working version)
+        local function find_claude_pane()
+            -- Get initial state ONCE
+            local initial_clients = vim.fn.system("zellij action list-clients")
+            local initial_nvim_pane = initial_clients:match("(%S+)%s+nvim")
+            
+            -- Cycle through panes until we find Claude or come back to nvim
+            for i = 1, 20 do  -- Max 20 panes (garde-fou)
+                vim.fn.system("zellij action focus-next-pane")
+                
+                -- Only check if we found Claude by testing list-clients ONCE per pane
+                local clients = vim.fn.system("zellij action list-clients")
+                
+                -- If we found Claude, we're done!
+                if clients:find("claude") then
+                    vim.notify("Found Claude in pane " .. i .. "!")
+                    return true
+                end
+                
+                -- Quick check: if we're back to nvim pane, we've cycled through all panes
+                local current_nvim_pane = clients:match("(%S+)%s+nvim")
+                if current_nvim_pane == initial_nvim_pane and i > 1 then
+                    vim.notify("Cycled back to nvim, Claude not found in tab")
+                    return false
+                end
+            end
+            
+            vim.notify("Reached max panes (20), Claude not found")
+            return false
+        end
+        
+        if not find_claude_pane() then
+            -- Fallback: just move right
+            vim.fn.system("zellij action move-focus right")
+        end
         
         -- Send code block
         vim.fn.system('zellij action write-chars "```"')

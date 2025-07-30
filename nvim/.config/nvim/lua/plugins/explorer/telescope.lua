@@ -1,3 +1,47 @@
+-- Telescope state management
+local telescope_state = {
+    last_command = nil,
+    last_opts = nil,
+    last_prompt = "",
+    reopen = false
+}
+
+-- Helper function for telescope navigation with reopen
+local function telescope_nav_with_reopen(direction)
+    return function()
+        local actions = require('telescope.actions')
+        local actions_state = require('telescope.actions.state')
+        local picker = actions_state.get_current_picker(vim.api.nvim_get_current_buf())
+        
+        -- Save state before closing
+        telescope_state.last_prompt = picker:_get_prompt()
+        telescope_state.reopen = true
+        
+        -- Close telescope
+        actions.close(vim.api.nvim_get_current_buf())
+        
+        -- Navigate immediately
+        require('zellij-nav')[direction]()
+        
+        -- Reopen telescope immediately
+        vim.schedule(function()
+            if telescope_state.reopen then
+                telescope_state.reopen = false
+                if telescope_state.last_command then
+                    -- Use our saved command
+                    local opts = vim.tbl_deep_extend('force', telescope_state.last_opts or {}, {
+                        default_text = telescope_state.last_prompt
+                    })
+                    telescope_state.last_command(opts)
+                else
+                    -- Fallback to telescope resume for pickers we didn't wrap
+                    require('telescope.builtin').resume()
+                end
+            end
+        end)
+    end
+end
+
 local cfg = {
     pickers = {
         find_files = { hidden = true },
@@ -17,10 +61,20 @@ local cfg = {
             i = {
                 ['<C-u>'] = false,
                 ['<C-d>'] = false,
+                -- Allow Alt+hjkl to pass through to zellij navigation
+                ['<A-h>'] = telescope_nav_with_reopen('left'),
+                ['<A-j>'] = telescope_nav_with_reopen('down'),
+                ['<A-k>'] = telescope_nav_with_reopen('up'),
+                ['<A-l>'] = telescope_nav_with_reopen('right'),
             },
             n = {
                 ["ss"] = "select_vertical",
-                ["sh"] = "select_horizontal"
+                ["sh"] = "select_horizontal",
+                -- Allow Alt+hjkl to pass through to zellij navigation
+                ['<A-h>'] = telescope_nav_with_reopen('left'),
+                ['<A-j>'] = telescope_nav_with_reopen('down'),
+                ['<A-k>'] = telescope_nav_with_reopen('up'),
+                ['<A-l>'] = telescope_nav_with_reopen('right'),
             }
         },
         theme = "center",
@@ -84,19 +138,53 @@ end
 --     ):find()
 -- end
 
+local function reopen_telescope()
+    if telescope_state.last_command then
+        telescope_state.last_command(telescope_state.last_opts or {})
+    else
+        require('telescope.builtin').resume()
+    end
+end
+
 local function setup_mappings()
     local builtin = require('telescope.builtin')
-    vim.keymap.set('n', '<leader>?', builtin.oldfiles, { desc = '[?] Find recently opened files' })
-    vim.keymap.set('n', '<leader><space>', builtin.buffers, { desc = '[ ] Find existing buffers' })
-    vim.keymap.set('n', '<leader>ss', function()
+    
+    -- Wrapper to store the last command
+    local function telescope_wrapper(func, opts)
+        return function()
+            telescope_state.last_command = function(override_opts)
+                func(override_opts or opts)
+            end
+            telescope_state.last_opts = opts
+            if opts then
+                func(opts)
+            else
+                func()
+            end
+        end
+    end
+    
+    vim.keymap.set('n', '<leader>?', telescope_wrapper(builtin.oldfiles), { desc = '[?] Find recently opened files' })
+    vim.keymap.set('n', '<leader><space>', telescope_wrapper(builtin.buffers), { desc = '[ ] Find existing buffers' })
+    vim.keymap.set('n', '<leader>ss', telescope_wrapper(function()
         builtin.current_buffer_fuzzy_find(require('telescope.themes').get_dropdown { winblend = 10, previewer = false })
-    end, { desc = '[/] Fuzzily search in current buffer' })
-    vim.keymap.set('n', '<leader>sf', builtin.find_files, { desc = '[S]earch [F]iles' })
-    vim.keymap.set('n', '<leader>sg', builtin.live_grep, { desc = '[S]earch by [G]rep' })
-    vim.keymap.set('n', '<leader>sw', builtin.grep_string, { desc = '[S]earch current [W]ord' })
-    vim.keymap.set('n', '<leader>sh', builtin.help_tags, { desc = '[S]earch [H]elp' })
+    end), { desc = '[/] Fuzzily search in current buffer' })
+    vim.keymap.set('n', '<leader>sf', telescope_wrapper(builtin.find_files), { desc = '[S]earch [F]iles' })
+    vim.keymap.set('n', '<leader>sg', telescope_wrapper(builtin.live_grep), { desc = '[S]earch by [G]rep' })
+    vim.keymap.set('n', '<leader>sw', telescope_wrapper(builtin.grep_string), { desc = '[S]earch current [W]ord' })
+    vim.keymap.set('n', '<leader>sh', telescope_wrapper(builtin.help_tags), { desc = '[S]earch [H]elp' })
     vim.keymap.set('n', '<leader>sG', ':LiveGrepGitRoot<cr>', { desc = '[S]earch by [G]rep on Git Root' })
     vim.keymap.set('n', '<leader>sr', builtin.resume, { desc = '[S]earch [R]esume' })
+    vim.keymap.set('n', '<leader>st', reopen_telescope, { desc = '[S]earch [T]elescope reopen' })
+    
+    -- File browser with state tracking
+    vim.keymap.set('n', '<leader>-', telescope_wrapper(function()
+        require('telescope').extensions.file_browser.file_browser({
+            path = vim.fn.expand('%:p:h'),
+            select_buffer = true
+        })
+    end), { desc = 'Open file explorer' })
+    
     -- vim.keymap.set('n', '<leader>hw', function() toggle_telescope(require('harpoon'):list()) end, { desc = 'Open [H]arpoon [W]indow' })
 end
 

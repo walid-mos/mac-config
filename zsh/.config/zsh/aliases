@@ -7,11 +7,35 @@ alias cdstow="cd ~/.stow_repository/"
 
 alias c="tput reset"
 
-alias gf="git fetch --prune"
+# Git aliases - these override oh-my-zsh defaults
+unalias gf 2>/dev/null
+unalias gl 2>/dev/null
+
+# Git fetch with prune and cleanup of gone branches
+gf() {
+    echo "Fetching with prune..."
+    git fetch --prune
+    echo "\nCleaning up branches that are gone on remote..."
+    local gone_branches=$(git branch -vv | grep ": gone]" | awk '{print $1}')
+    if [ -n "$gone_branches" ]; then
+        echo "Found branches to delete:"
+        echo "$gone_branches"
+        echo "$gone_branches" | while read branch; do
+            git branch -D "$branch"
+        done
+    else
+        echo "No branches to clean up"
+    fi
+}
+
+# Git log with pretty graph
+alias gl="git log --oneline --graph --decorate --all"
+
+# Other git aliases
 alias gs="git switch"
+alias gst="git status"
 alias gpl="git pull --all"
 alias ga="git add"
 alias gc="git commit"
 alias gr="git rebase"
-alias gl="git log --oneline --graph"
 alias gp="git push"

@@ -59,3 +59,4 @@ eval "$(starship init zsh)"
 fastfetch
 # MISC end
 eval "$(zellij setup --generate-auto-start zsh)"
+

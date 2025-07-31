@@ -3,32 +3,64 @@ local M = {}
 
 -- Find Claude pane in current tab
 function M.find_claude_pane()
-    -- Get initial state ONCE
-    local initial_clients = vim.fn.system("zellij action list-clients")
-    local initial_nvim_pane = initial_clients:match("(%S+)%s+nvim")
+    vim.notify("DEBUG: Starting pane detection...")
     
-    -- Cycle through panes until we find Claude or come back to nvim
-    for i = 1, 20 do  -- Max 20 panes (garde-fou)
+    -- Get current tab info
+    local tab_names = vim.fn.system("zellij action query-tab-names")
+    vim.notify("DEBUG: Available tabs: " .. tab_names:gsub("\n", " | "))
+    
+    -- Try a different approach: check screen content for Claude
+    local max_panes = 10  -- Reasonable limit
+    local initial_pane_id = nil
+    
+    -- First, get current pane info
+    local current_clients = vim.fn.system("zellij action list-clients")
+    if current_clients and current_clients ~= "" then
+        initial_pane_id = current_clients:match("(%w+_%d+)%s+nvim")
+        vim.notify("DEBUG: Starting from pane: " .. (initial_pane_id or "unknown"))
+    end
+    
+    -- Cycle through panes and check screen content
+    for i = 1, max_panes do
         vim.fn.system("zellij action focus-next-pane")
         
-        -- Only check if we found Claude by testing list-clients ONCE per pane
-        local clients = vim.fn.system("zellij action list-clients")
+        -- Small delay to let pane focus settle
+        vim.fn.system('sleep 0.05')
         
-        -- If we found Claude, we're done!
-        if clients:find("claude") then
-            vim.notify("Found Claude in pane " .. i .. "!")
+        -- Check screen content for Claude indicators
+        vim.fn.system('zellij action dump-screen /tmp/zellij_pane_check.txt')
+        local screen_content = vim.fn.system('cat /tmp/zellij_pane_check.txt 2>/dev/null || echo ""')
+        
+        vim.notify("DEBUG: Pane " .. i .. " screen preview: " .. screen_content:sub(1, 50):gsub("\n", "\\n"))
+        
+        -- Look for Claude Code indicators in screen content
+        if screen_content:find("Claude Code") or screen_content:find("Welcome to Claude") or 
+           screen_content:find("claude>") or screen_content:find("/Users/.*claude") then
+            vim.notify("Found Claude in pane " .. i .. " via screen content!")
+            os.remove('/tmp/zellij_pane_check.txt')
             return true
         end
         
-        -- Quick check: if we're back to nvim pane, we've cycled through all panes
-        local current_nvim_pane = clients:match("(%S+)%s+nvim")
-        if current_nvim_pane == initial_nvim_pane and i > 1 then
-            vim.notify("Cycled back to nvim, Claude not found in tab")
-            return false
+        -- Also check if we can see the running command contains claude
+        local new_clients = vim.fn.system("zellij action list-clients")
+        if new_clients and new_clients ~= "" and new_clients:find("claude") then
+            vim.notify("Found Claude in pane " .. i .. " via client list!")
+            os.remove('/tmp/zellij_pane_check.txt')
+            return true
+        end
+        
+        -- Check if we've cycled back to initial pane
+        if new_clients and new_clients ~= "" then
+            local current_pane_id = new_clients:match("(%w+_%d+)%s+nvim")
+            if current_pane_id == initial_pane_id and i > 1 then
+                vim.notify("DEBUG: Back to initial pane, stopping search")
+                break
+            end
         end
     end
     
-    vim.notify("Reached max panes (20), Claude not found")
+    os.remove('/tmp/zellij_pane_check.txt')
+    vim.notify("Claude not found in current tab after checking " .. max_panes .. " panes")
     return false
 end
 
@@ -153,17 +185,32 @@ end
 
 -- Send selected text to Claude
 function M.send_selection()
+    vim.notify("DEBUG: Starting send_selection()")
+    
     -- Get selected text
     vim.cmd('normal! "zy')
     local selected_text = vim.fn.getreg('z')
     
-    -- Exit visual mode properly
+    vim.notify("DEBUG: Selected text length: " .. #selected_text)
+    
+    -- Exit visual mode properly and ensure we're in normal mode
     vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<Esc>', true, false, true), 'n', false)
+    
+    -- Wait a moment for mode change to complete
+    vim.fn.system('sleep 0.1')
+    
+    -- Ensure we're in normal mode and cursor is stable
+    vim.cmd('stopinsert')
+    local mode = vim.api.nvim_get_mode().mode
+    vim.notify("DEBUG: Current mode after escape: " .. mode)
     
     if selected_text == '' then
         print('No text selected')
         return
     end
+    
+    -- Additional stabilization before calling zellij
+    vim.fn.system('sleep 0.05')
     
     -- Send with code block wrapper
     local wrapper = { open = "```", close = "```" }
@@ -171,6 +218,7 @@ function M.send_selection()
         print('Sent selected text to Claude Code')
     end
     
+    vim.notify("DEBUG: About to call send_to_claude()")
     M.send_to_claude(selected_text, wrapper, callback)
 end
 

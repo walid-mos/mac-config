@@ -198,11 +198,11 @@ Response format:
         local claude_error
         
         # First try with full path and capture errors
-        if claude_response=$(echo "$claude_input" | timeout 30s /Users/walid/Library/pnpm/claude 2>&1); then
+        if claude_response=$(echo "$claude_input" | /Users/walid/Library/pnpm/claude 2>&1); then
             echo "$claude_response"
         else
             # Get the actual error for debugging
-            claude_error=$(echo "$claude_input" | timeout 30s /Users/walid/Library/pnpm/claude 2>&1)
+            claude_error=$(echo "$claude_input" | /Users/walid/Library/pnpm/claude 2>&1)
             echo "⚠️  Claude CLI failed (exit code: $?), using fallback analysis"
             echo "<!-- Debug: Claude error: $claude_error -->" >&2
             

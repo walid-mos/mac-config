@@ -16,7 +16,7 @@ keybinds clear-defaults=true {
         bind "l" { MoveFocus "right"; }
         bind "n" { NewPane; SwitchToMode "normal"; }
         bind "d" { NewPane "down"; SwitchToMode "normal"; }
-        bind "r" { NewPane "right"; SwitchToMode "normal"; }
+        bind "s" { NewPane "right"; SwitchToMode "normal"; }
         bind "e" { TogglePaneEmbedOrFloating; SwitchToMode "normal"; }
         bind "f" { ToggleFocusFullscreen; SwitchToMode "normal"; }
         bind "i" { TogglePanePinned; SwitchToMode "normal"; }

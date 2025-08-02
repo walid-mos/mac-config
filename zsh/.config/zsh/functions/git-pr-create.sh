@@ -144,10 +144,17 @@ gprc() {
         local files=$(git diff $target_branch...$current_branch --name-status)
         
         # Get diff with exclusions and size limit
-        local diff_content=$(git diff $target_branch...$current_branch \
-            ':!*.lock' ':!package-lock.json' ':!yarn.lock' ':!Cargo.lock' \
-            ':!dist/*' ':!build/*' ':!node_modules/*' ':!.next/*' \
-            ':!*.min.js' ':!*.bundle.js')
+        local diff_content=$(git diff $target_branch...$current_branch -- . \
+            ':(exclude)package-lock.json' \
+            ':(exclude)yarn.lock' \
+            ':(exclude)Cargo.lock' \
+            ':(exclude)*.lock' \
+            ':(exclude)dist' \
+            ':(exclude)build' \
+            ':(exclude)node_modules' \
+            ':(exclude).next' \
+            ':(exclude)*.min.js' \
+            ':(exclude)*.bundle.js')
         
         # Check diff size (20000 chars limit)
         local diff_size=${#diff_content}
@@ -188,10 +195,17 @@ Response format:
         
         # Call Claude CLI with timeout and error handling
         local claude_response
-        if claude_response=$(echo "$claude_input" | timeout 30s claude 2>/dev/null); then
+        local claude_error
+        
+        # First try with full path and capture errors
+        if claude_response=$(echo "$claude_input" | timeout 30s /Users/walid/Library/pnpm/claude 2>&1); then
             echo "$claude_response"
         else
-            echo "⚠️  Claude CLI failed, using fallback analysis"
+            # Get the actual error for debugging
+            claude_error=$(echo "$claude_input" | timeout 30s /Users/walid/Library/pnpm/claude 2>&1)
+            echo "⚠️  Claude CLI failed (exit code: $?), using fallback analysis"
+            echo "<!-- Debug: Claude error: $claude_error -->" >&2
+            
             # Fallback to simplified analysis
             echo "## Summary"
             echo "This PR includes changes across $(echo "$files" | wc -l | tr -d ' ') files."

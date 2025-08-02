@@ -29,7 +29,7 @@ local function telescope_nav_with_reopen(direction)
                 telescope_state.reopen = false
                 if telescope_state.last_command then
                     -- Use our saved command
-                    local opts = vim.tbl_deep_extend('force', telescope_state.last_opts or {}, {
+                    local opts = vim.tbl_extend('force', telescope_state.last_opts or {}, {
                         default_text = telescope_state.last_prompt
                     })
                     telescope_state.last_command(opts)
@@ -48,6 +48,23 @@ local cfg = {
         buffers = {
             initial_mode = "normal",
             sort_lastused = true
+        },
+        lsp_type_definitions = {
+            file_ignore_patterns = {
+                -- TypeScript lib files (types génériques du langage)
+                "lib%.es.*%.d%.ts$",           -- lib.es2015.d.ts, lib.dom.d.ts, etc.
+                "lib%.dom.*%.d%.ts$",          -- lib.dom.d.ts
+                "lib%..*%.d%.ts$",             -- Autres lib.*.d.ts génériques
+                
+                -- Types génériques spécifiques (pas tout @types/)
+                "node_modules/@types/node/globals%.d%.ts",  -- Globals Node (trop générique)
+                "/typescript/lib/",            -- Dossier lib TypeScript core
+                
+                -- Noms de fichiers génériques
+                "/Array%.d%.ts$",              -- Définitions Array pures
+                "/Promise%.d%.ts$",            -- Définitions Promise pures
+                "/Object%.d%.ts$",             -- Définitions Object pures
+            }
         }
     },
     defaults = {
@@ -124,19 +141,6 @@ local function live_grep_git_root()
     end
 end
 
--- local function toggle_telescope(harpoon_files)
---     local conf = require("telescope.config").values
---     local file_paths = vim.tbl_map(function(item) return item.value end, harpoon_files.items)
---     require("telescope.pickers").new(
---         { initial_mode = 'normal' },
---         {
---             prompt_title = "Harpoon",
---             finder = require("telescope.finders").new_table({ results = file_paths }),
---             previewer = conf.file_previewer({}),
---             sorter = conf.generic_sorter({}),
---         }
---     ):find()
--- end
 
 local function reopen_telescope()
     if telescope_state.last_command then
@@ -185,10 +189,16 @@ local function setup_mappings()
         })
     end), { desc = 'Open file explorer' })
     
-    -- vim.keymap.set('n', '<leader>hw', function() toggle_telescope(require('harpoon'):list()) end, { desc = 'Open [H]arpoon [W]indow' })
+end
+
+-- Export telescope state for other modules
+local M = {}
+M.get_telescope_state = function()
+    return telescope_state
 end
 
 return {
+    get_telescope_state = M.get_telescope_state,
     {
         'nvim-telescope/telescope.nvim',
         branch = '0.1.x',

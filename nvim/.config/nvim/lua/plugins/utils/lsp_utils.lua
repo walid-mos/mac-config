@@ -4,15 +4,34 @@ local lsp_keymaps = function (bufnr)
         vim.keymap.set("n", keys, func, { buffer = bufnr, desc = desc })
     end
 
+    -- Wrapper to use telescope state management
+    local function telescope_wrapper(func, opts)
+        return function()
+            -- Clear any residual state to avoid "A" appearing
+            local telescope_state = require('plugins.explorer.telescope').get_telescope_state()
+            if telescope_state then
+                telescope_state.last_prompt = ""
+            end
+            
+            -- Call the original function
+            if opts then
+                func(opts)
+            else
+                func()
+            end
+        end
+    end
+
     nmap("<leader>rn", vim.lsp.buf.rename, "[R]e[n]ame")
     nmap("<leader>ca", vim.lsp.buf.code_action, "[C]ode [A]ction")
-    nmap("<leader>cd", require("telescope.builtin").lsp_definitions, "[D]efinition")
-    nmap("<leader>cD", require("telescope.builtin").lsp_type_definitions, "Type [D]efinition")
-    nmap("<leader>cr", require("telescope.builtin").lsp_references, "[R]eferences")
-    nmap("<leader>ci", require("telescope.builtin").lsp_implementations, "[I]mplementation")
-    nmap("<leader>ds", require("telescope.builtin").lsp_document_symbols, "[D]ocument [S]ymbols")
-    nmap("<leader>ws", require("telescope.builtin").lsp_dynamic_workspace_symbols, "[W]orkspace [S]ymbols")
+    nmap("<leader>cd", telescope_wrapper(require("telescope.builtin").lsp_definitions), "[D]efinition")
+    nmap("<leader>cD", telescope_wrapper(require("telescope.builtin").lsp_type_definitions), "Type [D]efinition")
+    nmap("<leader>cr", telescope_wrapper(require("telescope.builtin").lsp_references), "[R]eferences")
+    nmap("<leader>ci", telescope_wrapper(require("telescope.builtin").lsp_implementations), "[I]mplementation")
+    nmap("<leader>ds", telescope_wrapper(require("telescope.builtin").lsp_document_symbols), "[D]ocument [S]ymbols")
+    nmap("<leader>ws", telescope_wrapper(require("telescope.builtin").lsp_dynamic_workspace_symbols), "[W]orkspace [S]ymbols")
     nmap("K", vim.lsp.buf.hover, "Hover Documentation")
+    nmap("<leader>cK", vim.lsp.buf.signature_help, "Signature [H]elp")
 end
 
 local on_attach = function(client, bufnr)
@@ -23,7 +42,7 @@ local on_attach = function(client, bufnr)
 end
 
 local common_capabilities = function ()
-    return vim.lsp.protocol.make_client_capabilities()
+    return require('cmp_nvim_lsp').default_capabilities()
 end
 
 local initialize_diagnostics = function()

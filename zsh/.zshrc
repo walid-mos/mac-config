@@ -36,6 +36,14 @@ if [ -f ~/.config/zsh/aliases ]; then
     source ~/.config/zsh/aliases
 fi
 
+# Load all shell functions
+if [ -d ~/.config/zsh/functions ]; then
+    for f in ~/.config/zsh/functions/*.sh; do
+        if [ -r "$f" ]; then
+            . "$f"
+        fi
+    done
+fi
 
 if [ -f ~/.config/zsh/secret_env ]; then
     source ~/.config/zsh/secret_env

@@ -96,6 +96,72 @@ gprc() {
         return 0
     }
     
+    # Function to check if PR already exists for current branch
+    check_existing_pr() {
+        local current_branch=$1
+        local target_branch=$2
+        
+        # Get existing PRs for current branch
+        local existing_pr=$(gh pr list --head "$current_branch" --base "$target_branch" --json number,url --jq '.[0]')
+        
+        if [ "$existing_pr" != "null" ] && [ -n "$existing_pr" ]; then
+            echo "$existing_pr"
+            return 0
+        else
+            return 1
+        fi
+    }
+    
+    # Function to handle existing PR
+    handle_existing_pr() {
+        local pr_info=$1
+        local pr_number=$(echo "$pr_info" | jq -r '.number')
+        local pr_url=$(echo "$pr_info" | jq -r '.url')
+        
+        echo ""
+        echo "⚠️  A PR already exists for this branch:"
+        echo "   PR #$pr_number: $pr_url"
+        echo ""
+        echo "What would you like to do?"
+        echo "1) View existing PR in browser"
+        echo "2) Update existing PR description with new analysis"
+        echo "3) Cancel operation"
+        echo ""
+        
+        # Use read for simple selection (fallback if fzf not available)
+        if command -v fzf &> /dev/null; then
+            local choice=$(printf "1) View existing PR in browser\n2) Update existing PR description with new analysis\n3) Cancel operation" | fzf \
+                --prompt="Choose action: " \
+                --height=40% \
+                --border \
+                --header="Select what to do with existing PR" \
+                --preview-window=hidden | cut -d')' -f1)
+        else
+            echo -n "Enter your choice (1-3): "
+            read choice
+        fi
+        
+        case "$choice" in
+            1)
+                echo "🌐 Opening PR in browser..."
+                gh pr view "$pr_number" --web
+                return 2  # Special return code for "viewed"
+                ;;
+            2)
+                echo "🔄 Updating existing PR description..."
+                return 1  # Return code for "update"
+                ;;
+            3|"")
+                echo "❌ Operation cancelled"
+                return 0  # Return code for "cancel"
+                ;;
+            *)
+                echo "❌ Invalid choice. Operation cancelled."
+                return 0
+                ;;
+        esac
+    }
+    
     echo "🎯 Current branch: $CURRENT_BRANCH"
     echo ""
     
@@ -156,13 +222,27 @@ gprc() {
             ':(exclude)*.min.js' \
             ':(exclude)*.bundle.js')
         
-        # Check diff size (20000 chars limit)
+        # Check diff size using smarter calculation
         local diff_size=${#diff_content}
         local use_full_diff=true
         
-        if [ $diff_size -gt 20000 ]; then
+        # Get actual lines changed for better size estimation
+        local numstat=$(git diff $target_branch...$current_branch --numstat)
+        local total_lines_changed=0
+        local files_changed=0
+        
+        while IFS=$'\t' read -r added removed filename; do
+            if [ -n "$added" ] && [ -n "$removed" ] && [ "$added" != "-" ] && [ "$removed" != "-" ]; then
+                total_lines_changed=$((total_lines_changed + added + removed))
+                files_changed=$((files_changed + 1))
+            fi
+        done <<< "$numstat"
+        
+        # Use a combined approach: prioritize line count but also check char count
+        # Large diff criteria: >5000 lines changed OR >100000 chars OR >50 files
+        if [ $total_lines_changed -gt 5000 ] || [ $diff_size -gt 100000 ] || [ $files_changed -gt 50 ]; then
             use_full_diff=false
-            echo "⚠️  Large diff detected ($diff_size chars), using summary mode"
+            echo "⚠️  Large diff detected ($total_lines_changed lines changed, $files_changed files, $diff_size chars), using summary mode"
         fi
         
         # Prepare Claude prompt
@@ -221,28 +301,78 @@ Response format:
         fi
     }
     
-    # Generate changes analysis
-    CHANGES_ANALYSIS=$(generate_ai_analysis $TARGET_BRANCH $CURRENT_BRANCH)
+    # Check if PR already exists
+    echo ""
+    echo "🔍 Checking for existing PRs..."
     
-    # Create PR body
-    PR_BODY=$(cat <<EOF
+    if existing_pr_info=$(check_existing_pr "$CURRENT_BRANCH" "$TARGET_BRANCH"); then
+        # PR exists, handle it
+        handle_existing_pr "$existing_pr_info"
+        case $? in
+            0)  # Cancel
+                return 0
+                ;;
+            1)  # Update existing PR
+                echo ""
+                echo "🔄 Generating updated analysis..."
+                CHANGES_ANALYSIS=$(generate_ai_analysis $TARGET_BRANCH $CURRENT_BRANCH)
+                
+                # Create updated PR body
+                PR_BODY=$(cat <<EOF
 $CHANGES_ANALYSIS
 
 ---
 🤖 Generated with gprc made by Walid + Claude
 EOF
 )
-    
-    echo ""
-    echo "📝 Creating PR: $PR_TITLE"
-    echo ""
-    
-    # Create the PR
-    gh pr create \
-        --title "$PR_TITLE" \
-        --body "$PR_BODY" \
-        --base "$TARGET_BRANCH" \
-        --head "$CURRENT_BRANCH"
+                
+                # Update the existing PR
+                pr_number=$(echo "$existing_pr_info" | jq -r '.number')
+                echo ""
+                echo "📝 Updating PR #$pr_number: $PR_TITLE"
+                
+                if gh pr edit "$pr_number" --body "$PR_BODY"; then
+                    echo ""
+                    echo "✅ PR updated successfully!"
+                    gh pr view "$pr_number" --web
+                else
+                    echo ""
+                    echo "❌ Failed to update PR"
+                    return 1
+                fi
+                return 0
+                ;;
+            2)  # Viewed in browser
+                return 0
+                ;;
+        esac
+    else
+        # No existing PR, proceed with creation
+        echo "✅ No existing PR found, proceeding with creation..."
+        
+        # Generate changes analysis
+        CHANGES_ANALYSIS=$(generate_ai_analysis $TARGET_BRANCH $CURRENT_BRANCH)
+        
+        # Create PR body
+        PR_BODY=$(cat <<EOF
+$CHANGES_ANALYSIS
+
+---
+🤖 Generated with gprc made by Walid + Claude
+EOF
+)
+        
+        echo ""
+        echo "📝 Creating PR: $PR_TITLE"
+        echo ""
+        
+        # Create the PR
+        gh pr create \
+            --title "$PR_TITLE" \
+            --body "$PR_BODY" \
+            --base "$TARGET_BRANCH" \
+            --head "$CURRENT_BRANCH"
+    fi
     
     if [ $? -eq 0 ]; then
         echo ""

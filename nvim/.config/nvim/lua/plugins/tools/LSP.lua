@@ -8,6 +8,7 @@ local mason_servers = {
     "bashls",
     "jsonls",
     "rust_analyzer",
+    "eslint",
 }
 
 local servers = {

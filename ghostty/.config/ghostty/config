@@ -3,3 +3,4 @@ config-file = keys
 config-file = fonts
 config-file = theme
  
+keybind = shift+enter=text:\n

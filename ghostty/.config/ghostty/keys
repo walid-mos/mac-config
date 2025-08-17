@@ -1,3 +1,7 @@
 keybind = opt+enter=text:\n
 keybind = shift+enter=text:\n
 keybind = cmd+left=text:\x01
+
+# Navigation entre tabs Ghostty - Alt+[ et Alt+]
+keybind = alt+left_bracket=previous_tab
+keybind = alt+right_bracket=next_tab

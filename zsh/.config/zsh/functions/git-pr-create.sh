@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Git PR Create with automatic description
+# Git PR Create with automatic title and description generation
 
 gprc() {
     # Check if we're in a git repository
@@ -162,6 +162,38 @@ gprc() {
         esac
     }
     
+    # Function to generate AI title using Claude CLI
+    generate_ai_title() {
+        local target_branch=$1
+        local current_branch=$2
+        
+        # Collect commits for title generation
+        local commits=$(git log $target_branch..$current_branch --oneline --no-merges)
+        local files=$(git diff $target_branch...$current_branch --name-only | head -10)
+        
+        # Prepare Claude prompt for title generation
+        local claude_input="Generate a concise English PR title (max 70 characters) that summarizes all these commits:
+
+=== COMMITS ===
+$commits
+
+=== FILES AFFECTED (sample) ===
+$files
+
+Generate only the title, nothing else. Make it descriptive and natural (not conventional commits style)."
+        
+        # Call Claude CLI with error handling
+        local claude_response
+        
+        if claude_response=$(echo "$claude_input" | /Users/walid/Library/pnpm/claude 2>&1); then
+            # Clean the response (remove any extra whitespace/newlines)
+            echo "$claude_response" | tr -d '\n' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//'
+        else
+            # Fallback to first commit message if Claude fails
+            echo "$(git log -1 --pretty=%B | head -n1)"
+        fi
+    }
+    
     echo "🎯 Current branch: $CURRENT_BRANCH"
     echo ""
     
@@ -192,12 +224,10 @@ gprc() {
         return 1
     fi
     
-    # Get PR title from argument or last commit message
-    if [ -n "$1" ]; then
-        PR_TITLE="$1"
-    else
-        PR_TITLE=$(git log -1 --pretty=%B | head -n1)
-    fi
+    # Generate PR title using AI analysis of all commits
+    echo ""
+    echo "🤖 Generating PR title from commits..."
+    PR_TITLE=$(generate_ai_title $TARGET_BRANCH $CURRENT_BRANCH)
     
     # Function to generate AI analysis using Claude CLI
     generate_ai_analysis() {

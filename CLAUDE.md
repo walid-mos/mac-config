@@ -5,6 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Repository Overview
 
 This is a personal dotfiles repository managed with GNU Stow. It contains configuration files for:
+- **Claude** - Claude Code CLI configuration with permissions and settings
 - **Neovim** - Modern Lua-based configuration with LSP support
 - **Zsh** - Shell with Oh My Zsh and custom aliases/functions
 - **Ghostty** - Terminal emulator
@@ -18,6 +19,7 @@ This is a personal dotfiles repository managed with GNU Stow. It contains config
 cd ~/.stow_repository && stow */
 
 # Install specific package
+stow claude  # Install Claude Code config
 stow nvim    # Install Neovim config
 stow zsh     # Install Zsh config
 stow ghostty # Install Ghostty config
@@ -50,20 +52,25 @@ The repository follows GNU Stow conventions:
 
 ### Key Components
 
-1. **Neovim Configuration** (`nvim/.config/nvim/`)
+1. **Claude Configuration** (`claude/.claude/`)
+   - `settings.json` - Main configuration with permissions and model settings
+   - `settings.local.json` - Local overrides for additional permissions
+   - Managed via symlinks to enable version control of Claude CLI settings
+
+2. **Neovim Configuration** (`nvim/.config/nvim/`)
    - Uses lazy.nvim plugin manager
    - Modular Lua configuration under `lua/core/` and `lua/plugins/`
    - LSP servers: lua_ls, ts_ls, eslint, pyright, rust_analyzer, html, cssls, bashls, jsonls
    - Leader key: `<space>`
    - Claude Code integration: `<leader>cf` (send file), `<leader>cs` (send selection)
 
-2. **Zsh Configuration** (`zsh/`)
+3. **Zsh Configuration** (`zsh/`)
    - Main config: `.zshrc`
    - Custom aliases: `.config/zsh/aliases`
    - Custom functions: `.config/zsh/functions/`
    - Git aliases override Oh My Zsh defaults
 
-3. **Terminal Configurations**
+4. **Terminal Configurations**
    - Ghostty: Configured with custom keys, fonts, theme files
    - Zellij: KDL-based configuration with layouts
 

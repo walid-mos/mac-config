@@ -23,11 +23,11 @@ keymap("n", "]l", ":lnext<CR>", opts)
 keymap("n", "[l", ":lprev<CR>", opts)
 
 -- Normal
--- Better window navigation
-keymap("n", "<A-h>", "<C-w>h", opts)
-keymap("n", "<A-j>", "<C-w>j", opts)
-keymap("n", "<A-k>", "<C-w>k", opts)
-keymap("n", "<A-l>", "<C-w>l", opts)
+-- Better window navigation (remplacé par vim-tmux-navigator)
+-- keymap("n", "<A-h>", "<C-w>h", opts)
+-- keymap("n", "<A-j>", "<C-w>j", opts)
+-- keymap("n", "<A-k>", "<C-w>k", opts)
+-- keymap("n", "<A-l>", "<C-w>l", opts)
 keymap("n", "ss", ":vsplit<CR>", opts)
 keymap("n", "sv", ":split<CR>", opts)
 

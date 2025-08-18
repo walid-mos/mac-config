@@ -2,6 +2,23 @@
 # Git PR Create with automatic title and description generation
 
 gprc() {
+    # Parse arguments
+    local update_only=false
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -u|--update-description)
+                update_only=true
+                shift
+                ;;
+            *)
+                echo "❌ Unknown option: $1"
+                echo "Usage: gprc [-u|--update-description]"
+                echo "  -u, --update-description    Update description of existing PR only"
+                return 1
+                ;;
+        esac
+    done
+    
     # Check if we're in a git repository
     if ! git rev-parse --git-dir > /dev/null 2>&1; then
         echo "❌ Not in a git repository"
@@ -172,15 +189,29 @@ gprc() {
         local files=$(git diff $target_branch...$current_branch --name-only | head -10)
         
         # Prepare Claude prompt for title generation
-        local claude_input="Generate a concise English PR title (max 70 characters) that summarizes all these commits:
+        local claude_input="Generate a descriptive English PR title (max 70 characters) that clearly explains what this PR accomplishes from a user/business perspective.
+
+Style guidelines:
+- Use natural English sentences, not commitlint format (no \"feat:\", \"fix:\", etc.)
+- Focus on WHAT the change does, not HOW it's implemented
+- Make it readable for non-technical stakeholders
+- Examples of good titles:
+  * \"Add email notification system for user registration\"
+  * \"Improve dashboard loading performance\"
+  * \"Fix authentication issues on mobile devices\"
+
+Avoid:
+- Commitlint prefixes (feat:, fix:, chore:, etc.)
+- Technical jargon when possible
+- Vague descriptions like \"update code\" or \"refactor\"
 
 === COMMITS ===
 $commits
 
-=== FILES AFFECTED (sample) ===
+=== FILES AFFECTED ===
 $files
 
-Generate only the title, nothing else. Make it descriptive and natural (not conventional commits style)."
+Generate only the title, nothing else."
         
         # Call Claude CLI with error handling
         local claude_response
@@ -193,41 +224,6 @@ Generate only the title, nothing else. Make it descriptive and natural (not conv
             echo "$(git log -1 --pretty=%B | head -n1)"
         fi
     }
-    
-    echo "🎯 Current branch: $CURRENT_BRANCH"
-    echo ""
-    
-    # Select target branch interactively
-    TARGET_BRANCH=$(select_target_branch)
-    if [ $? -ne 0 ] || [ -z "$TARGET_BRANCH" ]; then
-        return 1
-    fi
-    
-    echo ""
-    echo "🎯 Target branch: $TARGET_BRANCH"
-    
-    # Check if current branch exists on remote and pull latest changes
-    if git show-ref --verify --quiet refs/remotes/origin/$CURRENT_BRANCH; then
-        echo ""
-        echo "🔄 Pulling latest changes with rebase..."
-        if ! git pull --rebase origin $CURRENT_BRANCH; then
-            echo ""
-            echo "❌ Rebase failed. Please resolve conflicts and try again."
-            echo "💡 After resolving conflicts, run: git rebase --continue"
-            return 1
-        fi
-        echo "✅ Branch up to date"
-    else
-        echo ""
-        echo "⚠️  Current branch '$CURRENT_BRANCH' does not exist on remote"
-        echo "💡 Push it first with: git push -u origin $CURRENT_BRANCH"
-        return 1
-    fi
-    
-    # Generate PR title using AI analysis of all commits
-    echo ""
-    echo "🤖 Generating PR title from commits..."
-    PR_TITLE=$(generate_ai_title $TARGET_BRANCH $CURRENT_BRANCH)
     
     # Function to generate AI analysis using Claude CLI
     generate_ai_analysis() {
@@ -330,6 +326,100 @@ Response format:
             echo "$files" | sed 's/^/- /'
         fi
     }
+    
+    echo "🎯 Current branch: $CURRENT_BRANCH"
+    echo ""
+    
+    # If update_only mode, find existing PR automatically and handle it completely
+    if [ "$update_only" = true ]; then
+        echo "🔍 Looking for existing PR on current branch..."
+        
+        # Try to find PR with any base branch
+        local existing_pr_info=$(gh pr list --head "$CURRENT_BRANCH" --json number,url,baseRefName --jq '.[0]')
+        
+        if [ "$existing_pr_info" = "null" ] || [ -z "$existing_pr_info" ]; then
+            echo "❌ No existing PR found for branch '$CURRENT_BRANCH'"
+            echo "💡 Create a PR first or run 'gprc' without the -u flag"
+            return 1
+        fi
+        
+        # Extract PR info
+        local pr_number=$(echo "$existing_pr_info" | jq -r '.number')
+        local pr_url=$(echo "$existing_pr_info" | jq -r '.url')
+        TARGET_BRANCH=$(echo "$existing_pr_info" | jq -r '.baseRefName')
+        
+        echo "✅ Found PR #$pr_number: $pr_url"
+        echo "🎯 Target branch: $TARGET_BRANCH"
+        
+        # Ask for confirmation
+        echo ""
+        echo "❓ Update the description of PR #$pr_number? (y/N)"
+        read -r confirm
+        
+        if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+            echo "❌ Operation cancelled"
+            return 0
+        fi
+        
+        echo ""
+        echo "🔄 Generating updated analysis..."
+        CHANGES_ANALYSIS=$(generate_ai_analysis $TARGET_BRANCH $CURRENT_BRANCH)
+        
+        # Create updated PR body
+        PR_BODY=$(cat <<EOF
+$CHANGES_ANALYSIS
+
+---
+🤖 Generated with gprc made by Walid + Claude
+EOF
+)
+        
+        echo ""
+        echo "📝 Updating PR #$pr_number description..."
+        
+        if gh pr edit "$pr_number" --body "$PR_BODY"; then
+            echo ""
+            echo "✅ PR description updated successfully!"
+            gh pr view "$pr_number" --web
+        else
+            echo ""
+            echo "❌ Failed to update PR description"
+            return 1
+        fi
+        return 0
+    fi
+    
+    # Normal flow: Select target branch interactively
+    TARGET_BRANCH=$(select_target_branch)
+    if [ $? -ne 0 ] || [ -z "$TARGET_BRANCH" ]; then
+        return 1
+    fi
+    
+    echo ""
+    echo "🎯 Target branch: $TARGET_BRANCH"
+    
+    # Check if current branch exists on remote and pull latest changes (skip in update mode)
+    if git show-ref --verify --quiet refs/remotes/origin/$CURRENT_BRANCH; then
+        echo ""
+        echo "🔄 Pulling latest changes with rebase..."
+        if ! git pull --rebase origin $CURRENT_BRANCH; then
+            echo ""
+            echo "❌ Rebase failed. Please resolve conflicts and try again."
+            echo "💡 After resolving conflicts, run: git rebase --continue"
+            return 1
+        fi
+        echo "✅ Branch up to date"
+    else
+        echo ""
+        echo "⚠️  Current branch '$CURRENT_BRANCH' does not exist on remote"
+        echo "💡 Push it first with: git push -u origin $CURRENT_BRANCH"
+        return 1
+    fi
+    
+    # Generate PR title using AI analysis of all commits
+    echo ""
+    echo "🤖 Generating PR title from commits..."
+    PR_TITLE=$(generate_ai_title $TARGET_BRANCH $CURRENT_BRANCH)
     
     # Check if PR already exists
     echo ""

@@ -6,41 +6,6 @@ local telescope_state = {
     reopen = false
 }
 
--- Helper function for telescope navigation with reopen
-local function telescope_nav_with_reopen(direction)
-    return function()
-        local actions = require('telescope.actions')
-        local actions_state = require('telescope.actions.state')
-        local picker = actions_state.get_current_picker(vim.api.nvim_get_current_buf())
-        
-        -- Save state before closing
-        telescope_state.last_prompt = picker:_get_prompt()
-        telescope_state.reopen = true
-        
-        -- Close telescope
-        actions.close(vim.api.nvim_get_current_buf())
-        
-        -- Navigate immediately
-        require('zellij-nav')[direction]()
-        
-        -- Reopen telescope immediately
-        vim.schedule(function()
-            if telescope_state.reopen then
-                telescope_state.reopen = false
-                if telescope_state.last_command then
-                    -- Use our saved command
-                    local opts = vim.tbl_extend('force', telescope_state.last_opts or {}, {
-                        default_text = telescope_state.last_prompt
-                    })
-                    telescope_state.last_command(opts)
-                else
-                    -- Fallback to telescope resume for pickers we didn't wrap
-                    require('telescope.builtin').resume()
-                end
-            end
-        end)
-    end
-end
 
 local cfg = {
     pickers = {
@@ -78,20 +43,10 @@ local cfg = {
             i = {
                 ['<C-u>'] = false,
                 ['<C-d>'] = false,
-                -- Allow Alt+hjkl to pass through to zellij navigation
-                ['<A-h>'] = telescope_nav_with_reopen('left'),
-                ['<A-j>'] = telescope_nav_with_reopen('down'),
-                ['<A-k>'] = telescope_nav_with_reopen('up'),
-                ['<A-l>'] = telescope_nav_with_reopen('right'),
             },
             n = {
                 ["ss"] = "select_vertical",
                 ["sh"] = "select_horizontal",
-                -- Allow Alt+hjkl to pass through to zellij navigation
-                ['<A-h>'] = telescope_nav_with_reopen('left'),
-                ['<A-j>'] = telescope_nav_with_reopen('down'),
-                ['<A-k>'] = telescope_nav_with_reopen('up'),
-                ['<A-l>'] = telescope_nav_with_reopen('right'),
             }
         },
         theme = "center",

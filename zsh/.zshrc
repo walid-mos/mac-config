@@ -45,8 +45,8 @@ if [ -d ~/.config/zsh/functions ]; then
     done
 fi
 
-if [ -f ~/.config/zsh/secret_env ]; then
-    source ~/.config/zsh/secret_env
+if [ -f ~/.config/zsh/secrets ]; then
+    source ~/.config/zsh/secrets
 fi
 # CONFIG end
 

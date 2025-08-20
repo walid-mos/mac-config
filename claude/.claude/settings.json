@@ -1,0 +1,50 @@
+{
+  "permissions": {
+    "allow": [
+      // Outils de lecture
+      "Bash(find *)",
+      "Bash(grep *)",
+      "Bash(rg *)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(pwd *)",
+      "Bash(which *)",
+      "Bash(wc *)",
+      "Bash(sort *)",
+      "Bash(uniq *)",
+      "Bash(less *)",
+      "Bash(more *)",
+      
+      // Git non-destructif
+      "Bash(git status *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git branch *)",
+      "Bash(git checkout *)",
+      "Bash(git stash *)",
+      "Bash(git blame *)",
+      "Bash(git tag *)",
+      
+      // Tous les outils pnpm
+      "Bash(pnpm *)",
+      
+      // Context7 MCP tools
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__get-library-docs"
+    ],
+    "deny": [
+      // Git destructif/dangereux
+      "Bash(git push *)",
+      "Bash(git rebase *)",
+      "Bash(git reset --hard *)",
+      "Bash(git force-push *)",
+      "Bash(git push --force *)",
+      "Bash(git push -f *)"
+    ]
+  }
+}

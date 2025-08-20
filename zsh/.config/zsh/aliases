@@ -1,7 +1,7 @@
 alias v="nvim"
 alias szsh="source ~/.zshrc"
 
-alias cdev="cd ~/Documents/Development"
+alias cdev="cd ~/Development"
 alias cdconfig="cd ~/.config/"
 alias cdstow="cd ~/.stow_repository/"
 

@@ -34,6 +34,7 @@ After each phase of a feature is developed, you must:
 - Add comments sparingly, only for complex features requiring explanation
 - Comments should be concise and comprehensible
 - **Comments MUST be in English only** - never use other languages
+- **NEVER add comments in JSON files** - JSON does not support comments and they will make the file invalid
 
 ## Documentation and Development
 

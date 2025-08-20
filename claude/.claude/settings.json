@@ -1,4 +1,8 @@
 {
+  "statusLine": {
+    "type": "command",
+    "command": "input=$(cat); echo \"$(echo \"$input\" | jq -r '.model.display_name') | $(echo \"$input\" | jq -r '.workspace.project_dir' | sed 's|.*/||') → $(echo \"$input\" | jq -r '.workspace.current_dir' | sed 's|.*/||')\""
+  },
   "permissions": {
     "allow": [
       // Outils de lecture
@@ -29,6 +33,8 @@
       "Bash(git stash *)",
       "Bash(git blame *)",
       "Bash(git tag *)",
+      "Bash(git fetch *)",
+      "Bash(git pull *)",
       
       // Tous les outils pnpm
       "Bash(pnpm *)",

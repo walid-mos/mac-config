@@ -45,6 +45,11 @@ if [ -d ~/.config/zsh/functions ]; then
     done
 fi
 
+# Tmux config auto-load
+if [ -n "$TMUX" ] && [ -f ~/.config/tmux/tmux.conf ]; then
+    tmux source-file ~/.config/tmux/tmux.conf > /dev/null 2>&1
+fi
+
 if [ -f ~/.config/zsh/secrets ]; then
     source ~/.config/zsh/secrets
 fi

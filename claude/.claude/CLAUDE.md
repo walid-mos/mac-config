@@ -27,6 +27,8 @@ After each phase of a feature is developed, you must:
 - **Always prioritize strong typing over unknown** - use unknown as last resort only
 - **Avoid `as` casting** - use as casting as last resort, always try to avoid `as` (`as const` is acceptable)
 - **Always prioritize reusability** - strong typed hardcoded values are only for specific use cases 
+- **TypeScript imports**: When importing in TypeScript, if there are more than `../` in the path, use TypeScript paths with `@/` prefix instead
+- **Vitest testing**: When using Vitest, leverage its powerful mocking capabilities. Prefer Vitest built-in mocks (vi.spyOn, vi.mock, etc.) over custom mock implementations. Use Vitest assertions like toHaveBeenNthCalledWith instead of manual mock.calls checks. Only create test utilities if the same test pattern is repeated extensively - otherwise use Vitest defaults directly
 
 ## Global instructions
 

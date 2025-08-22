@@ -1,0 +1,49 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find *)",
+      "Bash(grep *)",
+      "Bash(rg *)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(pwd *)",
+      "Bash(which *)",
+      "Bash(wc *)",
+      "Bash(sort *)",
+      "Bash(uniq *)",
+      "Bash(less *)",
+      "Bash(more *)",
+      "Bash(git status *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git branch *)",
+      "Bash(git checkout *)",
+      "Bash(git stash *)",
+      "Bash(git blame *)",
+      "Bash(git tag *)",
+      "Bash(git fetch *)",
+      "Bash(git pull *)",
+      "Bash(pnpm *)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__get-library-docs"
+    ],
+    "deny": [
+      "Bash(git push *)",
+      "Bash(git rebase *)",
+      "Bash(git reset --hard *)",
+      "Bash(git force-push *)",
+      "Bash(git push --force *)",
+      "Bash(git push -f *)"
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "input=$(cat); echo \"$(echo \"$input\" | jq -r '.model.display_name') | $(echo \"$input\" | jq -r '.workspace.project_dir' | sed 's|.*/||') → $(echo \"$input\" | jq -r '.workspace.current_dir' | sed 's|.*/||')\""
+  },
+  "model": "sonnet"
+}

@@ -6,16 +6,15 @@ After each phase of a feature is developed, you must:
 3. Test (`pnpm test` or package-specific test command)
 4. Run security review with @agent-security-commit-guardian
 5. Run code refactoring with @agent-code-refactor-specialist
-6. Update README.md documentation if necessary:
-   - Add new features to feature list
-   - Update installation/setup instructions if changed
-   - Document new environment variables or configuration
-   - Update API documentation for new endpoints
-   - Add new commands or scripts to usage section
+6. Check and update project documentation if necessary:
+   - Search for README.md and CLAUDE.md files in the project
+   - For README.md: Add new features to feature list, update installation/setup instructions if changed, document new environment variables or configuration, update API documentation for new endpoints, add new commands or scripts to usage section
+   - For CLAUDE.md: Update project-specific instructions to reflect changes in workflow, add new conventions or patterns used, document any new tools or dependencies
 7. Commit changes with descriptive message   
 
 ## Important note
 - You should always use pnpm, never npm or yarn, pnpm is the main package manager.
+- **NEVER bypass pre-commit hooks, linting, or type checking**: All checks must pass before committing. Fix all issues identified by pre-commit hooks, lint-staged, or any other validation tools. Bypassing these checks with flags like `--no-verify` is strictly forbidden.
 
 ### JavaScript/TypeScript specific rules:
 - **ALWAYS use `import`** - NEVER use `require()`
@@ -29,6 +28,10 @@ After each phase of a feature is developed, you must:
 - **Always prioritize reusability** - strong typed hardcoded values are only for specific use cases 
 - **TypeScript imports**: When importing in TypeScript, if there are more than `../` in the path, use TypeScript paths with `@/` prefix instead
 - **Vitest testing**: When using Vitest, leverage its powerful mocking capabilities. Prefer Vitest built-in mocks (vi.spyOn, vi.mock, etc.) over custom mock implementations. Use Vitest assertions like toHaveBeenNthCalledWith instead of manual mock.calls checks. Only create test utilities if the same test pattern is repeated extensively - otherwise use Vitest defaults directly
+- **Control flow priority**: Use early returns to minimize indentation and simplify functions. Prefer simple `if` statements over complex nested conditions. Use `switch` statements only as a last resort when multiple conditions need to be evaluated
+- **Code structure**: Avoid excessive nesting and indentation. Keep functions flat and readable through early returns and guard clauses
+- **Unused variables**: Always remove unused variables that generate warnings rather than using workarounds to keep them
+- **Deprecation policy**: Only deprecate APIs used by external applications. For internal code, remove unused code instead of deprecating
 
 ## Global instructions
 

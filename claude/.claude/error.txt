@@ -1,0 +1,108 @@
+
+ Checking installation status…
+[?2004h[2K[1A[2K[1A[2K[G
+ Diagnostics
+ └ Currently running: unknown (1.0.98)
+ └ Path: /Users/walid/Library/pnpm/nodejs/24.2.0/bin/node
+ └ Invoked: /Users/walid/Library/pnpm/global/5/.pnpm/@anthropic-ai+claude-code@
+ 1.0.98/node_modules/@anthropic-ai/claude-code/cli.js
+ └ Config install method: unknown
+ └ Auto-updates enabled: true
+ └ Search: OK (vendor)
+
+ Invalid Settings
+ /Users/walid/.claude/settings.json
+  └ permissions
+    ├ allow
+    │ ├ "Bash(find *)": Use ":*" for prefix matching, not just "*". Change to
+  "Bash(find :*)" for prefix matching. Examples: Bash(npm run:*), Bash(git:*)
+    │ ├ "Bash(grep *)": Use ":*" for prefix matching, not just "*". Change to
+  "Bash(grep :*)" for prefix matching. Examples: Bash(npm run:*), Bash(git:*)
+    │ ├ "Bash(sort *)": Use ":*" for prefix matching, not just "*". Change to
+  "Bash(sort :*)" for prefix matching. Examples: Bash(npm run:*), Bash(git:*)
+    │ ├ "Bash(uniq *)": Use ":*" for prefix matching, not just "*". Change to
+  "Bash(uniq :*)" for prefix matching. Examples: Bash(npm run:*), Bash(git:*)
+    │ ├ "Bash(less *)": Use ":*" for prefix matching, not just "*". Change to
+  "Bash(less :*)" for prefix matching. Examples: Bash(npm run:*), Bash(git:*)
+    │ ├ "Bash(more *)": Use ":*" for prefix matching, not just "*". Change to
+  "Bash(more :*)" for prefix matching. Examples: Bash(npm run:*), Bash(git:*)
+    │ ├ "Bash(git status *)": Use ":*" for prefix matching, not just "*".
+  Change to "Bash(git status :*)" for prefix matching. Examples: Bash(npm
+  run:*), Bash(git:*)
+    │ ├ "Bash(git add *)": Use ":*" for prefix matching, not just "*". Change
+  to "Bash(git add :*)" for prefix matching. Examples: Bash(npm run:*),
+  Bash(git:*)
+    │ ├ "Bash(git commit *)": Use ":*" for prefix matching, not just "*".
+  Change to "Bash(git commit :*)" for prefix matching. Examples: Bash(npm
+  run:*), Bash(git:*)
+    │ ├ "Bash(git diff *)": Use ":*" for prefix matching, not just "*". Change
+  to "Bash(git diff :*)" for prefix matching. Examples: Bash(npm run:*),
+  Bash(git:*)
+    │ ├ "Bash(git log *)": Use ":*" for prefix matching, not just "*". Change
+  to "Bash(git log :*)" for prefix matching. Examples: Bash(npm run:*),
+  Bash(git:*)
+    │ ├ "Bash(git show *)": Use ":*" for prefix matching, not just "*". Change
+  to "Bash(git show :*)" for prefix matching. Examples: Bash(npm run:*),
+  Bash(git:*)
+    │ ├ "Bash(rg *)": Use ":*" for prefix matching, not just "*". Change to
+  "Bash(rg :*)" for prefix matching. Examples: Bash(npm run:*), Bash(git:*)
+    │ ├ "Bash(git branch *)": Use ":*" for prefix matching, not just "*".
+  Change to "Bash(git branch :*)" for prefix matching. Examples: Bash(npm
+  run:*), Bash(git:*)
+    │ ├ "Bash(git checkout *)": Use ":*" for prefix matching, not just "*".
+  Change to "Bash(git checkout :*)" for prefix matching. Examples: Bash(npm
+  run:*), Bash(git:*)
+    │ ├ "Bash(git stash *)": Use ":*" for prefix matching, not just "*". Change
+   to "Bash(git stash :*)" for prefix matching. Examples: Bash(npm run:*),
+  Bash(git:*)
+    │ ├ "Bash(git blame *)": Use ":*" for prefix matching, not just "*". Change
+   to "Bash(git blame :*)" for prefix matching. Examples: Bash(npm run:*),
+  Bash(git:*)
+    │ ├ "Bash(git tag *)": Use ":*" for prefix matching, not just "*". Change
+  to "Bash(git tag :*)" for prefix matching. Examples: Bash(npm run:*),
+  Bash(git:*)
+    │ ├ "Bash(git fetch *)": Use ":*" for prefix matching, not just "*". Change
+   to "Bash(git fetch :*)" for prefix matching. Examples: Bash(npm run:*),
+  Bash(git:*)
+    │ ├ "Bash(git pull *)": Use ":*" for prefix matching, not just "*". Change
+  to "Bash(git pull :*)" for prefix matching. Examples: Bash(npm run:*),
+  Bash(git:*)
+    │ ├ "Bash(pnpm *)": Use ":*" for prefix matching, not just "*". Change to
+  "Bash(pnpm :*)" for prefix matching. Examples: Bash(npm run:*), Bash(git:*)
+    │ ├ "Bash(ls *)": Use ":*" for prefix matching, not just "*". Change to
+  "Bash(ls :*)" for prefix matching. Examples: Bash(npm run:*), Bash(git:*)
+    │ ├ "Bash(cat *)": Use ":*" for prefix matching, not just "*". Change to
+  "Bash(cat :*)" for prefix matching. Examples: Bash(npm run:*), Bash(git:*)
+    │ ├ "Bash(head *)": Use ":*" for prefix matching, not just "*". Change to
+  "Bash(head :*)" for prefix matching. Examples: Bash(npm run:*), Bash(git:*)
+    │ ├ "Bash(tail *)": Use ":*" for prefix matching, not just "*". Change to
+  "Bash(tail :*)" for prefix matching. Examples: Bash(npm run:*), Bash(git:*)
+    │ ├ "Bash(pwd *)": Use ":*" for prefix matching, not just "*". Change to
+  "Bash(pwd :*)" for prefix matching. Examples: Bash(npm run:*), Bash(git:*)
+    │ ├ "Bash(which *)": Use ":*" for prefix matching, not just "*". Change to
+  "Bash(which :*)" for prefix matching. Examples: Bash(npm run:*), Bash(git:*)
+    │ └ "Bash(wc *)": Use ":*" for prefix matching, not just "*". Change to
+  "Bash(wc :*)" for prefix matching. Examples: Bash(npm run:*), Bash(git:*)
+    └ deny
+      ├ "Bash(git push *)": Use ":*" for prefix matching, not just "*". Change
+  to "Bash(git push :*)" for prefix matching. Examples: Bash(npm run:*),
+  Bash(git:*)
+      ├ "Bash(git rebase *)": Use ":*" for prefix matching, not just "*".
+  Change to "Bash(git rebase :*)" for prefix matching. Examples: Bash(npm
+  run:*), Bash(git:*)
+      ├ "Bash(git reset --hard *)": Use ":*" for prefix matching, not just "*".
+   Change to "Bash(git reset --hard :*)" for prefix matching. Examples:
+  Bash(npm run:*), Bash(git:*)
+      ├ "Bash(git force-push *)": Use ":*" for prefix matching, not just "*".
+  Change to "Bash(git force-push :*)" for prefix matching. Examples: Bash(npm
+  run:*), Bash(git:*)
+      ├ "Bash(git push --force *)": Use ":*" for prefix matching, not just "*".
+   Change to "Bash(git push --force :*)" for prefix matching. Examples:
+  Bash(npm run:*), Bash(git:*)
+      └ "Bash(git push -f *)": Use ":*" for prefix matching, not just "*".
+  Change to "Bash(git push -f :*)" for prefix matching. Examples: Bash(npm
+  run:*), Bash(git:*)
+
+
+ Press Enter to continue…
+[?2004l

@@ -22,3 +22,6 @@ alias ga="git add"
 alias gc="git commit"
 alias gr="git rebase"
 alias gp="git push"
+
+# Claude CLI management
+alias upclaude="pnpm update -g @anthropic-ai/claude-code --latest"

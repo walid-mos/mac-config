@@ -40,6 +40,11 @@ fi
 if [ -d ~/.config/zsh/functions ]; then
     for f in ~/.config/zsh/functions/*.sh; do
         if [ -r "$f" ]; then
+            # Unset existing functions from this file
+            for func_name in $(grep -o '^[a-zA-Z_][a-zA-Z0-9_]*()' "$f" 2>/dev/null | sed 's/()$//'); do
+                unset -f "$func_name" 2>/dev/null
+            done
+            # Load the file (readonly variables will only be set if not already defined)
             . "$f"
         fi
     done

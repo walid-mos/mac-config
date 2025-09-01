@@ -83,18 +83,19 @@ gf() {
             done
         done
     else
-        # Default mode: global confirmation
-        echo -n "Delete all $branch_count branch(es)? (y/n): "
+        # Default mode: global confirmation (default to Y)
+        echo -n "Delete all $branch_count branch(es)? (Y/n): "
         read -r response
         case $response in
-            [Yy]|yes)
+            [Nn]|no)
+                echo "Cancelled"
+                return 0
+                ;;
+            *)
+                # Default to yes for empty input or 'y'/'yes'
                 for branch in "${branch_array[@]}"; do
                     _delete_branch_with_worktree "$branch"
                 done
-                ;;
-            *)
-                echo "Cancelled"
-                return 0
                 ;;
         esac
     fi

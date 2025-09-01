@@ -12,6 +12,105 @@ After each phase of a feature is developed, you must:
    - For CLAUDE.md: Update project-specific instructions to reflect changes in workflow, add new conventions or patterns used, document any new tools or dependencies
 7. Commit changes with descriptive message   
 
+## Code Refactor Specialist Agent Instructions
+
+### Output Format Requirements
+- **NEVER create any .md files** (REFACTORING_SUMMARY.md, ANALYSIS.md, etc.)
+- **Always provide summary directly in chat** with clear, concise bullet points
+- Focus on actionable changes and their business value
+- Include before/after code snippets only when necessary for clarity
+
+### Intelligent DRY Application Guidelines
+
+**Core Principle**: Apply DRY only when it provides real value, not just for the sake of reducing lines.
+
+### When TO Apply DRY:
+✅ **Repeated business logic with same behavior**
+```typescript
+// ✅ GOOD - Same validation logic used everywhere
+const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+```
+
+✅ **Complex calculations or transformations used multiple times**
+```typescript
+// ✅ GOOD - Complex date formatting logic
+const formatUserDate = (date: Date, timezone: string) => { /* complex logic */ }
+```
+
+✅ **Error handling patterns with consistent behavior**
+```typescript
+// ✅ GOOD - Consistent API error handling
+const handleApiError = (error: ApiError) => { /* standardized handling */ }
+```
+
+### When NOT to Apply DRY:
+
+❌ **Configuration-specific code that looks similar but serves different purposes**
+```typescript
+// ❌ BAD - Don't create "lib/env.ts" for Dockerfile-specific env vars
+// Dockerfile env vars ≠ Node.js env vars ≠ Browser env vars
+
+// ❌ BAD - Don't create "lib/paths.ts" for import paths
+// Import paths are context-specific and not reusable logic
+```
+
+❌ **Similar-looking code with different semantics or future evolution paths**
+```typescript
+// ❌ BAD - User validation vs Product validation
+// They might look similar now but will diverge with business requirements
+
+// ❌ BAD - Development configs vs Production configs
+// Similar structure but completely different purposes and lifecycles
+```
+
+❌ **Platform or environment-specific implementations**
+```typescript
+// ❌ BAD - Sharing code between server-side and client-side
+// Different execution contexts require different approaches
+
+// ❌ BAD - Mobile vs Desktop UI components that look similar
+// Different interaction patterns and constraints
+```
+
+❌ **Temporary or transitional code**
+```typescript
+// ❌ BAD - Extracting utilities during migration periods
+// Code in transition should not be abstracted until the migration is complete
+```
+
+### Smart Refactoring Decision Framework:
+
+1. **Semantic Analysis**: Is the code truly doing the same thing, or just looking similar?
+2. **Evolution Prediction**: Will these pieces likely evolve together or separately?
+3. **Context Dependency**: Are the dependencies and constraints the same?
+4. **Maintenance Burden**: Does the abstraction reduce or increase complexity?
+5. **Team Boundaries**: Are these used by the same team or different teams?
+
+### Refactoring Priorities (in order):
+
+1. **Remove actual duplication** - Same logic, same purpose, same context
+2. **Improve code clarity** - Extract meaningful abstractions with clear names
+3. **Optimize performance** - Only if there are measurable bottlenecks
+4. **Enhance type safety** - Strengthen TypeScript types without compromising readability
+5. **Update patterns** - Apply modern patterns only if they improve maintainability
+
+### Forbidden Abstractions:
+
+- **Generic utilities** that serve one specific use case
+- **Config/environment wrappers** unless there's complex transformation logic
+- **Path/routing abstractions** that are just string concatenation
+- **Type-only modules** that don't add semantic value
+- **Over-parameterized functions** with multiple boolean flags
+- **Premature abstractions** for code that might change
+
+### Quality Gates Before Extraction:
+
+1. **Usage Count**: Is it used in 3+ different contexts with identical behavior?
+2. **Stability**: Has the pattern been stable for at least 2 weeks?
+3. **Complexity**: Does the extraction simplify or complicate the codebase?
+4. **Testing**: Can the extracted code be easily unit tested in isolation?
+5. **Documentation**: Can the purpose be explained in one clear sentence?
+
 ## Important note
 - You should always use pnpm, never npm or yarn, pnpm is the main package manager.
 - **YAML validation**: Always use `yamllint` for YAML file validation. NEVER use other Python YAML validators.

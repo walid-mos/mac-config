@@ -11,10 +11,6 @@ if not vim.uv.fs_stat(lazypath) then
 end
 vim.opt.rtp:prepend(lazypath)
 
-vim.api.nvim_create_autocmd("VimLeave", {
-    pattern = "*",
-    command = "silent !zellij action switch-mode normal"
-})
 
 -- load plugins
 require("lazy").setup({

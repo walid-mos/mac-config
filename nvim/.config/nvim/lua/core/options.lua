@@ -9,8 +9,8 @@ vim.opt.relativenumber = true
 vim.opt.cursorline = true
 vim.opt.ruler = false
 
--- disable mouse 
-vim.opt.mouse = ""
+-- enable mouse for all modes (normal, visual, insert, command-line)
+vim.opt.mouse = "a"
 
 -- tab width
 vim.opt.tabstop = 4
@@ -93,3 +93,14 @@ vim.api.nvim_create_autocmd('TextYankPost', {
 })
 
 vim.o.formatexpr = "v:lua.require'conform'.formatexpr()"
+
+-- Fix Treesitter highlighter errors
+vim.api.nvim_create_autocmd('User', {
+  pattern = 'TSUpdate',
+  callback = function()
+    vim.schedule(function()
+      pcall(vim.cmd, 'TSBufDisable highlight')
+      pcall(vim.cmd, 'TSBufEnable highlight')
+    end)
+  end,
+})

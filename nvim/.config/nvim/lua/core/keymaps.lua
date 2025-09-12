@@ -95,8 +95,9 @@ keymap({ "n", "x" }, "k", "gk", opts)
 --keymap({'n', 'v'}, '<leader>y', '"*y', { desc = '[Y]ank between files' })
 --keymap({'n', 'v'}, '<leader>p', '"*p', { desc = '[P]aste between files' })
 
--- Claude Code integration
-local claude = require('utils.claude_integration')
+-- Fix Treesitter highlighting errors
+keymap('n', '<leader>tr', function()
+  vim.cmd('TSBufDisable highlight')
+  vim.cmd('TSBufEnable highlight')
+end, { desc = 'Reset Treesitter highlighting' })
 
-keymap('n', '<leader>cf', claude.send_file, { desc = 'Send file to Claude Code' })
-keymap('x', '<leader>cs', claude.send_selection, { desc = 'Send selected text to Claude Code' })

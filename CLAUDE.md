@@ -60,7 +60,40 @@ gst="git status"
 gpl="git pull --all"
 ```
 
-### Tmux Workspace Management
+### Ghostty Native Splits (Replacing Tmux)
+
+**Split Management:**
+```bash
+# Create splits
+Alt+n          # Split right (vertical split)  
+Alt+v          # Split down (horizontal split)
+
+# Navigate splits (seamless with Neovim via smart-splits.nvim)
+Alt+h          # Move to left split
+Alt+j          # Move to down split  
+Alt+k          # Move to up split
+Alt+l          # Move to right split
+
+# Resize splits
+Alt+Shift+h    # Resize left
+Alt+Shift+j    # Resize down
+Alt+Shift+k    # Resize up
+Alt+Shift+l    # Resize right
+
+# Close split
+Alt+x          # Close current split
+
+# Inspector/Debug
+Alt+q          # Toggle split inspector
+```
+
+**Tab Management:**
+```bash
+Alt+[          # Previous tab
+Alt+]          # Next tab
+```
+
+### Legacy Tmux Workspace Management (Optional)
 
 The `tmux/.config/tmux/setup-workspace.sh` script provides workspace automation:
 ```bash
@@ -92,13 +125,15 @@ Pre-configured project sessions:
 - Neovim with Lua configuration
 - Modular plugin structure in `nvim/.config/nvim/lua/`
 - LSP, autocompletion, and telescope integration
-- Tmux navigation integration
+- Smart-splits.nvim for seamless Ghostty navigation integration
+- Mouse support enabled for better terminal integration
 
-**Multiplexer:**
-- Tmux configured as Zellij replacement
+**Terminal Multiplexer:**
+- Ghostty native splits and tabs (primary)
 - Alt-based keybindings for pane management
-- Vim-tmux-navigator for seamless editor integration
-- Mouse support and 256-color terminal
+- Smart-splits.nvim for seamless Neovim ↔ Ghostty navigation
+- Native macOS UI components for better performance
+- Legacy tmux support available as fallback
 
 ## Architecture Notes
 

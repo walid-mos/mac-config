@@ -8,3 +8,30 @@ keybind = alt+right=text:\x1bf
 # Navigation entre tabs Ghostty - Alt+[ et Alt+]
 keybind = alt+left_bracket=previous_tab
 keybind = alt+right_bracket=next_tab
+
+# === Ghostty Native Splits (remplacement tmux) ===
+
+# Créer des splits comme tmux
+keybind = alt+n=new_split:right    # Alt+n : split à droite (comme tmux)
+keybind = alt+v=new_split:down     # Alt+v : split en bas (comme tmux) 
+
+# Navigation entre splits (comme vim-tmux-navigator)
+keybind = alt+h=goto_split:left
+keybind = alt+j=goto_split:down  
+keybind = alt+k=goto_split:up
+keybind = alt+l=goto_split:right
+
+# Fermer split actuel
+keybind = alt+x=close_surface
+
+# Redimensionnement des splits
+keybind = alt+shift+h=resize_split:left,10
+keybind = alt+shift+j=resize_split:down,5
+keybind = alt+shift+k=resize_split:up,5
+keybind = alt+shift+l=resize_split:right,10
+
+# Détacher/quitter (comme tmux prefix+d)
+keybind = ctrl+a,d=toggle_quick_terminal
+
+# Afficher les numéros des splits (comme tmux display-panes)
+keybind = alt+q=inspector:toggle

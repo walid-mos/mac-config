@@ -134,5 +134,48 @@
   "statusLine": {
     "type": "command",
     "command": "bash ~/.claude/statusline-command.sh"
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/log-commands.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/validate-imports.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "MultiEdit", 
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/validate-imports.sh"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/context-enhancer.sh"
+          }
+        ]
+      }
+    ]
   }
 }

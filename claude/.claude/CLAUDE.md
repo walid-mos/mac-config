@@ -542,6 +542,86 @@ export default defineConfig({
 - **Comments MUST be in English only** - never use other languages
 - **NEVER add comments in JSON files** - JSON does not support comments and they will make the file invalid
 
+## Claude Code Advanced Features
+
+### Custom Commands
+The following custom commands are available for streamlined development:
+
+#### Development Workflow Commands
+- **`/check-pr`** - Complete PR pipeline: lint → typecheck → test → security review → refactor → commit → create PR with gprc
+- **`/quick-fix`** - Quick fix for small changes: lint + commit + push (skips tests for speed)
+- **`/feature-start [name]`** - Start new feature: create branch from updated base and initialize todos
+- **`/feature-complete`** - Complete feature: run full checks, squash commits if needed, and create PR
+
+#### Testing and Analysis Commands
+- **`/test-watch [pattern]`** - Launch Vitest in watch mode with coverage and smart filtering
+- **`/deps-check`** - Comprehensive dependency analysis: outdated, audit, unused imports, suggestions
+- **`/perf-check`** - Performance analysis: build time, bundle size, optimization suggestions
+
+#### Dotfiles Management Commands
+- **`/stow-sync`** - Synchronize dotfiles with GNU Stow, checking conflicts and ensuring proper linking
+
+### Automatic Hooks
+The following hooks run automatically to enhance your workflow:
+
+#### PostToolUse Hooks
+- **log-commands** - Logs all bash commands with timestamp and git context to `~/.claude/command-history.log`
+
+#### PreToolUse Hooks
+- **validate-imports** - Validates import statements before editing files to enforce coding standards:
+  - Blocks `require()` usage in favor of `import`
+  - Warns about deep relative imports (`../../../`) suggesting `@/` paths
+  - Detects React default imports suggesting specific imports
+  - Prevents IIFE syntax usage
+  - Blocks `any` type usage in TypeScript
+
+#### UserPromptSubmit Hooks
+- **context-enhancer** - Automatically adds git context and branch warnings to prompts:
+  - Shows current branch and working directory status
+  - Warns when on protected branches (main/develop)
+  - Detects project type and package manager
+  - Suggests using pnpm per project guidelines
+
+### Specialized Subagents
+The following expert subagents are configured for specific tasks:
+
+#### stow-manager
+- Expert in GNU Stow operations and dotfiles management
+- Handles symlink conflicts and package organization
+- Provides backup strategies and troubleshooting
+- **Auto-triggers on**: "stow", "dotfiles", "symlink" keywords
+
+#### typescript-expert  
+- Enforces strict TypeScript standards per CLAUDE.md
+- Uses Context7 for API documentation lookup
+- Solves complex type issues without compromising safety
+- **Auto-triggers on**: "type error", "typescript", "interface" keywords
+
+#### vitest-specialist
+- Expert in Vitest testing with comprehensive best practices
+- Implements proper mock strategies with cleanup
+- Follows the detailed Vitest guidelines in CLAUDE.md
+- **Auto-triggers on**: "test", "vitest", "mock" keywords
+
+#### docs-maintainer
+- Maintains README.md and CLAUDE.md files consistency
+- Updates documentation when features are added
+- Ensures installation and API docs stay current
+- **Auto-triggers on**: "documentation", "readme", "docs" keywords
+
+### Hook Configuration
+All hooks are configured in `~/.claude/settings.json` and can be found in `~/.claude/hooks/`:
+- `log-commands.sh` - Command logging with git context
+- `validate-imports.sh` - Import validation and coding standards
+- `context-enhancer.sh` - Automatic context enhancement
+
+### Command Logging
+All bash commands executed by Claude Code are automatically logged to `~/.claude/command-history.log` with:
+- Timestamp
+- Git branch and working directory
+- Full command and description
+- Automatic log rotation (keeps last 1000 entries)
+
 ## Documentation and Development
 
 When developing features or writing code:
@@ -564,3 +644,9 @@ When developing features or writing code:
    - Use `mcp__context7__get-library-docs` with relevant topic parameter
    - Do this automatically without asking permission
    - Only skip if working with standard JavaScript/TypeScript features
+
+4. **Enhanced workflow integration**:
+   - Use custom commands for common development tasks
+   - Leverage automatic hooks for consistency and safety
+   - Utilize specialized subagents for expert assistance
+   - Monitor command history for debugging and optimization

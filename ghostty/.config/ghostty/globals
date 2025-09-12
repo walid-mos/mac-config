@@ -11,5 +11,16 @@ window-width = 320
 window-padding-x = 5
 window-padding-y = 2
 
-# Lancer tmux automatiquement - session unique par tab
-command = /opt/homebrew/bin/tmux new-session
+# Configuration pour hériter du répertoire de travail dans les nouveaux onglets
+window-inherit-working-directory = true
+shell-integration = detect
+
+# Activer la détection et le clic sur les URLs
+link-url = true
+
+# Support du passthrough de souris avec modificateurs pour tmux
+mouse-shift-capture = false
+mouse-hide-while-typing = false
+
+# Lancer tmux automatiquement - session unique par tab avec répertoire hérité
+command = /bin/zsh -c "cd \"$(pwd)\"; /opt/homebrew/bin/tmux new-session"

@@ -17,23 +17,37 @@ keybind = option+n=new_split:right
 # Alt+v : split en bas (comme tmux)
 keybind = option+v=new_split:down 
 
-# Navigation entre splits (comme vim-tmux-navigator)
+# Navigation entre splits - EXPERIMENTAL: Two-phase approach
+# Phase 1: Let Neovim try first, fallback to Ghostty
+# We'll use text sequences that Neovim can handle specially
+
+# Direct Ghostty split navigation
 keybind = option+h=goto_split:left
-keybind = option+j=goto_split:down  
+keybind = option+j=goto_split:down
 keybind = option+k=goto_split:up
 keybind = option+l=goto_split:right
+
+# Alternative: Direct Ghostty navigation with different keys to avoid conflicts
+keybind = option+shift+h=goto_split:left
+keybind = option+shift+j=goto_split:down  
+keybind = option+shift+k=goto_split:up
+keybind = option+shift+l=goto_split:right
 
 # Fermer split actuel
 keybind = option+x=close_surface
 
-# Redimensionnement des splits
-keybind = option+shift+h=resize_split:left,10
-keybind = option+shift+j=resize_split:down,5
-keybind = option+shift+k=resize_split:up,5
-keybind = option+shift+l=resize_split:right,10
+# Redimensionnement des splits - Utilise Ctrl+Alt+hjkl pour éviter conflits
+keybind = ctrl+option+h=resize_split:left,10
+keybind = ctrl+option+j=resize_split:down,5
+keybind = ctrl+option+k=resize_split:up,5
+keybind = ctrl+option+l=resize_split:right,10
 
 # Détacher/quitter (comme tmux prefix+d)
 keybind = ctrl+a>d=toggle_quick_terminal
 
 # Afficher les numéros des splits (comme tmux display-panes)
 keybind = option+q=inspector:toggle
+
+# === Suppression avancée (déplacée vers config principal) ===
+# CMD+Backspace et Alt+Backspace fonctionnent bien pour supprimer
+# Sélection de texte : utiliser la souris ou Shift+flèches par défaut

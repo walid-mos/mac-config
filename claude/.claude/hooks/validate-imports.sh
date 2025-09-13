@@ -2,6 +2,9 @@
 # Hook: PreToolUse - validate-imports.sh
 # Description: Validates import statements before editing files to enforce coding standards
 
+# Load common library
+source "$(dirname "$0")/../lib/common.sh"
+
 HOOK_EVENT="$1"
 TOOL_NAME="$2"
 TOOL_INPUT="$3"
@@ -11,8 +14,8 @@ if [ "$TOOL_NAME" != "Edit" ] && [ "$TOOL_NAME" != "MultiEdit" ]; then
     exit 0
 fi
 
-# Extract file path from tool input
-FILE_PATH=$(echo "$TOOL_INPUT" | jq -r '.file_path // empty')
+# Parse tool input efficiently (single jq call)
+parse_tool_input "$TOOL_INPUT"
 
 # Skip if no file path found
 if [ -z "$FILE_PATH" ]; then
@@ -24,11 +27,8 @@ if [[ ! "$FILE_PATH" =~ \.(ts|tsx|js|jsx)$ ]]; then
     exit 0
 fi
 
-# Extract new string content for validation
-NEW_STRING=""
-if [ "$TOOL_NAME" == "Edit" ]; then
-    NEW_STRING=$(echo "$TOOL_INPUT" | jq -r '.new_string // empty')
-elif [ "$TOOL_NAME" == "MultiEdit" ]; then
+# Get new string content for validation
+if [ "$TOOL_NAME" == "MultiEdit" ]; then
     NEW_STRING=$(echo "$TOOL_INPUT" | jq -r '.edits[].new_string // empty' | tr '\n' ' ')
 fi
 
@@ -67,13 +67,15 @@ fi
 
 # If violations found, report them and exit with error
 if [ ${#VIOLATIONS[@]} -gt 0 ]; then
-    echo "🚨 IMPORT/CODE VALIDATION FAILED for $FILE_PATH"
+    handle_error 1 "IMPORT/CODE VALIDATION FAILED for $FILE_PATH" \
+                 "Please fix these issues according to your CLAUDE.md guidelines" \
+                 "Code standards enforcement"
     echo ""
     for violation in "${VIOLATIONS[@]}"; do
         echo "  $violation"
     done
     echo ""
-    echo "📖 Please fix these issues according to your CLAUDE.md guidelines:"
+    echo "📖 Fix guidelines:"
     echo "  - Always use import instead of require()"
     echo "  - Use TypeScript paths (@/) for deeply nested imports"
     echo "  - Import specific React functions instead of entire React object"

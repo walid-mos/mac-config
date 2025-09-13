@@ -2,34 +2,31 @@
 # Hook: UserPromptSubmit - context-enhancer.sh
 # Description: Enhances user prompts with git context and branch protection warnings
 
+# Load common library
+source "$(dirname "$0")/../lib/common.sh"
+
 HOOK_EVENT="$1"
 USER_PROMPT="$2"
 
-# Get git information
-GIT_STATUS=""
-GIT_BRANCH=""
-GIT_CHANGES=""
+# Get git context efficiently
 BRANCH_WARNING=""
-
-if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    GIT_BRANCH=$(git branch --show-current 2>/dev/null)
-    
+if get_git_context 2>/dev/null; then
     # Check if on protected branches
     if [[ "$GIT_BRANCH" == "main" || "$GIT_BRANCH" == "develop" ]]; then
         BRANCH_WARNING="🚨 WARNING: You are on protected branch '$GIT_BRANCH'. Consider creating a feature branch first."
     fi
     
-    # Get git status summary
-    if ! git diff-index --quiet HEAD -- 2>/dev/null; then
-        GIT_CHANGES="📝 Uncommitted changes detected"
+    # Format git status
+    if [ "$GIT_STATUS" -gt 0 ]; then
+        GIT_STATUS_TEXT="$GIT_STATUS files modified"
+    else
+        GIT_STATUS_TEXT="Clean working directory"
     fi
     
-    # Get short status
-    GIT_STATUS=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
-    if [ "$GIT_STATUS" -gt 0 ]; then
-        GIT_STATUS="$GIT_STATUS files modified"
-    else
-        GIT_STATUS="Clean working directory"
+    # Format changes status
+    GIT_CHANGES=""
+    if [ "$GIT_HAS_CHANGES" == "true" ]; then
+        GIT_CHANGES="📝 Uncommitted changes detected"
     fi
 fi
 
@@ -39,7 +36,7 @@ CONTEXT_INFO=""
 if [ -n "$GIT_BRANCH" ]; then
     CONTEXT_INFO="
 🌿 Current branch: $GIT_BRANCH
-📊 Status: $GIT_STATUS"
+📊 Status: $GIT_STATUS_TEXT"
     
     if [ -n "$GIT_CHANGES" ]; then
         CONTEXT_INFO="$CONTEXT_INFO

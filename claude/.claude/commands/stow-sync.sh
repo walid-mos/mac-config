@@ -2,36 +2,44 @@
 # Command: /stow-sync
 # Description: Synchronize dotfiles with GNU Stow, checking for conflicts and ensuring proper linking
 
-set -e  # Exit on any error
+# Load common library
+source "$(dirname "$0")/../lib/common.sh"
+
+# Initialize common library
+init_common_lib
+init_steps 4
 
 echo "🔄 Starting Stow synchronization..."
 
 # Check if we're in the stow repository
 if [ ! -d ".stow-local-ignore" ] && [ ! -f ".stowrc" ] && [ ! -d "zsh" ] && [ ! -d "nvim" ]; then
-    echo "❌ Error: Not in stow repository directory"
-    echo "💡 Navigate to ~/.stow_repository first"
-    exit 1
+    handle_error 1 "Not in stow repository directory" \
+                 "Navigate to ~/.stow_repository first" \
+                 "Directory validation"
 fi
 
 # Check if stow is available
-if ! command -v stow >/dev/null 2>&1; then
-    echo "❌ Error: GNU Stow not found"
-    echo "💡 Install with: brew install stow"
-    exit 1
+if ! command_exists stow; then
+    handle_error 1 "GNU Stow not found" \
+                 "Install with: brew install stow" \
+                 "Command availability"
 fi
 
-echo "🔍 Step 1: Checking for existing symlink conflicts..."
+next_step "Checking for existing symlink conflicts"
 
 # Function to check for conflicts
 check_conflicts() {
-    local package=$1
-    echo "Checking package: $package"
+    local package="$1"
+    local temp_log
     
-    # Dry run to check for conflicts
-    if ! stow --no --verbose=2 "$package" 2>/tmp/stow_check.log; then
-        if grep -q "existing target is" /tmp/stow_check.log; then
-            echo "⚠️  Conflicts found for $package:"
-            grep "existing target is" /tmp/stow_check.log
+    echo "Checking package: $package"
+    temp_log=$(create_temp_file)
+    
+    # Dry run to check for conflicts (properly quoted)
+    if ! stow --no --verbose=2 "$package" 2>"$temp_log"; then
+        if grep -q "existing target is" "$temp_log"; then
+            show_warning "Conflicts found for $package:"
+            grep "existing target is" "$temp_log"
             return 1
         fi
     fi
@@ -44,7 +52,7 @@ PACKAGES=("${PACKAGES[@]%/}")
 
 CONFLICT_PACKAGES=()
 
-# Check each package for conflicts
+# Check each package for conflicts (with proper quoting)
 for package in "${PACKAGES[@]}"; do
     if [ -d "$package" ] && [[ ! "$package" == .* ]]; then
         if ! check_conflicts "$package"; then

@@ -27,20 +27,16 @@ keybind = option+j=goto_split:down
 keybind = option+k=goto_split:up
 keybind = option+l=goto_split:right
 
-# Alternative: Direct Ghostty navigation with different keys to avoid conflicts
-keybind = option+shift+h=goto_split:left
-keybind = option+shift+j=goto_split:down  
-keybind = option+shift+k=goto_split:up
-keybind = option+shift+l=goto_split:right
+# Alternative navigation removed - Alt+Shift now used for resizing
 
 # Fermer split actuel
 keybind = option+x=close_surface
 
-# Redimensionnement des splits - Utilise Ctrl+Alt+hjkl pour éviter conflits
-keybind = ctrl+option+h=resize_split:left,10
-keybind = ctrl+option+j=resize_split:down,5
-keybind = ctrl+option+k=resize_split:up,5
-keybind = ctrl+option+l=resize_split:right,10
+# Redimensionnement des splits - Alt+Shift+hjkl comme documenté
+keybind = option+shift+h=resize_split:left,10
+keybind = option+shift+j=resize_split:down,5
+keybind = option+shift+k=resize_split:up,5
+keybind = option+shift+l=resize_split:right,10
 
 # Détacher/quitter (comme tmux prefix+d)
 keybind = ctrl+a>d=toggle_quick_terminal

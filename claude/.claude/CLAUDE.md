@@ -145,7 +145,22 @@ const handleApiError = (error: ApiError) => { /* standardized handling */ }
 - **Control flow priority**: Use early returns to minimize indentation and simplify functions. Prefer simple `if` statements over complex nested conditions. Use `switch` statements only as a last resort when multiple conditions need to be evaluated
 - **Code structure**: Avoid excessive nesting and indentation. Keep functions flat and readable through early returns and guard clauses
 - **Unused variables**: Always remove unused variables that generate warnings rather than using workarounds to keep them
+- **Comments policy**: Do not add comment when remove useless code or variable, keep comments for usefull tasks like TODO: 
 - **Deprecation policy**: Only deprecate APIs used by external applications. For internal code, remove unused code instead of deprecating
+
+### Naming Conventions (MANDATORY):
+- **Components (React/Astro/Vue/etc.)** → **PascalCase** for component name AND file name
+  - ✅ Examples: `UserProfile.tsx`, `NavigationBar.astro`, `LoadingSpinner.vue`
+  - ❌ Wrong: `userProfile.tsx`, `navigation-bar.astro`, `loading_spinner.vue`
+- **Pages (Next.js/Astro/Nuxt/etc.)** → **kebab-case** for file names
+  - ✅ Examples: `user-profile.tsx`, `about-us.astro`, `contact-form.vue`
+  - ❌ Wrong: `UserProfile.tsx`, `aboutUs.astro`, `contact_form.vue`
+- **Variables (including const)** → **camelCase**
+  - ✅ Examples: `const userName`, `let isActive`, `const userPreferences`
+  - ❌ Wrong: `const user_name`, `let IsActive`, `const UserPreferences`
+- **Global constants** → **UPPER_CASE**
+  - ✅ Examples: `const API_BASE_URL`, `const MAX_RETRIES`, `const DEFAULT_TIMEOUT`
+  - ❌ Wrong: `const apiBaseUrl`, `const maxRetries`, `const default-timeout`
 
 ## Solution Philosophy: Simplest but Never Easiest
 

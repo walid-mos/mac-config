@@ -42,6 +42,22 @@ vim.opt.writebackup = false -- if a file is being edited by another program (or 
 vim.opt.autoread = true
 vim.cmd [[autocmd FocusGained,BufEnter * silent! checktime]]
 
+-- Handle external file changes with confirmation
+vim.api.nvim_create_autocmd("FileChangedShell", {
+  callback = function()
+    local choice = vim.fn.confirm(
+      "File changed outside of Nvim. Reload?", 
+      "&Yes\n&No\n&Load Both (diff)", 
+      1
+    )
+    if choice == 1 then
+      vim.cmd("edit")
+    elseif choice == 3 then
+      vim.cmd("DiffOrig")
+    end
+  end,
+})
+
 -- use number of spaces to insert <Tab>
 vim.opt.expandtab = true
 

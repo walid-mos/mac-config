@@ -1,6 +1,6 @@
 {
-  "numStartups": 112,
-  "installMethod": "unknown",
+  "numStartups": 117,
+  "installMethod": "global",
   "autoUpdates": true,
   "theme": "light",
   "verbose": true,
@@ -22,7 +22,7 @@
     "ide-upsell-external-terminal": 34,
     "install-github-app": 112,
     "drag-and-drop-images": 107,
-    "permissions": 105,
+    "permissions": 116,
     "double-esc": 107,
     "continue": 108,
     "custom-commands": 107,
@@ -30,8 +30,12 @@
     "custom-agents": 107,
     "paste-images-mac": 112,
     "git-worktrees": 112,
-    "image-paste": 95,
-    "status-line": 82
+    "image-paste": 116,
+    "status-line": 82,
+    "plan-mode-for-complex-tasks": 114,
+    "terminal-setup": 114,
+    "shift-enter": 114,
+    "opusplan-mode-reminder": 114
   },
   "promptQueueUseCount": 80,
   "cachedStatsigGates": {
@@ -43,6 +47,14 @@
     "/Users/walid": {
       "allowedTools": [],
       "history": [
+        {
+          "display": "/exit",
+          "pastedContents": {}
+        },
+        {
+          "display": "use context7\n\nPourquoi mon ghostty me renvoie une erreur quil trouve pas catppuccin-latte alors que avant ca fonctionnais normalement ? C'est pas integré a ghostty normalememt ? ",
+          "pastedContents": {}
+        },
         {
           "display": "/clear ",
           "pastedContents": {}
@@ -94,26 +106,48 @@
       "disabledMcpjsonServers": [],
       "hasTrustDialogAccepted": false,
       "hasTrustDialogHooksAccepted": true,
-      "projectOnboardingSeenCount": 3,
+      "projectOnboardingSeenCount": 4,
       "hasClaudeMdExternalIncludesApproved": false,
       "hasClaudeMdExternalIncludesWarningShown": false,
       "hasCompletedProjectOnboarding": true,
-      "lastTotalWebSearchRequests": 0,
-      "lastCost": 0.3714124000000001,
-      "lastAPIDuration": 111686,
-      "lastToolDuration": 16127,
-      "lastDuration": 518747,
-      "lastLinesAdded": 0,
-      "lastLinesRemoved": 0,
-      "lastTotalInputTokens": 63876,
-      "lastTotalOutputTokens": 4786,
-      "lastTotalCacheCreationInputTokens": 31672,
-      "lastTotalCacheReadInputTokens": 467632,
-      "lastSessionId": "e7e791d2-de00-42e7-b908-d9a901b36732"
+      "lastTotalWebSearchRequests": 1,
+      "lastCost": 1.4626290499999999,
+      "lastAPIDuration": 69850,
+      "lastToolDuration": 22575,
+      "lastDuration": 4125881,
+      "lastLinesAdded": 1,
+      "lastLinesRemoved": 1,
+      "lastTotalInputTokens": 4652,
+      "lastTotalOutputTokens": 2000,
+      "lastTotalCacheCreationInputTokens": 79505,
+      "lastTotalCacheReadInputTokens": 196669,
+      "lastSessionId": "a7cc0b75-4e37-4f7d-83fa-a25ca633b87a"
     },
     "/Users/walid/.stow_repository": {
       "allowedTools": [],
       "history": [
+        {
+          "display": "commit tout ce quil y a a commit ",
+          "pastedContents": {}
+        },
+        {
+          "display": "/exit",
+          "pastedContents": {}
+        },
+        {
+          "display": "Pourquoi tu update chmod ? ",
+          "pastedContents": {}
+        },
+        {
+          "display": "update settings.json pour que j'ai plus ce message : \n[Pasted text #1 +5 lines]",
+          "pastedContents": {
+            "1": {
+              "id": 1,
+              "type": "text",
+              "content": " git log --oneline -5 --date=short --pretty=format:\"%h %ad %s\"                                                                                                                                                                                                                                                               │\n│   Check recent commits with dates in astro template                                                                                                                                                                                                                                                                           │\n│                                                                                                                                                                                                                                                                                                                               │\n│ Do you want to proceed?                                                                                                                                                                                                                                                                                                       │\n│ ❯ 1. Yes                                                                                                                                                                                                                                                                                                                      │\n│   2. Yes, and don't ask again for git log commands in /Users/walid/Development/Nextnode"
+            }
+          }
+        },
         {
           "display": "Putain on a installé mcp context7 hier et je l'ai a nouveau perdu ajd, tu peux faire un check pour savoir pourquoi je perd mon mcp a chaque fois c'est la 3em fois ",
           "pastedContents": {}
@@ -509,28 +543,6 @@
         {
           "display": "est-ce que tu peux verifier que la config tmux est bien versionné avec stow ? ",
           "pastedContents": {}
-        },
-        {
-          "display": "/clear ",
-          "pastedContents": {}
-        },
-        {
-          "display": "y a t-il une difference entre cette liste brew : \n==> Formulae\nca-certificates         docker-compose          lazydocker              lpeg                    openssl@3               tmux\ncolima                  fastfetch               libevent                luajit                  pcre2                   tree-sitter\ndocker                  flyctl                  libunistring            luv                     ripgrep                 unibilium\ndocker-buildx           gettext                 libuv                   ncurses                 starship                utf8proc\ndocker-completion       gh                      lima                    neovim                  stow\n\n==> Casks\ncursor          discord         ghostty         iina            linear-linear   missive         nordvpn         postman         raycast\n\net celle ci : \n[Pasted text #1 +10 lines]",
-          "pastedContents": {
-            "1": {
-              "id": 1,
-              "type": "text",
-              "content": "==> Formulae\nca-certificates         fastfetch               libevent                luv                     ripgrep                 utf8proc\ncolima                  flyctl                  libunistring            ncurses                 starship\ndocker                  fzf                     libuv                   neovim                  stow\ndocker-buildx           gettext                 lima                    opencode                tmux\ndocker-completion       gh                      lpeg                    openssl@3               tree-sitter\ndocker-compose          lazydocker              luajit                  pcre2                   unibilium\n\n==> Casks\ncursor          discord         ghostty         iina            linear-linear   missive         nordvpn         postman         raycast\n"
-            }
-          }
-        },
-        {
-          "display": "/clear ",
-          "pastedContents": {}
-        },
-        {
-          "display": "/exit",
-          "pastedContents": {}
         }
       ],
       "mcpContextUris": [],
@@ -549,23 +561,43 @@
       "disabledMcpjsonServers": [],
       "hasTrustDialogAccepted": true,
       "hasTrustDialogHooksAccepted": false,
-      "projectOnboardingSeenCount": 0,
+      "projectOnboardingSeenCount": 2,
       "hasClaudeMdExternalIncludesApproved": false,
       "hasClaudeMdExternalIncludesWarningShown": false,
       "exampleFiles": [
         "keymaps.lua",
-        "LSP.lua",
+        "plugins.lua",
         "telescope.lua",
-        "config.kdl",
-        "aliases"
+        "LSP.lua",
+        "git-pr-create.sh"
       ],
-      "exampleFilesGeneratedAt": 1756557528092,
+      "exampleFilesGeneratedAt": 1758919582074,
       "hasCompletedProjectOnboarding": true,
       "lastTotalWebSearchRequests": 0
     },
     "/Users/walid/Development/Nextnode": {
       "allowedTools": [],
       "history": [
+        {
+          "display": "Tu peux me dire on en est ou sur l'update du template astro dans project-templates ? Normalement on prend le plus recent de nextnode-front + on a bien update les packages etc ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Ecris ce plan dans un .md dans le bureau",
+          "pastedContents": {}
+        },
+        {
+          "display": "Fait moi le plan si je partait sur swift + metal, sache que je n'ai JAMAIS developpé en swift ni sur iOS, donc toutes les etapes pour initialiser le projet aussi, et aussi optimise au mieux comment je peux t'utiliser toi l'IA pour powerboost ce projet ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Alors je veux pas utiliser ni godot ni unreal ni unity, forcement en code \nJe me fiche de la durée de dev (qui est grandement acceleré par l'IA d'ailleurs) donc n'exclue pas une tech a cause de ca ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Imaginons que je lance un nouveau projet la \n\nJ'ai eu une idée pour créer un jeu sur iOs (peut etre android aussi)\nCe serait :\n- Un rpg \n- Avec des donjons generés procedurement\n- Un systeme de races de boss\n- Un systeme de maisons qu'on peut choisir pour gagner des skills specifique a chaque maison (genre maison des flammes, maison des ouragans ... etc)\n- Je ne sais pas encore quel visuel, surement pixel art, mais ca sera surement generé par IA\n\nC'est juste une ebauche, mais je me demande, si je lance le projet, quel techno je devrais utiliser ? Sachant que je vise plutot ios est-ce que swift est une bonne idée ? Est-ce que c'est interrssant comme langage pour ce genre de projet ? Ou plutot viser multiplateforme avec kotlin ? \nOu commencer ? Un plan complet pour faire ce jeu video de A a Z, je pense que le plus cool serait qu'on fasse notre propre moteur, ca nous permettera d'etre completement libre sur la DA du jeu \nultrathink ",
+          "pastedContents": {}
+        },
         {
           "display": "/exit",
           "pastedContents": {}
@@ -975,32 +1007,6 @@
         {
           "display": "Mais surtout c'est quoi cette histoire de template supprime moi ca c'est quoi cette merde ",
           "pastedContents": {}
-        },
-        {
-          "display": "[Pasted text #1 +36 lines]\n\nMais ces changements c'etait ou ???",
-          "pastedContents": {
-            "1": {
-              "id": 1,
-              "type": "text",
-              "content": "⏺ Update(github-actions/workflow-templates/railway-cd.yml)\n  ⎿  Updated github-actions/workflow-templates/railway-cd.yml with 4 additions and 5 removals\n       31        uses: NextNodeSolutions/github-actions/.github/workflows/pack-deploy-railway-dev.yml@main\n       32        with:\n       33          app-name: \"${{ github.event.repository.name }}\"  # Uses repository name\n       34 -        # domain: \"your-domain.com\"  # Uncomment and set your domain for custom domain (will become dev.your-domain.com)\n       34 +        domain: \"nextnode.fr\"  # Will become dev.nextnode.fr for development\n       35          run-quality-checks: true\n       36          checkout-ref: develop\n       37          app-env: \"DEV\"\n     ...\n       41            }\n       42        secrets:\n       43          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}\n       44 -        # CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}  # Uncomment for custom DNS\n       44 +        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}\n       45\n       46      # Production deployment\n       47      deploy-prod:\n     ...\n       49        uses: NextNodeSolutions/github-actions/.github/workflows/pack-deploy-railway-prod.yml@main\n       50        with:\n       51          app-name: \"${{ github.event.repository.name }}\"  # Uses repository name\n       52 -        # domain: \"your-domain.com\"  # Uncomment and set your domain\n       53 -        # configure-ssl: true        # Uncomment for SSL configuration\n       52 +        domain: \"nextnode.fr\"  # Will use nextnode.fr as-is for production\n       53          memory-mb: \"1024\"\n       54          app-env: \"PROD\"\n       55          variables: |\n     ...\n       59            }\n       60        secrets:\n       61          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}\n       62 -        # CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}  # Uncomment for DNS\n       62   \\ No newline at end of file\n       63 +        CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}\n       64   \\ No newline at end of file"
-            }
-          }
-        },
-        {
-          "display": "et coté nextnode-front ta push ? ",
-          "pastedContents": {}
-        },
-        {
-          "display": "ta push ? ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Non mais la je veux le domain c'est nextnode.fr pour nextnode-front ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Bon je sais plus ou on etait mais tu etait en train de reparer la gestion des url dans github_actions pour railway (car c'est lancien fonctionnement fly.io qui est la)\n\nJe veux que lors d'un creation du nouveau service, une url interne railway est generée quoi qu'il arrive (skip si service deja existant)\nEnsuite si une url est donnée au workflow (ex nextnode.fr) on y met le short_env devant (dev.nextnode.fr, test.nextnode.fr ... etc) \nEt ensuite on connecte le cloudflare au railway ! \n\nJ'ai vu railway domain, mais hesite surtout pas a utiliser context7 pour t'assurer des commandes que tu utilise, tu peux aussi tester en local car j'ai railway installé et connecté ",
-          "pastedContents": {}
         }
       ],
       "mcpContextUris": [],
@@ -1009,22 +1015,11 @@
       "disabledMcpjsonServers": [],
       "hasTrustDialogAccepted": true,
       "hasTrustDialogHooksAccepted": false,
-      "projectOnboardingSeenCount": 0,
+      "projectOnboardingSeenCount": 2,
       "hasClaudeMdExternalIncludesApproved": false,
       "hasClaudeMdExternalIncludesWarningShown": false,
       "hasCompletedProjectOnboarding": true,
-      "lastTotalWebSearchRequests": 0,
-      "lastCost": 25.492859150000015,
-      "lastAPIDuration": 2151994,
-      "lastToolDuration": 1368156,
-      "lastDuration": 196164439,
-      "lastLinesAdded": 633,
-      "lastLinesRemoved": 243,
-      "lastTotalInputTokens": 59621,
-      "lastTotalOutputTokens": 72979,
-      "lastTotalCacheCreationInputTokens": 1054613,
-      "lastTotalCacheReadInputTokens": 17481972,
-      "lastSessionId": "0efe6dad-0b03-4a79-81b3-6438789e04ad"
+      "lastTotalWebSearchRequests": 10
     },
     "/Users/walid/.config": {
       "allowedTools": [],
@@ -3881,7 +3876,8 @@
   "s1mAccessCache": {
     "391c4a11-6684-4c23-b279-588198cf7ad8": {
       "hasAccess": false,
-      "timestamp": 1756943251168
+      "hasAccessNotAsDefault": false,
+      "timestamp": 1758919411484
     }
   },
   "recommendedSubscription": "",
@@ -3891,5 +3887,6 @@
       "hasAccess": false,
       "timestamp": 1756893894624
     }
-  }
+  },
+  "lastPlanModeUse": 1758919416765
 }

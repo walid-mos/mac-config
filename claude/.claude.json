@@ -12,7 +12,7 @@
     ]
   },
   "tipsHistory": {
-    "# for memory": 112,
+    "# for memory": 124,
     "new-user-warmup": 1,
     "memory-command": 112,
     "theme-command": 107,
@@ -20,15 +20,15 @@
     "enter-to-steer-in-relatime": 107,
     "todo-list": 107,
     "ide-upsell-external-terminal": 34,
-    "install-github-app": 112,
+    "install-github-app": 124,
     "drag-and-drop-images": 124,
     "permissions": 116,
-    "double-esc": 123,
-    "continue": 123,
-    "custom-commands": 123,
+    "double-esc": 124,
+    "continue": 124,
+    "custom-commands": 124,
     "shift-tab": 124,
     "custom-agents": 124,
-    "paste-images-mac": 112,
+    "paste-images-mac": 124,
     "git-worktrees": 124,
     "image-paste": 116,
     "status-line": 82,
@@ -36,9 +36,9 @@
     "terminal-setup": 114,
     "shift-enter": 114,
     "opusplan-mode-reminder": 114,
-    "double-esc-code-restore": 123
+    "double-esc-code-restore": 124
   },
-  "promptQueueUseCount": 94,
+  "promptQueueUseCount": 95,
   "cachedStatsigGates": {
     "tengu_disable_bypass_permissions_mode": false,
     "tengu_use_file_checkpoints": true
@@ -128,6 +128,68 @@
     "/Users/walid/.stow_repository": {
       "allowedTools": [],
       "history": [
+        {
+          "display": "commit tout",
+          "pastedContents": {}
+        },
+        {
+          "display": "/clear ",
+          "pastedContents": {}
+        },
+        {
+          "display": "/exit",
+          "pastedContents": {}
+        },
+        {
+          "display": "/clear ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Perfect ca m'a l'air top",
+          "pastedContents": {}
+        },
+        {
+          "display": "To be sure, you know that when i launch wt -> i want it to work for the current git \nNextnode was just an example, it should be dynamic ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Voila magnifique merci, commit ce que tu as fait, ne prend pas en compte les fichiers worktree",
+          "pastedContents": {}
+        },
+        {
+          "display": "Toujours pas assez clairs, beaucoup mieux pour les borders",
+          "pastedContents": {}
+        },
+        {
+          "display": "Ok les borders beaucoup plus clairs et les fond inactifs encore plus clairs",
+          "pastedContents": {}
+        },
+        {
+          "display": "Magnifique juste encore un peu plus clair et on est au sweet spot \n\nAussi tu a changé les borders non ? ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Magnifique c'est tout ce que je voulais, juste malheureusement c'est TROP foncé au final, essaye avec 0.8 et un gris un peu plus clair ? ",
+          "pastedContents": {}
+        },
+        {
+          "display": "[Pasted text #1 +60 lines]\n\nWtf ? ",
+          "pastedContents": {
+            "1": {
+              "id": 1,
+              "type": "text",
+              "content": "❯ szsh\n/Users/walid/.config/zsh/functions/worktree-manager.sh:788: defining function based on alias `wt'\n/Users/walid/.config/zsh/functions/worktree-manager.sh:788: parse error near `()'\n_setup_colors:print:8: bad option: -A\n_setup_colors:print:8: bad option: -A\n🚀 Setting up Worktree Manager...\n\n_setup_colors:print:8: bad option: -A\n🚀 Worktree Manager Setup\n\nThis script will:\n• Check for required dependencies\n• Create necessary directories\n• Test the worktree manager functionality\n• Display usage instructions\n\nRequired dependencies:\n• git (version control)\n• fzf (interactive selection)\n• pnpm (package manager)\n\nOptional dependencies:\n• ghostty (terminal for new windows)\n• gh (GitHub CLI for PR integration)\n\nConfiguration:\n• Project path: /Users/walid/Development/Nextnode\n• Worktree base: /Users/walid/Development/Nextnode-worktrees\n• Config directory: /Users/walid/.config\n\nUsage after setup:\n• wt new <branch-name>  - Create new worktree\n• wt switch             - Switch between worktrees\n• wt status             - Show worktree dashboard\n• wt clean              - Clean up merged worktrees\n\n_setup_colors:print:8: bad option: -A\n_confirm_setup:read:4: -p: no coprocess\n\n\n_setup_colors:print:8: bad option: -A\nℹ Checking dependencies...\n_setup_colors:print:8: bad option: -A\n✓ All required dependencies found\n\n_setup_colors:print:8: bad option: -A\nℹ Setting up directories...\n_setup_colors:print:8: bad option: -A\nℹ worktree directory already exists: /Users/walid/Development/Nextnode-worktrees\n_setup_colors:print:8: bad option: -A\nℹ config directory already exists: /Users/walid/.config\n\n_setup_colors:print:8: bad option: -A\nℹ Testing functionality...\n_setup_colors:print:8: bad option: -A\nℹ Testing worktree manager functionality...\n_setup_colors:print:8: bad option: -A\n✗ /Users/walid/Development/Nextnode is not a git repository\n\n_setup_colors:print:8: bad option: -A\n✗ Setup completed with errors. Check the issues above."
+            }
+          }
+        },
+        {
+          "display": "Non mais les ajoute pas je suis en train de les modifier on les excluse n'y touche pas pedale",
+          "pastedContents": {}
+        },
+        {
+          "display": "Pourquoi tu reset sale zinzin on est en train de l'update la ",
+          "pastedContents": {}
+        },
         {
           "display": "Good idea, doing a 0.6 opacity + a little fill subtle like en francais des trais hashurés vraiment fins et gris qui veulent dire \"je ne suis pas utilisé\" peuvent etre une bonne idée ",
           "pastedContents": {}
@@ -501,62 +563,6 @@
         {
           "display": "Ajoute sur le claude code que j'aimerai que :\n- JAMAIS il n'importe React en entier, mais seulement les component utilise (ex : import type { ComponentRef } plutot que React.ComponentRef)\n- Toujours separer import et import type ! (les import types sont a la fin des imports) ",
           "pastedContents": {}
-        },
-        {
-          "display": "nouveau fichier ",
-          "pastedContents": {}
-        },
-        {
-          "display": "verifie si il y a vim repeat oui ",
-          "pastedContents": {}
-        },
-        {
-          "display": "sur nvim, quand je fais . apres avoir fait cw + \"squash\" + esc, ca ne fait que coller squash sans le cw avant, est-ce que ca pourrait venir d'un conflit sur ma config ? ",
-          "pastedContents": {}
-        },
-        {
-          "display": "/exit",
-          "pastedContents": {}
-        },
-        {
-          "display": "Authorize this : \n Yes, and don't ask again for Web Search commands in /Users/walid/Development/Nextnode   \n\nso it doesnt ask me again, you can use context7 to know how to do ",
-          "pastedContents": {}
-        },
-        {
-          "display": "fix all errors you can see in error.txt",
-          "pastedContents": {}
-        },
-        {
-          "display": "/clear ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Now i want for you to fix ALL things in claude doctor in background",
-          "pastedContents": {}
-        },
-        {
-          "display": "launch claude doctor in background",
-          "pastedContents": {}
-        },
-        {
-          "display": "/clear ",
-          "pastedContents": {}
-        },
-        {
-          "display": "c",
-          "pastedContents": {}
-        },
-        {
-          "display": "fix all things in /doctor ",
-          "pastedContents": {}
-        },
-        {
-          "display": "/doctor ",
-          "pastedContents": {}
-        },
-        {
-          "display": "/exit",
-          "pastedContents": {}
         }
       ],
       "mcpContextUris": [],
@@ -587,11 +593,34 @@
       ],
       "exampleFilesGeneratedAt": 1758919582074,
       "hasCompletedProjectOnboarding": true,
-      "lastTotalWebSearchRequests": 0
+      "lastTotalWebSearchRequests": 1,
+      "lastCost": 3.058809349999999,
+      "lastAPIDuration": 248616,
+      "lastToolDuration": 34775,
+      "lastDuration": 8446728,
+      "lastLinesAdded": 16,
+      "lastLinesRemoved": 6,
+      "lastTotalInputTokens": 21418,
+      "lastTotalOutputTokens": 8552,
+      "lastTotalCacheCreationInputTokens": 211063,
+      "lastTotalCacheReadInputTokens": 1372585,
+      "lastSessionId": "d9281563-407d-4f3a-9b3c-72b3db80dd0d"
     },
     "/Users/walid/Development/Nextnode": {
       "allowedTools": [],
       "history": [
+        {
+          "display": "/exit",
+          "pastedContents": {}
+        },
+        {
+          "display": "Ton plan c'est ce que fait deja nextnode-front ? je veux le plus optimisé et plus bonnes pratiques possible ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Regarde dans le template apps/astro dans project-templates, si la gestion du SEO est bien géré, comme on l'a bien géré dans Nextnode-front \n\nJe veux un etat des lieux pour savoir si il y a des choses a update ",
+          "pastedContents": {}
+        },
         {
           "display": "/clear ",
           "pastedContents": {}
@@ -985,18 +1014,6 @@
         {
           "display": "J'aimerai crée un projet pour tester mes templates\n\nJe dois faire une config avec la branch fix/library-template-config\n\nMais comment créer la config facilement vu que le fichier template_config se trouve dans le template en question ? Flem de les connaitre par coeur et j'aimerai automatiser ca aussi ",
           "pastedContents": {}
-        },
-        {
-          "display": "/clear ",
-          "pastedContents": {}
-        },
-        {
-          "display": "J'ai update le lintstaged de library template\n\nCheck tout ce qu'il y a a mettre a jour pour revenir a jour, par rapport a config-manager / logger (surtout pour le husky / github actions) ",
-          "pastedContents": {}
-        },
-        {
-          "display": "commit le tout ",
-          "pastedContents": {}
         }
       ],
       "mcpContextUris": [],
@@ -1009,7 +1026,18 @@
       "hasClaudeMdExternalIncludesApproved": false,
       "hasClaudeMdExternalIncludesWarningShown": false,
       "hasCompletedProjectOnboarding": true,
-      "lastTotalWebSearchRequests": 4
+      "lastTotalWebSearchRequests": 3,
+      "lastCost": 4.86574255,
+      "lastAPIDuration": 320657,
+      "lastToolDuration": 114741,
+      "lastDuration": 9761285,
+      "lastLinesAdded": 0,
+      "lastLinesRemoved": 0,
+      "lastTotalInputTokens": 6228,
+      "lastTotalOutputTokens": 10609,
+      "lastTotalCacheCreationInputTokens": 135437,
+      "lastTotalCacheReadInputTokens": 1017902,
+      "lastSessionId": "24685107-39c1-49a6-a35f-43ffc86348dd"
     },
     "/Users/walid/.config": {
       "allowedTools": [],
@@ -3877,7 +3905,7 @@
       "timestamp": 1756893894624
     }
   },
-  "lastPlanModeUse": 1759178651504,
+  "lastPlanModeUse": 1759186991881,
   "feedbackSurveyState": {
     "lastShownTime": 1759172759352
   }

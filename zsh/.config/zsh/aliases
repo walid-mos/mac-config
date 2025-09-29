@@ -25,3 +25,11 @@ alias gp="git push"
 
 # Claude CLI management
 alias upclaude="pnpm update -g @anthropic-ai/claude-code --latest"
+
+# Worktree management aliases
+alias wt="$HOME/.config/zsh/functions/worktree-manager.sh"
+alias wtn="wt new"
+alias wts="wt switch"
+alias wtd="wt status"
+alias wtc="wt clean"
+alias wtl="wt list"

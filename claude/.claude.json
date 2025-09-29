@@ -1,5 +1,5 @@
 {
-  "numStartups": 117,
+  "numStartups": 124,
   "installMethod": "global",
   "autoUpdates": true,
   "theme": "light",
@@ -21,25 +21,27 @@
     "todo-list": 107,
     "ide-upsell-external-terminal": 34,
     "install-github-app": 112,
-    "drag-and-drop-images": 107,
+    "drag-and-drop-images": 124,
     "permissions": 116,
-    "double-esc": 107,
-    "continue": 108,
-    "custom-commands": 107,
-    "shift-tab": 109,
-    "custom-agents": 107,
+    "double-esc": 123,
+    "continue": 123,
+    "custom-commands": 123,
+    "shift-tab": 124,
+    "custom-agents": 124,
     "paste-images-mac": 112,
-    "git-worktrees": 112,
+    "git-worktrees": 124,
     "image-paste": 116,
     "status-line": 82,
     "plan-mode-for-complex-tasks": 114,
     "terminal-setup": 114,
     "shift-enter": 114,
-    "opusplan-mode-reminder": 114
+    "opusplan-mode-reminder": 114,
+    "double-esc-code-restore": 123
   },
-  "promptQueueUseCount": 80,
+  "promptQueueUseCount": 94,
   "cachedStatsigGates": {
-    "tengu_disable_bypass_permissions_mode": false
+    "tengu_disable_bypass_permissions_mode": false,
+    "tengu_use_file_checkpoints": true
   },
   "userID": "515d6cd095b38a47aff51b93ce9564db547aaa72f0c7a3cd182f433aaeedb4d8",
   "fallbackAvailableWarningThreshold": 0.2,
@@ -126,6 +128,150 @@
     "/Users/walid/.stow_repository": {
       "allowedTools": [],
       "history": [
+        {
+          "display": "Good idea, doing a 0.6 opacity + a little fill subtle like en francais des trais hashurés vraiment fins et gris qui veulent dire \"je ne suis pas utilisé\" peuvent etre une bonne idée ",
+          "pastedContents": {}
+        },
+        {
+          "display": "continue",
+          "pastedContents": {}
+        },
+        {
+          "display": "Regarde context7 pour voir si c'est possible de mettre des borders au pane selectionné dans ghostty ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Commit everything except worktree function related as we are still fixing it",
+          "pastedContents": {}
+        },
+        {
+          "display": "@agent-code-refactor-specialist Refactor worktree-setup and worktree-manager\n\nWe need a better working function\nWe use zsh\nThis function will be sourced in zshrc, so this should not crash at launch \nDo not use readonly variable to not overlap when zshrc \nUse context7 when needed to make everything work\n",
+          "pastedContents": {}
+        },
+        {
+          "display": "/clear ",
+          "pastedContents": {}
+        },
+        {
+          "display": "setopt err_exit pipe_fail\n\nque fait ca ?",
+          "pastedContents": {}
+        },
+        {
+          "display": "Mais putain mais qu'est ce que tu fais je peux meme pas lancer de terminal maintenant sale fils de pute comment c'est possible de tout casser comme ca c'est juste une fonctione merde ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Mon terminal crash toujours quand je source zshrc ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Mais wtf pourquoi worktree se lance des que je source zshrc ? ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Bon le worktree script que tu ma fait est un peu naze\ndeja : \n[Pasted text #1 +31 lines]\n\nVoila le --help, donc il va falloir que tu regle ce souci de symboles partout dans le script\n\naussi quand je fais wt status par ex, le terminal crash, donc il y a des soucis,\n\nHesite pas a tout check en passant par context7, je veux un truc fonctionnel parfaitement\n\nultrathink",
+          "pastedContents": {
+            "1": {
+              "id": 1,
+              "type": "text",
+              "content": "❯ wt --help\n\\033[0;36m🚀 Worktree Manager - Ultra-fast Multi-Claude Workflow\\033[0m\n\n\\033[0;35mUSAGE:\\033[0m\n  wt <command> [arguments]\n\n\\033[0;35mCOMMANDS:\\033[0m\n  \\033[0;32mnew <branch-name>\\033[0m     Create new worktree with branch\n  \\033[0;32mswitch\\033[0m               Interactive worktree switcher (requires fzf)\n  \\033[0;32mstatus\\033[0m               Show dashboard of all worktrees\n  \\033[0;32mlist\\033[0m                 List all active worktrees\n  \\033[0;32mclean\\033[0m                Clean up merged worktrees\n  \\033[0;32msync\\033[0m                 Sync all worktrees with remote\n  \\033[0;32mhelp\\033[0m                 Show this help message\n\n\\033[0;35mEXAMPLES:\\033[0m\n  wt new user-authentication    # Creates feature/user-authentication\n  wt new \"fix login bug\"        # Creates fix/fix-login-bug\n  wt switch                     # Interactive worktree selection\n  wt status                     # Show worktree dashboard\n  wt clean                      # Remove merged worktrees\n\n\\033[0;35mFEATURES:\\033[0m\n  • Auto-detects branch type (feature/fix/chore)\n  • Ensures base branch is up-to-date before creation\n  • Copies .env files automatically\n  • Runs pnpm install automatically\n  • Opens new Ghostty window/tab\n  • Interactive navigation with fzf\n  • Smart cleanup of merged branches\n\n\\033[1;33mNote: Designed for \\033[0;36m/Users/walid/Development/Nextnode\\033[1;33m project\\033[0m"
+            }
+          }
+        },
+        {
+          "display": "/clear ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Last login: Mon Sep 29 20:42:12 on ttys009\n/Users/walid/.config/zsh/functions/worktree-manager.sh:510: BASH_SOURCE[0]: parameter not set\n/Users/walid/.config/zsh/functions/worktree-setup.sh:8: read-only variable: GREEN\n/Users/walid/.zshrc:54: TMUX: parameter not set\n_defer_async_git_register:2: RPROMPT: parameter not set\ngit_prompt_info:1: _omz_git_prompt_info: parameter not set\n\nWtf ??? ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Non mais si c'est juste ca supprime le fichier de test je vais vraiment tester sur le terrain ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Dapres context7 quelle est la meilleure solution a adopter ? ",
+          "pastedContents": {}
+        },
+        {
+          "display": "/Users/walid/.stow_repository/zsh/.config/zsh/functions/demo-worktree.sh: line 226: demos: bad array subscript\n\nC'est quoi ?",
+          "pastedContents": {}
+        },
+        {
+          "display": "Check quels consignes Claude (quand on appelle avec / ) on a crée de notre coté ? J'ai l'impression que plusieurs ne fonctionnent pas ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Ce sera surtout pour les projets dans /Users/walid/Development/Nextnode pas ici ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Ok on va créer un script pour me simplifier la tache pour faire du multitache avec claude :\n- Le but va etre de split le code via worktree \n- Il est tres important de verifier que la branche est A JOUR avec le remote pour split, pour pas avoir des horrible merge conflicts\n- Le but va etre de prendre la branche, creer un worktree en lien avec la nouvelle branche, et deplacer notre terminal dessus pour simplifier le workflow\n- Donc la commande fait : create-worktree -> check remote -> pull -> crée un worktree dans le dossier precedent (pas le meme dossier pour pas polluer le git) -> nous deplace dessus -> pnpm install \n- Il faut une tres bonne gestion d'erreur pour pas avoir de soucis\n- L'interet et de lancer des agents Claude sur chacun des worktree pour avancer 3x plus vite\n\nEst-ce que tu vois d'autres ameliorations a apporter pour un workflow ultra rapide? \n\nultrathink",
+          "pastedContents": {}
+        },
+        {
+          "display": "/clear ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Si tu va dans claude/.claude/Claude.md\nCheck avec context7 si on respecte bien les bonne pratiques pour les regles claude code \nJe veux le fichier le plus optimal pour mes workflows possible\nultrathink",
+          "pastedContents": {}
+        },
+        {
+          "display": "/clear ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Aller go alors ",
+          "pastedContents": {}
+        },
+        {
+          "display": " Agent Parse Errors\n └ Failed to parse 4 agent file(s):\n   └ /Users/walid/.claude/agents/vitest-specialist.md: Missing required \"name\" field in frontmatter\n   └ /Users/walid/.claude/agents/typescript-expert.md: Missing required \"name\" field in frontmatter\n   └ /Users/walid/.claude/agents/docs-maintainer.md: Missing required \"name\" field in frontmatter\n   └ /Users/walid/.claude/agents/stow-manager.md: Missing required \"name\" field in frontmatter\n\nCheck pour reparer ca stp dans claude/.claude",
+          "pastedContents": {}
+        },
+        {
+          "display": "Ca veut dire quoi focusable ? Ctrl-w w est compliqué je trouve c'est relou",
+          "pastedContents": {}
+        },
+        {
+          "display": "Quand je fait <leader>E pour afficher l'erreur dans nvim, comment je fait pour rentrer dans le message (pour naviger dedans, surtout quand c'est long) ou pour copier coller etc ? \n\nUse context7",
+          "pastedContents": {}
+        },
+        {
+          "display": "/clear ",
+          "pastedContents": {}
+        },
+        {
+          "display": "En fait je viens de check et bizarrement ca me le fait que dans ~/Development/nextnode/test-library",
+          "pastedContents": {}
+        },
+        {
+          "display": "Wtf jai nvim qui marche plus :\n[Pasted text #1 +20 lines]\n\ndes que je le lance, impossible d'ouvrir un fichier ",
+          "pastedContents": {
+            "1": {
+              "id": 1,
+              "type": "text",
+              "content": "Error executing vim.schedule lua callback: ....local/share/nvim/lazy/plenary.nv\nim/lua/plenary/path.lua:306: invalid value (nil) at index 1 in table for 'conca\nt'\nstack traceback:\n        [C]: in function 'concat'\n        ....local/share/nvim/lazy/plenary.nvim/lua/plenary/path.lua:306: in fun\nction 'absolute'\n        ....local/share/nvim/lazy/plenary.nvim/lua/plenary/path.lua:279: in fun\nction '_fs_filename'\n        ....local/share/nvim/lazy/plenary.nvim/lua/plenary/path.lua:283: in fun\nction '_stat'\n        ....local/share/nvim/lazy/plenary.nvim/lua/plenary/path.lua:311: in fun\nction 'exists'\n        ...er.nvim/lua/telescope/_extensions/file_browser/utils.lua:231: in fun\nction 'to_absolute_path'\n        ...r.nvim/lua/telescope/_extensions/file_browser/picker.lua:150: in fun\nction 'fb_picker'\n        ...-browser.nvim/lua/telescope/_extensions/file_browser.lua:101: in fun\nction 'file_browser'\n        ...r.nvim/lua/telescope/_extensions/file_browser/config.lua:112: in fun\nction <...r.nvim/lua/telescope/_extensions/file_browser/config.lua:91>"
+            }
+          }
+        },
+        {
+          "display": "commit",
+          "pastedContents": {}
+        },
+        {
+          "display": "Pas besoin pour 5 et 6, le reste top ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Ma fonction gprc est extremement utile \n\nMais je vois qu'il genere le titre AVANT de tester si la PR existe\n\nFait un petit check de ce qu'on peut ameliorer dans ce petit script",
+          "pastedContents": {}
+        },
+        {
+          "display": "/exit",
+          "pastedContents": {}
+        },
         {
           "display": "commit tout ce quil y a a commit ",
           "pastedContents": {}
@@ -411,138 +557,6 @@
         {
           "display": "/exit",
           "pastedContents": {}
-        },
-        {
-          "display": "J'ai gprc qui show \"develop(default)\" pour mon projet logger alors que develop n'existe meme pas comme branche sur ce projet \n\nComment ca se fait ?? ",
-          "pastedContents": {}
-        },
-        {
-          "display": "/clear ",
-          "pastedContents": {}
-        },
-        {
-          "display": "\u001dAjoute que tu dois utiliser la route la plus simple mais jamais la plus facile \n\nex : \nProbleme avec un type :\n- plus facile : supprimer le type -> INTERDIT\n- reponse possible : Ajouter un type complexe avec multiples generiques + fonctions typé -> trop compliqué\n- plus simple : ajouter un type fonctionnel, dynamique et minimal mais strong typé \n\ndonnes d'autres exemples pour bien narrow cette commande, car l'IA peut vite faire nimporte quoi ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Ajoute dans le Claude.md que main et develop sont toujours protégés, donc s'il est dans l'une de ces 2 branches, alors il doit créer une branche avec une version a jour (et demander quelle branche a l'utilisateur) avant de continuer ",
-          "pastedContents": {}
-        },
-        {
-          "display": "nextnode-front on  feat/integrate-logger via 🐳 colima is 📦 v0.0.0 via  v24.2.0\n❯ szsh\n➜  nextnode-front git:(feat/integrate-logger)\n\n\nBah ca continue a faire nimporte quoi la ",
-          "pastedContents": {}
-        },
-        {
-          "display": "❯ szsh\n[5]    42100 done       grep --color=auto --exclude-dir={.bzr,CVS,.git,.hg,.svn,.idea,.tox,.venv,venv |\n       42101 done       sed 's/^readonly //'\n\nwtf ",
-          "pastedContents": {}
-        },
-        {
-          "display": "apres szsh ca ma ecrit : /Users/walid/.config/zsh/functions/git-pr-create.sh:9: read-only variable: DEFAULT_BRANCHES\n",
-          "pastedContents": {}
-        },
-        {
-          "display": "C'est pas factorisable ? les 2 on le meme for la ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Ouais mais flem de faire ca avec toutes mes fonctions, tu peux pas ajouter ca a zshrc pour que ca le fasse automatiquement avant de source les fichiers de functions ? ",
-          "pastedContents": {}
-        },
-        {
-          "display": "pourquoi quand je fais szsh (source .zshrc) ca source zshrc mais ca remet pas a jour gprc c'est relou ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Ah mais on avais fait un plan pour avoir un systeme si la branche remote est differente ca montre en avance et recul de combien, sinon ca les merge pour afficher que la branche, sauf si elle est que locale la ca ecrit locale (ou inversement avec remote)",
-          "pastedContents": {}
-        },
-        {
-          "display": "Ensuite ca affiche toujours main et main (remote) alors que les 2 sont les memes ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Quand je met echap sur le choix de branche sur gprc ca doit annuler gprc et quitter et non continuer ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Est- ce que tu peux voir si gprc est chargé depuis zshrc ?\n\nCar c'est zsh que je source, j'aimerai que quand je source zshrc ca source aussi les differentes foncitons (gprc et gf pour linstant, mais tout en meme temps dans functions/ sans que j'ai a reupdate zshrc)",
-          "pastedContents": {}
-        },
-        {
-          "display": "❯ gprc\n🎯 Current branch: feat/integrate-logger\n\nget_available_branches:18: read-only variable: status\n❌ No target branches available (current: feat/integrate-logger)\n\n🎯 Target branch:\n🔄 Pulling latest changes with rebase...\nFrom https://github.com/NextNodeSolutions/nextnode-front\n * branch            feat/integrate-logger -> FETCH_HEAD\nAlready up to date.\n✅ Branch up to date\nJ'ai toujours ca ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Aussi j'ai origin qui s'affiche alors que c'est pas une branche c'est relou ",
-          "pastedContents": {}
-        },
-        {
-          "display": "❯ gprc\n🎯 Current branch: feat/integrate-logger\n\nget_available_branches:18: read-only variable: status\n❌ No target branches available (current: feat/integrate-logger)\n\n🎯 Target branch:\n🔄 Pulling latest changes with rebase...\nFrom https://github.com/NextNodeSolutions/nextnode-front\n * branch            feat/integrate-logger -> FETCH_HEAD\nAlready up to date.\n✅ Branch up to date\n\nCa me fait ca mainteannt",
-          "pastedContents": {}
-        },
-        {
-          "display": "Profite pour refactor tout le fichier meme ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Refactor il y a trop de if et c'est illisible",
-          "pastedContents": {}
-        },
-        {
-          "display": "Super go ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Est-ce que ca check que c'est a jour ? ex il y a pas de commit de difference ou de chemin de branche differents ? ",
-          "pastedContents": {}
-        },
-        {
-          "display": "J'ai 2 soucis :\n- GPRC me montre maintenant des branches origin + remote je comprend pas la difference, par ex quand main est le meme en local et remonte il me le propose quand meme 2 fois \n- Je veux que quand je gf, la demande de suppression de branche locale (qui pour l'instant propose y/n) fasse y par defaut, vu que la plupart du temps c'est oui alors je veux juste avoir a appuyer sur entrer pour que ca supprime ",
-          "pastedContents": {}
-        },
-        {
-          "display": "/exit",
-          "pastedContents": {}
-        },
-        {
-          "display": "commit",
-          "pastedContents": {}
-        },
-        {
-          "display": "ajoute au claude.md que c'est toujours mieux de supprimer une variable non utilisé qui est en warning plutot que faire des trucs bizarre pour la garder\n\nEt ne met en deprecié que les api qui sont utilisés par des apps externe, sinon il faut toujours supprimer plutot que deprecier ",
-          "pastedContents": {}
-        },
-        {
-          "display": "/clear ",
-          "pastedContents": {}
-        },
-        {
-          "display": "claude",
-          "pastedContents": {}
-        },
-        {
-          "display": "commit",
-          "pastedContents": {}
-        },
-        {
-          "display": "/exit",
-          "pastedContents": {}
-        },
-        {
-          "display": "Ajoute le fait que tu as interdiction de contourner les check / precommit / lintstaged etc, il faut toujours fix avant de commit obligatoire",
-          "pastedContents": {}
-        },
-        {
-          "display": "Ajoute au claude.md d'utiliser switch en cas de dernier recours, prefere un if simple\n\nEt la meilleure technique reste le early return qui permet de simplifier les fonctions et garder le minimum d'indentation possible\n\nAussi eviter d'avoir trop d'indentation dans le code ",
-          "pastedContents": {}
-        },
-        {
-          "display": "J'aimerai que tu mette a jour le claude.md pour qu'il check avant de commit de update le readme et le claude.md du projet en consequence quand il les trouve",
-          "pastedContents": {}
-        },
-        {
-          "display": "est-ce que tu peux verifier que la config tmux est bien versionné avec stow ? ",
-          "pastedContents": {}
         }
       ],
       "mcpContextUris": [],
@@ -561,7 +575,7 @@
       "disabledMcpjsonServers": [],
       "hasTrustDialogAccepted": true,
       "hasTrustDialogHooksAccepted": false,
-      "projectOnboardingSeenCount": 2,
+      "projectOnboardingSeenCount": 4,
       "hasClaudeMdExternalIncludesApproved": false,
       "hasClaudeMdExternalIncludesWarningShown": false,
       "exampleFiles": [
@@ -579,35 +593,11 @@
       "allowedTools": [],
       "history": [
         {
-          "display": "Tu peux me dire on en est ou sur l'update du template astro dans project-templates ? Normalement on prend le plus recent de nextnode-front + on a bien update les packages etc ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Ecris ce plan dans un .md dans le bureau",
-          "pastedContents": {}
-        },
-        {
-          "display": "Fait moi le plan si je partait sur swift + metal, sache que je n'ai JAMAIS developpé en swift ni sur iOS, donc toutes les etapes pour initialiser le projet aussi, et aussi optimise au mieux comment je peux t'utiliser toi l'IA pour powerboost ce projet ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Alors je veux pas utiliser ni godot ni unreal ni unity, forcement en code \nJe me fiche de la durée de dev (qui est grandement acceleré par l'IA d'ailleurs) donc n'exclue pas une tech a cause de ca ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Imaginons que je lance un nouveau projet la \n\nJ'ai eu une idée pour créer un jeu sur iOs (peut etre android aussi)\nCe serait :\n- Un rpg \n- Avec des donjons generés procedurement\n- Un systeme de races de boss\n- Un systeme de maisons qu'on peut choisir pour gagner des skills specifique a chaque maison (genre maison des flammes, maison des ouragans ... etc)\n- Je ne sais pas encore quel visuel, surement pixel art, mais ca sera surement generé par IA\n\nC'est juste une ebauche, mais je me demande, si je lance le projet, quel techno je devrais utiliser ? Sachant que je vise plutot ios est-ce que swift est une bonne idée ? Est-ce que c'est interrssant comme langage pour ce genre de projet ? Ou plutot viser multiplateforme avec kotlin ? \nOu commencer ? Un plan complet pour faire ce jeu video de A a Z, je pense que le plus cool serait qu'on fasse notre propre moteur, ca nous permettera d'etre completement libre sur la DA du jeu \nultrathink ",
-          "pastedContents": {}
-        },
-        {
-          "display": "/exit",
-          "pastedContents": {}
-        },
-        {
-          "display": "@agent-code-refactor-specialist I want a cool refactor where you better handle all those try catch that i don't like, and i think we can shrink a lot of useless code and useless fallbacks",
-          "pastedContents": {}
-        },
-        {
           "display": "/clear ",
+          "pastedContents": {}
+        },
+        {
+          "display": "/doctor ",
           "pastedContents": {}
         },
         {
@@ -615,53 +605,11 @@
           "pastedContents": {}
         },
         {
-          "display": "commit ",
-          "pastedContents": {}
-        },
-        {
-          "display": "J'aime pas cette syntaxe, je prefere que tu permette undefined OU que tu teste avec un if avant, je trouve que c'est trop illisible comme ca",
-          "pastedContents": {}
-        },
-        {
-          "display": "[Pasted text #1 +14 lines]\n\nLe output file se fait au niveau du node_module et pas du projet fille ce qui est tres problematique, il faut savoir retrouver le projet fille pour le mettre dans types/config.d.ts par defaut, et outputFile option doit absolument etre par rapport a la base du projet fille",
-          "pastedContents": {
-            "1": {
-              "id": 1,
-              "type": "text",
-              "content": "⏺ Parfait ! Je vois le fichier généré. Regardons son contenu pour comprendre le problème :\n\n⏺ Read(node_modules/.pnpm/@nextnode+config-manager@file+..+config-manager_astro@5.13.3_@types+node@24.3.0_jiti@2._6337a6949f3040d1f4c0e19f36168b\n      5c/node_modules/@nextnode/config-manager/.generated-types/index.d.ts)\n  ⎿  Read 39 lines (ctrl+r to expand)\n\n⏺ Excellent ! Le fichier de types est correct et bien généré. Le problème est qu'il est généré dans le dossier node_modules au lieu de\n  types/config.d.ts. Il faut configurer le plugin pour générer le fichier au bon endroit.\n\n  ★ Insight ─────────────────────────────────────\n  Le plugin Vite génère automatiquement les types, mais il les place dans le dossier des node_modules. Pour que TypeScript puisse les\n  utiliser dans le projet, il faut soit :\n  1. Configurer le plugin pour les générer dans types/config.d.ts\n  2. Ajouter une référence aux types générés dans un fichier de déclaration\n"
-            }
-          }
-        },
-        {
-          "display": "commit et push",
-          "pastedContents": {}
-        },
-        {
-          "display": "J'aime bien que tu defini __filename et __dirname c'est plus propre",
-          "pastedContents": {}
-        },
-        {
-          "display": "Will using node:url could break in client side ? or never used client side ? then ok",
-          "pastedContents": {}
-        },
-        {
-          "display": "⏺ Le fichier config.d.ts n'a pas été généré à cause de l'erreur. Il faut corriger le problème dans le package config-manager. Regardons\n  l'erreur dans les logs :\n\n  ★ Insight ─────────────────────────────────────\n  Le problème vient du fait que le plugin utilise __filename qui n'est pas disponible dans les modules ES. Cela indique que le code du\n  générateur de types doit être mis à jour pour utiliser import.meta.url à la place.\n\n\nJe teste sur nextnode-front cette version, et je tombe sur ca, tu peux expliquer ? ",
-          "pastedContents": {}
-        },
-        {
           "display": "/clear ",
           "pastedContents": {}
         },
         {
-          "display": "Non mais je veux pas de plugin rollup ou esbuild je les utilise pas, je te pose la question generate-config existe toujours pour generer les types ? ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Ah donc il y a toujours un script \"generate-config\" alors ? ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Mais d'ailleurs, ton plugin marche pour les front (vite / astro) mais comment faire pour un projet purement back (ex: library en node) ???",
+          "display": "Quest ce que tu me raconte je veux juste que tu pnpm update @nextnode/standards dans les 2 templates, puis tu testes les 2 templates c'est tout rien d'autre",
           "pastedContents": {}
         },
         {
@@ -669,31 +617,11 @@
           "pastedContents": {}
         },
         {
-          "display": "update config-manager and logger and template library to use github actions, make sure deployment still work (as it's auto deployed to npm",
+          "display": "/clear ",
           "pastedContents": {}
         },
         {
-          "display": "where is short-env ? and is there no variables to add ? no need for memory-mb",
-          "pastedContents": {}
-        },
-        {
-          "display": "We are not deploying with fly.io anymore, so delete all attributes and write new attributes as waited in deploy.yml of github-actions",
-          "pastedContents": {}
-        },
-        {
-          "display": "deploy in nextnode-front why is there no domain and app name with -dev and -front wtf is going on ? ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Ah no you will need to update test.yml of yasmine to use quality-checks ",
-          "pastedContents": {}
-        },
-        {
-          "display": "No need of deploy-dev on yasmine (we deploy only prod for this app)\n\nEverything else is good ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Update tout les projets pour utiliser la nouvelle version de github-actions",
+          "display": "Met a jour @nextnode/standards pour apps/astro et package/library \n\nPuis lance les tests (typecheck test lint) et enfin commit si c'est bon",
           "pastedContents": {}
         },
         {
@@ -701,23 +629,11 @@
           "pastedContents": {}
         },
         {
-          "display": "Il faut update toute les valeurs de branche vers main sur github-actions",
+          "display": "ajoute un changeset a standards puis commit ",
           "pastedContents": {}
         },
         {
-          "display": "Pourquoi tu git init ?? ",
-          "pastedContents": {}
-        },
-        {
-          "display": "supprime alors et commit ",
-          "pastedContents": {}
-        },
-        {
-          "display": "C'est possible d'utiliser ces defaults ou on supprime le fichier ? ",
-          "pastedContents": {}
-        },
-        {
-          "display": "est-ce que le fichier dans defaults.yml est bien utilisé dans github-actions ? ",
+          "display": "Met a jour @nextnode/standards pour apps/astro et package/library pour ne plus avoir les tsconfigpaths\n\nPuis lance les tests (typecheck test lint) et enfin commit si c'est bon",
           "pastedContents": {}
         },
         {
@@ -725,7 +641,11 @@
           "pastedContents": {}
         },
         {
-          "display": "Enfin tout a l'air de fonctionner, je veux que tu squash tout les commits de github-actions jusque acb1a03 (inclus comme commit visible) ",
+          "display": "Ok update ~/.claude/Claude.md pour que tu ecrive toujours les changeset directement, pas besoin dessayer de passer par pnpm changeset a chaque fois vu que ca marche pas ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Check avec context7 si c'est possible pour toi d'utiliser changeset en cli ? Car il pose des questions et de ce que j'ai compris tu peux pas utiliser les cli interactifs ",
           "pastedContents": {}
         },
         {
@@ -733,203 +653,7 @@
           "pastedContents": {}
         },
         {
-          "display": "Ah mais la les jobs sont a la suite et non dans le meme job, ils ne gardent pas le link l'un apres l'autre et donc fail \n\nJe prefereai qu'ils soient tous dans un job mais dans des etapes specifiques plutot non ? ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Super tout marche, c'est pas possible de diviser les jobs dans deploy to railway ? La tout se fait dans Run NextNodeSolutions/github-actions/actions/railway-deploy@feat/railway-deployment-support\n\nC'est triste ",
-          "pastedContents": {}
-        },
-        {
-          "display": "1s\nRun # Get zone ID if not provided\n[\n  {\n    \"code\": 9007,\n    \"message\": \"Content for CNAME record is invalid.\"\n  }\n]\nError: Process completed with exit code 1.\n\nPour le job dns ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Putain reprend ce qui marchais sur le commit bb92d8c parce que tu vas pas tout recasser c'etait deja tres compliqué a mettre en place ultrathink ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Run NextNodeSolutions/github-actions/actions/railway-deploy@feat/railway-deployment-support\nRun npm install -g @railway/cli@latest\nnpm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead\n\nadded 17 packages in 4s\n\n3 packages are looking for funding\n  run `npm fund` for details\nRun railway environment development\nProject Token not found\nError: Process completed with exit code 1.\n\nPUTAIN C'EST QUOI CA POURQUOI TU AS PAS REUTILISER EXACTEMENT CE QUON AVAIT QUI MARCHAIS ENFIN PUTAIN ?? ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Quality Checks / Lint / Lint Code\nInvalid format '0'\nQuality Checks / Lint / Lint Code\nUnable to process file command 'output' successfully.\nQuality Checks / Type Check / Type Check\nInvalid format '0'\nQuality Checks / Type Check / Type Check\nUnable to process file command 'output' successfully.\n\nPutain ca rend fou",
-          "pastedContents": {}
-        },
-        {
-          "display": "[Pasted text #1 +8 lines]\n\nMais putain tu fous quoi ",
-          "pastedContents": {
-            "1": {
-              "id": 1,
-              "type": "text",
-              "content": "\nQuality Checks / Type Check / Type Check\nCan't find 'action.yml', 'action.yaml' or 'Dockerfile' under '/home/runner/work/nextnode-front/nextnode-front/actions/setup-node-pnpm'. Did you forget to run actions/checkout before running your local action?\nQuality Checks / Lint / Lint Code\nCan't find 'action.yml', 'action.yaml' or 'Dockerfile' under '/home/runner/work/nextnode-front/nextnode-front/actions/setup-node-pnpm'. Did you forget to run actions/checkout before running your local action?\nQuality Checks / Build / Build Project\nCan't find 'action.yml', 'action.yaml' or 'Dockerfile' under '/home/runner/work/nextnode-front/nextnode-front/actions/setup-node-pnpm'. Did you forget to run actions/checkout before running your local action?\nQuality Checks / Test / Run Tests\nCan't find 'action.yml', 'action.yaml' or 'Dockerfile' under '/home/runner/work/nextnode-front/nextnode-front/actions/setup-node-pnpm'. Did you forget to run actions/checkout before running your local action?"
-            }
-          }
-        },
-        {
-          "display": "Mais utiliser des chemins relatif on va revenir au probleme precedent non ? ",
-          "pastedContents": {}
-        },
-        {
-          "display": "\nInvalid workflow file: .github/workflows/test-railway.yml#L28\nerror parsing called workflow \".github/workflows/test-railway.yml\" -> \"NextNodeSolutions/github-actions/.github/workflows/deploy.yml@feat/railway-deployment-support\" (source branch with sha:b6c5ac7eb46c2381a3efe35ce5da0e9cdf36d53c) : (Line: 70, Col: 15): Expected format {org}/{repo}[/path]@ref. Actual 'NextNodeSolutions/github-actions/actions/railway-deploy'",
-          "pastedContents": {}
-        },
-        {
-          "display": "Mais pourquoi tu met une branche met pas de branche du tout ",
-          "pastedContents": {}
-        },
-        {
-          "display": "[Pasted text #1 +9 lines]\n\nCouillon va",
-          "pastedContents": {
-            "1": {
-              "id": 1,
-              "type": "text",
-              "content": "Quality Checks / Test / Run Tests\nCan't find 'action.yml', 'action.yaml' or 'Dockerfile' under '/home/runner/work/nextnode-front/nextnode-front/actions/node-setup-complete'. Did you forget to run actions/checkout before running your local action?\nQuality Checks / Type Check / Type Check\nCan't find 'action.yml', 'action.yaml' or 'Dockerfile' under '/home/runner/work/nextnode-front/nextnode-front/actions/node-setup-complete'. Did you forget to run actions/checkout before running your local action?\nQuality Checks / Build / Build Project\nCan't find 'action.yml', 'action.yaml' or 'Dockerfile' under '/home/runner/work/nextnode-front/nextnode-front/actions/node-setup-complete'. Did you forget to run actions/checkout before running your local action?\nQuality Checks / Lint / Lint Code\nCan't find 'action.yml', 'action.yaml' or 'Dockerfile' under '/home/runner/work/nextnode-front/nextnode-front/actions/node-setup-complete'. Did you forget to run actions/checkout before running your local action?\nQuality Checks / Quality Summary\nCan't find 'action.yml', 'action.yaml' or 'Dockerfile' under '/home/runner/work/nextnode-front/nextnode-front/actions/check-job-results'. Did you forget to run actions/checkout before running your local action?"
-            }
-          }
-        },
-        {
-          "display": "C'est inutile pour railway, mais y a t-il des quality checks qui demandent un build ? le reste ok ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Ah mais que fait docker-build exactement ? yen a besoin pour le deploiement ? C'est pas railway qui s'en occupe ? ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Mais que fait deploy full si tu appelle railway-deploy depuis test-railway ? \n\nJe pense que tu devrais supprimer tout les trucs inutile (les wrapper, et deploy full) et renomer les actuels : \n- quality-checks\n- deploy \n- dns-cloudflare \n... etc",
-          "pastedContents": {}
-        },
-        {
-          "display": "Non quand meme moins granulaire sur test-railway, juste quality-checks deploy dns c'est bien ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Non mais le but c'est pas d'appeler qu'un seul job sur test-railway ! \n\nC'est mieux que sur test-railway on ai un job qui appelle quality check et un autre deploy ... etc ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Verifie qu'il y a pas d'autres wrappers inutiles et d'autres workflow avec depth 3+ ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Deja pourquoi dns update est pas un job a part entiere plutot que un sous job de deploy ? \n\nEnsuite option 1 me parait mieux ",
-          "pastedContents": {}
-        },
-        {
-          "display": "\nInvalid workflow file: .github/workflows/test-railway.yml#L16\nerror parsing called workflow\n\".github/workflows/test-railway.yml\"\n-> \"NextNodeSolutions/github-actions/.github/workflows/deploy-railway.yml@feat/railway-deployment-support\" (source branch with sha:490edf690f9a11614cc446c49716b2fdf401f4f4)\n--> \"./.github/workflows/deploy-full.yml\" (source branch with sha:490edf690f9a11614cc446c49716b2fdf401f4f4)\n---> \"./.github/workflows/dns-update.yml\" (source branch with sha:490edf690f9a11614cc446c49716b2fdf401f4f4)\n: job \"cloudflare\" calls workflow \"./.github/workflows/dns-cloudflare.yml\", but doing so would exceed the limit on called workflow depth of 3\n\nJe vais peter un cable c'est quoi ces soucis ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Invalid workflow file: .github/workflows/test-railway.yml#L16\nerror parsing called workflow\n\".github/workflows/test-railway.yml\"\n-> \"NextNodeSolutions/github-actions/.github/workflows/deploy-railway.yml@feat/railway-deployment-support\" (source branch with sha:1a230d6ee9667eb113143cba4dabbab28aaf8c1e)\n--> \"./.github/workflows/deploy-full.yml\" (source branch with sha:1a230d6ee9667eb113143cba4dabbab28aaf8c1e)\n: (Line: 170, Col: 13): Unrecognized named-value: 'secrets'. Located at position 1 within expression: secrets.DOCKER_USERNAME != '' && secrets.DOCKER_PASSWORD != ''\n\nPutain verifie les yaml ",
-          "pastedContents": {}
-        },
-        {
-          "display": "jai push relance ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Invalid workflow file: .github/workflows/test-railway.yml#L16\nerror parsing called workflow\n\".github/workflows/test-railway.yml\"\n-> \"NextNodeSolutions/github-actions/.github/workflows/deploy-railway.yml@feat/railway-deployment-support\" (source branch with sha:acb1a03b5ebde6759ebac81ab61d1a00e07812b1)\n--> \"./.github/workflows/deploy-full.yml\" (source branch with sha:acb1a03b5ebde6759ebac81ab61d1a00e07812b1)\n: You have an error in your yaml syntax on line 180",
-          "pastedContents": {}
-        },
-        {
-          "display": "relance alors test-railway",
-          "pastedContents": {}
-        },
-        {
-          "display": "continue",
-          "pastedContents": {}
-        },
-        {
-          "display": "Invalid workflow file: .github/workflows/test-railway.yml#L16\nerror parsing called workflow\n\".github/workflows/test-railway.yml\"\n-> \"NextNodeSolutions/github-actions/.github/workflows/deploy-railway.yml@feat/railway-deployment-support\" (source branch with sha:acb1a03b5ebde6759ebac81ab61d1a00e07812b1)\n--> \"./.github/workflows/deploy-full.yml\" (source branch with sha:acb1a03b5ebde6759ebac81ab61d1a00e07812b1)\n: You have an error in your yaml syntax on line 180",
-          "pastedContents": {}
-        },
-        {
-          "display": "trigger le dev stp je peux pas le faire",
-          "pastedContents": {}
-        },
-        {
-          "display": "Commit + push puis\nUpdate test-railway sur nextnode-front pour deployer dev (pas besoin de prod dans le test) pour etre sur que les nouveau actions sont bon",
-          "pastedContents": {}
-        },
-        {
-          "display": "ENLEVE LES @MAIN ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Je vois que tu met des @main ??? MAIS POURQUOI TU FAIS CA VU QUE TU APPELE JUSTE LE PROPRE PROJET ??? A QUOI CA SERT DE METRE @MAIN A PART CREER DES BUGS PUTAIN ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Bon fini de decouper les workflow alors, ca fait 2h t'es dessus",
-          "pastedContents": {}
-        },
-        {
-          "display": "Bon j'en ai marre, t'en est ou la ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Non mais laisse Claude pedale pq tu me parle de claude, t'essaye de creer workflow jsais pas quoi la",
-          "pastedContents": {}
-        },
-        {
-          "display": "Mais a quoi sert de creer ce fichier alors que Readme existe ?? ",
-          "pastedContents": {}
-        },
-        {
-          "display": "go",
-          "pastedContents": {}
-        },
-        {
-          "display": "C'est quoi la diff avec le Readme ?",
-          "pastedContents": {}
-        },
-        {
-          "display": "Ok top, maintenant le probleme c'est que les workflow externe que ta fait sont TROP larges \n\nIl faut decouper ca en plusieurs taches eux aussi exportables, histoire d'allerger le code, et utilisable par les differents projets\n\n@agent-code-refactor-specialist ",
-          "pastedContents": {}
-        },
-        {
-          "display": "fait comme tu le sens, sachant que internal-tests ne sera pas appelé de l'exterieur, et les actions disponible pour l'exterieurs ne doivent pas etre lancé au commit de github-actions ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Ok top, ensuite je vois que .github est vide, t'es sur que je pourrais appeler mes actions depuis mes autres projets la / ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Pourquoi les atomic ont un folder puis action.yml ? ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Pas de case npm pnpm yarn, on utilise que pnpm donc on supporte que ca ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Bah pourquoi tu ajoute develop ? il y a pas develop sur github-actions",
-          "pastedContents": {}
-        },
-        {
-          "display": "C'est quoi test-actions ? ",
-          "pastedContents": {}
-        },
-        {
-          "display": "I dont want dev and prod file, it should be one file for both ! ",
-          "pastedContents": {}
-        },
-        {
-          "display": "@agent-code-refactor-specialist Je veux que tu refactor le projet github_actions\nJe veux : \n- Que tu supprime le deadcode\n- Que tu supprime les 2 dossier templates et je sais plus quoi non utilisés \n- que tu mette une bien meilleure structure, separer les packs / actions / actions interne \n- Fait tres attention a que les actions ne se lancent pas au commit pour github_actions qui a ses propres actions de test interne, et inversement ces tests ne doivent pas etre dispo a l'exterieur si possible \n- reutilise au maximum les actions atomiques (quality checks, install ... etc) avec des variables pour etre le plus dry possible\n- soit le plus clean et propre possible, evite les fix sale et degueulasse\n- Log comme il faut\n- SUPPRIME le deploiement fly.io qui est deprecié, maitnenant on utilise railway \n- Divise au maximum les etapes de worfklow, pour avoir plein d'etapes sur github (j'aime bien que tout soit propre, et assez atomiques) avec les dependances qu'il faut (ex: DNS doit etre solo, mais dependant du build ... etc)",
-          "pastedContents": {}
-        },
-        {
-          "display": "Non bah fait le rebase interactive toi meme stp, je veux que toute la branche soit squas en 1 seul commit ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Pas possible sans interactive ? J'ai la flem je sais que je veux tout squash jusque main ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Je veux squash tout les commits de la branche sur github actions en 1 seul comment je ferais ? ",
+          "display": "Ajoute le changeset sur standards stp ",
           "pastedContents": {}
         },
         {
@@ -937,75 +661,341 @@
           "pastedContents": {}
         },
         {
-          "display": "[Pasted text #1 +41 lines]\n\nOn y est presque ! \n\nPar contre retire la log Railway domain response et ajout des logs plus ciblé et utiles ",
-          "pastedContents": {
-            "1": {
-              "id": 1,
-              "type": "text",
-              "content": "✅ Existing custom domains removed\n🔧 Configuring Railway custom domain: dev.nextnode.fr\n✅ Railway custom domain configured!\n🔍 Railway domain response:\n{\n  \"customDomainCreate\": {\n    \"id\": \"f28607cc-7a9c-4178-a7af-043ffec8e6c4\",\n    \"domain\": \"dev.nextnode.fr\",\n    \"createdAt\": \"2025-08-30T12:34:46.842Z\",\n    \"updatedAt\": \"2025-08-30T12:34:46.842Z\",\n    \"serviceId\": \"8baef3d5-6987-4e71-afa5-9d79483a26e2\",\n    \"environmentId\": \"8d182962-0130-426f-836d-cbd74bd0eb29\",\n    \"projectId\": \"5b79845d-fabb-47ff-aa45-c9d3def588dc\",\n    \"targetPort\": null,\n    \"status\": {\n      \"dnsRecords\": [\n        {\n          \"hostlabel\": \"dev\",\n          \"fqdn\": \"dev.nextnode.fr\",\n          \"recordType\": \"DNS_RECORD_TYPE_CNAME\",\n          \"requiredValue\": \"kus9ro0s.up.railway.app\",\n          \"currentValue\": \"\",\n          \"status\": \"DNS_RECORD_STATUS_REQUIRES_UPDATE\",\n          \"zone\": \"nextnode.fr\",\n          \"purpose\": \"DNS_RECORD_PURPOSE_TRAFFIC_ROUTE\"\n        }\n      ],\n      \"cdnProvider\": null,\n      \"certificates\": [],\n      \"certificateStatus\": \"CERTIFICATE_STATUS_TYPE_VALIDATING_OWNERSHIP\"\n    }\n  }\n}\n📋 Domain: dev.nextnode.fr\n🔍 CNAME target: kus9ro0s.up.railway.app\n1s\nRun echo \"☁️  Configuring Cloudflare DNS...\"\n☁️  Configuring Cloudflare DNS...\n🔍 Root domain: nextnode.fr\n✅ Found Cloudflare zone: f8f3403a30894b43455b9f3f0bca6757\n➕ Creating new DNS record...\n❌ Failed to configure Cloudflare DNS: An A, AAAA, or CNAME record with that host already exists. For more details, refer to <https://developers.cloudflare.com/dns/manage-dns-records/troubleshooting/records-with-same-name/>."
-            }
-          }
+          "display": "commit tout ce que j'ai fait dans standards en creant une branche pour la PR stp ",
+          "pastedContents": {}
+        },
+        {
+          "display": "/clear ",
+          "pastedContents": {}
+        },
+        {
+          "display": "commit tout ce que j'ai fait sur project-templates ",
+          "pastedContents": {}
+        },
+        {
+          "display": "/model ",
+          "pastedContents": {}
+        },
+        {
+          "display": "continue dsl",
+          "pastedContents": {}
+        },
+        {
+          "display": "Tu peux check la difference de version sur tout ce qui touche a vite entre library et astro template ? Car visivlement j'ai un probleme de type pour le plugin sur astro mais pas sur library ",
+          "pastedContents": {}
+        },
+        {
+          "display": "/clear ",
+          "pastedContents": {}
         },
         {
           "display": "/doctor ",
           "pastedContents": {}
         },
         {
-          "display": "/statusline actual + target folder + current git branch + last time since last commit + is git commit is pushed or local",
+          "display": "claude doctor",
           "pastedContents": {}
         },
         {
-          "display": "Run echo \"🔍 Ensuring Railway internal URL exists...\"\n🔍 Ensuring Railway internal URL exists...\n✅ Railway internal URL already exists!\n🌐 URL: https://{\n📋 Domain: {\n\nCa ma mis ca pour generate railway \n\net \n\n[Pasted text #1 +45 lines]\n\npour la suite ",
+          "display": "/clear ",
+          "pastedContents": {}
+        },
+        {
+          "display": "claude doctor",
+          "pastedContents": {}
+        },
+        {
+          "display": "J'ai reparé, mais sur library j'ai pas le souci, tu peux voir la difference de version sur tout ce qui touche a vite entre library et astro template > ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Regarde comment gerer avec context7",
+          "pastedContents": {}
+        },
+        {
+          "display": "[Pasted text #1 +24 lines]\n\nRegarde l'erreur que j'ai dans vitest.config.ts dans astro template ",
           "pastedContents": {
             "1": {
               "id": 1,
               "type": "text",
-              "content": "Run echo \"🌐 Configuring custom domain...\"\n🌐 Configuring custom domain...\n📋 Target domain: dev.nextnode.fr\n🔍 Checking existing custom domains...\n🗑️  Found existing custom domains, removing them first...\n🗑️  Deleting custom domain: af2e274c-0c75-473e-9365-a87b8fbd6c6b\n✅ Existing custom domains removed\n🔧 Configuring Railway custom domain: dev.nextnode.fr\n✅ Railway custom domain configured!\n🔍 Railway domain response:\n{\n  \"customDomainCreate\": {\n    \"id\": \"1567ef79-ea6d-40cb-94ae-f146cf04d37e\",\n    \"domain\": \"dev.nextnode.fr\",\n    \"createdAt\": \"2025-08-30T12:28:44.867Z\",\n    \"updatedAt\": \"2025-08-30T12:28:44.867Z\",\n    \"serviceId\": \"8baef3d5-6987-4e71-afa5-9d79483a26e2\",\n    \"environmentId\": \"8d182962-0130-426f-836d-cbd74bd0eb29\",\n    \"projectId\": \"5b79845d-fabb-47ff-aa45-c9d3def588dc\",\n    \"targetPort\": null,\n    \"status\": {\n      \"dnsRecords\": [\n        {\n          \"hostlabel\": \"dev\",\n          \"fqdn\": \"dev.nextnode.fr\",\n          \"recordType\": \"DNS_RECORD_TYPE_CNAME\",\n          \"requiredValue\": \"3lcmpr7a.up.railway.app\",\n          \"currentValue\": \"\",\n          \"status\": \"DNS_RECORD_STATUS_REQUIRES_UPDATE\",\n          \"zone\": \"nextnode.fr\",\n          \"purpose\": \"DNS_RECORD_PURPOSE_TRAFFIC_ROUTE\"\n        }\n      ],\n      \"cdnProvider\": null,\n      \"certificates\": [],\n      \"certificateStatus\": \"CERTIFICATE_STATUS_TYPE_VALIDATING_OWNERSHIP\"\n    }\n  }\n}\n📋 Domain: dev.nextnode.fr\n⚠️  No CNAME target found in Railway response\n0s\nRun echo \"☁️  Configuring Cloudflare DNS...\"\n☁️  Configuring Cloudflare DNS...\n⚠️  No CNAME target available - skipping DNS configuration\n💡 Railway domain may not be ready yet or custom domain setup failed"
+              "content": "typescript: Argument of type 'UserConfig & Promise<UserConfig> & (UserConfigFnObject & UserConfigExport)' is not assignable to parameter of type 'never'.\n  Type 'UserConfig & Promise<UserConfig> & UserConfigFnObject' is not assignable to type 'never'. [2345]\ntypescript: Argument of type 'UserConfig & Promise<UserConfig> & (UserConfigFnObject & UserConfigExport)' is not assignable to parameter of type 'never'.\n  Type 'UserConfig & Promise<UserConfig> & UserConfigFnObject' is not assignable to type 'never'. [2345]\ntypescript: No overload matches this call.\n  The last overload gave the following error.\n    Type 'Plugin<any>' is not assignable to type 'PluginOption'.\n      Type 'Plugin<any>' is not assignable to type 'Plugin$1<any>'.\n        Types of property 'hotUpdate' are incompatible.\n          Type 'ObjectHook<(this: HotUpdatePluginContext, options: HotUpdateOptions) => void | EnvironmentModuleNode[] | Promise<void | EnvironmentModuleNode[]>> | undefined' is not assignable to type 'ObjectHook<(this: MinimalPluginContext & { environment: DevEnvironment; }, options: HotUpdateOptions) => void | EnvironmentModuleNode[] | Promise<...>> | undefined'.\n            Type '(this: HotUpdatePluginContext, options: HotUpdateOptions) => void | EnvironmentModuleNode[] | Promise<void | EnvironmentModuleNode[]>' is not assignable to type 'ObjectHook<(this: MinimalPluginContext & { environment: DevEnvironment; }, options: HotUpdateOptions) => void | EnvironmentModuleNode[] | Promise<...>> | undefined'.\n              Type '(this: HotUpdatePluginContext, options: HotUpdateOptions) => void | EnvironmentModuleNode[] | Promise<void | EnvironmentModuleNode[]>' is not assignable to type '(this: MinimalPluginContext & { environment: DevEnvironment; }, options: HotUpdateOptions) => void | EnvironmentModuleNode[] | Promise<...>'.\n                Types of parameters 'options' and 'options' are incompatible.\n                  Property 'environment' is missing in type 'import(\"/Users/walid/Development/Nextnode/project-templates/apps/astro/node_modules/.pnpm/vite@7.1.7_@types+node@24.5.2_jiti@2.6.0_lightningcss@1.30.1_yaml@2.8.1/node_modules/vite/dist/node/index\").HotUpdateOptions' but required in type 'import(\"/Users/walid/Development/Nextnode/project-templates/apps/astro/node_modules/.pnpm/vite@6.3.6_@types+node@24.5.2_jiti@2.6.0_lightningcss@1.30.1_yaml@2.8.1/node_modules/vite/dist/node/index\").HotUpdateOptions'. [2769]\ntypescript: No overload matches this call.\n  The last overload gave the following error.\n    Type 'Plugin<any>' is not assignable to type 'PluginOption'.\n      Type 'Plugin<any>' is not assignable to type 'Plugin$1<any>'.\n        Types of property 'hotUpdate' are incompatible.\n          Type 'ObjectHook<(this: HotUpdatePluginContext, options: HotUpdateOptions) => void | EnvironmentModuleNode[] | Promise<void | EnvironmentModuleNode[]>> | undefined' is not assignable to type 'ObjectHook<(this: MinimalPluginContext & { environment: DevEnvironment; }, options: HotUpdateOptions) => void | EnvironmentModuleNode[] | Promise<...>> | undefined'.\n            Type '(this: HotUpdatePluginContext, options: HotUpdateOptions) => void | EnvironmentModuleNode[] | Promise<void | EnvironmentModuleNode[]>' is not assignable to type 'ObjectHook<(this: MinimalPluginContext & { environment: DevEnvironment; }, options: HotUpdateOptions) => void | EnvironmentModuleNode[] | Promise<...>> | undefined'.\n              Type '(this: HotUpdatePluginContext, options: HotUpdateOptions) => void | EnvironmentModuleNode[] | Promise<void | EnvironmentModuleNode[]>' is not assignable to type '(this: MinimalPluginContext & { environment: DevEnvironment; }, options: HotUpdateOptions) => void | EnvironmentModuleNode[] | Promise<...>'.\n                Types of parameters 'options' and 'options' are incompatible.\n                  Property 'environment' is missing in type 'import(\"/Users/walid/Development/Nextnode/project-templates/apps/astro/node_modules/.pnpm/vite@7.1.7_@types+node@24.5.2_jiti@2.6.0_lightningcss@1.30.1_yaml@2.8.1/node_modules/vite/dist/node/index\").HotUpdateOptions' but required in type 'import(\"/Users/walid/Development/Nextnode/project-templates/apps/astro/node_modules/.pnpm/vite@6.3.6_@types+node@24.5.2_jiti@2.6.0_lightningcss@1.30.1_yaml@2.8.1/node_modules/vite/dist/node/index\").HotUpdateOptions'. [2769]\n"
             }
           }
         },
         {
-          "display": "Non je prefere que tu supprime le domain railway si on entre un domaine c'est plus simple ",
+          "display": "Fait le pour astro template aussi",
           "pastedContents": {}
         },
         {
-          "display": "❯ railway domain https://dev.nextnode.fr --json\nYou have reached the limit for custom domains per service on your plan. Please upgrade to add more.\n\nCa me fait ca ",
+          "display": "Bon en fait annule on va faire plus simple :\n- Supprime dans standards la partie avec vitetsconfig\n- desinstalle vitetsconfig de package.json\n- Ajoute le dans le template",
           "pastedContents": {}
         },
         {
-          "display": "Non pas de fallback enculé trouve comment faire ",
+          "display": "vasy go on va test ",
           "pastedContents": {}
         },
         {
-          "display": "Run echo \"🌐 Configuring custom domain...\"\n🌐 Configuring custom domain...\n📋 Target domain: dev.nextnode.fr\n🔍 Checking existing custom domains...\n✅ Custom domain already exists: dev.nextnode.fr\n🔍 Existing domain info:\n{\n  \"id\": \"af2e274c-0c75-473e-9365-a87b8fbd6c6b\",\n  \"domain\": \"dev.nextnode.fr\",\n  \"targetPort\": null\n}\n📋 Domain: dev.nextnode.fr\n⚠️  No CNAME target found in Railway response\n0s\nRun echo \"☁️  Configuring Cloudflare DNS...\"\n  \n☁️  Configuring Cloudflare DNS...\n⚠️  No CNAME target available - skipping DNS configuration\n💡 Railway domain may not be ready yet or custom domain setup failed",
+          "display": "Non mais dans l'option1, tu as const tsconfig = JSON.parse(readFileSync(tsconfigPath, 'utf-8')), mais comment tu as tsconfigpaths ? ",
           "pastedContents": {}
         },
         {
-          "display": "1s\nRun echo \"🌐 Configuring custom domain...\"\n🌐 Configuring custom domain...\n📋 Target domain: dev.nextnode.fr\n🔧 Configuring Railway custom domain...\n⚠️  Failed to configure Railway custom domain\n🌐 Check Railway dashboard: https://railway.app/project/5b79845d-fabb-47ff-aa45-c9d3def588dc\n\n\nCa me fait ca, probablement parce que le custom domain est deja bien reglé c'est le cloudflare le probleme la ",
+          "display": "Ok ca me parait interessant, comment on a tsconfigpath ? ",
           "pastedContents": {}
         },
         {
-          "display": "Run echo \"☁️  Configuring Cloudflare DNS...\"\n☁️  Configuring Cloudflare DNS...\n⚠️  No CNAME target available - skipping DNS configuration\n\nCa me met ca ",
+          "display": "Ptdr c'est quoi cette option a la con sale fils de pute \n\nDegage moi ce local de ton serveur de merde\n\nTrouve moi la solution pour merge les configs proprement, et que j'ai aps de souci avec vitetsconfigpaths, trouve moi la solution la plus optimisé et bonne pratiques, utilise context7, ultrathink",
           "pastedContents": {}
         },
         {
-          "display": "relance un workflow ",
+          "display": "Bah le probleme c'est que quand je faisais ca, alors ca me fait ca :\n❯ pnpm t\n\n> @nextnode/test-library-20250927_210507@1.0.0 test /Users/walid/Development/Nextnode/test-library-20250927_210507\n> vitest run\n\nfailed to load config from /Users/walid/Development/Nextnode/test-library-20250927_210507/vitest.config.ts\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ Startup Error ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\nError [ERR_MODULE_NOT_FOUND]: Cannot find package 'vite-tsconfig-paths' imported from /Users/walid/Development/Nextnode/test-library-20250927_210507/node_modules/.pnpm/@nextnode+standards@2.1.1_@biomejs+biome@2.2.4_@commitlint+cli@19.8.1_@types+node@22.17_59d278aa1ce76c91771f53a26f855afb/node_modules/@nextnode/standards/src/vitest/vitest.backend.js",
           "pastedContents": {}
         },
         {
-          "display": "\nInvalid workflow file: .github/workflows/test-railway.yml#L48\nerror parsing called workflow\n\".github/workflows/test-railway.yml\"\n-> \"NextNodeSolutions/github-actions/.github/workflows/pack-deploy-railway-prod.yml@feat/railway-deployment-support\" (source branch with sha:276d9874de2b0b7579699dbad5ef8cb21af982fd)\n--> \"./.github/workflows/job-deploy-railway.yml\" (source branch with sha:276d9874de2b0b7579699dbad5ef8cb21af982fd)\n: (Line: 450, Col: 13): Unrecognized named-value: 'secrets'. Located at position 74 within expression: inputs.domain != '' && steps.custom-domain.outputs.final-domain != '' && secrets.CLOUDFLARE_API_TOKEN != ''",
+          "display": "Use context7 what you are doing seems bad AND not functionnal",
           "pastedContents": {}
         },
         {
-          "display": "oui",
+          "display": "Pas possible de passer a vite v6 sur standards ? ",
           "pastedContents": {}
         },
         {
-          "display": "Ok on va faire ca apres, pour l'instant verifie juste que nextnode-front appelle correctement le job ",
+          "display": "0.0.0 via  v24.2.0\n❯ pnpm add -D vite-tsconfig-paths\nPackages: +4\n++++\nProgress: resolved 479, reused 429, downloaded 0, added 4, done\n WARN  Issues with peer dependencies found\n.\n└─┬ @nextnode/standards 2.1.1\n  └── ✕ unmet peer vite@^5.0.0: found 6.3.5\n\nTu peux me dire d'ou ca peut venir dans package/library template ?",
           "pastedContents": {}
         },
         {
-          "display": "Mais surtout c'est quoi cette histoire de template supprime moi ca c'est quoi cette merde ",
+          "display": "/clear ",
+          "pastedContents": {}
+        },
+        {
+          "display": "❯ pnpm type-check\n\n> @nextnode/test-astro-20250927_210458@1.0.0 type-check /Users/walid/Development/Nextnode/test-astro-20250927_210458\n> astro check && tsc --noEmit\n\n{\"level\":\"info\",\"message\":\"Configuration loaded\",\"timestamp\":\"2025-09-29T12:57:21.287Z\",\"location\":{\"function\":\"mjs?t=1759150640709:12:8\"},\"requestId\":\"req_0dcb5a5c\",\"object\":{\"details\":{\"host\":\"0.0.0.0\",\"port\":4321,\"site\":\"http://0.0.0.0:4321\",\"environment\":\"production\"}}}\n[config] Astro found issue(s) with your configuration:\n\n! experimental: Invalid or outdated experimental feature.\n  Check for incorrect spelling or outdated Astro version.\n  See https://docs.astro.build/en/reference/experimental-flags/ for a list of all current experiments.\n\n ELIFECYCLE  Command failed with exit code 1.\n\nDou peut venir cette erreur dans test-astro ? ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Donne moi la commande pour generer un projet avec config-astro et config-library pour que je puisse tester en une seule ligne de commande",
+          "pastedContents": {}
+        },
+        {
+          "display": "/clear ",
+          "pastedContents": {}
+        },
+        {
+          "display": "delete test-astro et test-library, et relance les test de generation de projet pour ces 2 la",
+          "pastedContents": {}
+        },
+        {
+          "display": "/clear ",
+          "pastedContents": {}
+        },
+        {
+          "display": "commit tout sur project-template",
+          "pastedContents": {}
+        },
+        {
+          "display": "commit tout ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Add changeset et commit ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Je veux le debug et la gestion de sitemap aussi sur le template ! ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Sale fils de pute anule tout ce que ta fait sale merde, c'est sur @nextnode/standards quil fallait faire ca ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Fait moi une difference astro config nextnode-front - project-template pour verifier que j'ai pas autre chose a fix ",
+          "pastedContents": {}
+        },
+        {
+          "display": "commit ce que tu as dans standards dans une branch fix types ",
+          "pastedContents": {}
+        },
+        {
+          "display": "/clear ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Non on va faire la seconde option qui est plus battletested, ca veut dire qu'il faut update standards non ? il faut faire une .d.ts vraiment propre ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Quand je test test-library, pnpm lint me jette une erreur :\nvitest.config.ts:2:24 - error TS7016: Could not find a declaration file for module '@nextnode/standards/vitest/backend'. '/Users/walid/Development/Nextnode/test-library-20250927_210507/node_modules/.pnpm/@nextnode+standards@2.1.0_@biomejs+biome@2.2.4_@commitlint+cli@19.8.1_@types+node@22.17_7ac66d6dab784865246768fe2ba8b6e9/node_modules/@nextnode/standards/src/vitest/vitest.backend.js' implicitly has an 'any' type.\n  Try `npm i --save-dev @types/nextnode__standards` if it exists or add a new declaration (.d.ts) file containing `declare module '@nextnode/standards/vitest/backend';`\n\n2 import baseConfig from '@nextnode/standards/vitest/backend'\n                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n\n\nFound 1 error in vitest.config.ts:2\n\nDonc va voir sur le project-template library quel est le souci pour le regler ",
+          "pastedContents": {}
+        },
+        {
+          "display": "C'est bizarre le astro.config.mjs de template n'a rien a voir avec celui de nextnode-front ? A quel moment t'a ajouté un import type Config, et meme le @nextnode/config il a rien a faire la vu qu'on passe par des env ",
+          "pastedContents": {}
+        },
+        {
+          "display": "questce que tu me propose ? ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Pourquoi quand c'est generé ca me donne :\n  \"keywords\": [\n    \"[\\\"astro\\\"\",\n    \"\\\"nextnode\\\"\",\n    \"\\\"test\\\"]\"\n  ],\n",
+          "pastedContents": {}
+        },
+        {
+          "display": "Ok, fait moi: \n- Un coup de make test-astro et un make test-library en local pour generer les fichier yaml de config\n- Update les fichiers de config pour que je teste les templates\n- Assure toi qu'on vise la branche fix/library-template-config pour les templates (c'est cette branche qu'on veut tester pour PR apres si c'est bon)\n- Ensuite lance la commande project-generator pour generer les projets \n\nLe but est juste de tester si les templates fonctionnent",
+          "pastedContents": {}
+        },
+        {
+          "display": "ORH les commandes sur le terminal pas un makefile fdp",
+          "pastedContents": {}
+        },
+        {
+          "display": "Non mais genere les config avec les make test-astro et make test-library troufion ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Non pas de makefile juste fait les a la main pour tester",
+          "pastedContents": {}
+        },
+        {
+          "display": "Ok, fait moi un make test-astro et un make test-library en local pour que je teste les projets, assure toi qu'on vise la branche fix/library-template-config pour les templates (c'est cette branche qu'on veut tester pour PR apres si c'est bon), ensuite lance la commande project-generator pour generer les projets, le but est juste de tester si les templates fonctionnent",
+          "pastedContents": {}
+        },
+        {
+          "display": "/clear ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Ce que tu viens de faire, est-ce que les make fonctionnent toujours ? ",
+          "pastedContents": {}
+        },
+        {
+          "display": "En fait ne fait pas de detection dans le code source car c'est des variable qui sont tiré depuis les variables de file_config et template_config ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Quand meme quand tu dis rust la seule reference, il faut pas oublier de prendre template_config aussi dans le template en question, car ces donnés ne sont pas dans le script rust ?",
+          "pastedContents": {}
+        },
+        {
+          "display": "Attention quand je dis automatiquement, je veux AUCUNE clé hardcodé dans le script, tout doit etre récupéré DYNAMIQUEMENT ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Update le script de generation de config de project-generator pour prendre en compte la config qu'on peut entrer dans le projet mais qui ne passe pas par template_config (ex: name / develop_branch / branch pour template), pour totalement automatiser la config\n\nLe but est que la config généré soit la source de verité, et que ce soit parfaitement toujours généré avec toute les key possible, et comme tu a fait en commenter certaines par defaut c'est top ",
+          "pastedContents": {}
+        },
+        {
+          "display": "/clear ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Ok, fait moi un make test-astro et un make test-library en local pour que je teste les projets, assure toi qu'on est sur la branche fix/library-template-config pour les templates, ensuite lance la commande project-generator pour generer les projets, le but est juste de tester si les templates fonctionnent",
+          "pastedContents": {}
+        },
+        {
+          "display": "Les make files dans project-generator marchent plus car on a changé le systeme des template_config ",
+          "pastedContents": {}
+        },
+        {
+          "display": "commit project-ctemplate ",
+          "pastedContents": {}
+        },
+        {
+          "display": "commit ",
+          "pastedContents": {}
+        },
+        {
+          "display": "ok go alors parfait le plan + ca ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Est-ce que package.json marche specialement ou je me trompe ? si on change pour les .json avec un \"attribute\" pour differencier de key c'est pas mieux ? ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Dans project-generator, quand on lit le template_config.json, il y a un champ key et un champ value\n\nJe pense que ca devrais etre optionnel, et par defaut on a juste key, et que le replacement fonctionne automatiquement en prenant la key qui va etre donné dans la config. ex :\n- config : -> project_name = astro\n- template_json -> readme.md // key = \"{{project_name}}\"\n- replace {{project_name}} in readme.md by astro \n\nMoreover, je vois \"name\" dans chacun des \"replacements\", tu peux me dire a quoi ca sert ? a la limite pour package.json c'etait pour les name des attributs, mais ailleurs je comprends pas ? ",
+          "pastedContents": {}
+        },
+        {
+          "display": "/clear ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Aussi le template de library est naze, genre changeset/config ou le readme, pourquoi on utilise pas des {{ }}\n\nAussi c'est pas refactor comme template_config de astro",
+          "pastedContents": {}
+        },
+        {
+          "display": "Mais je comprend pas dans ce cas, car le template_json cest :\n        \"files_to_replace\": [\"package.json\"],\n        \"replacements\": [\n            { \"name\": \"name\", \"key\": \"name\", \"value\": \"{{project_name}}\" },\n",
+          "pastedContents": {}
+        },
+        {
+          "display": "Dis moi dans le workflow project generator, quand je crée un projet, explique moi comment on a 2 noms differents pour github (ex standards), mais dans package.json ce sera un nom avec @ (ex @nextnode/standards) ?? ",
+          "pastedContents": {}
+        },
+        {
+          "display": "/clear ",
+          "pastedContents": {}
+        },
+        {
+          "display": "NON C'EST PAS FAIT enculé ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Ensuite je t'ai dis update apps_eslint-pluging dans changesets/config par le nom qui sera sur le github, probablement project_name aussi ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Non mais non il y a pas dev_domain et si il y en a faut le supprimer, c'est que website_url",
+          "pastedContents": {}
+        },
+        {
+          "display": "C'est quoi ca dev_domain pourquoi tu ajoute dev_domain enculé ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Dans le readme transforme en {{project_name}} pour pouvoir factoriser\n\nPuis fait l'option 1 stp",
+          "pastedContents": {}
+        },
+        {
+          "display": "J'ai pas compris option 2, en plus ca necessiterai une modification du fonctionnement de project-generator non  ?",
+          "pastedContents": {}
+        },
+        {
+          "display": "Est-ce qu'on pourrait factoriser template_config ? je vois qu'il y a beaucoup de project_name dans pleins de fichiers differents ",
+          "pastedContents": {}
+        },
+        {
+          "display": "commit ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Tu peux mettre deploy-dev et deploy-prod ensemble vu que c'est la meme chose non ? pour template config ",
+          "pastedContents": {}
+        },
+        {
+          "display": "Tu as pas update template astro avec les github actions de nextnode-front putaing \nVerifie aussi husky",
+          "pastedContents": {}
+        },
+        {
+          "display": "pas test-astro",
+          "pastedContents": {}
+        },
+        {
+          "display": "Super, commit moi ca c'est top ",
+          "pastedContents": {}
+        },
+        {
+          "display": "J'aimerai crée un projet pour tester mes templates\n\nJe dois faire une config avec la branch fix/library-template-config\n\nMais comment créer la config facilement vu que le fichier template_config se trouve dans le template en question ? Flem de les connaitre par coeur et j'aimerai automatiser ca aussi ",
+          "pastedContents": {}
+        },
+        {
+          "display": "/clear ",
+          "pastedContents": {}
+        },
+        {
+          "display": "J'ai update le lintstaged de library template\n\nCheck tout ce qu'il y a a mettre a jour pour revenir a jour, par rapport a config-manager / logger (surtout pour le husky / github actions) ",
+          "pastedContents": {}
+        },
+        {
+          "display": "commit le tout ",
           "pastedContents": {}
         }
       ],
@@ -1015,11 +1005,11 @@
       "disabledMcpjsonServers": [],
       "hasTrustDialogAccepted": true,
       "hasTrustDialogHooksAccepted": false,
-      "projectOnboardingSeenCount": 2,
+      "projectOnboardingSeenCount": 4,
       "hasClaudeMdExternalIncludesApproved": false,
       "hasClaudeMdExternalIncludesWarningShown": false,
       "hasCompletedProjectOnboarding": true,
-      "lastTotalWebSearchRequests": 10
+      "lastTotalWebSearchRequests": 4
     },
     "/Users/walid/.config": {
       "allowedTools": [],
@@ -1066,6 +1056,22 @@
     "/Users/walid/Development/Nextnode/nextnode-front": {
       "allowedTools": [],
       "history": [
+        {
+          "display": "/exit",
+          "pastedContents": {}
+        },
+        {
+          "display": "/clear ",
+          "pastedContents": {}
+        },
+        {
+          "display": "v .",
+          "pastedContents": {}
+        },
+        {
+          "display": "Divise les commit par type de feature et commit tout ",
+          "pastedContents": {}
+        },
         {
           "display": "Ouais mais dans ce cas, pour 1 ou 2 projet supabase est gratuit [Image #1]",
           "pastedContents": {
@@ -1492,22 +1498,6 @@
         {
           "display": "commit push ",
           "pastedContents": {}
-        },
-        {
-          "display": "je viens de rebase sur main mate les conflits t'a litteralement rien fait",
-          "pastedContents": {}
-        },
-        {
-          "display": "commit et push",
-          "pastedContents": {}
-        },
-        {
-          "display": "Yes go, donc on reste sur select qui viens de main et tout le reste a voir ",
-          "pastedContents": {}
-        },
-        {
-          "display": "Ah non mais du coup c'est probablement select.tsx de develop qui est plus a jour dans ce cas !! \n\nMais dis moi le commit sur main il y a quoi d'autre ? sinon juste je le supprime ",
-          "pastedContents": {}
         }
       ],
       "mcpContextUris": [],
@@ -1516,30 +1506,30 @@
       "disabledMcpjsonServers": [],
       "hasTrustDialogAccepted": true,
       "hasTrustDialogHooksAccepted": false,
-      "projectOnboardingSeenCount": 1,
+      "projectOnboardingSeenCount": 2,
       "hasClaudeMdExternalIncludesApproved": false,
       "hasClaudeMdExternalIncludesWarningShown": false,
       "exampleFiles": [
-        "index.astro",
-        "global.css",
-        "config.mjs",
-        "types.d.ts",
-        "vitest.config.ts"
+        "HeroContent.astro",
+        "BaseLayout.astro",
+        "Header.astro",
+        "language-manager.ts",
+        "common.ts"
       ],
-      "exampleFilesGeneratedAt": 1756477161671,
+      "exampleFilesGeneratedAt": 1758922991328,
       "hasCompletedProjectOnboarding": true,
-      "lastTotalWebSearchRequests": 6,
-      "lastCost": 4.27165325,
-      "lastAPIDuration": 1179231,
-      "lastToolDuration": 712423,
-      "lastDuration": 52666704,
-      "lastLinesAdded": 204,
-      "lastLinesRemoved": 93,
-      "lastTotalInputTokens": 120613,
-      "lastTotalOutputTokens": 52835,
-      "lastTotalCacheCreationInputTokens": 282837,
-      "lastTotalCacheReadInputTokens": 7667289,
-      "lastSessionId": "cb88e3bf-1ebf-4765-81f6-8102c623cbcb"
+      "lastTotalWebSearchRequests": 0,
+      "lastCost": 2.0615858500000006,
+      "lastAPIDuration": 192693,
+      "lastToolDuration": 54575,
+      "lastDuration": 2338783,
+      "lastLinesAdded": 0,
+      "lastLinesRemoved": 0,
+      "lastTotalInputTokens": 24195,
+      "lastTotalOutputTokens": 5455,
+      "lastTotalCacheCreationInputTokens": 127787,
+      "lastTotalCacheReadInputTokens": 1089056,
+      "lastSessionId": "4a845d6c-5b59-431d-ae09-6352669a47e4"
     },
     "/Users/walid/Development/Nextnode/functions-server": {
       "allowedTools": [],
@@ -2426,26 +2416,15 @@
       "hasClaudeMdExternalIncludesApproved": false,
       "hasClaudeMdExternalIncludesWarningShown": false,
       "exampleFiles": [
-        "main.rs",
+        "mod.rs",
+        "functions.rs",
         "file_operations.rs",
-        "file_config.rs",
-        "repo.rs",
-        "functions.rs"
+        "project_generator.rs",
+        "repo.rs"
       ],
-      "exampleFilesGeneratedAt": 1755786517737,
+      "exampleFilesGeneratedAt": 1758925393817,
       "lastTotalWebSearchRequests": 0,
-      "hasCompletedProjectOnboarding": true,
-      "lastCost": 1.7549789,
-      "lastAPIDuration": 289415,
-      "lastToolDuration": 28018,
-      "lastDuration": 27895625,
-      "lastLinesAdded": 107,
-      "lastLinesRemoved": 69,
-      "lastTotalInputTokens": 14076,
-      "lastTotalOutputTokens": 11265,
-      "lastTotalCacheCreationInputTokens": 203154,
-      "lastTotalCacheReadInputTokens": 2718372,
-      "lastSessionId": "0f2fde53-b2e5-4746-b9f7-3ef1e4eb2f77"
+      "hasCompletedProjectOnboarding": true
     },
     "/Users/walid/Development/Nextnode/project-templates": {
       "allowedTools": [],
@@ -2505,25 +2484,14 @@
       "hasClaudeMdExternalIncludesWarningShown": false,
       "exampleFiles": [
         "package.json",
+        "deploy-dev.yml",
+        "astro.config.mjs",
         "tsconfig.json",
-        "test.yml",
-        "template_config.json",
-        "pnpm-lock.yaml"
+        "test.yml"
       ],
-      "exampleFilesGeneratedAt": 1756478323391,
+      "exampleFilesGeneratedAt": 1758923046931,
       "hasCompletedProjectOnboarding": true,
-      "lastTotalWebSearchRequests": 0,
-      "lastCost": 0,
-      "lastAPIDuration": 0,
-      "lastToolDuration": 0,
-      "lastDuration": 2224,
-      "lastLinesAdded": 0,
-      "lastLinesRemoved": 0,
-      "lastTotalInputTokens": 0,
-      "lastTotalOutputTokens": 0,
-      "lastTotalCacheCreationInputTokens": 0,
-      "lastTotalCacheReadInputTokens": 0,
-      "lastSessionId": "1658e158-ca31-4c34-a513-5d76e791be8e"
+      "lastTotalWebSearchRequests": 0
     },
     "/Users/walid/Development/Nextnode/logger": {
       "allowedTools": [],
@@ -3810,6 +3778,26 @@
       "lastTotalCacheReadInputTokens": 6886193,
       "lastTotalWebSearchRequests": 0,
       "lastSessionId": "79606848-8103-4227-83b5-1f9d3eba76b6"
+    },
+    "/Users/walid/Development/Nextnode/standards": {
+      "allowedTools": [],
+      "history": [],
+      "mcpContextUris": [],
+      "mcpServers": {},
+      "enabledMcpjsonServers": [],
+      "disabledMcpjsonServers": [],
+      "hasTrustDialogAccepted": false,
+      "projectOnboardingSeenCount": 0,
+      "hasClaudeMdExternalIncludesApproved": false,
+      "hasClaudeMdExternalIncludesWarningShown": false,
+      "exampleFiles": [
+        "base.json",
+        "test.yml",
+        "package.json",
+        "base.js",
+        "auto-publish.yml"
+      ],
+      "exampleFilesGeneratedAt": 1758923019768
     }
   },
   "subscriptionNoticeCount": 0,
@@ -3821,7 +3809,8 @@
     "organizationUuid": "391c4a11-6684-4c23-b279-588198cf7ad8",
     "organizationRole": "admin",
     "workspaceRole": null,
-    "organizationName": "walidmostefaoui@nextnode.fr's Organization"
+    "organizationName": "walidmostefaoui@nextnode.fr's Organization",
+    "displayName": "Walid"
   },
   "isQualifiedForDataSharing": false,
   "hasCompletedOnboarding": true,
@@ -3870,14 +3859,14 @@
       "Bash(git push -f *)"
     ]
   },
-  "cachedChangelog": "# Changelog\n\n## 1.0.97\n\n- Settings: /doctor now validates permission rule syntax and suggests corrections\n\n## 1.0.94\n\n- Vertex: add support for global endpoints for supported models\n- /memory command now allows direct editing of all imported memory files\n- SDK: Add custom tools as callbacks\n- Added /todos command to list current todo items\n\n## 1.0.93\n\n- Windows: Add alt + v shortcut for pasting images from clipboard\n- Support NO_PROXY environment variable to bypass proxy for specified hostnames and IPs\n\n## 1.0.90\n\n- Settings file changes take effect immediately - no restart required\n\n## 1.0.88\n\n- Fixed issue causing \"OAuth authentication is currently not supported\"\n- Status line input now includes `exceeds_200k_tokens`\n- Fixed incorrect usage tracking in /cost.\n- Introduced `ANTHROPIC_DEFAULT_SONNET_MODEL` and `ANTHROPIC_DEFAULT_OPUS_MODEL` for controlling model aliases opusplan, opus, and sonnet.\n- Bedrock: Updated default Sonnet model to Sonnet 4\n\n## 1.0.86\n\n- Added /context to help users self-serve debug context issues\n- SDK: Added UUID support for all SDK messages\n- SDK: Added `--replay-user-messages` to replay user messages back to stdout\n\n## 1.0.85\n\n- Status line input now includes session cost info\n- Hooks: Introduced SessionEnd hook\n\n## 1.0.84\n\n- Fix tool_use/tool_result id mismatch error when network is unstable\n- Fix Claude sometimes ignoring real-time steering when wrapping up a task\n- @-mention: Add ~/.claude/\\* files to suggestions for easier agent, output style, and slash command editing\n- Use built-in ripgrep by default; to opt out of this behavior, set USE_BUILTIN_RIPGREP=0\n\n## 1.0.83\n\n- @-mention: Support files with spaces in path\n- New shimmering spinner\n\n## 1.0.82\n\n- SDK: Add request cancellation support\n- SDK: New additionalDirectories option to search custom paths, improved slash command processing\n- Settings: Validation prevents invalid fields in .claude/settings.json files\n- MCP: Improve tool name consistency\n- Bash: Fix crash when Claude tries to automatically read large files\n\n## 1.0.81\n\n- Released output styles, including new built-in educational output styles \"Explanatory\" and \"Learning\". Docs: https://docs.anthropic.com/en/docs/claude-code/output-styles\n- Agents: Fix custom agent loading when agent files are unparsable\n\n## 1.0.80\n\n- UI improvements: Fix text contrast for custom subagent colors and spinner rendering issues\n\n## 1.0.77\n\n- Bash tool: Fix heredoc and multiline string escaping, improve stderr redirection handling\n- SDK: Add session support and permission denial tracking\n- Fix token limit errors in conversation summarization\n- Opus Plan Mode: New setting in `/model` to run Opus only in plan mode, Sonnet otherwise\n\n## 1.0.73\n\n- MCP: Support multiple config files with `--mcp-config file1.json file2.json`\n- MCP: Press Esc to cancel OAuth authentication flows\n- Bash: Improved command validation and reduced false security warnings\n- UI: Enhanced spinner animations and status line visual hierarchy\n- Linux: Added support for Alpine and musl-based distributions (requires separate ripgrep installation)\n\n## 1.0.72\n\n- Ask permissions: have Claude Code always ask for confirmation to use specific tools with /permissions\n\n## 1.0.71\n\n- Background commands: (Ctrl-b) to run any Bash command in the background so Claude can keep working (great for dev servers, tailing logs, etc.)\n- Customizable status line: add your terminal prompt to Claude Code with /statusline\n\n## 1.0.70\n\n- Performance: Optimized message rendering for better performance with large contexts\n- Windows: Fixed native file search, ripgrep, and subagent functionality\n- Added support for @-mentions in slash command arguments\n\n## 1.0.69\n\n- Upgraded Opus to version 4.1\n\n## 1.0.68\n\n- Fix incorrect model names being used for certain commands like `/pr-comments`\n- Windows: improve permissions checks for allow / deny tools and project trust. This may create a new project entry in `.claude.json` - manually merge the history field if desired.\n- Windows: improve sub-process spawning to eliminate \"No such file or directory\" when running commands like pnpm\n- Enhanced /doctor command with CLAUDE.md and MCP tool context for self-serve debugging\n- SDK: Added canUseTool callback support for tool confirmation\n- Added `disableAllHooks` setting\n- Improved file suggestions performance in large repos\n\n## 1.0.65\n\n- IDE: Fixed connection stability issues and error handling for diagnostics\n- Windows: Fixed shell environment setup for users without .bashrc files\n\n## 1.0.64\n\n- Agents: Added model customization support - you can now specify which model an agent should use\n- Agents: Fixed unintended access to the recursive agent tool\n- Hooks: Added systemMessage field to hook JSON output for displaying warnings and context\n- SDK: Fixed user input tracking across multi-turn conversations\n- Added hidden files to file search and @-mention suggestions\n\n## 1.0.63\n\n- Windows: Fixed file search, @agent mentions, and custom slash commands functionality\n\n## 1.0.62\n\n- Added @-mention support with typeahead for custom agents. @<your-custom-agent> to invoke it\n- Hooks: Added SessionStart hook for new session initialization\n- /add-dir command now supports typeahead for directory paths\n- Improved network connectivity check reliability\n\n## 1.0.61\n\n- Transcript mode (Ctrl+R): Changed Esc to exit transcript mode rather than interrupt\n- Settings: Added `--settings` flag to load settings from a JSON file\n- Settings: Fixed resolution of settings files paths that are symlinks\n- OTEL: Fixed reporting of wrong organization after authentication changes\n- Slash commands: Fixed permissions checking for allowed-tools with Bash\n- IDE: Added support for pasting images in VSCode MacOS using ⌘+V\n- IDE: Added `CLAUDE_CODE_AUTO_CONNECT_IDE=false` for disabling IDE auto-connection\n- Added `CLAUDE_CODE_SHELL_PREFIX` for wrapping Claude and user-provided shell commands run by Claude Code\n\n## 1.0.60\n\n- You can now create custom subagents for specialized tasks! Run /agents to get started\n\n## 1.0.59\n\n- SDK: Added tool confirmation support with canUseTool callback\n- SDK: Allow specifying env for spawned process\n- Hooks: Exposed PermissionDecision to hooks (including \"ask\")\n- Hooks: UserPromptSubmit now supports additionalContext in advanced JSON output\n- Fixed issue where some Max users that specified Opus would still see fallback to Sonnet\n\n## 1.0.58\n\n- Added support for reading PDFs\n- MCP: Improved server health status display in 'claude mcp list'\n- Hooks: Added CLAUDE_PROJECT_DIR env var for hook commands\n\n## 1.0.57\n\n- Added support for specifying a model in slash commands\n- Improved permission messages to help Claude understand allowed tools\n- Fix: Remove trailing newlines from bash output in terminal wrapping\n\n## 1.0.56\n\n- Windows: Enabled shift+tab for mode switching on versions of Node.js that support terminal VT mode\n- Fixes for WSL IDE detection\n- Fix an issue causing awsRefreshHelper changes to .aws directory not to be picked up\n\n## 1.0.55\n\n- Clarified knowledge cutoff for Opus 4 and Sonnet 4 models\n- Windows: fixed Ctrl+Z crash\n- SDK: Added ability to capture error logging\n- Add --system-prompt-file option to override system prompt in print mode\n\n## 1.0.54\n\n- Hooks: Added UserPromptSubmit hook and the current working directory to hook inputs\n- Custom slash commands: Added argument-hint to frontmatter\n- Windows: OAuth uses port 45454 and properly constructs browser URL\n- Windows: mode switching now uses alt + m, and plan mode renders properly\n- Shell: Switch to in-memory shell snapshot to fix file-related errors\n\n## 1.0.53\n\n- Updated @-mention file truncation from 100 lines to 2000 lines\n- Add helper script settings for AWS token refresh: awsAuthRefresh (for foreground operations like aws sso login) and awsCredentialExport (for background operation with STS-like response).\n\n## 1.0.52\n\n- Added support for MCP server instructions\n\n## 1.0.51\n\n- Added support for native Windows (requires Git for Windows)\n- Added support for Bedrock API keys through environment variable AWS_BEARER_TOKEN_BEDROCK\n- Settings: /doctor can now help you identify and fix invalid setting files\n- `--append-system-prompt` can now be used in interactive mode, not just --print/-p.\n- Increased auto-compact warning threshold from 60% to 80%\n- Fixed an issue with handling user directories with spaces for shell snapshots\n- OTEL resource now includes os.type, os.version, host.arch, and wsl.version (if running on Windows Subsystem for Linux)\n- Custom slash commands: Fixed user-level commands in subdirectories\n- Plan mode: Fixed issue where rejected plan from sub-task would get discarded\n\n## 1.0.48\n\n- Fixed a bug in v1.0.45 where the app would sometimes freeze on launch\n- Added progress messages to Bash tool based on the last 5 lines of command output\n- Added expanding variables support for MCP server configuration\n- Moved shell snapshots from /tmp to ~/.claude for more reliable Bash tool calls\n- Improved IDE extension path handling when Claude Code runs in WSL\n- Hooks: Added a PreCompact hook\n- Vim mode: Added c, f/F, t/T\n\n## 1.0.45\n\n- Redesigned Search (Grep) tool with new tool input parameters and features\n- Disabled IDE diffs for notebook files, fixing \"Timeout waiting after 1000ms\" error\n- Fixed config file corruption issue by enforcing atomic writes\n- Updated prompt input undo to Ctrl+\\_ to avoid breaking existing Ctrl+U behavior, matching zsh's undo shortcut\n- Stop Hooks: Fixed transcript path after /clear and fixed triggering when loop ends with tool call\n- Custom slash commands: Restored namespacing in command names based on subdirectories. For example, .claude/commands/frontend/component.md is now /frontend:component, not /component.\n\n## 1.0.44\n\n- New /export command lets you quickly export a conversation for sharing\n- MCP: resource_link tool results are now supported\n- MCP: tool annotations and tool titles now display in /mcp view\n- Changed Ctrl+Z to suspend Claude Code. Resume by running `fg`. Prompt input undo is now Ctrl+U.\n\n## 1.0.43\n\n- Fixed a bug where the theme selector was saving excessively\n- Hooks: Added EPIPE system error handling\n\n## 1.0.42\n\n- Added tilde (`~`) expansion support to `/add-dir` command\n\n## 1.0.41\n\n- Hooks: Split Stop hook triggering into Stop and SubagentStop\n- Hooks: Enabled optional timeout configuration for each command\n- Hooks: Added \"hook_event_name\" to hook input\n- Fixed a bug where MCP tools would display twice in tool list\n- New tool parameters JSON for Bash tool in `tool_decision` event\n\n## 1.0.40\n\n- Fixed a bug causing API connection errors with UNABLE_TO_GET_ISSUER_CERT_LOCALLY if `NODE_EXTRA_CA_CERTS` was set\n\n## 1.0.39\n\n- New Active Time metric in OpenTelemetry logging\n\n## 1.0.38\n\n- Released hooks. Special thanks to community input in https://github.com/anthropics/claude-code/issues/712. Docs: https://docs.anthropic.com/en/docs/claude-code/hooks\n\n## 1.0.37\n\n- Remove ability to set `Proxy-Authorization` header via ANTHROPIC_AUTH_TOKEN or apiKeyHelper\n\n## 1.0.36\n\n- Web search now takes today's date into context\n- Fixed a bug where stdio MCP servers were not terminating properly on exit\n\n## 1.0.35\n\n- Added support for MCP OAuth Authorization Server discovery\n\n## 1.0.34\n\n- Fixed a memory leak causing a MaxListenersExceededWarning message to appear\n\n## 1.0.33\n\n- Improved logging functionality with session ID support\n- Added prompt input undo functionality (Ctrl+Z and vim 'u' command)\n- Improvements to plan mode\n\n## 1.0.32\n\n- Updated loopback config for litellm\n- Added forceLoginMethod setting to bypass login selection screen\n\n## 1.0.31\n\n- Fixed a bug where ~/.claude.json would get reset when file contained invalid JSON\n\n## 1.0.30\n\n- Custom slash commands: Run bash output, @-mention files, enable thinking with thinking keywords\n- Improved file path autocomplete with filename matching\n- Added timestamps in Ctrl-r mode and fixed Ctrl-c handling\n- Enhanced jq regex support for complex filters with pipes and select\n\n## 1.0.29\n\n- Improved CJK character support in cursor navigation and rendering\n\n## 1.0.28\n\n- Slash commands: Fix selector display during history navigation\n- Resizes images before upload to prevent API size limit errors\n- Added XDG_CONFIG_HOME support to configuration directory\n- Performance optimizations for memory usage\n- New attributes (terminal.type, language) in OpenTelemetry logging\n\n## 1.0.27\n\n- Streamable HTTP MCP servers are now supported\n- Remote MCP servers (SSE and HTTP) now support OAuth\n- MCP resources can now be @-mentioned\n- /resume slash command to switch conversations within Claude Code\n\n## 1.0.25\n\n- Slash commands: moved \"project\" and \"user\" prefixes to descriptions\n- Slash commands: improved reliability for command discovery\n- Improved support for Ghostty\n- Improved web search reliability\n\n## 1.0.24\n\n- Improved /mcp output\n- Fixed a bug where settings arrays got overwritten instead of merged\n\n## 1.0.23\n\n- Released TypeScript SDK: import @anthropic-ai/claude-code to get started\n- Released Python SDK: pip install claude-code-sdk to get started\n\n## 1.0.22\n\n- SDK: Renamed `total_cost` to `total_cost_usd`\n\n## 1.0.21\n\n- Improved editing of files with tab-based indentation\n- Fix for tool_use without matching tool_result errors\n- Fixed a bug where stdio MCP server processes would linger after quitting Claude Code\n\n## 1.0.18\n\n- Added --add-dir CLI argument for specifying additional working directories\n- Added streaming input support without require -p flag\n- Improved startup performance and session storage performance\n- Added CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR environment variable to freeze working directory for bash commands\n- Added detailed MCP server tools display (/mcp)\n- MCP authentication and permission improvements\n- Added auto-reconnection for MCP SSE connections on disconnect\n- Fixed issue where pasted content was lost when dialogs appeared\n\n## 1.0.17\n\n- We now emit messages from sub-tasks in -p mode (look for the parent_tool_use_id property)\n- Fixed crashes when the VS Code diff tool is invoked multiple times quickly\n- MCP server list UI improvements\n- Update Claude Code process title to display \"claude\" instead of \"node\"\n\n## 1.0.11\n\n- Claude Code can now also be used with a Claude Pro subscription\n- Added /upgrade for smoother switching to Claude Max plans\n- Improved UI for authentication from API keys and Bedrock/Vertex/external auth tokens\n- Improved shell configuration error handling\n- Improved todo list handling during compaction\n\n## 1.0.10\n\n- Added markdown table support\n- Improved streaming performance\n\n## 1.0.8\n\n- Fixed Vertex AI region fallback when using CLOUD_ML_REGION\n- Increased default otel interval from 1s -> 5s\n- Fixed edge cases where MCP_TIMEOUT and MCP_TOOL_TIMEOUT weren't being respected\n- Fixed a regression where search tools unnecessarily asked for permissions\n- Added support for triggering thinking non-English languages\n- Improved compacting UI\n\n## 1.0.7\n\n- Renamed /allowed-tools -> /permissions\n- Migrated allowedTools and ignorePatterns from .claude.json -> settings.json\n- Deprecated claude config commands in favor of editing settings.json\n- Fixed a bug where --dangerously-skip-permissions sometimes didn't work in --print mode\n- Improved error handling for /install-github-app\n- Bugfixes, UI polish, and tool reliability improvements\n\n## 1.0.6\n\n- Improved edit reliability for tab-indented files\n- Respect CLAUDE_CONFIG_DIR everywhere\n- Reduced unnecessary tool permission prompts\n- Added support for symlinks in @file typeahead\n- Bugfixes, UI polish, and tool reliability improvements\n\n## 1.0.4\n\n- Fixed a bug where MCP tool errors weren't being parsed correctly\n\n## 1.0.1\n\n- Added `DISABLE_INTERLEAVED_THINKING` to give users the option to opt out of interleaved thinking.\n- Improved model references to show provider-specific names (Sonnet 3.7 for Bedrock, Sonnet 4 for Console)\n- Updated documentation links and OAuth process descriptions\n\n## 1.0.0\n\n- Claude Code is now generally available\n- Introducing Sonnet 4 and Opus 4 models\n\n## 0.2.125\n\n- Breaking change: Bedrock ARN passed to `ANTHROPIC_MODEL` or `ANTHROPIC_SMALL_FAST_MODEL` should no longer contain an escaped slash (specify `/` instead of `%2F`)\n- Removed `DEBUG=true` in favor of `ANTHROPIC_LOG=debug`, to log all requests\n\n## 0.2.117\n\n- Breaking change: --print JSON output now returns nested message objects, for forwards-compatibility as we introduce new metadata fields\n- Introduced settings.cleanupPeriodDays\n- Introduced CLAUDE_CODE_API_KEY_HELPER_TTL_MS env var\n- Introduced --debug mode\n\n## 0.2.108\n\n- You can now send messages to Claude while it works to steer Claude in real-time\n- Introduced BASH_DEFAULT_TIMEOUT_MS and BASH_MAX_TIMEOUT_MS env vars\n- Fixed a bug where thinking was not working in -p mode\n- Fixed a regression in /cost reporting\n- Deprecated MCP wizard interface in favor of other MCP commands\n- Lots of other bugfixes and improvements\n\n## 0.2.107\n\n- CLAUDE.md files can now import other files. Add @path/to/file.md to ./CLAUDE.md to load additional files on launch\n\n## 0.2.106\n\n- MCP SSE server configs can now specify custom headers\n- Fixed a bug where MCP permission prompt didn't always show correctly\n\n## 0.2.105\n\n- Claude can now search the web\n- Moved system & account status to /status\n- Added word movement keybindings for Vim\n- Improved latency for startup, todo tool, and file edits\n\n## 0.2.102\n\n- Improved thinking triggering reliability\n- Improved @mention reliability for images and folders\n- You can now paste multiple large chunks into one prompt\n\n## 0.2.100\n\n- Fixed a crash caused by a stack overflow error\n- Made db storage optional; missing db support disables --continue and --resume\n\n## 0.2.98\n\n- Fixed an issue where auto-compact was running twice\n\n## 0.2.96\n\n- Claude Code can now also be used with a Claude Max subscription (https://claude.ai/upgrade)\n\n## 0.2.93\n\n- Resume conversations from where you left off from with \"claude --continue\" and \"claude --resume\"\n- Claude now has access to a Todo list that helps it stay on track and be more organized\n\n## 0.2.82\n\n- Added support for --disallowedTools\n- Renamed tools for consistency: LSTool -> LS, View -> Read, etc.\n\n## 0.2.75\n\n- Hit Enter to queue up additional messages while Claude is working\n- Drag in or copy/paste image files directly into the prompt\n- @-mention files to directly add them to context\n- Run one-off MCP servers with `claude --mcp-config <path-to-file>`\n- Improved performance for filename auto-complete\n\n## 0.2.74\n\n- Added support for refreshing dynamically generated API keys (via apiKeyHelper), with a 5 minute TTL\n- Task tool can now perform writes and run bash commands\n\n## 0.2.72\n\n- Updated spinner to indicate tokens loaded and tool usage\n\n## 0.2.70\n\n- Network commands like curl are now available for Claude to use\n- Claude can now run multiple web queries in parallel\n- Pressing ESC once immediately interrupts Claude in Auto-accept mode\n\n## 0.2.69\n\n- Fixed UI glitches with improved Select component behavior\n- Enhanced terminal output display with better text truncation logic\n\n## 0.2.67\n\n- Shared project permission rules can be saved in .claude/settings.json\n\n## 0.2.66\n\n- Print mode (-p) now supports streaming output via --output-format=stream-json\n- Fixed issue where pasting could trigger memory or bash mode unexpectedly\n\n## 0.2.63\n\n- Fixed an issue where MCP tools were loaded twice, which caused tool call errors\n\n## 0.2.61\n\n- Navigate menus with vim-style keys (j/k) or bash/emacs shortcuts (Ctrl+n/p) for faster interaction\n- Enhanced image detection for more reliable clipboard paste functionality\n- Fixed an issue where ESC key could crash the conversation history selector\n\n## 0.2.59\n\n- Copy+paste images directly into your prompt\n- Improved progress indicators for bash and fetch tools\n- Bugfixes for non-interactive mode (-p)\n\n## 0.2.54\n\n- Quickly add to Memory by starting your message with '#'\n- Press ctrl+r to see full output for long tool results\n- Added support for MCP SSE transport\n\n## 0.2.53\n\n- New web fetch tool lets Claude view URLs that you paste in\n- Fixed a bug with JPEG detection\n\n## 0.2.50\n\n- New MCP \"project\" scope now allows you to add MCP servers to .mcp.json files and commit them to your repository\n\n## 0.2.49\n\n- Previous MCP server scopes have been renamed: previous \"project\" scope is now \"local\" and \"global\" scope is now \"user\"\n\n## 0.2.47\n\n- Press Tab to auto-complete file and folder names\n- Press Shift + Tab to toggle auto-accept for file edits\n- Automatic conversation compaction for infinite conversation length (toggle with /config)\n\n## 0.2.44\n\n- Ask Claude to make a plan with thinking mode: just say 'think' or 'think harder' or even 'ultrathink'\n\n## 0.2.41\n\n- MCP server startup timeout can now be configured via MCP_TIMEOUT environment variable\n- MCP server startup no longer blocks the app from starting up\n\n## 0.2.37\n\n- New /release-notes command lets you view release notes at any time\n- `claude config add/remove` commands now accept multiple values separated by commas or spaces\n\n## 0.2.36\n\n- Import MCP servers from Claude Desktop with `claude mcp add-from-claude-desktop`\n- Add MCP servers as JSON strings with `claude mcp add-json <n> <json>`\n\n## 0.2.34\n\n- Vim bindings for text input - enable with /vim or /config\n\n## 0.2.32\n\n- Interactive MCP setup wizard: Run \"claude mcp add\" to add MCP servers with a step-by-step interface\n- Fix for some PersistentShell issues\n\n## 0.2.31\n\n- Custom slash commands: Markdown files in .claude/commands/ directories now appear as custom slash commands to insert prompts into your conversation\n- MCP debug mode: Run with --mcp-debug flag to get more information about MCP server errors\n\n## 0.2.30\n\n- Added ANSI color theme for better terminal compatibility\n- Fixed issue where slash command arguments weren't being sent properly\n- (Mac-only) API keys are now stored in macOS Keychain\n\n## 0.2.26\n\n- New /approved-tools command for managing tool permissions\n- Word-level diff display for improved code readability\n- Fuzzy matching for slash commands\n\n## 0.2.21\n\n- Fuzzy matching for /commands\n",
-  "changelogLastFetched": 1756943251597,
-  "lastReleaseNotesSeen": "1.0.98",
+  "cachedChangelog": "# Changelog\n\n## 2.0.0\n\n- New native VS Code extension\n- Fresh coat of paint throughout the whole app\n- /rewind a conversation to undo code changes\n- /usage command to see plan limits\n- Tab to toggle thinking (sticky across sessions)\n- Ctrl-R to search history\n- Unshipped claude config command\n- Hooks: Reduced PostToolUse 'tool_use' ids were found without 'tool_result' blocks errors\n- SDK: The Claude Code SDK is now the Claude Agent SDK\n- Add subagents dynamically with `--agents` flag\n\n## 1.0.126\n\n- Enable /context command for Bedrock and Vertex\n- Add mTLS support for HTTP-based OpenTelemetry exporters\n\n## 1.0.124\n\n- Set `CLAUDE_BASH_NO_LOGIN` environment variable to 1 or true to to skip login shell for BashTool\n- Fix Bedrock and Vertex environment variables evaluating all strings as truthy\n- No longer inform Claude of the list of allowed tools when permission is denied\n- Fixed security vulnerability in Bash tool permission checks\n- Improved VSCode extension performance for large files\n\n## 1.0.123\n\n- Bash permission rules now support output redirections when matching (e.g., `Bash(python:*)` matches `python script.py > output.txt`)\n- Fixed thinking mode triggering on negation phrases like \"don't think\"\n- Fixed rendering performance degradation during token streaming\n- Added SlashCommand tool, which enables Claude to invoke your slash commands. https://docs.claude.com/en/docs/claude-code/slash-commands#SlashCommand-tool\n- Enhanced BashTool environment snapshot logging\n- Fixed a bug where resuming a conversation in headless mode would sometimes enable thinking unnecessarily\n- Migrated --debug logging to a file, to enable easy tailing & filtering\n\n## 1.0.120\n\n- Fix input lag during typing, especially noticeable with large prompts\n- Improved VSCode extension command registry and sessions dialog user experience\n- Enhanced sessions dialog responsiveness and visual feedback\n- Fixed IDE compatibility issue by removing worktree support check\n- Fixed security vulnerability where Bash tool permission checks could be bypassed using prefix matching\n\n## 1.0.119\n\n- Fix Windows issue where process visually freezes on entering interactive mode\n- Support dynamic headers for MCP servers via headersHelper configuration\n- Fix thinking mode not working in headless sessions\n- Fix slash commands now properly update allowed tools instead of replacing them\n\n## 1.0.117\n\n- Add Ctrl-R history search to recall previous commands like bash/zsh\n- Fix input lag while typing, especially on Windows\n- Add sed command to auto-allowed commands in acceptEdits mode\n- Fix Windows PATH comparison to be case-insensitive for drive letters\n- Add permissions management hint to /add-dir output\n\n## 1.0.115\n\n- Improve thinking mode display with enhanced visual effects\n- Type /t to temporarily disable thinking mode in your prompt\n- Improve path validation for glob and grep tools\n- Show condensed output for post-tool hooks to reduce visual clutter\n- Fix visual feedback when loading state completes\n- Improve UI consistency for permission request dialogs\n\n## 1.0.113\n\n- Deprecated piped input in interactive mode\n- Move Ctrl+R keybinding for toggling transcript to Ctrl+O\n\n## 1.0.112\n\n- Transcript mode (Ctrl+R): Added the model used to generate each assistant message\n- Addressed issue where some Claude Max users were incorrectly recognized as Claude Pro users\n- Hooks: Added systemMessage support for SessionEnd hooks\n- Added `spinnerTipsEnabled` setting to disable spinner tips\n- IDE: Various improvements and bug fixes\n\n## 1.0.111\n\n- /model now validates provided model names\n- Fixed Bash tool crashes caused by malformed shell syntax parsing\n\n## 1.0.110\n\n- /terminal-setup command now supports WezTerm\n- MCP: OAuth tokens now proactively refresh before expiration\n- Fixed reliability issues with background Bash processes\n\n## 1.0.109\n\n- SDK: Added partial message streaming support via `--include-partial-messages` CLI flag\n\n## 1.0.106\n\n- Windows: Fixed path permission matching to consistently use POSIX format (e.g., `Read(//c/Users/...)`)\n\n## 1.0.97\n\n- Settings: /doctor now validates permission rule syntax and suggests corrections\n\n## 1.0.94\n\n- Vertex: add support for global endpoints for supported models\n- /memory command now allows direct editing of all imported memory files\n- SDK: Add custom tools as callbacks\n- Added /todos command to list current todo items\n\n## 1.0.93\n\n- Windows: Add alt + v shortcut for pasting images from clipboard\n- Support NO_PROXY environment variable to bypass proxy for specified hostnames and IPs\n\n## 1.0.90\n\n- Settings file changes take effect immediately - no restart required\n\n## 1.0.88\n\n- Fixed issue causing \"OAuth authentication is currently not supported\"\n- Status line input now includes `exceeds_200k_tokens`\n- Fixed incorrect usage tracking in /cost.\n- Introduced `ANTHROPIC_DEFAULT_SONNET_MODEL` and `ANTHROPIC_DEFAULT_OPUS_MODEL` for controlling model aliases opusplan, opus, and sonnet.\n- Bedrock: Updated default Sonnet model to Sonnet 4\n\n## 1.0.86\n\n- Added /context to help users self-serve debug context issues\n- SDK: Added UUID support for all SDK messages\n- SDK: Added `--replay-user-messages` to replay user messages back to stdout\n\n## 1.0.85\n\n- Status line input now includes session cost info\n- Hooks: Introduced SessionEnd hook\n\n## 1.0.84\n\n- Fix tool_use/tool_result id mismatch error when network is unstable\n- Fix Claude sometimes ignoring real-time steering when wrapping up a task\n- @-mention: Add ~/.claude/\\* files to suggestions for easier agent, output style, and slash command editing\n- Use built-in ripgrep by default; to opt out of this behavior, set USE_BUILTIN_RIPGREP=0\n\n## 1.0.83\n\n- @-mention: Support files with spaces in path\n- New shimmering spinner\n\n## 1.0.82\n\n- SDK: Add request cancellation support\n- SDK: New additionalDirectories option to search custom paths, improved slash command processing\n- Settings: Validation prevents invalid fields in .claude/settings.json files\n- MCP: Improve tool name consistency\n- Bash: Fix crash when Claude tries to automatically read large files\n\n## 1.0.81\n\n- Released output styles, including new built-in educational output styles \"Explanatory\" and \"Learning\". Docs: https://docs.claude.com/en/docs/claude-code/output-styles\n- Agents: Fix custom agent loading when agent files are unparsable\n\n## 1.0.80\n\n- UI improvements: Fix text contrast for custom subagent colors and spinner rendering issues\n\n## 1.0.77\n\n- Bash tool: Fix heredoc and multiline string escaping, improve stderr redirection handling\n- SDK: Add session support and permission denial tracking\n- Fix token limit errors in conversation summarization\n- Opus Plan Mode: New setting in `/model` to run Opus only in plan mode, Sonnet otherwise\n\n## 1.0.73\n\n- MCP: Support multiple config files with `--mcp-config file1.json file2.json`\n- MCP: Press Esc to cancel OAuth authentication flows\n- Bash: Improved command validation and reduced false security warnings\n- UI: Enhanced spinner animations and status line visual hierarchy\n- Linux: Added support for Alpine and musl-based distributions (requires separate ripgrep installation)\n\n## 1.0.72\n\n- Ask permissions: have Claude Code always ask for confirmation to use specific tools with /permissions\n\n## 1.0.71\n\n- Background commands: (Ctrl-b) to run any Bash command in the background so Claude can keep working (great for dev servers, tailing logs, etc.)\n- Customizable status line: add your terminal prompt to Claude Code with /statusline\n\n## 1.0.70\n\n- Performance: Optimized message rendering for better performance with large contexts\n- Windows: Fixed native file search, ripgrep, and subagent functionality\n- Added support for @-mentions in slash command arguments\n\n## 1.0.69\n\n- Upgraded Opus to version 4.1\n\n## 1.0.68\n\n- Fix incorrect model names being used for certain commands like `/pr-comments`\n- Windows: improve permissions checks for allow / deny tools and project trust. This may create a new project entry in `.claude.json` - manually merge the history field if desired.\n- Windows: improve sub-process spawning to eliminate \"No such file or directory\" when running commands like pnpm\n- Enhanced /doctor command with CLAUDE.md and MCP tool context for self-serve debugging\n- SDK: Added canUseTool callback support for tool confirmation\n- Added `disableAllHooks` setting\n- Improved file suggestions performance in large repos\n\n## 1.0.65\n\n- IDE: Fixed connection stability issues and error handling for diagnostics\n- Windows: Fixed shell environment setup for users without .bashrc files\n\n## 1.0.64\n\n- Agents: Added model customization support - you can now specify which model an agent should use\n- Agents: Fixed unintended access to the recursive agent tool\n- Hooks: Added systemMessage field to hook JSON output for displaying warnings and context\n- SDK: Fixed user input tracking across multi-turn conversations\n- Added hidden files to file search and @-mention suggestions\n\n## 1.0.63\n\n- Windows: Fixed file search, @agent mentions, and custom slash commands functionality\n\n## 1.0.62\n\n- Added @-mention support with typeahead for custom agents. @<your-custom-agent> to invoke it\n- Hooks: Added SessionStart hook for new session initialization\n- /add-dir command now supports typeahead for directory paths\n- Improved network connectivity check reliability\n\n## 1.0.61\n\n- Transcript mode (Ctrl+R): Changed Esc to exit transcript mode rather than interrupt\n- Settings: Added `--settings` flag to load settings from a JSON file\n- Settings: Fixed resolution of settings files paths that are symlinks\n- OTEL: Fixed reporting of wrong organization after authentication changes\n- Slash commands: Fixed permissions checking for allowed-tools with Bash\n- IDE: Added support for pasting images in VSCode MacOS using ⌘+V\n- IDE: Added `CLAUDE_CODE_AUTO_CONNECT_IDE=false` for disabling IDE auto-connection\n- Added `CLAUDE_CODE_SHELL_PREFIX` for wrapping Claude and user-provided shell commands run by Claude Code\n\n## 1.0.60\n\n- You can now create custom subagents for specialized tasks! Run /agents to get started\n\n## 1.0.59\n\n- SDK: Added tool confirmation support with canUseTool callback\n- SDK: Allow specifying env for spawned process\n- Hooks: Exposed PermissionDecision to hooks (including \"ask\")\n- Hooks: UserPromptSubmit now supports additionalContext in advanced JSON output\n- Fixed issue where some Max users that specified Opus would still see fallback to Sonnet\n\n## 1.0.58\n\n- Added support for reading PDFs\n- MCP: Improved server health status display in 'claude mcp list'\n- Hooks: Added CLAUDE_PROJECT_DIR env var for hook commands\n\n## 1.0.57\n\n- Added support for specifying a model in slash commands\n- Improved permission messages to help Claude understand allowed tools\n- Fix: Remove trailing newlines from bash output in terminal wrapping\n\n## 1.0.56\n\n- Windows: Enabled shift+tab for mode switching on versions of Node.js that support terminal VT mode\n- Fixes for WSL IDE detection\n- Fix an issue causing awsRefreshHelper changes to .aws directory not to be picked up\n\n## 1.0.55\n\n- Clarified knowledge cutoff for Opus 4 and Sonnet 4 models\n- Windows: fixed Ctrl+Z crash\n- SDK: Added ability to capture error logging\n- Add --system-prompt-file option to override system prompt in print mode\n\n## 1.0.54\n\n- Hooks: Added UserPromptSubmit hook and the current working directory to hook inputs\n- Custom slash commands: Added argument-hint to frontmatter\n- Windows: OAuth uses port 45454 and properly constructs browser URL\n- Windows: mode switching now uses alt + m, and plan mode renders properly\n- Shell: Switch to in-memory shell snapshot to fix file-related errors\n\n## 1.0.53\n\n- Updated @-mention file truncation from 100 lines to 2000 lines\n- Add helper script settings for AWS token refresh: awsAuthRefresh (for foreground operations like aws sso login) and awsCredentialExport (for background operation with STS-like response).\n\n## 1.0.52\n\n- Added support for MCP server instructions\n\n## 1.0.51\n\n- Added support for native Windows (requires Git for Windows)\n- Added support for Bedrock API keys through environment variable AWS_BEARER_TOKEN_BEDROCK\n- Settings: /doctor can now help you identify and fix invalid setting files\n- `--append-system-prompt` can now be used in interactive mode, not just --print/-p.\n- Increased auto-compact warning threshold from 60% to 80%\n- Fixed an issue with handling user directories with spaces for shell snapshots\n- OTEL resource now includes os.type, os.version, host.arch, and wsl.version (if running on Windows Subsystem for Linux)\n- Custom slash commands: Fixed user-level commands in subdirectories\n- Plan mode: Fixed issue where rejected plan from sub-task would get discarded\n\n## 1.0.48\n\n- Fixed a bug in v1.0.45 where the app would sometimes freeze on launch\n- Added progress messages to Bash tool based on the last 5 lines of command output\n- Added expanding variables support for MCP server configuration\n- Moved shell snapshots from /tmp to ~/.claude for more reliable Bash tool calls\n- Improved IDE extension path handling when Claude Code runs in WSL\n- Hooks: Added a PreCompact hook\n- Vim mode: Added c, f/F, t/T\n\n## 1.0.45\n\n- Redesigned Search (Grep) tool with new tool input parameters and features\n- Disabled IDE diffs for notebook files, fixing \"Timeout waiting after 1000ms\" error\n- Fixed config file corruption issue by enforcing atomic writes\n- Updated prompt input undo to Ctrl+\\_ to avoid breaking existing Ctrl+U behavior, matching zsh's undo shortcut\n- Stop Hooks: Fixed transcript path after /clear and fixed triggering when loop ends with tool call\n- Custom slash commands: Restored namespacing in command names based on subdirectories. For example, .claude/commands/frontend/component.md is now /frontend:component, not /component.\n\n## 1.0.44\n\n- New /export command lets you quickly export a conversation for sharing\n- MCP: resource_link tool results are now supported\n- MCP: tool annotations and tool titles now display in /mcp view\n- Changed Ctrl+Z to suspend Claude Code. Resume by running `fg`. Prompt input undo is now Ctrl+U.\n\n## 1.0.43\n\n- Fixed a bug where the theme selector was saving excessively\n- Hooks: Added EPIPE system error handling\n\n## 1.0.42\n\n- Added tilde (`~`) expansion support to `/add-dir` command\n\n## 1.0.41\n\n- Hooks: Split Stop hook triggering into Stop and SubagentStop\n- Hooks: Enabled optional timeout configuration for each command\n- Hooks: Added \"hook_event_name\" to hook input\n- Fixed a bug where MCP tools would display twice in tool list\n- New tool parameters JSON for Bash tool in `tool_decision` event\n\n## 1.0.40\n\n- Fixed a bug causing API connection errors with UNABLE_TO_GET_ISSUER_CERT_LOCALLY if `NODE_EXTRA_CA_CERTS` was set\n\n## 1.0.39\n\n- New Active Time metric in OpenTelemetry logging\n\n## 1.0.38\n\n- Released hooks. Special thanks to community input in https://github.com/anthropics/claude-code/issues/712. Docs: https://docs.claude.com/en/docs/claude-code/hooks\n\n## 1.0.37\n\n- Remove ability to set `Proxy-Authorization` header via ANTHROPIC_AUTH_TOKEN or apiKeyHelper\n\n## 1.0.36\n\n- Web search now takes today's date into context\n- Fixed a bug where stdio MCP servers were not terminating properly on exit\n\n## 1.0.35\n\n- Added support for MCP OAuth Authorization Server discovery\n\n## 1.0.34\n\n- Fixed a memory leak causing a MaxListenersExceededWarning message to appear\n\n## 1.0.33\n\n- Improved logging functionality with session ID support\n- Added prompt input undo functionality (Ctrl+Z and vim 'u' command)\n- Improvements to plan mode\n\n## 1.0.32\n\n- Updated loopback config for litellm\n- Added forceLoginMethod setting to bypass login selection screen\n\n## 1.0.31\n\n- Fixed a bug where ~/.claude.json would get reset when file contained invalid JSON\n\n## 1.0.30\n\n- Custom slash commands: Run bash output, @-mention files, enable thinking with thinking keywords\n- Improved file path autocomplete with filename matching\n- Added timestamps in Ctrl-r mode and fixed Ctrl-c handling\n- Enhanced jq regex support for complex filters with pipes and select\n\n## 1.0.29\n\n- Improved CJK character support in cursor navigation and rendering\n\n## 1.0.28\n\n- Slash commands: Fix selector display during history navigation\n- Resizes images before upload to prevent API size limit errors\n- Added XDG_CONFIG_HOME support to configuration directory\n- Performance optimizations for memory usage\n- New attributes (terminal.type, language) in OpenTelemetry logging\n\n## 1.0.27\n\n- Streamable HTTP MCP servers are now supported\n- Remote MCP servers (SSE and HTTP) now support OAuth\n- MCP resources can now be @-mentioned\n- /resume slash command to switch conversations within Claude Code\n\n## 1.0.25\n\n- Slash commands: moved \"project\" and \"user\" prefixes to descriptions\n- Slash commands: improved reliability for command discovery\n- Improved support for Ghostty\n- Improved web search reliability\n\n## 1.0.24\n\n- Improved /mcp output\n- Fixed a bug where settings arrays got overwritten instead of merged\n\n## 1.0.23\n\n- Released TypeScript SDK: import @anthropic-ai/claude-code to get started\n- Released Python SDK: pip install claude-code-sdk to get started\n\n## 1.0.22\n\n- SDK: Renamed `total_cost` to `total_cost_usd`\n\n## 1.0.21\n\n- Improved editing of files with tab-based indentation\n- Fix for tool_use without matching tool_result errors\n- Fixed a bug where stdio MCP server processes would linger after quitting Claude Code\n\n## 1.0.18\n\n- Added --add-dir CLI argument for specifying additional working directories\n- Added streaming input support without require -p flag\n- Improved startup performance and session storage performance\n- Added CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR environment variable to freeze working directory for bash commands\n- Added detailed MCP server tools display (/mcp)\n- MCP authentication and permission improvements\n- Added auto-reconnection for MCP SSE connections on disconnect\n- Fixed issue where pasted content was lost when dialogs appeared\n\n## 1.0.17\n\n- We now emit messages from sub-tasks in -p mode (look for the parent_tool_use_id property)\n- Fixed crashes when the VS Code diff tool is invoked multiple times quickly\n- MCP server list UI improvements\n- Update Claude Code process title to display \"claude\" instead of \"node\"\n\n## 1.0.11\n\n- Claude Code can now also be used with a Claude Pro subscription\n- Added /upgrade for smoother switching to Claude Max plans\n- Improved UI for authentication from API keys and Bedrock/Vertex/external auth tokens\n- Improved shell configuration error handling\n- Improved todo list handling during compaction\n\n## 1.0.10\n\n- Added markdown table support\n- Improved streaming performance\n\n## 1.0.8\n\n- Fixed Vertex AI region fallback when using CLOUD_ML_REGION\n- Increased default otel interval from 1s -> 5s\n- Fixed edge cases where MCP_TIMEOUT and MCP_TOOL_TIMEOUT weren't being respected\n- Fixed a regression where search tools unnecessarily asked for permissions\n- Added support for triggering thinking non-English languages\n- Improved compacting UI\n\n## 1.0.7\n\n- Renamed /allowed-tools -> /permissions\n- Migrated allowedTools and ignorePatterns from .claude.json -> settings.json\n- Deprecated claude config commands in favor of editing settings.json\n- Fixed a bug where --dangerously-skip-permissions sometimes didn't work in --print mode\n- Improved error handling for /install-github-app\n- Bugfixes, UI polish, and tool reliability improvements\n\n## 1.0.6\n\n- Improved edit reliability for tab-indented files\n- Respect CLAUDE_CONFIG_DIR everywhere\n- Reduced unnecessary tool permission prompts\n- Added support for symlinks in @file typeahead\n- Bugfixes, UI polish, and tool reliability improvements\n\n## 1.0.4\n\n- Fixed a bug where MCP tool errors weren't being parsed correctly\n\n## 1.0.1\n\n- Added `DISABLE_INTERLEAVED_THINKING` to give users the option to opt out of interleaved thinking.\n- Improved model references to show provider-specific names (Sonnet 3.7 for Bedrock, Sonnet 4 for Console)\n- Updated documentation links and OAuth process descriptions\n\n## 1.0.0\n\n- Claude Code is now generally available\n- Introducing Sonnet 4 and Opus 4 models\n\n## 0.2.125\n\n- Breaking change: Bedrock ARN passed to `ANTHROPIC_MODEL` or `ANTHROPIC_SMALL_FAST_MODEL` should no longer contain an escaped slash (specify `/` instead of `%2F`)\n- Removed `DEBUG=true` in favor of `ANTHROPIC_LOG=debug`, to log all requests\n\n## 0.2.117\n\n- Breaking change: --print JSON output now returns nested message objects, for forwards-compatibility as we introduce new metadata fields\n- Introduced settings.cleanupPeriodDays\n- Introduced CLAUDE_CODE_API_KEY_HELPER_TTL_MS env var\n- Introduced --debug mode\n\n## 0.2.108\n\n- You can now send messages to Claude while it works to steer Claude in real-time\n- Introduced BASH_DEFAULT_TIMEOUT_MS and BASH_MAX_TIMEOUT_MS env vars\n- Fixed a bug where thinking was not working in -p mode\n- Fixed a regression in /cost reporting\n- Deprecated MCP wizard interface in favor of other MCP commands\n- Lots of other bugfixes and improvements\n\n## 0.2.107\n\n- CLAUDE.md files can now import other files. Add @path/to/file.md to ./CLAUDE.md to load additional files on launch\n\n## 0.2.106\n\n- MCP SSE server configs can now specify custom headers\n- Fixed a bug where MCP permission prompt didn't always show correctly\n\n## 0.2.105\n\n- Claude can now search the web\n- Moved system & account status to /status\n- Added word movement keybindings for Vim\n- Improved latency for startup, todo tool, and file edits\n\n## 0.2.102\n\n- Improved thinking triggering reliability\n- Improved @mention reliability for images and folders\n- You can now paste multiple large chunks into one prompt\n\n## 0.2.100\n\n- Fixed a crash caused by a stack overflow error\n- Made db storage optional; missing db support disables --continue and --resume\n\n## 0.2.98\n\n- Fixed an issue where auto-compact was running twice\n\n## 0.2.96\n\n- Claude Code can now also be used with a Claude Max subscription (https://claude.ai/upgrade)\n\n## 0.2.93\n\n- Resume conversations from where you left off from with \"claude --continue\" and \"claude --resume\"\n- Claude now has access to a Todo list that helps it stay on track and be more organized\n\n## 0.2.82\n\n- Added support for --disallowedTools\n- Renamed tools for consistency: LSTool -> LS, View -> Read, etc.\n\n## 0.2.75\n\n- Hit Enter to queue up additional messages while Claude is working\n- Drag in or copy/paste image files directly into the prompt\n- @-mention files to directly add them to context\n- Run one-off MCP servers with `claude --mcp-config <path-to-file>`\n- Improved performance for filename auto-complete\n\n## 0.2.74\n\n- Added support for refreshing dynamically generated API keys (via apiKeyHelper), with a 5 minute TTL\n- Task tool can now perform writes and run bash commands\n\n## 0.2.72\n\n- Updated spinner to indicate tokens loaded and tool usage\n\n## 0.2.70\n\n- Network commands like curl are now available for Claude to use\n- Claude can now run multiple web queries in parallel\n- Pressing ESC once immediately interrupts Claude in Auto-accept mode\n\n## 0.2.69\n\n- Fixed UI glitches with improved Select component behavior\n- Enhanced terminal output display with better text truncation logic\n\n## 0.2.67\n\n- Shared project permission rules can be saved in .claude/settings.json\n\n## 0.2.66\n\n- Print mode (-p) now supports streaming output via --output-format=stream-json\n- Fixed issue where pasting could trigger memory or bash mode unexpectedly\n\n## 0.2.63\n\n- Fixed an issue where MCP tools were loaded twice, which caused tool call errors\n\n## 0.2.61\n\n- Navigate menus with vim-style keys (j/k) or bash/emacs shortcuts (Ctrl+n/p) for faster interaction\n- Enhanced image detection for more reliable clipboard paste functionality\n- Fixed an issue where ESC key could crash the conversation history selector\n\n## 0.2.59\n\n- Copy+paste images directly into your prompt\n- Improved progress indicators for bash and fetch tools\n- Bugfixes for non-interactive mode (-p)\n\n## 0.2.54\n\n- Quickly add to Memory by starting your message with '#'\n- Press ctrl+r to see full output for long tool results\n- Added support for MCP SSE transport\n\n## 0.2.53\n\n- New web fetch tool lets Claude view URLs that you paste in\n- Fixed a bug with JPEG detection\n\n## 0.2.50\n\n- New MCP \"project\" scope now allows you to add MCP servers to .mcp.json files and commit them to your repository\n\n## 0.2.49\n\n- Previous MCP server scopes have been renamed: previous \"project\" scope is now \"local\" and \"global\" scope is now \"user\"\n\n## 0.2.47\n\n- Press Tab to auto-complete file and folder names\n- Press Shift + Tab to toggle auto-accept for file edits\n- Automatic conversation compaction for infinite conversation length (toggle with /config)\n\n## 0.2.44\n\n- Ask Claude to make a plan with thinking mode: just say 'think' or 'think harder' or even 'ultrathink'\n\n## 0.2.41\n\n- MCP server startup timeout can now be configured via MCP_TIMEOUT environment variable\n- MCP server startup no longer blocks the app from starting up\n\n## 0.2.37\n\n- New /release-notes command lets you view release notes at any time\n- `claude config add/remove` commands now accept multiple values separated by commas or spaces\n\n## 0.2.36\n\n- Import MCP servers from Claude Desktop with `claude mcp add-from-claude-desktop`\n- Add MCP servers as JSON strings with `claude mcp add-json <n> <json>`\n\n## 0.2.34\n\n- Vim bindings for text input - enable with /vim or /config\n\n## 0.2.32\n\n- Interactive MCP setup wizard: Run \"claude mcp add\" to add MCP servers with a step-by-step interface\n- Fix for some PersistentShell issues\n\n## 0.2.31\n\n- Custom slash commands: Markdown files in .claude/commands/ directories now appear as custom slash commands to insert prompts into your conversation\n- MCP debug mode: Run with --mcp-debug flag to get more information about MCP server errors\n\n## 0.2.30\n\n- Added ANSI color theme for better terminal compatibility\n- Fixed issue where slash command arguments weren't being sent properly\n- (Mac-only) API keys are now stored in macOS Keychain\n\n## 0.2.26\n\n- New /approved-tools command for managing tool permissions\n- Word-level diff display for improved code readability\n- Fuzzy matching for slash commands\n\n## 0.2.21\n\n- Fuzzy matching for /commands\n",
+  "changelogLastFetched": 1759171336357,
+  "lastReleaseNotesSeen": "1.0.128",
   "s1mAccessCache": {
     "391c4a11-6684-4c23-b279-588198cf7ad8": {
       "hasAccess": false,
       "hasAccessNotAsDefault": false,
-      "timestamp": 1758919411484
+      "timestamp": 1759176614715
     }
   },
   "recommendedSubscription": "",
@@ -3888,5 +3877,8 @@
       "timestamp": 1756893894624
     }
   },
-  "lastPlanModeUse": 1758919416765
+  "lastPlanModeUse": 1759178651504,
+  "feedbackSurveyState": {
+    "lastShownTime": 1759172759352
+  }
 }

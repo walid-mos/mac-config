@@ -64,44 +64,17 @@ After each development phase:
 
 ### Custom Commands
 
-**Available commands** (format: Markdown files in `.claude/commands/`):
+#### Development Workflow
+- **`/check-pr`** - Complete PR pipeline: lint → typecheck → test → security review → refactor → commit → create PR
+- **`/quick-fix`** - Quick fix: lint + commit + push (skips tests)
+- **`/feature-start [name]`** - Start feature: create branch from updated base
+- **`/feature-complete`** - Complete feature: full checks, squash commits, create PR
 
-#### 🚀 Development Workflow
-- **`/check-pr`** - Complete PR pipeline: lint → typecheck → test → security review → refactor → commit → create PR with AI-generated content
-- **`/quick-fix`** - Quick fix for small changes: auto-fix linting, smart commit, push to remote (skips tests for speed)
-- **`/feature-start [name]`** - Start new feature: create properly named branch from updated base branch with environment setup
-- **`/feature-complete`** - Complete feature development: full validation, optional commit squashing, production-ready PR creation
-
-#### 🔍 Analysis & Testing
-- **`/test-watch [pattern]`** - Launch Vitest in watch mode with coverage, smart filtering, and interactive controls
-- **`/deps-check`** - Comprehensive dependency analysis: outdated packages, security audit, unused imports, bundle optimization
-- **`/perf-check`** - Performance analysis: build time profiling, bundle size analysis, asset optimization, runtime performance
-
-#### ⚙️ System Management
-- **`/stow-sync`** - Synchronize dotfiles with GNU Stow: conflict detection, backup strategy, symlink verification
-
-### Command Usage Patterns
-
-#### Quick Development Cycle
-```
-/feature-start user-auth          # Start new feature
-/quick-fix                        # Quick iterations
-/test-watch auth                  # Continuous testing
-/check-pr                         # Full validation & PR
-```
-
-#### Performance Optimization
-```
-/deps-check                       # Analyze dependencies
-/perf-check                       # Performance audit
-/quick-fix                        # Apply optimizations
-```
-
-#### System Maintenance
-```
-/stow-sync                        # Sync dotfiles
-/deps-check                       # Check for updates
-```
+#### Analysis & Testing
+- **`/test-watch [pattern]`** - Vitest in watch mode with coverage
+- **`/deps-check`** - Dependency analysis: outdated, audit, unused imports
+- **`/perf-check`** - Performance analysis: build time, bundle size
+- **`/stow-sync`** - Synchronize dotfiles with GNU Stow
 
 ### Automatic Hooks
 

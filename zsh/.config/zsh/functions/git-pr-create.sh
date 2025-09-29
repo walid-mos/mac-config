@@ -31,8 +31,48 @@
 )
 
 # ============================================================================
-# UTILITY FUNCTIONS
+# CACHING AND UTILITY FUNCTIONS
 # ============================================================================
+
+# Branch cache to avoid repeated git calls
+declare -A BRANCH_CACHE=()
+
+# Clear branch cache
+clear_branch_cache() {
+    BRANCH_CACHE=()
+}
+
+# Cached branch check
+branch_exists_local_cached() {
+    local branch="$1"
+    local cache_key="local_$branch"
+
+    if [[ -z "${BRANCH_CACHE[$cache_key]}" ]]; then
+        if git show-ref --verify --quiet "refs/heads/$branch"; then
+            BRANCH_CACHE[$cache_key]="1"
+        else
+            BRANCH_CACHE[$cache_key]="0"
+        fi
+    fi
+
+    [ "${BRANCH_CACHE[$cache_key]}" = "1" ]
+}
+
+# Cached remote branch check
+branch_exists_remote_cached() {
+    local branch="$1"
+    local cache_key="remote_$branch"
+
+    if [[ -z "${BRANCH_CACHE[$cache_key]}" ]]; then
+        if git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+            BRANCH_CACHE[$cache_key]="1"
+        else
+            BRANCH_CACHE[$cache_key]="0"
+        fi
+    fi
+
+    [ "${BRANCH_CACHE[$cache_key]}" = "1" ]
+}
 
 # Check if command exists
 command_exists() {
@@ -50,17 +90,24 @@ validate_dependencies() {
         echo "❌ Not in a git repository"
         return 1
     fi
-    
+
     if ! command_exists gh; then
         echo "❌ GitHub CLI (gh) is not installed. Install it with: brew install gh"
         return 1
     fi
-    
+
     if ! command_exists fzf; then
         echo "❌ fzf is required for interactive branch selection. Install it with: brew install fzf"
         return 1
     fi
-    
+
+    if [ ! -f "$CLAUDE_CLI_PATH" ]; then
+        echo "⚠️  Claude CLI not found at $CLAUDE_CLI_PATH"
+        echo "   Will use fallback title generation"
+    elif ! command_exists timeout; then
+        echo "⚠️  timeout command not available. Claude calls may hang."
+    fi
+
     return 0
 }
 
@@ -127,7 +174,7 @@ should_include_branch() {
 # Get default branch for repository
 get_default_branch() {
     for branch in "${DEFAULT_BRANCHES[@]}"; do
-        if branch_exists_local "$branch" || branch_exists_remote "$branch"; then
+        if branch_exists_local_cached "$branch" || branch_exists_remote_cached "$branch"; then
             echo "$branch"
             return 0
         fi
@@ -169,7 +216,7 @@ get_available_branches() {
             continue
         fi
         # Only add if branch doesn't exist locally and hasn't been seen yet
-        if should_include_branch "$branch" "$current_branch" "$default_branch" && [[ -z "${seen_branches[$branch]}" ]] && ! branch_exists_local "$branch"; then
+        if should_include_branch "$branch" "$current_branch" "$default_branch" && [[ -z "${seen_branches[$branch]}" ]] && ! branch_exists_local_cached "$branch"; then
             branches+=("$branch (remote)")
             seen_branches["$branch"]=1
         fi
@@ -280,8 +327,43 @@ create_or_update_pr() {
 }
 
 # ============================================================================
-# AI GENERATION FUNCTIONS  
+# PROGRESS INDICATORS
 # ============================================================================
+
+# Simple spinner for long operations
+show_spinner() {
+    local pid=$1
+    local message="$2"
+    local spin='⣾⣽⣻⢿⡿⣟⣯⣷'
+    local i=0
+
+    while kill -0 "$pid" 2>/dev/null; do
+        printf "\r%s %s" "${spin:$i:1}" "$message"
+        i=$(( (i+1) % ${#spin} ))
+        sleep 0.1
+    done
+    printf "\r✅ %s\n" "$message"
+}
+
+# ============================================================================
+# AI GENERATION FUNCTIONS
+# ============================================================================
+
+# Safe Claude CLI wrapper with timeout
+call_claude_cli() {
+    local input="$1"
+    local timeout_seconds="${2:-30}"
+
+    if [ ! -f "$CLAUDE_CLI_PATH" ]; then
+        return 1
+    fi
+
+    if command_exists timeout; then
+        echo "$input" | timeout "$timeout_seconds" "$CLAUDE_CLI_PATH" 2>&1
+    else
+        echo "$input" | "$CLAUDE_CLI_PATH" 2>&1
+    fi
+}
 
 # Generate PR title using Claude CLI
 generate_ai_title() {
@@ -316,10 +398,11 @@ $files
 Generate only the title, nothing else."
     
     local claude_response
-    if claude_response=$(echo "$claude_input" | "$CLAUDE_CLI_PATH" 2>&1); then
+    if claude_response=$(call_claude_cli "$claude_input" 30); then
         echo "$claude_response" | tr -d '\n' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//'
     else
         # Fallback to first commit message
+        echo "⚠️  Claude CLI failed, using fallback title" >&2
         git log -1 --pretty=%B | head -n1
     fi
 }
@@ -389,10 +472,11 @@ Response format:
 [Detailed analysis of changes by category with relevant technical details]"
     
     local claude_response
-    if claude_response=$(echo "$claude_input" | "$CLAUDE_CLI_PATH" 2>&1); then
+    if claude_response=$(call_claude_cli "$claude_input" 45); then
         echo "$claude_response"
     else
         # Fallback analysis
+        echo "⚠️  Claude CLI failed, using fallback analysis" >&2
         echo "## Summary"
         echo "This PR includes changes across $(echo "$files" | wc -l | tr -d ' ') files."
         echo ""
@@ -473,8 +557,8 @@ handle_update_mode() {
 # Ensure branch is pushed to remote
 ensure_branch_pushed() {
     local current_branch="$1"
-    
-    if branch_exists_remote "$current_branch"; then
+
+    if branch_exists_remote_cached "$current_branch"; then
         echo "🔄 Pulling latest changes with rebase..."
         if ! git pull --rebase origin "$current_branch"; then
             echo ""
@@ -508,12 +592,8 @@ handle_create_mode() {
     fi
     
     echo ""
-    echo "🤖 Generating PR title from commits..."
-    local pr_title=$(generate_ai_title "$target_branch" "$current_branch")
-    
-    echo ""
     echo "🔍 Checking for existing PRs..."
-    
+
     local existing_pr_info=$(find_existing_pr "$current_branch" "$target_branch")
     
     if [ "$existing_pr_info" != "null" ] && [ -n "$existing_pr_info" ]; then
@@ -527,7 +607,7 @@ handle_create_mode() {
                 local pr_body=$(create_pr_body "$target_branch" "$current_branch")
                 local pr_number=$(echo "$existing_pr_info" | jq -r '.number')
                 
-                if create_or_update_pr "update" "$pr_number" "$pr_title" "$pr_body" "$target_branch" "$current_branch"; then
+                if create_or_update_pr "update" "$pr_number" "" "$pr_body" "$target_branch" "$current_branch"; then
                     echo ""
                     echo "✅ PR updated successfully!"
                     gh pr view "$pr_number" --web
@@ -541,9 +621,12 @@ handle_create_mode() {
     else
         echo "✅ No existing PR found, proceeding with creation..."
         echo ""
+        echo "🤖 Generating PR title from commits..."
+        local pr_title=$(generate_ai_title "$target_branch" "$current_branch")
+        echo ""
         echo "🔄 Generating changes analysis..."
         local pr_body=$(create_pr_body "$target_branch" "$current_branch")
-        
+
         if create_or_update_pr "create" "" "$pr_title" "$pr_body" "$target_branch" "$current_branch"; then
             echo ""
             echo "✅ PR created successfully!"
@@ -560,6 +643,9 @@ handle_create_mode() {
 # ============================================================================
 
 gprc() {
+    # Clear branch cache for fresh data
+    clear_branch_cache
+
     # Parse arguments
     local update_only=false
     

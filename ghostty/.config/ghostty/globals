@@ -23,3 +23,13 @@ mouse-shift-capture = false
 mouse-hide-while-typing = false
 
 # NOTE: Utilisation des splits natifs de Ghostty au lieu de tmux
+
+# Indicateurs visuels pour les panes actifs/inactifs
+# Réduction de l'opacité pour un meilleur contraste visuel
+unfocused-split-opacity = 0.8
+
+# Ajout d'un voile gris subtil sur les panes inactifs (effet "désactivé")
+unfocused-split-fill = #888888
+
+# Couleur des diviseurs de split plus visible
+split-divider-color = #808080

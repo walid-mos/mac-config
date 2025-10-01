@@ -61,7 +61,12 @@
       "Bash(cargo run :*)",
       "Bash(cargo outdated :*)",
       "Bash(cargo audit :*)",
-      "Bash(curl :*)",
+      "Bash(curl -s :*)",
+      "Bash(curl -L :*)",
+      "Bash(curl -I :*)",
+      "Bash(curl --head :*)",
+      "Bash(curl -G :*)",
+      "Bash(curl --get :*)",
       "Bash(gh repo view :*)",
       "Bash(gh repo list :*)",
       "Bash(gh repo clone :*)",
@@ -125,17 +130,27 @@
       "Bash(gh auth logout :*)",
       "Bash(gh auth refresh :*)",
       "Bash(gh config set :*)",
-      "Bash(gh extension :*)"
+      "Bash(gh extension :*)",
+      "Bash(curl -X POST :*)",
+      "Bash(curl --request POST :*)",
+      "Bash(curl -X PUT :*)",
+      "Bash(curl -X DELETE :*)",
+      "Bash(curl -X PATCH :*)",
+      "Bash(curl -o :*)",
+      "Bash(curl --output :*)",
+      "Bash(curl -O :*)",
+      "Bash(curl --remote-name :*)",
+      "Bash(curl -d :*)",
+      "Bash(curl --data :*)",
+      "Bash(curl -F :*)",
+      "Bash(curl --form :*)",
+      "Bash(curl -T :*)",
+      "Bash(curl --upload-file :*)"
     ],
     "defaultMode": "acceptEdits",
     "additionalDirectories": [
       "/Users/walid/Development/Nextnode"
     ]
-  },
-  "model": "opusplan",
-  "statusLine": {
-    "type": "command",
-    "command": "bash ~/.claude/statusline-command.sh"
   },
   "hooks": {
     "PostToolUse": [
@@ -160,7 +175,7 @@
         ]
       },
       {
-        "matcher": "MultiEdit", 
+        "matcher": "MultiEdit",
         "hooks": [
           {
             "type": "command",
@@ -179,5 +194,9 @@
         ]
       }
     ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "bash ~/.claude/statusline-command.sh"
   }
 }

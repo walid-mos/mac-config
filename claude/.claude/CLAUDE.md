@@ -45,6 +45,93 @@ After each development phase:
 - See `@agent-code-refactor-specialist` for detailed analysis
 - Focus on semantic similarity, not visual similarity
 
+### Tailwind CSS Rules (MANDATORY when project uses Tailwind)
+- **ALWAYS use Tailwind utility classes** whenever possible - this is the primary styling method
+- **Custom CSS is FORBIDDEN** except when:
+  - The styling is extremely complex and impossible to achieve with Tailwind
+  - Tailwind does not provide the necessary features
+- **Tailwind classes MUST be inline** - storing classes in constants is STRICTLY FORBIDDEN
+- **ONLY exception**: `class-variance-authority` (cva) for component variants (e.g., shadcn/ui components)
+  - cva is the ONLY library where Tailwind classes in constants are permitted
+  - Used for managing different component variants (sizes, colors, states, etc.)
+
+#### cn() Utility Function (MANDATORY when available)
+
+When a project includes the `cn()` utility function (typically combining `clsx` + `tailwind-merge`), it becomes the **MANDATORY** way to apply className:
+
+**Core Principles**:
+- `cn()` combines conditional class logic (`clsx`) with Tailwind conflict resolution (`tailwind-merge`)
+- Common pattern: `const cn = (...inputs) => twMerge(clsx(inputs))`
+- **ALWAYS organize classes by category** as separate arguments for readability
+
+**Organization Categories** (separate arguments):
+1. Base/structural classes
+2. Responsive breakpoint modifiers
+3. Dark mode variants
+4. State modifiers (hover, focus, active)
+5. Conditional logic (ternaries, boolean conditions)
+
+**Example - CORRECT with cn()**:
+```tsx
+// Organized by category - CORRECT
+<div className={cn(
+  // Base structural classes
+  "flex items-center justify-between p-4 rounded-lg shadow-md",
+  // Responsive breakpoints
+  "md:p-6 lg:p-8",
+  // Dark mode
+  "dark:bg-gray-800 dark:text-white",
+  // States
+  "hover:shadow-lg focus:ring-2",
+  // Conditional logic
+  isActive && "bg-blue-500 text-white",
+  isDisabled && "opacity-50 cursor-not-allowed"
+)}>
+
+// Complex conditional logic - CORRECT
+<button className={cn(
+  "px-4 py-2 rounded font-medium transition-colors",
+  variant === "primary" ? "bg-blue-500 text-white hover:bg-blue-600" :
+  variant === "secondary" ? "bg-gray-200 text-gray-800 hover:bg-gray-300" :
+  "bg-transparent text-blue-500 hover:bg-blue-50",
+  size === "sm" && "text-sm px-3 py-1",
+  size === "lg" && "text-lg px-6 py-3",
+  disabled && "opacity-50 cursor-not-allowed"
+)}>
+```
+
+**Example - FORBIDDEN**:
+```tsx
+// Single long string without organization - FORBIDDEN
+<div className={cn("flex items-center justify-between p-4 md:p-6 lg:p-8 dark:bg-gray-800 dark:text-white hover:shadow-lg focus:ring-2 bg-white rounded-lg shadow-md")}>
+
+// Classes in constants outside cn() - FORBIDDEN
+const baseClasses = "flex items-center"
+<div className={cn(baseClasses, "p-4")}>
+
+// Not using cn() when it's available - FORBIDDEN
+<div className={`flex items-center ${isActive ? 'bg-blue-500' : 'bg-gray-200'}`}>
+```
+
+**Standard Examples**:
+```tsx
+// Inline classes without cn() - CORRECT (when cn() not available)
+<div className="flex items-center justify-between p-4 bg-white rounded-lg shadow-md">
+
+// cva for variants - CORRECT (ONLY exception)
+const buttonVariants = cva(
+  "inline-flex items-center justify-center rounded-md font-medium",
+  {
+    variants: {
+      variant: {
+        default: "bg-primary text-white hover:bg-primary/90",
+        outline: "border border-input bg-background hover:bg-accent"
+      }
+    }
+  }
+)
+```
+
 ## Testing Guidelines
 
 @claude/.claude/guidelines/vitest.md

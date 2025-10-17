@@ -4,6 +4,7 @@ claude/.claude/statsig/
 claude/.claude/todos/
 claude/.claude/shell-snapshots/
 claude/.claude/file-history/
+claude/.claude/debug/
 .claude/local
 
 # Claude Code runtime and history

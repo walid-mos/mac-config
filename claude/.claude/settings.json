@@ -5,6 +5,11 @@
       "Bash(grep :*)",
       "Bash(rg :*)",
       "Bash(ls :*)",
+      "Bash(ls -l :*)",
+      "Bash(ls -la :*)",
+      "Bash(ls -lh :*)",
+      "Bash(ls -lah :*)",
+      "Bash(ls -a :*)",
       "Bash(cat :*)",
       "Bash(head :*)",
       "Bash(tail :*)",
@@ -94,7 +99,8 @@
       "mcp__context7__resolve-library-id",
       "mcp__context7__get-library-docs",
       "WebSearch",
-      "WebFetch"
+      "WebFetch",
+      "Read"
     ],
     "deny": [
       "Bash(git push :*)",
@@ -199,5 +205,5 @@
     "type": "command",
     "command": "bash ~/.claude/statusline-command.sh"
   },
-  "alwaysThinkingEnabled": false
+  "alwaysThinkingEnabled": true
 }

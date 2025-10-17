@@ -28,8 +28,8 @@ keymap("n", "[l", ":lprev<CR>", opts)
 -- keymap("n", "<A-j>", "<C-w>j", opts)
 -- keymap("n", "<A-k>", "<C-w>k", opts)
 -- keymap("n", "<A-l>", "<C-w>l", opts)
-keymap("n", "ss", ":vsplit<CR>", opts)
-keymap("n", "sv", ":split<CR>", opts)
+keymap("n", "sv", ":vsplit<CR>", opts)
+keymap("n", "sn", ":split<CR>", opts)
 
 -- Move lines
 keymap({ 'n', 'v' }, 'J', ':m .+1<CR>==', opts)
@@ -81,8 +81,8 @@ keymap("n", "*", "*zz", opts)
 keymap("n", "#", "#zz", opts)
 
 -- Easier start and endline
-keymap({ "n", "o", "x" }, "<leader>h", "^", { desc = 'Line start' })
-keymap({ "n", "o", "x" }, "<leader>l", "g_", { desc = 'Line end' })
+keymap({ "n", "o", "x" }, "H", "^", { desc = 'Line start' })
+keymap({ "n", "o", "x" }, "L", "g_", { desc = 'Line end' })
 
 -- Remove line ending
 keymap({ "n", "i" }, "<S-A-j>", ":join<CR>", opts)

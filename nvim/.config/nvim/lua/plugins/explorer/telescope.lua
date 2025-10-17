@@ -45,8 +45,8 @@ local cfg = {
                 ['<C-d>'] = false,
             },
             n = {
-                ["ss"] = "select_vertical",
-                ["sh"] = "select_horizontal",
+                ["sv"] = "select_vertical",
+                ["sn"] = "select_horizontal",
             }
         },
         theme = "center",
@@ -56,7 +56,8 @@ local cfg = {
                 prompt_position = "top",
                 preview_width = 0.6,
             },
-        }
+        },
+        path_display = { "smart" }
     },
     extensions = {
         file_browser = {

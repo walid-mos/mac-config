@@ -41,16 +41,35 @@ local lsp_keymaps = function (bufnr)
         end
     end
 
-    nmap("<leader>rn", vim.lsp.buf.rename, "[R]e[n]ame")
+    -- Rename is handled by inc-rename.nvim plugin
+    -- nmap("<leader>rn", vim.lsp.buf.rename, "[R]e[n]ame")
+
+    -- Modern Neovim 0.11+ keymaps
+    nmap("gd", telescope_lsp_wrapper(require("telescope.builtin").lsp_definitions), "Go to Definition")
+    nmap("gD", vim.lsp.buf.declaration, "Go to Declaration")
+    nmap("gi", telescope_lsp_wrapper(require("telescope.builtin").lsp_implementations), "Go to Implementation")
+    nmap("gr", telescope_lsp_wrapper(require("telescope.builtin").lsp_references), "Go to References (Telescope)")
+    nmap("grr", function()
+        vim.cmd("Trouble lsp_references")
+    end, "Go to References (Trouble)")
+    nmap("gy", telescope_lsp_wrapper(require("telescope.builtin").lsp_type_definitions), "Go to Type Definition")
+
+    -- Code actions and documentation
     nmap("<leader>ca", vim.lsp.buf.code_action, "[C]ode [A]ction")
-    nmap("<leader>cd", telescope_lsp_wrapper(require("telescope.builtin").lsp_definitions), "[D]efinition")
-    nmap("<leader>cD", telescope_lsp_wrapper(require("telescope.builtin").lsp_type_definitions), "Type [D]efinition")
-    nmap("<leader>cr", telescope_lsp_wrapper(require("telescope.builtin").lsp_references), "[R]eferences")
-    nmap("<leader>ci", telescope_lsp_wrapper(require("telescope.builtin").lsp_implementations), "[I]mplementation")
+    nmap("K", vim.lsp.buf.hover, "Hover Documentation")
+    nmap("gK", vim.lsp.buf.signature_help, "Signature Help")
+
+    -- Symbols navigation
     nmap("<leader>ds", telescope_wrapper(require("telescope.builtin").lsp_document_symbols), "[D]ocument [S]ymbols")
     nmap("<leader>ws", telescope_wrapper(require("telescope.builtin").lsp_dynamic_workspace_symbols), "[W]orkspace [S]ymbols")
-    nmap("K", vim.lsp.buf.hover, "Hover Documentation")
-    nmap("<leader>cK", vim.lsp.buf.signature_help, "Signature [H]elp")
+
+    -- Diagnostics
+    nmap("<leader>cd", function()
+        vim.cmd("Trouble diagnostics toggle filter.buf=0")
+    end, "Buffer [D]iagnostics")
+    nmap("<leader>cD", function()
+        vim.cmd("Trouble diagnostics toggle")
+    end, "Workspace [D]iagnostics")
 end
 
 local on_attach = function(client, bufnr)
@@ -61,7 +80,41 @@ local on_attach = function(client, bufnr)
 end
 
 local common_capabilities = function ()
-    return require('cmp_nvim_lsp').default_capabilities()
+    local capabilities = require('cmp_nvim_lsp').default_capabilities()
+
+    -- Enhanced capabilities for modern LSP features
+    capabilities.textDocument.completion.completionItem = {
+        documentationFormat = { "markdown", "plaintext" },
+        snippetSupport = true,
+        preselectSupport = true,
+        insertReplaceSupport = true,
+        labelDetailsSupport = true,
+        deprecatedSupport = true,
+        commitCharactersSupport = true,
+        tagSupport = { valueSet = { 1 } },
+        resolveSupport = {
+            properties = {
+                "documentation",
+                "detail",
+                "additionalTextEdits",
+            },
+        },
+    }
+
+    -- File operations support (for auto-import on file moves, etc.)
+    capabilities.workspace = capabilities.workspace or {}
+    capabilities.workspace.fileOperations = {
+        didRename = true,
+        willRename = true,
+    }
+
+    -- Folding support
+    capabilities.textDocument.foldingRange = {
+        dynamicRegistration = false,
+        lineFoldingOnly = true,
+    }
+
+    return capabilities
 end
 
 local initialize_diagnostics = function()
@@ -76,7 +129,24 @@ local initialize_diagnostics = function()
                 { name = "DiagnosticSignInfo", text = icons.diagnostics.Information },
             },
         },
-        virtual_text = false,
+        -- Enhanced virtual_text with better formatting
+        virtual_text = {
+            spacing = 4,
+            source = "if_many",
+            prefix = "●",
+            -- Only show errors and warnings inline, hints/info in float
+            severity = {
+                min = vim.diagnostic.severity.WARN,
+            },
+            format = function(diagnostic)
+                -- Truncate long messages
+                local max_width = 80
+                if #diagnostic.message > max_width then
+                    return diagnostic.message:sub(1, max_width) .. "..."
+                end
+                return diagnostic.message
+            end,
+        },
         update_in_insert = false,
         underline = true,
         severity_sort = true,
@@ -87,9 +157,31 @@ local initialize_diagnostics = function()
             source = "always",
             header = "",
             prefix = "",
+            format = function(diagnostic)
+                return string.format("%s: %s", diagnostic.source or "", diagnostic.message)
+            end,
         },
     }
     vim.diagnostic.config(config)
+
+    -- Add keymap to toggle virtual_text
+    vim.keymap.set("n", "<leader>ct", function()
+        local current = vim.diagnostic.config().virtual_text
+        if current then
+            vim.diagnostic.config({ virtual_text = false })
+            vim.notify("Virtual text disabled", vim.log.levels.INFO)
+        else
+            vim.diagnostic.config({
+                virtual_text = {
+                    spacing = 4,
+                    source = "if_many",
+                    prefix = "●",
+                    severity = { min = vim.diagnostic.severity.WARN },
+                }
+            })
+            vim.notify("Virtual text enabled", vim.log.levels.INFO)
+        end
+    end, { desc = "Toggle diagnostic virtual text" })
 end
 
 return {

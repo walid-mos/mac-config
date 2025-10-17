@@ -108,8 +108,6 @@ vim.api.nvim_create_autocmd('TextYankPost', {
   pattern = '*',
 })
 
-vim.o.formatexpr = "v:lua.require'conform'.formatexpr()"
-
 -- Fix Treesitter highlighter errors
 vim.api.nvim_create_autocmd('User', {
   pattern = 'TSUpdate',

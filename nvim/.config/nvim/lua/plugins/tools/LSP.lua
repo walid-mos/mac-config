@@ -3,24 +3,22 @@ local mason_servers = {
     "lua_ls",
     "cssls",
     "html",
-    "ts_ls",
+    -- "ts_ls", -- Replaced by typescript-tools.nvim
     "pyright",
     "bashls",
     "jsonls",
+    "yamlls",
     "rust_analyzer",
     "eslint",
+    "gopls",
+    "volar",
+    "tailwindcss",
+    "dockerls",
 }
 
 local servers = {
     rust_analyzer = {},
-    ts_ls = {
-        init_options = {
-            preferences = {
-                importModuleSpecifierPreference = "non-relative",
-                includeCompletionsForModuleExports = false,
-            },
-        },
-    },
+    -- ts_ls handled by typescript-tools.nvim
     eslint = {},
     cssls = {
         css = {
@@ -46,6 +44,42 @@ local servers = {
             },
         },
     },
+    yamlls = {
+        yaml = {
+            schemas = {
+                ["https://json.schemastore.org/github-workflow.json"] = "/.github/workflows/*",
+                ["https://json.schemastore.org/github-action.json"] = "/.github/action.{yml,yaml}",
+            },
+        },
+    },
+    gopls = {
+        gopls = {
+            analyses = {
+                unusedparams = true,
+            },
+            staticcheck = true,
+            gofumpt = true,
+        },
+    },
+    volar = {
+        filetypes = { "vue" },
+        init_options = {
+            vue = {
+                hybridMode = false,
+            },
+        },
+    },
+    tailwindcss = {
+        tailwindCSS = {
+            experimental = {
+                classRegex = {
+                    { "cva\\(([^)]*)\\)", "[\"'`]([^\"'`]*).*?[\"'`]" },
+                    { "cx\\(([^)]*)\\)", "(?:'|\"|`)([^']*)(?:'|\"|`)" },
+                },
+            },
+        },
+    },
+    dockerls = {},
 }
 
 
@@ -62,9 +96,6 @@ local mason_handlers = {
             settings = servers[server_name],
             filetypes = (servers[server_name] or {}).filetypes,
         }
-        if server_name == "ts_ls" then
-            opts.root_dir = nvim_lsp.util.root_pattern(".git", "tsconfig.json", "package.json", "jsconfig.json")
-        end
         if server_name == "lua_ls" then
             require("neodev").setup({})
             opts.settings.Lua.diagnostics.globals = { "vim" }

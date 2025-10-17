@@ -11,28 +11,21 @@ keybind = option+right_bracket=next_tab
 
 # === Ghostty Native Splits (remplacement tmux) ===
 
-# Créer des splits comme tmux
-# Alt+n : split à droite (comme tmux)
+# Créer des splits
 keybind = option+n=new_split:right
-# Alt+v : split en bas (comme tmux)
-keybind = option+v=new_split:down 
+keybind = option+v=new_split:down
 
-# Navigation entre splits - EXPERIMENTAL: Two-phase approach
-# Phase 1: Let Neovim try first, fallback to Ghostty
-# We'll use text sequences that Neovim can handle specially
-
-# Direct Ghostty split navigation
+# Navigation entre panes Ghostty (Alt+hjkl)
+# Neovim utilise Ctrl+hjkl pour ses propres splits
 keybind = option+h=goto_split:left
 keybind = option+j=goto_split:down
 keybind = option+k=goto_split:up
 keybind = option+l=goto_split:right
 
-# Alternative navigation removed - Alt+Shift now used for resizing
-
-# Fermer split actuel
+# Fermer pane actuel
 keybind = option+x=close_surface
 
-# Redimensionnement des splits - Alt+Shift+hjkl comme documenté
+# Redimensionnement des panes Ghostty (Alt+Shift+hjkl)
 keybind = option+shift+h=resize_split:left,10
 keybind = option+shift+j=resize_split:down,5
 keybind = option+shift+k=resize_split:up,5

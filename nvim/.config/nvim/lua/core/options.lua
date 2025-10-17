@@ -22,7 +22,8 @@ vim.opt.wrap = false
 -- fold
 vim.opt.foldenable = true
 vim.opt.foldlevel = 99
-vim.opt.foldmethod = "indent"
+vim.opt.foldmethod = "expr"
+vim.opt.foldexpr = "nvim_treesitter#foldexpr()"
 
 -- screen
 vim.opt.scrolloff = 4

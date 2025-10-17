@@ -61,5 +61,28 @@ return {
     init = function()
         -- Use conform for gq formatting
         vim.o.formatexpr = "v:lua.require'conform'.formatexpr()"
+
+        -- Add :W command to write without formatting
+        vim.api.nvim_create_user_command('W', function()
+            vim.b.disable_autoformat = true
+            vim.cmd('write')
+            vim.b.disable_autoformat = false
+        end, { desc = 'Write without formatting' })
+
+        -- Add :Wq command to write without formatting and quit
+        vim.api.nvim_create_user_command('Wq', function()
+            vim.b.disable_autoformat = true
+            vim.cmd('write')
+            vim.b.disable_autoformat = false
+            vim.cmd('quit')
+        end, { desc = 'Write without formatting and quit' })
+
+        -- Also add :WQ as alias
+        vim.api.nvim_create_user_command('WQ', function()
+            vim.b.disable_autoformat = true
+            vim.cmd('write')
+            vim.b.disable_autoformat = false
+            vim.cmd('quit')
+        end, { desc = 'Write without formatting and quit' })
     end,
 }

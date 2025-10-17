@@ -62,48 +62,67 @@ When a project includes the `cn()` utility function (typically combining `clsx` 
 **Core Principles**:
 - `cn()` combines conditional class logic (`clsx`) with Tailwind conflict resolution (`tailwind-merge`)
 - Common pattern: `const cn = (...inputs) => twMerge(clsx(inputs))`
-- **ALWAYS organize classes by category** as separate arguments for readability
+- **Keep it concise** - group related classes together, avoid excessive line separation
 
-**Organization Categories** (separate arguments):
-1. Base/structural classes
-2. Responsive breakpoint modifiers
-3. Dark mode variants
-4. State modifiers (hover, focus, active)
-5. Conditional logic (ternaries, boolean conditions)
+**Organization Domains** (3 logical groups only):
+1. **Base/Global** - Structural classes, colors, typography, layout
+2. **Responsive** - One line per breakpoint size (sm:, md:, lg:, xl:, 2xl:)
+3. **Variants/States** - Modifiers grouped by type:
+   - Dark modes WITH their base state: `bg-white dark:bg-gray-800`
+   - Interactive states WITH dark variants: `hover:bg-blue-600 dark:hover:bg-blue-700`
+   - Pseudo-elements grouped: `before:content-[''] before:absolute before:inset-0`
+   - Group states combined: `group-hover:opacity-100 dark:group-hover:opacity-90`
+4. **Conditional logic** - Ternaries and boolean conditions (ternaries, boolean conditions)
 
 **Example - CORRECT with cn()**:
 ```tsx
-// Organized by category - CORRECT
+// Concise organization - CORRECT
 <div className={cn(
-  // Base structural classes
-  "flex items-center justify-between p-4 rounded-lg shadow-md",
-  // Responsive breakpoints
-  "md:p-6 lg:p-8",
-  // Dark mode
-  "dark:bg-gray-800 dark:text-white",
-  // States
-  "hover:shadow-lg focus:ring-2",
+  // Base: structure, colors, typography (dark variants included)
+  "flex items-center justify-between p-4 rounded-lg shadow-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white",
+  // Responsive: one line per breakpoint
+  "md:p-6 md:rounded-xl lg:p-8 lg:shadow-xl",
+  // States: hover, focus, active (dark variants included)
+  "hover:shadow-lg dark:hover:shadow-2xl focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400",
   // Conditional logic
-  isActive && "bg-blue-500 text-white",
+  isActive && "bg-blue-500 dark:bg-blue-600 text-white",
   isDisabled && "opacity-50 cursor-not-allowed"
 )}>
 
-// Complex conditional logic - CORRECT
+// Complex with pseudo-elements - CORRECT
 <button className={cn(
-  "px-4 py-2 rounded font-medium transition-colors",
-  variant === "primary" ? "bg-blue-500 text-white hover:bg-blue-600" :
-  variant === "secondary" ? "bg-gray-200 text-gray-800 hover:bg-gray-300" :
-  "bg-transparent text-blue-500 hover:bg-blue-50",
-  size === "sm" && "text-sm px-3 py-1",
-  size === "lg" && "text-lg px-6 py-3",
-  disabled && "opacity-50 cursor-not-allowed"
+  "relative px-4 py-2 rounded font-medium transition-colors bg-blue-500 dark:bg-blue-600 text-white",
+  "before:content-[''] before:absolute before:inset-0 before:rounded before:opacity-0 before:transition-opacity",
+  "hover:bg-blue-600 dark:hover:bg-blue-700 hover:before:opacity-10",
+  "disabled:opacity-50 disabled:cursor-not-allowed"
 )}>
+
+// With group variants - CORRECT
+<div className="group">
+  <div className={cn(
+    "transition-all opacity-0 group-hover:opacity-100 dark:group-hover:opacity-90",
+    "transform translate-y-2 group-hover:translate-y-0"
+  )}>
+</div>
 ```
 
 **Example - FORBIDDEN**:
 ```tsx
-// Single long string without organization - FORBIDDEN
+// Single long unorganized string - FORBIDDEN
 <div className={cn("flex items-center justify-between p-4 md:p-6 lg:p-8 dark:bg-gray-800 dark:text-white hover:shadow-lg focus:ring-2 bg-white rounded-lg shadow-md")}>
+
+// Over-segmentation with too many lines - FORBIDDEN
+<div className={cn(
+  "flex items-center",
+  "justify-between",
+  "p-4",
+  "bg-white",
+  "dark:bg-gray-800",  // Don't separate dark from base
+  "text-white",
+  "dark:text-gray-100", // Don't separate dark from base
+  "hover:shadow-lg",
+  "dark:hover:shadow-xl" // Don't separate dark:hover from hover
+)}>
 
 // Classes in constants outside cn() - FORBIDDEN
 const baseClasses = "flex items-center"

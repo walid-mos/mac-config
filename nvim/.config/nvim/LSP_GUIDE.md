@@ -48,24 +48,24 @@ Configuration automatique des schemas YAML pour GitHub Actions/Workflows.
 
 ## ⌨️ Keymaps LSP Modernisés
 
-### Navigation LSP (Style Neovim 0.11+)
+### Navigation LSP (Sous `<leader>l`)
 
 | Keymap | Action | Description |
 |--------|--------|-------------|
-| `gd` | Go to Definition | Ouvre la définition dans Telescope |
-| `gD` | Go to Declaration | Va à la déclaration |
-| `gi` | Go to Implementation | Ouvre l'implémentation dans Telescope |
-| `gr` | Go to References (Telescope) | Liste les références avec Telescope |
-| `grr` | Go to References (Trouble) | Liste les références avec Trouble |
-| `gy` | Go to Type Definition | Ouvre la définition de type |
+| `<leader>ld` | Go to Definition | Ouvre la définition dans Telescope |
+| `<leader>lD` | Go to Declaration | Va à la déclaration |
+| `<leader>li` | Go to Implementation | Ouvre l'implémentation dans Telescope |
+| `<leader>lr` | Go to References (Trouble) | Liste les références avec Trouble ⭐ |
+| `<leader>lR` | Go to References (Telescope) | Liste les références avec Telescope |
+| `<leader>lt` | Go to Type Definition | Ouvre la définition de type |
 
 ### Code Actions & Documentation
 
 | Keymap | Action | Description |
 |--------|--------|-------------|
 | `<leader>ca` | Code Action | Affiche les actions disponibles |
-| `K` | Hover Documentation | Documentation du symbole |
-| `gK` | Signature Help | Aide sur la signature |
+| `<leader>k` | Hover Documentation | Documentation du symbole |
+| `<leader>K` | Signature Help | Aide sur la signature |
 
 ### Renommage
 
@@ -96,10 +96,12 @@ Configuration automatique des schemas YAML pour GitHub Actions/Workflows.
 
 ### Formatage (Conform)
 
-| Keymap | Action | Description |
+| Keymap/Commande | Action | Description |
 |--------|--------|-------------|
 | `<leader>cf` | Format Buffer | Formate le buffer actuel |
 | `<leader>cF` | Toggle Autoformat | Active/désactive format on save |
+| `:W` | Write No Format | Sauvegarde SANS formater (une fois) |
+| `:Wq` / `:WQ` | Write & Quit No Format | Sauvegarde SANS formater et quitte |
 
 ### TypeScript Spécifique
 
@@ -255,19 +257,25 @@ brew install shfmt
    - Activé par défaut
    - Désactiver avec `<leader>cF`
 
-4. **Keymaps Standards**
-   - `gd`, `gi`, `gr` suivent Neovim 0.11+
-   - `grr` pour Trouble references
-   - `gr` pour Telescope references
+4. **Keymaps sous `<leader>l`**
+   - Navigation LSP regroupée sous `<leader>l` pour cohérence
+   - `<leader>lr` pour Trouble references (défaut) ⭐
+   - `<leader>lR` pour Telescope references (alternative)
+   - Documentation sous `<leader>k` et `<leader>K`
+
+5. **Treesitter Folding**
+   - Folding intelligent basé sur la structure du code
+   - `za` pour toggle, `zM`/`zR` pour tout fermer/ouvrir
+   - Plus intelligent que le folding par indentation
 
 ## 🎯 Workflow Recommandé
 
 ### Pour "Where is Used" (References)
-1. `gr` → Telescope references (navigation rapide)
-2. `grr` → Trouble references (vue d'ensemble avec preview)
+1. `<leader>lr` → Trouble references (vue d'ensemble avec preview) ⭐ **Recommandé**
+2. `<leader>lR` → Telescope references (navigation rapide si besoin)
 
 ### Pour Go to Definition
-1. `gd` → Va à la définition (Telescope)
+1. `<leader>ld` → Va à la définition (Telescope)
 2. `<C-o>` → Retour en arrière
 3. `<C-i>` → En avant
 
@@ -281,6 +289,37 @@ brew install shfmt
 1. `<leader>rn` → Inc-rename avec preview
 2. Tape le nouveau nom
 3. Enter pour confirmer
+
+### Pour le Code Folding (Treesitter)
+
+Le folding intelligent basé sur Treesitter est activé! Il comprend la structure de ton code.
+
+**Keybindings disponibles:**
+
+| Keymap | Action | Description |
+|--------|--------|-------------|
+| `za` | Toggle fold | Ouvrir/fermer le fold sous curseur ⭐ **Le plus utilisé** |
+| `zo` | Open fold | Ouvrir le fold sous curseur |
+| `zc` | Close fold | Fermer le fold sous curseur |
+| `zR` | Open ALL folds | Ouvrir tous les folds du fichier |
+| `zM` | Close ALL folds | Fermer tous les folds du fichier |
+| `zj` | Next fold | Aller au fold suivant |
+| `zk` | Previous fold | Aller au fold précédent |
+
+**Exemples d'utilisation:**
+```javascript
+function maFonction() {  // 👈 Curseur ici, tape 'za' pour toggle
+    if (condition) {
+        // code plié
+    }
+}
+```
+
+**Tips:**
+- `za` est ton meilleur ami pour toggle rapidement
+- `zM` pour tout fermer et avoir une vue d'ensemble
+- `zR` pour tout ouvrir quand tu cherches quelque chose
+- Le folding Treesitter plie intelligemment par fonction, classe, bloc, etc.
 
 ## 🐛 Troubleshooting
 

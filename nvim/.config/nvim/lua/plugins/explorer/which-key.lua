@@ -6,6 +6,7 @@ local keys = {
     {'<leader>w', name = '[W]orkspace' },
     {'<leader>m', name = '[M]ulticursor' },
     {'<leader>b', name = '[B]uffers' },
+    {'<leader>l', name = '[L]SP' },
 } 
 
 local cfg = {

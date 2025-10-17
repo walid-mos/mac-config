@@ -10,8 +10,6 @@ local mason_servers = {
     "yamlls",
     "rust_analyzer",
     "eslint",
-    "gopls",
-    "volar",
     "tailwindcss",
     "dockerls",
 }
@@ -52,23 +50,6 @@ local servers = {
             },
         },
     },
-    gopls = {
-        gopls = {
-            analyses = {
-                unusedparams = true,
-            },
-            staticcheck = true,
-            gofumpt = true,
-        },
-    },
-    volar = {
-        filetypes = { "vue" },
-        init_options = {
-            vue = {
-                hybridMode = false,
-            },
-        },
-    },
     tailwindcss = {
         tailwindCSS = {
             experimental = {
@@ -89,7 +70,6 @@ local lsp_utils = require("plugins.utils.lsp_utils")
 
 local mason_handlers = {
     function(server_name)
-        local nvim_lsp = require("lspconfig")
         local opts = {
             on_attach = lsp_utils.on_attach,
             capabilities = lsp_utils.common_capabilities(),
@@ -110,7 +90,10 @@ local mason_handlers = {
             end
             opts.capabilities = nil
         end
-        nvim_lsp[server_name].setup(opts)
+
+        -- Use new Neovim 0.11+ API
+        vim.lsp.config(server_name, opts)
+        vim.lsp.enable(server_name)
     end,
 }
 

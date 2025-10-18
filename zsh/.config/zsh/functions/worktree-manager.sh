@@ -91,7 +91,7 @@ init_state_file() {
 add_to_state() {
     local project="$1"
     local branch="$2"
-    local path="$3"
+    local wt_path="$3"
     local git_root="$4"
 
     init_state_file
@@ -101,7 +101,7 @@ add_to_state() {
         local temp_file=$(mktemp)
         jq --arg proj "$project" \
            --arg br "$branch" \
-           --arg p "$path" \
+           --arg p "$wt_path" \
            --arg gr "$git_root" \
            '.worktrees[$proj + "/" + $br] = {
                "path": $p,
@@ -247,6 +247,7 @@ wt_new() {
 
 # Switch to existing worktree
 wt_switch() {
+    local target_branch="$1"
     local worktrees=$(get_project_worktrees)
 
     if [ -z "$worktrees" ]; then
@@ -255,6 +256,41 @@ wt_switch() {
         return 1
     fi
 
+    # If branch name provided, switch directly
+    if [ -n "$target_branch" ]; then
+        local target_path=""
+        while IFS='|' read -r wt_path branch; do
+            if [ "$branch" = "$target_branch" ]; then
+                target_path="$wt_path"
+                break
+            fi
+        done <<< "$worktrees"
+
+        if [ -z "$target_path" ]; then
+            echo "❌ No worktree found for branch: $target_branch"
+            echo ""
+            echo "Available branches:"
+            while IFS='|' read -r wt_path branch; do
+                echo "  - $branch"
+            done <<< "$worktrees"
+            return 1
+        fi
+
+        if [ -d "$target_path" ]; then
+            if cd "$target_path" 2>/dev/null; then
+                echo "✅ Switched to: $target_path"
+                return 0
+            else
+                echo "❌ Failed to switch to: $target_path"
+                return 1
+            fi
+        else
+            echo "❌ Worktree path not found: $target_path"
+            return 1
+        fi
+    fi
+
+    # Interactive mode with fzf
     local current_dir=$(pwd)
     local selected=$(echo "$worktrees" | while IFS='|' read -r wt_path branch; do
         if [ "$wt_path" = "$current_dir" ]; then
@@ -386,8 +422,8 @@ wt_clean() {
 
     echo ""
     echo "📋 Worktrees to remove:"
-    while IFS='|' read -r branch path; do
-        echo "  - $branch ($path)"
+    while IFS='|' read -r branch wt_path; do
+        echo "  - $branch ($wt_path)"
     done <<< "$selected"
     echo ""
     echo -n "⚠️  Remove these worktrees? (y/N): "
@@ -399,16 +435,16 @@ wt_clean() {
     fi
 
     echo ""
-    while IFS='|' read -r branch path; do
+    while IFS='|' read -r branch wt_path; do
         echo "🗑️  Removing worktree: $branch"
-        if git worktree remove "$path" --force 2>/dev/null; then
+        if git worktree remove "$wt_path" --force 2>/dev/null; then
             echo "   ✅ Removed from git"
         else
             echo "   ⚠️  Failed to remove from git, removing directory..."
         fi
 
-        if [ -d "$path" ]; then
-            rm -rf "$path"
+        if [ -d "$wt_path" ]; then
+            rm -rf "$wt_path"
             echo "   ✅ Removed directory"
         fi
 

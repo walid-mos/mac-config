@@ -511,7 +511,8 @@ wt_prune() {
 
     while IFS='|' read -r wt_path branch; do
         # Check if branch is gone on remote
-        local branch_info=$(git branch -vv | grep "^[* ] $branch " | grep ": gone]")
+        # Note: ^. matches any symbol (*, +, or space) at the start
+        local branch_info=$(git branch -vv | grep "^. $branch " | grep ": gone]")
         if [ -n "$branch_info" ]; then
             gone_worktrees_branches+=("$branch")
             gone_worktrees_paths+=("$wt_path")

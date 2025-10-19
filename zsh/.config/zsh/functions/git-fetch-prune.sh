@@ -44,7 +44,10 @@ gf() {
     echo "Found $branch_count branch(es) to delete:"
     printf "  - %s\n" "${branch_array[@]}"
     echo
-    
+
+    # Track branches that are worktrees
+    local -a worktree_branches=()
+
     if [ "$interactive_mode" = true ]; then
         # Interactive mode: ask for each branch
         local skip_all=false
@@ -52,13 +55,18 @@ gf() {
             if [ "$skip_all" = true ]; then
                 break
             fi
-            
+
             while true; do
                 echo -n "Delete branch '$branch'? (y/n/a/q): "
                 read -r response
                 case $response in
                     [Yy]|yes)
                         _delete_branch_with_worktree "$branch"
+                        local delete_status=$?
+                        if [ $delete_status -eq 2 ]; then
+                            worktree_branches+=("$branch")
+                            echo "Skipping '$branch' (worktree detected)"
+                        fi
                         break
                         ;;
                     [Nn]|no)
@@ -69,12 +77,17 @@ gf() {
                         echo "Deleting all remaining branches..."
                         for remaining_branch in "${branch_array[@]}"; do
                             _delete_branch_with_worktree "$remaining_branch"
+                            local delete_status=$?
+                            if [ $delete_status -eq 2 ]; then
+                                worktree_branches+=("$remaining_branch")
+                                echo "Skipping '$remaining_branch' (worktree detected)"
+                            fi
                         done
-                        return 0
+                        break
                         ;;
                     [Qq]|quit)
                         echo "Cancelled"
-                        return 0
+                        break
                         ;;
                     *)
                         echo "Please answer y(es), n(o), a(ll), or q(uit)"
@@ -95,30 +108,59 @@ gf() {
                 # Default to yes for empty input or 'y'/'yes'
                 for branch in "${branch_array[@]}"; do
                     _delete_branch_with_worktree "$branch"
+                    local delete_status=$?
+                    if [ $delete_status -eq 2 ]; then
+                        worktree_branches+=("$branch")
+                        echo "Skipping '$branch' (worktree detected)"
+                    fi
                 done
+                ;;
+        esac
+    fi
+
+    # If worktrees were detected, suggest using wt prune
+    if [ ${#worktree_branches[@]} -gt 0 ]; then
+        echo ""
+        echo "⚠️  ${#worktree_branches[@]} branch(es) with worktrees detected:"
+        printf "  - %s\n" "${worktree_branches[@]}"
+        echo ""
+        echo "💡 These branches cannot be deleted with 'git branch -D' because they have active worktrees."
+        echo "   Use 'wt prune' to remove both the worktrees and branches for deleted remotes."
+        echo ""
+        echo -n "Run 'wt prune' now? (Y/n): "
+        read -r wt_response
+        case $wt_response in
+            [Nn]|no)
+                echo "Skipped. You can run 'wt prune' or 'wt prune -i' manually later."
+                ;;
+            *)
+                echo ""
+                if [ "$interactive_mode" = true ]; then
+                    wt prune -i
+                else
+                    wt prune
+                fi
                 ;;
         esac
     fi
 }
 
-# Helper function to delete a branch and its worktree
+# Helper function to delete a branch (returns 2 if worktree detected, 1 if error, 0 if success)
 _delete_branch_with_worktree() {
     local branch="$1"
-    
+
     # Check if branch has an associated worktree
     local worktree_info=$(git worktree list --porcelain | grep -A2 "branch refs/heads/$branch")
     if [ -n "$worktree_info" ]; then
-        local worktree_path=$(echo "$worktree_info" | grep "worktree" | cut -d' ' -f2)
-        if [ -n "$worktree_path" ]; then
-            echo "Removing worktree for '$branch' at: $worktree_path"
-            git worktree remove "$worktree_path" --force 2>/dev/null
-            if [ -d "$worktree_path" ]; then
-                echo "Removing directory: $worktree_path"
-                rm -rf "$worktree_path"
-            fi
-        fi
+        # Worktree detected - don't attempt to delete, return special code
+        return 2
     fi
-    
+
     echo "Deleting branch: $branch"
-    git branch -D "$branch"
+    if git branch -D "$branch" 2>/dev/null; then
+        return 0
+    else
+        echo "Failed to delete branch: $branch"
+        return 1
+    fi
 }

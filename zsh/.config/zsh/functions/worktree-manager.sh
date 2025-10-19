@@ -11,6 +11,7 @@ unalias wts 2>/dev/null
 unalias wtl 2>/dev/null
 unalias wtd 2>/dev/null
 unalias wtc 2>/dev/null
+unalias wtp 2>/dev/null
 
 # ============================================================================
 # CONSTANTS AND CONFIGURATION
@@ -426,13 +427,18 @@ wt_clean() {
         echo "  - $branch ($wt_path)"
     done <<< "$selected"
     echo ""
-    echo -n "⚠️  Remove these worktrees? (y/N): "
+    echo -n "⚠️  Remove these worktrees? (Y/n): "
     read -r confirm
 
-    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
-        echo "❌ Operation cancelled"
-        return 0
-    fi
+    case $confirm in
+        [Nn]|no)
+            echo "❌ Operation cancelled"
+            return 0
+            ;;
+        *)
+            # Default to yes for empty input or anything else
+            ;;
+    esac
 
     echo ""
     while IFS='|' read -r branch wt_path; do
@@ -455,6 +461,211 @@ wt_clean() {
     echo "✅ Cleanup complete!"
 }
 
+# Prune worktrees for deleted branches
+wt_prune() {
+    local interactive_mode=false
+
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --interactive|-i)
+                interactive_mode=true
+                shift
+                ;;
+            --help|-h)
+                echo "Usage: wt prune [--interactive|-i]"
+                echo "  --interactive, -i    Ask confirmation for each worktree individually"
+                echo "  --help, -h          Show this help message"
+                echo ""
+                echo "Automatically removes worktrees AND local branches for branches deleted on remote."
+                echo "This command will:"
+                echo "  1. Fetch with --prune to update remote tracking"
+                echo "  2. Identify branches marked as 'gone' on remote"
+                echo "  3. Remove the associated worktrees"
+                echo "  4. Delete the local branches (git branch -D)"
+                return 0
+                ;;
+            *)
+                echo "❌ Unknown argument: $1"
+                echo "Usage: wt prune [--interactive|-i]"
+                return 1
+                ;;
+        esac
+    done
+
+    echo "🔍 Fetching with prune to update remote tracking..."
+    git fetch --prune
+    echo ""
+
+    # Get all worktrees for this project
+    local worktrees=$(get_project_worktrees)
+
+    if [ -z "$worktrees" ]; then
+        echo "📋 No worktrees found for this project"
+        return 0
+    fi
+
+    # Find worktrees whose branches are gone on remote
+    local -a gone_worktrees_branches=()
+    local -a gone_worktrees_paths=()
+
+    while IFS='|' read -r wt_path branch; do
+        # Check if branch is gone on remote
+        local branch_info=$(git branch -vv | grep "^[* ] $branch " | grep ": gone]")
+        if [ -n "$branch_info" ]; then
+            gone_worktrees_branches+=("$branch")
+            gone_worktrees_paths+=("$wt_path")
+        fi
+    done <<< "$worktrees"
+
+    local gone_count=${#gone_worktrees_branches[@]}
+
+    if [ $gone_count -eq 0 ]; then
+        echo "✅ No worktrees to prune (all branches are up to date)"
+        return 0
+    fi
+
+    local project=$(get_project_name)
+
+    echo "🧹 Found $gone_count worktree(s) for deleted branches:"
+    for i in {1..$gone_count}; do
+        echo "  - ${gone_worktrees_branches[$i]}"
+        echo "    📂 ${gone_worktrees_paths[$i]}"
+    done
+    echo ""
+
+    if [ "$interactive_mode" = true ]; then
+        # Interactive mode: ask for each worktree
+        for i in {1..$gone_count}; do
+            local branch="${gone_worktrees_branches[$i]}"
+            local wt_path="${gone_worktrees_paths[$i]}"
+
+            while true; do
+                echo -n "Remove worktree for '$branch'? (y/n/a/q): "
+                read -r response
+                case $response in
+                    [Yy]|yes)
+                        echo "🗑️  Removing worktree and branch: $branch"
+                        if git worktree remove "$wt_path" --force 2>/dev/null; then
+                            echo "   ✅ Removed worktree from git"
+                        else
+                            echo "   ⚠️  Failed to remove worktree from git, removing directory..."
+                        fi
+
+                        if [ -d "$wt_path" ]; then
+                            rm -rf "$wt_path"
+                            echo "   ✅ Removed directory"
+                        fi
+
+                        # Delete the local branch (now that worktree is removed)
+                        echo "   🗑️  Deleting local branch: $branch"
+                        if git branch -D "$branch" 2>/dev/null; then
+                            echo "   ✅ Deleted branch"
+                        else
+                            echo "   ⚠️  Failed to delete branch (may not exist)"
+                        fi
+
+                        remove_from_state "$project" "$branch"
+                        echo "   ✅ Updated state"
+                        echo ""
+                        break
+                        ;;
+                    [Nn]|no)
+                        echo "⏭️  Skipping '$branch'"
+                        echo ""
+                        break
+                        ;;
+                    [Aa]|all)
+                        echo "🗑️  Removing all remaining worktrees and branches..."
+                        echo ""
+                        for j in {$i..$gone_count}; do
+                            local remaining_branch="${gone_worktrees_branches[$j]}"
+                            local remaining_path="${gone_worktrees_paths[$j]}"
+
+                            echo "🗑️  Removing worktree and branch: $remaining_branch"
+                            if git worktree remove "$remaining_path" --force 2>/dev/null; then
+                                echo "   ✅ Removed worktree from git"
+                            else
+                                echo "   ⚠️  Failed to remove worktree from git, removing directory..."
+                            fi
+
+                            if [ -d "$remaining_path" ]; then
+                                rm -rf "$remaining_path"
+                                echo "   ✅ Removed directory"
+                            fi
+
+                            # Delete the local branch (now that worktree is removed)
+                            echo "   🗑️  Deleting local branch: $remaining_branch"
+                            if git branch -D "$remaining_branch" 2>/dev/null; then
+                                echo "   ✅ Deleted branch"
+                            else
+                                echo "   ⚠️  Failed to delete branch (may not exist)"
+                            fi
+
+                            remove_from_state "$project" "$remaining_branch"
+                            echo "   ✅ Updated state"
+                            echo ""
+                        done
+                        echo "✅ Prune complete!"
+                        return 0
+                        ;;
+                    [Qq]|quit)
+                        echo "❌ Cancelled"
+                        return 0
+                        ;;
+                    *)
+                        echo "Please answer y(es), n(o), a(ll), or q(uit)"
+                        ;;
+                esac
+            done
+        done
+        echo "✅ Prune complete!"
+    else
+        # Default mode: global confirmation (default to Y)
+        echo -n "⚠️  Remove all $gone_count worktree(s)? (Y/n): "
+        read -r response
+        case $response in
+            [Nn]|no)
+                echo "❌ Cancelled"
+                return 0
+                ;;
+            *)
+                # Default to yes for empty input or 'y'/'yes'
+                echo ""
+                for i in {1..$gone_count}; do
+                    local branch="${gone_worktrees_branches[$i]}"
+                    local wt_path="${gone_worktrees_paths[$i]}"
+
+                    echo "🗑️  Removing worktree and branch: $branch"
+                    if git worktree remove "$wt_path" --force 2>/dev/null; then
+                        echo "   ✅ Removed worktree from git"
+                    else
+                        echo "   ⚠️  Failed to remove worktree from git, removing directory..."
+                    fi
+
+                    if [ -d "$wt_path" ]; then
+                        rm -rf "$wt_path"
+                        echo "   ✅ Removed directory"
+                    fi
+
+                    # Delete the local branch (now that worktree is removed)
+                    echo "   🗑️  Deleting local branch: $branch"
+                    if git branch -D "$branch" 2>/dev/null; then
+                        echo "   ✅ Deleted branch"
+                    else
+                        echo "   ⚠️  Failed to delete branch (may not exist)"
+                    fi
+
+                    remove_from_state "$project" "$branch"
+                    echo "   ✅ Updated state"
+                    echo ""
+                done
+                echo "✅ Prune complete!"
+                ;;
+        esac
+    fi
+}
+
 # Show help
 wt_help() {
     echo "Git Worktree Manager - Centralized worktree management"
@@ -468,6 +679,7 @@ wt_help() {
     echo "    list              List all worktrees for current project"
     echo "    status            Show git status for all worktrees"
     echo "    clean             Remove worktrees (interactive)"
+    echo "    prune [-i]        Auto-remove worktrees AND branches deleted on remote"
     echo "    help              Show this help message"
     echo ""
     echo "EXAMPLES:"
@@ -475,7 +687,9 @@ wt_help() {
     echo "    wt switch                        Interactive worktree selection"
     echo "    wt list                          List all worktrees"
     echo "    wt status                        Show status of all worktrees"
-    echo "    wt clean                         Clean up worktrees"
+    echo "    wt clean                         Clean up worktrees (keeps local branches)"
+    echo "    wt prune                         Remove worktrees + local branches for deleted remotes"
+    echo "    wt prune -i                      Interactive prune (confirm each individually)"
     echo ""
     echo "WORKTREE LOCATION:"
     echo "    All worktrees are stored in: ~/development/worktrees"
@@ -487,6 +701,7 @@ wt_help() {
     echo "    wtl    Alias for 'wt list'"
     echo "    wtd    Alias for 'wt status'"
     echo "    wtc    Alias for 'wt clean'"
+    echo "    wtp    Alias for 'wt prune'"
     echo ""
     echo "REQUIREMENTS:"
     echo "    - Git repository"
@@ -540,6 +755,13 @@ wt() {
             fi
             wt_clean "$@"
             ;;
+        prune)
+            if ! is_git_repo; then
+                echo "❌ Not in a git repository"
+                return 1
+            fi
+            wt_prune "$@"
+            ;;
         help|--help|-h|"")
             wt_help
             ;;
@@ -561,4 +783,5 @@ wts() { wt switch "$@"; }
 wtl() { wt list "$@"; }
 wtd() { wt status "$@"; }
 wtc() { wt clean "$@"; }
+wtp() { wt prune "$@"; }
 

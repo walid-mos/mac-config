@@ -161,6 +161,8 @@
 - ⛔ `const classes = "..."` with Tailwind → Use inline or cva only
 - ⛔ `require()` in TypeScript → Use ES6 imports
 - ⛔ `any` type → Use proper types or `unknown`
+- ⛔ Deep inheritance hierarchies → Prefer composition (see 🏗️ COMPOSITION ARCHITECTURE)
+- ⛔ Inheriting for code reuse → Use composition via DI or interfaces
 
 **Tool Anti-Patterns**:
 - ⛔ `npm install` or `yarn add` → Use `pnpm add` only
@@ -219,6 +221,104 @@ Always choose the simplest solution that maintains code quality and type safety.
 
 ---
 
+## 🏗️ COMPOSITION ARCHITECTURE
+
+### Prefer Composition Over Inheritance
+
+**RULE**: Composition is the PRIMARY pattern for code reuse. Inheritance ONLY for shallow, true "is-a" relationships.
+
+**Why Composition?**
+- ✅ Flexibility - Easy to change behavior and swap implementations
+- ✅ Loose Coupling - No complex inheritance hierarchies
+- ✅ Testability - Components tested in isolation
+- ✅ SOLID Compliant - Open-Closed, Interface Segregation principles
+- ✅ Maintainability - Avoids fragile base class problem
+
+### Decision Matrix
+
+**Use Composition When:**
+- Need code reuse without "is-a" relationship
+- Want runtime flexibility or behavior swapping
+- Components share behavior but aren't subtypes
+
+**Use Inheritance Only When:**
+- Genuine "is-a" relationship exists (e.g., `Dog is Animal`)
+- Hierarchy stays shallow (1-2 levels max)
+- Base class designed for extension
+
+### TypeScript Patterns
+
+#### 1. Interface Composition (Preferred)
+```typescript
+// ✅ GOOD: Interface extends (fast, better errors)
+interface Identifiable { id: string }
+interface Timestamped { createdAt: Date; updatedAt: Date }
+interface User extends Identifiable, Timestamped {
+  name: string;
+  email: string;
+}
+
+// ❌ AVOID: Type intersection (slower, worse errors)
+type User = Identifiable & Timestamped & { name: string };
+```
+
+#### 2. Dependency Injection
+```typescript
+// ✅ GOOD: Compose via constructor injection
+interface Logger { log(message: string): void }
+interface Storage { save(key: string, value: any): Promise<void> }
+
+class UserService {
+  constructor(
+    private logger: Logger,
+    private storage: Storage
+  ) {}
+}
+
+// ❌ AVOID: Inheritance for code reuse
+class BaseService { protected log() {} }
+class UserService extends BaseService {} // Tight coupling
+```
+
+#### 3. Utility Type Composition
+```typescript
+type PublicUser = Omit<User, 'password'>;
+type UserUpdate = Partial<Pick<User, 'name' | 'email'>>;
+```
+
+### React Patterns
+
+#### Component Composition
+```typescript
+// ✅ GOOD: Flexible composition with children
+<Card>
+  <CardHeader>Title</CardHeader>
+  <CardBody>Content</CardBody>
+</Card>
+```
+
+#### Custom Hooks
+```typescript
+// ✅ GOOD: Compose behavior via hooks
+function SearchComponent() {
+  const [query, setQuery] = useLocalStorage('search', '');
+  const debouncedQuery = useDebounce(query, 300);
+  // Composed behaviors without inheritance
+}
+```
+
+### Validation Checklist
+
+Before using inheritance, ask:
+1. ⚠️ Is this a true "is-a" relationship?
+2. ⚠️ Could composition work with more flexibility?
+3. ⚠️ Will hierarchy stay shallow (1-2 levels)?
+4. ⚠️ Am I inheriting just for code reuse?
+
+**If "no" to #1 or "yes" to #2 or #4: Use composition instead.**
+
+---
+
 ## 🛠️ ADVANCED FEATURES & CONFIGURATION
 
 ### Custom Commands
@@ -238,13 +338,14 @@ Always choose the simplest solution that maintains code quality and type safety.
 
 #### ⚙️ System Management
 - **`/stow-sync`** - Synchronize dotfiles with GNU Stow: conflict detection, backup strategy
+- **`/context7-add [libs...]`** - Add technologies to Context7 detection list with auto-resolution and smart categorization
 
 ### Automatic Hooks
 
 #### Active Hooks
 - **PostToolUse**: `log-commands` - Logs bash commands to `~/.claude/command-history.log`
 - **PreToolUse**: `validate-imports` - Enforces import standards (blocks `require()`, `any` type)
-- **UserPromptSubmit**: `context-enhancer` - Adds git context and branch warnings
+- **UserPromptSubmit**: `context7-enhancer` - Detects library mentions and suggests using Context7 MCP for documentation
 
 ### Permission Configuration
 

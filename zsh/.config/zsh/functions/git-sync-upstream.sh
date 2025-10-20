@@ -460,11 +460,25 @@ push_changes() {
 
     if [ "$force_mode" = "force" ]; then
         echo ""
-        echo "⚠️  Force push is required (history was rewritten)"
-        echo -n "   Continue with force push? (y/N): "
+        echo "⚠️  Force push required (history was rewritten)"
+        echo ""
+        echo "📋 Changes to be pushed:"
+        echo "   Local:  $current_branch"
+        echo "   Remote: origin/$current_branch"
+        echo ""
+
+        # Show visual preview of commits that will be force-pushed
+        echo "📊 Commits preview:"
+        git log --oneline --graph --decorate "origin/$current_branch..HEAD" -3 2>/dev/null || echo "   (unable to show preview)"
+        echo ""
+
+        echo "🔒 Safety: Using --force-with-lease (will abort if remote changed)"
+        echo ""
+        echo -n "   Continue with force push? (Y/n): "
         read -r confirm
 
-        if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        # Accept by default (refuse only if explicitly n/N)
+        if [[ "$confirm" =~ ^[Nn]$ ]]; then
             echo "❌ Push cancelled"
             echo ""
             echo "💡 Your local branch has been rebased but not pushed."
@@ -655,9 +669,12 @@ EOF
                 # Reset to parent
                 if reset_to_parent "$parent_branch"; then
                     echo ""
-                    echo "✅ Sync completed! Branch reset to '$parent_branch'"
+                    echo "✅ Branch reset to '$parent_branch'"
+                    echo "   Proceeding to push changes..."
+                else
+                    return 1
                 fi
-                return 0
+                # Don't return - continue to push step
                 ;;
             2)
                 # Delete branch
@@ -673,10 +690,9 @@ EOF
                 return 0
                 ;;
         esac
-    fi
 
     # Second check: Minimal diff but different trees
-    if has_minimal_diff "$current_branch" "$parent_branch"; then
+    elif has_minimal_diff "$current_branch" "$parent_branch"; then
         local new_commits=$(count_new_commits "$current_branch" "$parent_branch")
 
         if [ "$new_commits" = "0" ]; then
@@ -774,5 +790,5 @@ EOF
 
     echo ""
     echo "✅ Sync completed successfully!"
-    echo "🎉 Branch '$current_branch' is now up to date with '$upstream_branch'"
+    echo "🎉 Branch '$current_branch' is now up to date with '$parent_branch'"
 }

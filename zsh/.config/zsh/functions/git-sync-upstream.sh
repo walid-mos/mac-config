@@ -177,6 +177,16 @@ fetch_origin() {
     return 0
 }
 
+# Check if we're in a worktree
+is_worktree() {
+    # Check if current directory is a worktree (not the main working tree)
+    local git_dir=$(git rev-parse --git-dir 2>/dev/null)
+    local git_common_dir=$(git rev-parse --git-common-dir 2>/dev/null)
+
+    # If git-dir and git-common-dir are different, we're in a worktree
+    [ "$git_dir" != "$git_common_dir" ]
+}
+
 # Pull parent branch from origin
 pull_parent_branch() {
     local parent_branch="$1"
@@ -191,24 +201,47 @@ pull_parent_branch() {
         return 0
     fi
 
-    # Switch to parent branch temporarily to pull
-    local current_branch=$(get_current_branch)
+    # Check if we're in a worktree
+    if is_worktree; then
+        # In a worktree: fetch remote and update local ref directly
+        # This avoids the "already checked out" error
+        echo "📍 Worktree detected - updating parent branch via update-ref..."
 
-    if ! git checkout "$parent_branch" 2>/dev/null; then
-        echo "❌ Failed to checkout parent branch '$parent_branch'"
-        return 1
-    fi
+        # Fetch the remote branch (updates refs/remotes/origin/$parent_branch)
+        if ! git fetch origin "$parent_branch"; then
+            echo "❌ Failed to fetch '$parent_branch' from origin"
+            return 1
+        fi
 
-    if ! git pull origin "$parent_branch"; then
-        echo "❌ Failed to pull '$parent_branch'"
+        # Update the local branch ref directly without checkout
+        # This works because refs are shared across all worktrees
+        if ! git update-ref "refs/heads/$parent_branch" "refs/remotes/origin/$parent_branch"; then
+            echo "❌ Failed to update local branch '$parent_branch'"
+            return 1
+        fi
+
+        echo "✅ Parent branch updated"
+        return 0
+    else
+        # Not in a worktree: use traditional checkout + pull method
+        local current_branch=$(get_current_branch)
+
+        if ! git checkout "$parent_branch" 2>/dev/null; then
+            echo "❌ Failed to checkout parent branch '$parent_branch'"
+            return 1
+        fi
+
+        if ! git pull origin "$parent_branch"; then
+            echo "❌ Failed to pull '$parent_branch'"
+            git checkout "$current_branch" 2>/dev/null
+            return 1
+        fi
+
+        # Switch back to original branch
         git checkout "$current_branch" 2>/dev/null
-        return 1
+        echo "✅ Parent branch updated"
+        return 0
     fi
-
-    # Switch back to original branch
-    git checkout "$current_branch" 2>/dev/null
-    echo "✅ Parent branch updated"
-    return 0
 }
 
 # Perform rebase onto parent branch
@@ -457,6 +490,7 @@ needs_force_push() {
 push_changes() {
     local current_branch="$1"
     local force_mode="$2"  # "force" or "normal"
+    local parent_branch="$3"  # parent branch for comparison
 
     if [ "$force_mode" = "force" ]; then
         echo ""
@@ -467,9 +501,9 @@ push_changes() {
         echo "   Remote: origin/$current_branch"
         echo ""
 
-        # Show visual preview of commits that will be force-pushed
-        echo "📊 Commits preview:"
-        git log --oneline --graph --decorate "origin/$current_branch..HEAD" -3 2>/dev/null || echo "   (unable to show preview)"
+        # Show visual preview of divergence between parent and current branch
+        echo "📊 Branch divergence (< = from $parent_branch, > = your commits):"
+        git --no-pager log --left-right --oneline --graph --decorate "$parent_branch...HEAD" -15 2>/dev/null || echo "   (unable to show preview)"
         echo ""
 
         echo "🔒 Safety: Using --force-with-lease (will abort if remote changed)"
@@ -752,13 +786,13 @@ EOF
     case $push_status in
         0)
             # Force push needed
-            if ! push_changes "$current_branch" "force"; then
+            if ! push_changes "$current_branch" "force" "$parent_branch"; then
                 return 1
             fi
             ;;
         1)
             # Normal push is fine
-            if ! push_changes "$current_branch" "normal"; then
+            if ! push_changes "$current_branch" "normal" "$parent_branch"; then
                 return 1
             fi
             ;;

@@ -115,6 +115,16 @@
 - See `@agent-code-refactor-specialist` for detailed analysis
 - Focus on semantic similarity, not visual similarity
 
+### Function Extraction (MANDATORY)
+@claude/.claude/guidelines/function-extraction.md
+
+**Quick Reference**:
+- Functions are for FEATURES and COMPOSITION, not trivial wrappers
+- ✅ Extract for features with business logic (3+ meaningful lines)
+- ✅ Extract for composition patterns (DI, interfaces)
+- ⛔ NO 1-2 line wrappers (unless composition/testing boundary required)
+- ⛔ NO config getters or property wrappers
+
 ### Tailwind CSS (MANDATORY when project uses Tailwind)
 @claude/.claude/guidelines/tailwind.md
 
@@ -163,6 +173,7 @@
 - ⛔ `any` type → Use proper types or `unknown`
 - ⛔ Deep inheritance hierarchies → Prefer composition (see 🏗️ COMPOSITION ARCHITECTURE)
 - ⛔ Inheriting for code reuse → Use composition via DI or interfaces
+- ⛔ 1-2 line wrapper functions → Use direct calls (unless composition/testing boundary)
 
 **Tool Anti-Patterns**:
 - ⛔ `npm install` or `yarn add` → Use `pnpm add` only

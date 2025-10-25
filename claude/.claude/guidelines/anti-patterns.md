@@ -478,6 +478,69 @@ describe('API tests', () => {
 
 ---
 
+## Function Extraction Anti-Patterns
+
+### ⛔ Unnecessary 1-2 Line Wrapper Functions
+
+**Anti-Pattern**:
+```typescript
+function getUser(id: string) {
+  return userRepository.findById(id);
+}
+
+function getUserName(user: User) {
+  return user.name;
+}
+
+function getApiUrl() {
+  return process.env.API_URL;
+}
+
+const user = await getUser(userId);
+const name = getUserName(user);
+```
+
+**Why It's Wrong**:
+- Adds no semantic value
+- Extra indirection makes code harder to trace
+- Bloats codebase with pointless abstractions
+- Violates "functions are for features" principle
+- Just renaming variables/properties
+
+**✅ Correct Approach**:
+```typescript
+// Direct calls - clear and simple
+const user = await userRepository.findById(userId);
+const name = user.name;
+const apiUrl = process.env.API_URL;
+
+// OR destructuring for clarity
+const { name, email } = user;
+
+// ONLY extract when implementing a real feature
+function validateAndCreateUser(data: UserData): Promise<User> {
+  if (!validateEmail(data.email)) {
+    throw new ValidationError('Invalid email');
+  }
+
+  const hashedPassword = hashPassword(data.password);
+  return userRepository.create({
+    ...data,
+    password: hashedPassword
+  });
+}
+```
+
+**Rule**: Functions are for FEATURES with business logic (3+ meaningful lines), not trivial wrappers.
+
+**Exceptions** (allowed 1-2 line functions):
+- Encapsulating complex conditionals for readability
+- Required by interface/composition contracts
+- Creating testing/mocking boundaries
+- Platform-specific abstractions
+
+---
+
 ## Architecture Anti-Patterns
 
 ### ⛔ God Objects/Components

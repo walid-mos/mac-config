@@ -338,6 +338,7 @@ Before using inheritance, ask:
 
 #### 🚀 Development Workflow
 - **`/check-pr`** - Complete PR pipeline: lint → typecheck → test → security review → refactor → commit → create PR
+- **`/review`** - Process GitHub PR review comments: fetch unresolved comments, propose fixes, create atomic commits
 - **`/quick-fix`** - Quick fix: auto-fix linting, smart commit, push (skips tests for speed)
 - **`/feature-start [name]`** - Start feature: create branch from updated base with environment setup
 - **`/feature-complete`** - Complete feature: full validation, optional squashing, production-ready PR

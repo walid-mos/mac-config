@@ -1,5 +1,10 @@
 {
   "permissions": {
+    "defaultMode": "acceptEdits",
+    "additionalDirectories": [
+      "/Users/walid/Development",
+      "/Users/walid/.stow_repository"
+    ],
     "allowedTools": [
       "Bash(find:*)",
       "Bash(grep:*)",
@@ -102,7 +107,6 @@
       "WebSearch",
       "WebFetch",
       "Read",
-      "Read(//Users/walid/Library/Mobile Documents/com~apple~CloudDocs/Notes/**)",
       "Read(//Users/walid/Library/Mobile Documents/com~apple~CloudDocs/**)"
     ],
     "deniedTools": [
@@ -155,10 +159,6 @@
       "Bash(curl --form:*)",
       "Bash(curl -T:*)",
       "Bash(curl --upload-file:*)"
-    ],
-    "defaultMode": "acceptEdits",
-    "additionalDirectories": [
-      "/Users/walid/Development"
     ]
   },
   "hooks": {
@@ -208,5 +208,5 @@
     "type": "command",
     "command": "bash ~/.claude/statusline-command.sh"
   },
-  "alwaysThinkingEnabled": false
+  "alwaysThinkingEnabled": true
 }

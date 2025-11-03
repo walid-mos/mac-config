@@ -6,6 +6,7 @@ claude/.claude/shell-snapshots/
 claude/.claude/file-history/
 claude/.claude/debug/
 .claude/local
+claude/.claude/local
 
 # Claude Code runtime and history
 claude/.claude.json

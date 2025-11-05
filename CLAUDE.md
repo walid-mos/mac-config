@@ -41,6 +41,14 @@ Key custom functions available in `zsh/.config/zsh/functions/`:
   - Uses fzf for interactive branch selection
   - Integrates with GitHub CLI and Claude CLI for enhanced automation
 
+- **`gmrc`**: GitLab MR creation with AI-generated titles and descriptions using Claude CLI
+  - `gmrc` - Create new MR with interactive branch selection
+  - `gmrc -u` - Update existing MR description only
+  - `gmrc --draft` - Create as draft MR (Work In Progress)
+  - Uses fzf for interactive branch selection
+  - Integrates with GitLab CLI and Claude CLI
+  - Auto-removes source branch on merge
+
 - **`gf`**: Enhanced git fetch with branch cleanup
   - `gf` - Fetch and prune, then delete gone branches with confirmation
   - `gf -i` - Interactive mode for individual branch confirmation
@@ -144,10 +152,11 @@ Pre-configured project sessions:
 - Environment variables and paths configured in `.zshrc`
 
 **Git Workflow Integration:**
-- Custom PR creation with AI assistance via `gprc` function
-- Automated branch cleanup with `gf` function  
-- Integration with GitHub CLI for PR management
-- Claude CLI integration for generating PR content
+- Custom PR/MR creation with AI assistance via `gprc` (GitHub) and `gmrc` (GitLab) functions
+- Automated branch cleanup with `gf` function
+- Integration with GitHub CLI and GitLab CLI for PR/MR management
+- Claude CLI integration for generating PR/MR content
+- Shared utilities module (`git-pr-common.sh`) for DRY code architecture
 
 **Development Workflow:**
 - Uses PNPM exclusively (never npm/yarn)
@@ -170,6 +179,7 @@ Pre-configured project sessions:
 - Starship (shell prompt)
 - fzf (fuzzy finder for interactive selections)
 - GitHub CLI (`gh` command)
-- Claude CLI (for AI-powered PR generation)
+- GitLab CLI (`glab` command)
+- Claude CLI (for AI-powered PR/MR generation)
 - Neovim with Lua support
 - Tmux

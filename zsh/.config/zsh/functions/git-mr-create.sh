@@ -1,0 +1,319 @@
+#!/bin/zsh
+# Git MR Create with automatic title and description generation
+# GitLab-specific implementation using shared git-pr-common module
+
+# Get script directory for reliable sourcing
+typeset -g GMRC_SCRIPT_DIR="${GMRC_SCRIPT_DIR:-$(dirname "${(%):-%x}")}"
+
+# Source shared utilities
+source "${GMRC_SCRIPT_DIR}/git-pr-common.sh"
+
+# ============================================================================
+# GITLAB-SPECIFIC VALIDATION
+# ============================================================================
+
+# Validate GitLab CLI and dependencies
+gmrc::validate_dependencies() {
+    if ! git_pr_common::validate_base_dependencies; then
+        return 1
+    fi
+
+    if ! git_pr_common::command_exists glab; then
+        echo "❌ GitLab CLI (glab) is not installed. Install it with: brew install glab"
+        return 1
+    fi
+
+    return 0
+}
+
+# ============================================================================
+# GITLAB MR MANAGEMENT FUNCTIONS
+# ============================================================================
+
+# Find existing MR for branch and base
+gmrc::find_existing_mr() {
+    local source_branch="$1"
+    local target_branch="$2"
+
+    local mr_list
+    if [ -n "$target_branch" ]; then
+        mr_list=$(glab mr list --source-branch "$source_branch" --target-branch "$target_branch" --output=json 2>/dev/null)
+    else
+        mr_list=$(glab mr list --source-branch "$source_branch" --output=json 2>/dev/null)
+    fi
+
+    # Parse first MR from array, extracting key fields
+    if [ -n "$mr_list" ] && [ "$mr_list" != "[]" ]; then
+        echo "$mr_list" | jq -r '.[0] | {iid: .iid, web_url: .web_url, target_branch: .target_branch}'
+    else
+        echo "null"
+    fi
+}
+
+# Handle existing MR interaction
+gmrc::handle_existing_mr() {
+    local mr_info="$1"
+    local mr_iid=$(echo "$mr_info" | jq -r '.iid')
+    local mr_url=$(echo "$mr_info" | jq -r '.web_url')
+
+    echo ""
+    echo "⚠️  An MR already exists for this branch:"
+    echo "   MR !$mr_iid: $mr_url"
+    echo ""
+
+    local choice=$(printf "View existing MR in browser\nUpdate existing MR description\nCancel operation" | fzf \
+        --prompt="Choose action: " \
+        --height=40% \
+        --border \
+        --header="Select what to do with existing MR" \
+        --preview-window=hidden)
+
+    case "$choice" in
+        "View existing MR in browser")
+            echo "🌐 Opening MR in browser..."
+            glab mr view "$mr_iid" --web
+            return 2
+            ;;
+        "Update existing MR description")
+            echo "🔄 Updating existing MR description..."
+            return 1
+            ;;
+        *)
+            echo "❌ Operation cancelled"
+            return 0
+            ;;
+    esac
+}
+
+# Create or update MR
+gmrc::create_or_update_mr() {
+    local mode="$1"  # "create" or "update"
+    local mr_iid="$2"  # only for update
+    local title="$3"
+    local body="$4"
+    local target_branch="$5"
+    local source_branch="$6"
+    local draft="${7:-false}"  # "true" or "false"
+
+    if [ "$mode" = "create" ]; then
+        echo "📝 Creating MR: $title"
+
+        local create_args=(
+            --title "$title"
+            --description "$body"
+            --target-branch "$target_branch"
+            --source-branch "$source_branch"
+            --remove-source-branch
+            --yes
+        )
+
+        # Add draft flag if requested
+        if [ "$draft" = "true" ]; then
+            create_args+=(--draft)
+        fi
+
+        glab mr create "${create_args[@]}"
+    else
+        echo "📝 Updating MR !$mr_iid: $title"
+        glab mr update "$mr_iid" --description "$body"
+    fi
+}
+
+# ============================================================================
+# MAIN FLOW HANDLERS
+# ============================================================================
+
+# Handle update-only mode
+gmrc::handle_update_mode() {
+    local current_branch="$1"
+
+    echo "🔍 Looking for existing MR on current branch..."
+
+    local existing_mr_info=$(gmrc::find_existing_mr "$current_branch" "")
+
+    if [ "$existing_mr_info" = "null" ] || [ -z "$existing_mr_info" ]; then
+        echo "❌ No existing MR found for branch '$current_branch'"
+        echo "💡 Create an MR first or run 'gmrc' without the -u flag"
+        return 1
+    fi
+
+    local mr_iid=$(echo "$existing_mr_info" | jq -r '.iid')
+    local mr_url=$(echo "$existing_mr_info" | jq -r '.web_url')
+    local target_branch=$(echo "$existing_mr_info" | jq -r '.target_branch')
+
+    echo "✅ Found MR !$mr_iid: $mr_url"
+    echo "🎯 Target branch: $target_branch"
+    echo ""
+    echo "❓ Update the description of MR !$mr_iid? (y/N)"
+    read -r confirm
+
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        echo "❌ Operation cancelled"
+        return 0
+    fi
+
+    echo ""
+    echo "🔄 Generating updated analysis..."
+    local mr_body=$(git_pr_common::create_pr_body "$target_branch" "$current_branch" "MR" "gmrc")
+
+    if gmrc::create_or_update_mr "update" "$mr_iid" "" "$mr_body" "$target_branch" "$current_branch" "false"; then
+        echo ""
+        echo "✅ MR description updated successfully!"
+        glab mr view "$mr_iid" --web
+    else
+        echo ""
+        echo "❌ Failed to update MR description"
+        return 1
+    fi
+}
+
+# Handle create mode
+gmrc::handle_create_mode() {
+    local current_branch="$1"
+    local draft="$2"
+
+    local target_branch
+    if ! target_branch=$(git_pr_common::select_target_branch "$current_branch"); then
+        return 1
+    fi
+
+    echo ""
+    echo "🎯 Target branch: $target_branch"
+
+    if ! git_pr_common::ensure_branch_pushed "$current_branch"; then
+        return 1
+    fi
+
+    echo ""
+    echo "🔍 Checking for existing MRs..."
+
+    local existing_mr_info=$(gmrc::find_existing_mr "$current_branch" "$target_branch")
+
+    if [ "$existing_mr_info" != "null" ] && [ -n "$existing_mr_info" ]; then
+        gmrc::handle_existing_mr "$existing_mr_info"
+        case $? in
+            0) return 0 ;;  # Cancel
+            2) return 0 ;;  # Viewed
+            1)  # Update
+                echo ""
+                echo "🔄 Generating updated analysis..."
+                local mr_body=$(git_pr_common::create_pr_body "$target_branch" "$current_branch" "MR" "gmrc")
+                local mr_iid=$(echo "$existing_mr_info" | jq -r '.iid')
+
+                if gmrc::create_or_update_mr "update" "$mr_iid" "" "$mr_body" "$target_branch" "$current_branch" "false"; then
+                    echo ""
+                    echo "✅ MR updated successfully!"
+                    glab mr view "$mr_iid" --web
+                else
+                    echo ""
+                    echo "❌ Failed to update MR"
+                    return 1
+                fi
+                ;;
+        esac
+    else
+        echo "✅ No existing MR found, proceeding with creation..."
+        echo ""
+        echo "🤖 Generating MR title from commits..."
+        local mr_title=$(git_pr_common::generate_ai_title "$target_branch" "$current_branch" "MR")
+        echo ""
+        echo "🔄 Generating changes analysis..."
+        local mr_body=$(git_pr_common::create_pr_body "$target_branch" "$current_branch" "MR" "gmrc")
+
+        if gmrc::create_or_update_mr "create" "" "$mr_title" "$mr_body" "$target_branch" "$current_branch" "$draft"; then
+            echo ""
+            echo "✅ MR created successfully!"
+        else
+            echo ""
+            echo "❌ Failed to create MR"
+            return 1
+        fi
+    fi
+}
+
+# ============================================================================
+# MAIN ENTRY POINT
+# ============================================================================
+
+gmrc() {
+    # Clear branch cache for fresh data
+    git_pr_common::clear_branch_cache
+
+    # Parse arguments
+    local update_only=false
+    local draft=false
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -u|--update-description)
+                update_only=true
+                shift
+                ;;
+            --draft)
+                draft=true
+                shift
+                ;;
+            -h|--help)
+                cat <<EOF
+Git MR Create with AI-powered title and description generation
+
+USAGE:
+    gmrc [OPTIONS]
+
+OPTIONS:
+    -u, --update-description    Update description of existing MR only
+    --draft                     Create MR as draft (Work In Progress)
+    -h, --help                 Show this help message
+
+DESCRIPTION:
+    Creates GitLab MRs with AI-generated titles and descriptions using Claude CLI.
+    Supports interactive branch selection, automatic conflict detection, and
+    smart handling of existing MRs. Automatically removes source branch after merge.
+
+FEATURES:
+    - Interactive branch selection with fzf
+    - AI-generated MR titles and descriptions
+    - Automatic sync checking between local and remote branches
+    - Smart handling of existing MRs
+    - Large diff detection with summary mode
+    - Integration with GitLab CLI
+    - Draft MR support
+    - Auto-remove source branch after merge
+
+EXAMPLES:
+    gmrc                       Create new MR with interactive branch selection
+    gmrc --draft               Create draft MR (Work In Progress)
+    gmrc -u                    Update existing MR description only
+
+REQUIREMENTS:
+    - GitLab CLI (glab)
+    - fzf (fuzzy finder)
+    - Claude CLI
+    - Git repository
+EOF
+                return 0
+                ;;
+            *)
+                echo "❌ Unknown option: $1"
+                echo "Usage: gmrc [-u|--update-description] [--draft] [-h|--help]"
+                return 1
+                ;;
+        esac
+    done
+
+    # Validate dependencies
+    if ! gmrc::validate_dependencies; then
+        return 1
+    fi
+
+    local current_branch=$(git branch --show-current)
+    echo "🎯 Current branch: $current_branch"
+    echo ""
+
+    # Route to appropriate handler
+    if [ "$update_only" = true ]; then
+        gmrc::handle_update_mode "$current_branch"
+    else
+        gmrc::handle_create_mode "$current_branch" "$draft"
+    fi
+}

@@ -85,7 +85,9 @@ local mason_handlers = {
             opts.on_attach = function(client, bufnr)
                 vim.api.nvim_create_autocmd("BufWritePre", {
                     buffer = bufnr,
-                    command = "EslintFixAll",
+                    callback = function()
+                        pcall(vim.cmd, "EslintFixAll")
+                    end,
                 })
             end
             opts.capabilities = nil

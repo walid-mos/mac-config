@@ -28,7 +28,7 @@ return {
                 vim.api.nvim_create_autocmd("BufWritePre", {
                     buffer = bufnr,
                     callback = function()
-                        vim.cmd("TSToolsOrganizeImports sync")
+                        pcall(vim.cmd, "TSToolsOrganizeImports sync")
                     end,
                 })
             end,

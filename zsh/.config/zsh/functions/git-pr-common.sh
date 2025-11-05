@@ -5,25 +5,22 @@
 
 # Prevent double-sourcing
 [[ -n "${GIT_PR_COMMON_LOADED}" ]] && return 0
-readonly GIT_PR_COMMON_LOADED=1
+GIT_PR_COMMON_LOADED=1
 
 # ============================================================================
 # CONSTANTS AND CONFIGURATION
 # ============================================================================
 
 # Default branches to check for (in order of preference)
-[[ -z "$DEFAULT_BRANCHES" ]] && readonly DEFAULT_BRANCHES=("develop" "main" "master")
-
-# Claude CLI path
-[[ -z "$CLAUDE_CLI_PATH" ]] && readonly CLAUDE_CLI_PATH="/Users/walid/Library/pnpm/claude"
+[[ -z "$DEFAULT_BRANCHES" ]] && DEFAULT_BRANCHES=("develop" "main" "master")
 
 # Diff size thresholds
-[[ -z "$MAX_LINES_CHANGED" ]] && readonly MAX_LINES_CHANGED=5000
-[[ -z "$MAX_DIFF_SIZE" ]] && readonly MAX_DIFF_SIZE=100000
-[[ -z "$MAX_FILES_CHANGED" ]] && readonly MAX_FILES_CHANGED=50
+[[ -z "$MAX_LINES_CHANGED" ]] && MAX_LINES_CHANGED=5000
+[[ -z "$MAX_DIFF_SIZE" ]] && MAX_DIFF_SIZE=100000
+[[ -z "$MAX_FILES_CHANGED" ]] && MAX_FILES_CHANGED=50
 
 # Git diff exclusions
-[[ -z "$DIFF_EXCLUSIONS" ]] && readonly DIFF_EXCLUSIONS=(
+[[ -z "$DIFF_EXCLUSIONS" ]] && DIFF_EXCLUSIONS=(
     ':(exclude)package-lock.json'
     ':(exclude)yarn.lock'
     ':(exclude)Cargo.lock'
@@ -35,6 +32,14 @@ readonly GIT_PR_COMMON_LOADED=1
     ':(exclude)*.min.js'
     ':(exclude)*.bundle.js'
 )
+
+# Find Claude CLI dynamically in PATH
+git_pr_common::find_claude_cli() {
+    command -v claude 2>/dev/null
+}
+
+# Cache Claude CLI path at module load (dynamic detection)
+[[ -z "$CLAUDE_CLI_PATH" ]] && CLAUDE_CLI_PATH="$(git_pr_common::find_claude_cli)"
 
 # ============================================================================
 # CACHING SYSTEM
@@ -106,9 +111,11 @@ git_pr_common::validate_base_dependencies() {
         return 1
     fi
 
-    if [ ! -f "$CLAUDE_CLI_PATH" ]; then
-        echo "⚠️  Claude CLI not found at $CLAUDE_CLI_PATH"
+    if [ -z "$CLAUDE_CLI_PATH" ] || [ ! -x "$CLAUDE_CLI_PATH" ]; then
+        echo "⚠️  Claude CLI not found in PATH"
         echo "   Will use fallback title generation"
+        echo ""
+        echo "💡 To install: curl -fsSL https://claude.ai/install.sh | bash"
     elif ! git_pr_common::command_exists timeout; then
         echo "⚠️  timeout command not available. Claude calls may hang."
     fi
@@ -286,7 +293,7 @@ git_pr_common::call_claude_cli() {
     local input="$1"
     local timeout_seconds="${2:-30}"
 
-    if [ ! -f "$CLAUDE_CLI_PATH" ]; then
+    if [ -z "$CLAUDE_CLI_PATH" ] || [ ! -x "$CLAUDE_CLI_PATH" ]; then
         return 1
     fi
 

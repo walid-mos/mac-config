@@ -8,16 +8,12 @@
 # fnm installation directory (standard location from mac-setup)
 export FNM_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/fnm"
 
-# Add fnm to PATH immediately (instant binary access)
-# This allows `fnm` command to be available right away
+# Add fnm to PATH immediately
 export PATH="$FNM_DIR:$PATH"
 
-# Defer full initialization to background (saves 50-80ms startup time)
-# Full init includes: shell hooks, auto-cd detection, env setup
-# The shell becomes interactive immediately, fnm loads in 1-2 seconds
-if [[ -o interactive ]]; then
-  {
-    # Full fnm initialization with auto-switch on directory change
-    eval "$(fnm env --use-on-cd)"
-  } &!  # Background job, disowned (no job control messages)
+# Initialize fnm with auto-switch on directory change
+# Note: Background loading doesn't work (env vars don't propagate to parent shell)
+# This adds ~5-10ms to startup but ensures fnm works immediately
+if command -v fnm &>/dev/null && [[ -o interactive ]]; then
+  eval "$(fnm env --use-on-cd)"
 fi

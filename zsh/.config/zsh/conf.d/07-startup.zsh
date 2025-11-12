@@ -1,0 +1,33 @@
+# =============================================================================
+# Startup & Miscellaneous
+# =============================================================================
+# Shell startup display, editor config, and secret loading
+# =============================================================================
+
+# System info display (conditional)
+# Only show in interactive, non-nested shells
+if [[ -o interactive ]] && [[ -z "$TMUX" ]] && [[ -z "$NVIM" ]]; then
+  if command -v fastfetch &>/dev/null; then
+    fastfetch
+  fi
+fi
+
+# Editor selection
+# Use vim for SSH connections (might not have neovim)
+# Use neovim for local sessions
+if [[ -n $SSH_CONNECTION ]]; then
+  export EDITOR='vim'
+else
+  export EDITOR='nvim'
+fi
+
+# Tmux config auto-reload (if running in tmux)
+if [[ -n "$TMUX" ]] && [[ -f ~/.config/tmux/tmux.conf ]]; then
+  tmux source-file ~/.config/tmux/tmux.conf >/dev/null 2>&1
+fi
+
+# Load secrets (API keys, tokens, etc.)
+# This file is gitignored and should contain sensitive data
+if [[ -f "$HOME/.config/zsh/secrets" ]]; then
+  source "$HOME/.config/zsh/secrets"
+fi

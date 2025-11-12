@@ -1,0 +1,41 @@
+# =============================================================================
+# Shell Aliases
+# =============================================================================
+# Command shortcuts and overrides
+# =============================================================================
+
+# Editor & Shell
+alias v="nvim"
+alias szsh="exec zsh"  # Better than source ~/.zshrc (starts fresh shell)
+alias c="tput reset"   # Clear terminal completely
+
+# Navigation
+alias cdev="cd ~/Development"
+alias cdconfig="cd ~/.config/"
+alias cdstow="cd ~/.stow_repository/"
+
+# Git aliases - override Oh-My-Zsh defaults
+# Free up 'gf' for our custom git-fetch-prune function
+unalias gf 2>/dev/null
+
+# Override OMZ 'gl' with better git log
+unalias gl 2>/dev/null
+alias gl="git log --oneline --graph --decorate --all"
+
+# Other git shortcuts
+alias gs="git switch"
+alias gst="git status"
+alias gpl="git pull --all"
+alias ga="git add"
+alias gc="git commit"
+alias gr="git rebase"
+alias gp="git push"
+
+# Tools
+alias upclaude="pnpm update -g @anthropic-ai/claude-code --latest"
+
+# FNM (Fast Node Manager) shortcuts
+alias fnmi="fnm install"
+alias fnmu="fnm use"
+alias fnml="fnm list"
+alias nv="node --version"

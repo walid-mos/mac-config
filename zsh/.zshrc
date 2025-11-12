@@ -12,4 +12,4 @@ done
 
 # Load custom functions (flat structure - zsh standard)
 fpath=(~/.config/zsh/functions $fpath)
-autoload -Uz ~/.config/zsh/functions/*(:t)
+autoload -Uz ~/.config/zsh/functions/*.zsh(:t:r)

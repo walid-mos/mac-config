@@ -6,7 +6,7 @@
 typeset -g GPRC_SCRIPT_DIR="${GPRC_SCRIPT_DIR:-$(dirname "${(%):-%x}")}"
 
 # Source shared utilities
-source "${GPRC_SCRIPT_DIR}/git-pr-common.sh"
+source "${GPRC_SCRIPT_DIR}/git-common"
 
 # ============================================================================
 # GITHUB-SPECIFIC VALIDATION

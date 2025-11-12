@@ -6,7 +6,7 @@
 typeset -g GMRC_SCRIPT_DIR="${GMRC_SCRIPT_DIR:-$(dirname "${(%):-%x}")}"
 
 # Source shared utilities
-source "${GMRC_SCRIPT_DIR}/git-pr-common.sh"
+source "${GMRC_SCRIPT_DIR}/git-common"
 
 # ============================================================================
 # GITLAB-SPECIFIC VALIDATION

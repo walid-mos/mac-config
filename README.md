@@ -68,7 +68,8 @@ zsh/                          # Stow package
     │   ├── git-fetch-prune.zsh     # Branch cleanup (gf)
     │   ├── git-sync-upstream.zsh   # Branch sync (gsync)
     │   ├── git-worktree-manager.zsh # Worktree manager (wt)
-    │   └── git-common.zsh          # Shared utilities
+    │   ├── git-common.zsh          # Shared utilities
+    │   └── nasreco                 # NAS volume reconnection
     └── cache/                # Completion cache, history
 ```
 
@@ -81,6 +82,40 @@ zsh/                          # Stow package
 - `gf` - Fetch and prune gone branches (with worktree detection)
 - `gsync` - Sync branch with parent (interactive rebase)
 - `wt` - Worktree manager (create, switch, list, delete, prune)
+
+### System Management
+
+#### nasreco - NAS Volume Reconnection
+
+Reconnect NAS volumes manually using existing Keychain credentials.
+
+**Usage:**
+```bash
+nasreco                    # Reconnect all shares
+nasreco Storage Medias     # Reconnect specific shares only
+nasreco --status           # Show current mount status
+nasreco --force            # Force remount even if already mounted
+nasreco --verbose          # Show detailed diagnostics
+```
+
+**Configuration:**
+
+Uses environment variables (with fallback defaults):
+- `NAS_SERVER` - NAS IP address (default: 192.168.1.2)
+- `NAS_USERNAME` - Username (default: wmostefaoui)
+- `NAS_MOUNT_BASE` - Mount base directory (default: /Volumes)
+
+Password is retrieved from macOS Keychain (service: `nas-share-<server>`).
+
+**Default Shares:**
+- Storage
+- photo
+- Exchange
+- Medias
+
+**Prerequisites:**
+- NAS credentials must be configured in Keychain
+- Network connectivity to NAS server
 
 ### Requirements
 

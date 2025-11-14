@@ -1,0 +1,195 @@
+#!/bin/zsh
+# Reconnect NAS volumes manually
+
+nasreco() {
+    local verbose=false
+    local status_only=false
+    local force_remount=false
+    local -a requested_shares=()
+
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --verbose|-v)
+                verbose=true
+                shift
+                ;;
+            --status|-s)
+                status_only=true
+                shift
+                ;;
+            --force|-f)
+                force_remount=true
+                shift
+                ;;
+            --help|-h)
+                echo "Usage: nasreco [OPTIONS] [SHARE...]"
+                echo ""
+                echo "Reconnect NAS volumes using existing Keychain credentials."
+                echo ""
+                echo "Options:"
+                echo "  --status, -s     Show mount status without reconnecting"
+                echo "  --force, -f      Force remount even if already mounted"
+                echo "  --verbose, -v    Show detailed diagnostic information"
+                echo "  --help, -h       Show this help message"
+                echo ""
+                echo "Arguments:"
+                echo "  SHARE...         Specific shares to reconnect (default: all)"
+                echo ""
+                echo "Examples:"
+                echo "  nasreco                    # Reconnect all shares"
+                echo "  nasreco Storage Medias     # Reconnect only Storage and Medias"
+                echo "  nasreco --status           # Show current mount status"
+                echo "  nasreco --force            # Force remount all shares"
+                return 0
+                ;;
+            -*)
+                echo "Error: Unknown option '$1'"
+                echo "Usage: nasreco [OPTIONS] [SHARE...]"
+                return 1
+                ;;
+            *)
+                requested_shares+=("$1")
+                shift
+                ;;
+        esac
+    done
+
+    # NAS Configuration
+    local nas_server="${NAS_SERVER:-192.168.1.2}"
+    local nas_username="${NAS_USERNAME:-wmostefaoui}"
+    local mount_base="${NAS_MOUNT_BASE:-/Volumes}"
+    local keychain_service="nas-share-${nas_server}"
+
+    # Default shares if not specified
+    local -a all_shares=("Storage" "photo" "Exchange" "Medias")
+    local -a shares_to_process
+
+    if [ ${#requested_shares[@]} -eq 0 ]; then
+        shares_to_process=("${all_shares[@]}")
+    else
+        shares_to_process=("${requested_shares[@]}")
+    fi
+
+    [ "$verbose" = true ] && echo "NAS Server: $nas_server"
+    [ "$verbose" = true ] && echo "Username: $nas_username"
+    [ "$verbose" = true ] && echo "Shares to process: ${shares_to_process[*]}"
+    [ "$verbose" = true ] && echo ""
+
+    # Retrieve password from Keychain
+    [ "$verbose" = true ] && echo "Retrieving password from Keychain (service: $keychain_service)..."
+    local nas_password=$(security find-generic-password -s "$keychain_service" -w 2>/dev/null)
+
+    if [ -z "$nas_password" ]; then
+        echo "Error: Could not retrieve NAS password from Keychain"
+        echo "Expected service name: $keychain_service"
+        echo ""
+        echo "Please ensure the NAS setup has been completed first."
+        return 1
+    fi
+
+    [ "$verbose" = true ] && echo "✓ Password retrieved successfully"
+    [ "$verbose" = true ] && echo ""
+
+    # Check network connectivity
+    [ "$verbose" = true ] && echo "Checking network connectivity to $nas_server..."
+    if ! ping -c 1 -W 2 "$nas_server" &>/dev/null; then
+        echo "Error: Cannot reach NAS server at $nas_server"
+        echo "Please check your network connection."
+        return 1
+    fi
+    [ "$verbose" = true ] && echo "✓ Network connectivity OK"
+    [ "$verbose" = true ] && echo ""
+
+    # Process each share
+    local -a mounted_shares=()
+    local -a unmounted_shares=()
+    local -a failed_shares=()
+
+    for share in "${shares_to_process[@]}"; do
+        local mount_point="${mount_base}/${share}"
+
+        # Check if already mounted
+        if mount | grep -q "on ${mount_point} "; then
+            mounted_shares+=("$share")
+
+            if [ "$status_only" = true ]; then
+                echo "✓ $share: mounted at $mount_point"
+                continue
+            fi
+
+            if [ "$force_remount" = false ]; then
+                echo "Share '$share' is already mounted at $mount_point"
+                echo -n "Do you want to remount it? (y/N): "
+                read -r response
+                case $response in
+                    [Yy]|yes)
+                        [ "$verbose" = true ] && echo "Unmounting $share..."
+                        if ! umount "$mount_point" 2>/dev/null; then
+                            echo "Warning: Failed to unmount $share, attempting diskutil..."
+                            diskutil unmount "$mount_point" &>/dev/null
+                        fi
+                        ;;
+                    *)
+                        echo "Skipping $share"
+                        continue
+                        ;;
+                esac
+            else
+                [ "$verbose" = true ] && echo "Force unmounting $share..."
+                if ! umount "$mount_point" 2>/dev/null; then
+                    diskutil unmount force "$mount_point" &>/dev/null
+                fi
+            fi
+        else
+            unmounted_shares+=("$share")
+            if [ "$status_only" = true ]; then
+                echo "✗ $share: not mounted"
+                continue
+            fi
+        fi
+
+        # Skip mounting if status-only mode
+        [ "$status_only" = true ] && continue
+
+        # Create mount point if needed
+        if [ ! -d "$mount_point" ]; then
+            [ "$verbose" = true ] && echo "Creating mount point: $mount_point"
+            mkdir -p "$mount_point"
+        fi
+
+        # Mount the share
+        echo "Mounting $share..."
+        local smb_url="//${nas_username}:${nas_password}@${nas_server}/${share}"
+
+        if [ "$verbose" = true ]; then
+            if mount_smbfs "$smb_url" "$mount_point" 2>&1; then
+                echo "✓ Successfully mounted $share"
+            else
+                echo "✗ Failed to mount $share"
+                failed_shares+=("$share")
+            fi
+        else
+            if mount_smbfs "$smb_url" "$mount_point" &>/dev/null; then
+                echo "✓ Successfully mounted $share"
+            else
+                echo "✗ Failed to mount $share"
+                failed_shares+=("$share")
+            fi
+        fi
+    done
+
+    # Summary
+    if [ "$status_only" = false ]; then
+        echo ""
+        echo "=== Summary ==="
+        echo "Mounted: ${#mounted_shares[@]}"
+        echo "Unmounted: ${#unmounted_shares[@]}"
+        if [ ${#failed_shares[@]} -gt 0 ]; then
+            echo "Failed: ${#failed_shares[@]} (${failed_shares[*]})"
+            return 1
+        fi
+    fi
+
+    return 0
+}

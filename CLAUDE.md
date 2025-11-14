@@ -80,12 +80,17 @@ export PATH="$FNM_DIR:$PATH"  # Immediate binary access
 ### Custom Functions
 
 All in `functions/` (flat):
+
+**Git Workflow:**
 - `git-pr-create.zsh` - GitHub PR (gprc)
 - `git-mr-create.zsh` - GitLab MR (gmrc)
 - `git-fetch-prune.zsh` - Branch cleanup (gf)
 - `git-sync-upstream.zsh` - Branch sync (gsync)
 - `git-worktree-manager.zsh` - Worktree manager (wt)
 - `git-common.zsh` - Shared utilities
+
+**System Management:**
+- `nasreco` - NAS volume reconnection using Keychain
 
 ---
 
@@ -202,6 +207,7 @@ stow zsh     # Back to stable
 - GitHub CLI (gh)
 - GitLab CLI (glab)
 - fzf (interactive selection)
+- NAS credentials in Keychain (for nasreco)
 
 ---
 

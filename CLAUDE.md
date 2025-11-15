@@ -20,7 +20,7 @@
     ├── .zprofile      # Login shell setup
     ├── .zshrc         # Interactive shell config
     └── .config/zsh/   # Modular configuration
-        ├── conf.d/    # Configuration modules (01-07)
+        ├── conf.d/    # Configuration modules (01-08)
         ├── functions/ # Custom functions (flat structure)
         └── cache/     # Runtime cache directory
 ```
@@ -76,6 +76,7 @@ export PATH="$FNM_DIR:$PATH"  # Immediate binary access
 5. `conf.d/05-aliases.zsh` - Shell aliases
 6. `conf.d/06-node-manager.zsh` - fnm setup
 7. `conf.d/07-startup.zsh` - Fastfetch, editor, secrets
+8. `conf.d/08-ruby-manager.zsh` - rbenv setup
 
 ### Custom Functions
 
@@ -203,6 +204,7 @@ stow zsh     # Back to stable
 - Starship prompt
 - Fastfetch (system info)
 - fnm (Node version manager)
+- rbenv (Ruby version manager)
 - Claude CLI (for gprc/gmrc)
 - GitHub CLI (gh)
 - GitLab CLI (glab)
@@ -242,6 +244,14 @@ zinit light plugin-name
 - NVM: ~50-80ms init (bash script)
 
 **With background load:** 0ms perceived delay
+
+### rbenv
+
+**Why rbenv?**
+- rbenv: ~5-10ms init (lightweight)
+- RVM: ~50-100ms init (heavyweight, shell overrides)
+
+**Synchronous load:** Required for proper env var propagation
 
 ---
 

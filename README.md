@@ -9,7 +9,7 @@ Clean, modular ZSH configuration managed with GNU Stow.
 - **Performance Optimized** - 60-80ms startup (70% faster than v2)
 - **XDG Compliant** - Follows XDG Base Directory specification
 - **Git Workflow Functions** - AI-powered PR/MR creation, branch management, worktrees
-- **fnm Background Loading** - Node version manager loads asynchronously
+- **Language Version Managers** - fnm for Node.js, rbenv for Ruby
 
 ## Installation
 
@@ -61,7 +61,8 @@ zsh/                          # Stow package
     │   ├── 04-prompt.zsh     # Starship prompt
     │   ├── 05-aliases.zsh    # Shell aliases
     │   ├── 06-node-manager.zsh # fnm (Fast Node Manager)
-    │   └── 07-startup.zsh    # Fastfetch, editor, secrets
+    │   ├── 07-startup.zsh    # Fastfetch, editor, secrets
+    │   └── 08-ruby-manager.zsh # rbenv (Ruby Version Manager)
     ├── functions/            # Custom shell functions (autoloaded)
     │   ├── git-pr-create.zsh       # GitHub PR creation (gprc)
     │   ├── git-mr-create.zsh       # GitLab MR creation (gmrc)
@@ -119,10 +120,13 @@ Password is retrieved from macOS Keychain (service: `nas-share-<server>`).
 
 ### Requirements
 
-- Claude CLI: `claude` command must be available
+**Optional (for specific features):**
+- Claude CLI: `claude` command (for gprc/gmrc)
 - GitHub CLI: `gh` (for gprc)
 - GitLab CLI: `glab` (for gmrc)
 - fzf: for interactive selection
+- fnm: Fast Node Manager (for Node.js version management)
+- rbenv: Ruby version manager (for Ruby version management)
 
 ## Aliases
 

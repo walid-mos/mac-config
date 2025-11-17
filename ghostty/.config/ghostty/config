@@ -1,0 +1,4 @@
+config-file = globals.conf
+config-file = keybindings.conf
+config-file = fonts.conf
+config-file = appearance.conf

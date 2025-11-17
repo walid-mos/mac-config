@@ -4,6 +4,7 @@
     "allow": [
       "Bash(pnpm :*)",
       "Bash(npm run :*)",
+      "Bash(cd:*)",
       "Bash(git :*)",
       "Bash(gh :*)",
       "Bash(glab :*)",
@@ -12,15 +13,12 @@
       "Bash(grep:*)",
       "Bash(rg:*)",
       "Bash(ls:*)",
-      "Bash(ls -l:*)",
-      "Bash(ls -la:*)",
-      "Bash(ls -lh:*)",
-      "Bash(ls -lah:*)",
-      "Bash(ls -a:*)",
       "Bash(cat:*)",
       "Bash(head:*)",
       "Bash(tail:*)",
       "Bash(pwd:*)",
+      "Bash(readlink:*)",
+      "Bash(test:*)",
       "Bash(which:*)",
       "Bash(wc:*)",
       "Bash(sort:*)",
@@ -86,7 +84,11 @@
       "Bash(gh auth status:*)",
       "Bash(gh config get:*)",
       "Read(~/.zshrc)",
-      "Read(~/.config/zsh/**)"
+      "Read(~/.config/zsh/**)",
+      "Bash(git commit:*)",
+      "mcp__context7__",
+      "WebFetch",
+      "WebSearch"
     ],
     "deny": [
       "Bash(npm install :*)",

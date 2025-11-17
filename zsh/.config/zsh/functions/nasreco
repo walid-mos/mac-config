@@ -152,25 +152,29 @@ nasreco() {
         # Skip mounting if status-only mode
         [ "$status_only" = true ] && continue
 
-        # Create mount point if needed
-        if [ ! -d "$mount_point" ]; then
-            [ "$verbose" = true ] && echo "Creating mount point: $mount_point"
-            mkdir -p "$mount_point"
-        fi
-
-        # Mount the share
+        # Mount the share using AppleScript (Finder-compatible mounting)
         echo "Mounting $share..."
-        local smb_url="//${nas_username}:${nas_password}@${nas_server}/${share}"
+        local smb_url="smb://${nas_server}/${share}"
 
         if [ "$verbose" = true ]; then
-            if mount_smbfs "$smb_url" "$mount_point" 2>&1; then
+            if osascript <<EOF 2>&1
+tell application "Finder"
+    mount volume "$smb_url" as user name "$nas_username" with password "$nas_password"
+end tell
+EOF
+            then
                 echo "✓ Successfully mounted $share"
             else
                 echo "✗ Failed to mount $share"
                 failed_shares+=("$share")
             fi
         else
-            if mount_smbfs "$smb_url" "$mount_point" &>/dev/null; then
+            if osascript <<EOF &>/dev/null
+tell application "Finder"
+    mount volume "$smb_url" as user name "$nas_username" with password "$nas_password"
+end tell
+EOF
+            then
                 echo "✓ Successfully mounted $share"
             else
                 echo "✗ Failed to mount $share"

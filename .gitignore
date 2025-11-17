@@ -1,13 +1,6 @@
-# Claude Code dynamic files
-claude/.claude/projects/
-claude/.claude/statsig/
-claude/.claude/todos/
-claude/.claude/shell-snapshots/
-claude/.claude/file-history/
-claude/.claude/debug/
-.claude/local
-claude/.claude/local
+# Claude runtime data (ignore everything except CLAUDE.md)
+claude/.claude/*
+!claude/.claude/CLAUDE.md
 
-# Claude Code runtime and history
-claude/.claude.json
-claude/.claude/history.jsonl
+# Claude user config (stays in ~/, not in Stow)
+.claude.json

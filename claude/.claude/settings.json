@@ -114,7 +114,7 @@
   },
   "sandbox": {
     "enabled": true,
-    "autoAllowBashIfSandboxed": false,
+    "autoAllowBashIfSandboxed": true,
     "excludedCommands": ["docker", "kubectl"],
     "network": {
       "allowUnixSockets": [],

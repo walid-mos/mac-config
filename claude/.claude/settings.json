@@ -114,6 +114,18 @@
   "env": {
     "CLAUDE_CODE_ENABLE_TELEMETRY": "0"
   },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/pre-tool-use.py"
+          }
+        ]
+      }
+    ]
+  },
   "sandbox": {
     "enabled": false
   }

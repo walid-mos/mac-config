@@ -4,6 +4,10 @@
 vim.g.mapleader = ' '
 vim.g.maplocalleader = '//'
 
+-- Disable netrw (using oil.nvim instead)
+vim.g.loaded_netrw = 1
+vim.g.loaded_netrwPlugin = 1
+
 -- Sync clipboard between OS and Nvim.
 -- Remove this option if you want your OS clipboard to remain independent.
 -- See `:help 'clipboard'`
@@ -80,7 +84,7 @@ vim.wo.signcolumn = 'yes'
 
 -- Decrease update time
 vim.opt.updatetime = 250
-vim.opt.timeoutlen = 300
+vim.opt.timeoutlen = 500  -- Increased from 300ms for more comfortable leader key usage
 
 -- Set completeopt to have a better completion experience
 vim.opt.completeopt = { "menuone", "noselect" }

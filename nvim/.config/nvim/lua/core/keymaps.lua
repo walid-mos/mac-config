@@ -69,8 +69,6 @@ keymap("n", "#", "#zz", { desc = 'Search word under cursor backward (centered)' 
 keymap({ "n", "o", "x" }, "H", "^", { desc = 'Line start' })
 keymap({ "n", "o", "x" }, "L", "g_", { desc = 'Line end' })
 
--- Treesitter utilities (plugin required)
-keymap('n', '<leader>tr', function()
-  vim.cmd('TSBufDisable highlight')
-  vim.cmd('TSBufEnable highlight')
-end, { desc = 'Reset Treesitter highlighting' })
+-- Note: LSP keymaps are configured in lua/plugins/lsp.lua (on_attach function)
+-- Note: Git keymaps are configured in lua/plugins/gitsigns.lua (on_attach function)
+-- Note: Fuzzy finder keymaps are configured in lua/plugins/fzf.lua (keys section)

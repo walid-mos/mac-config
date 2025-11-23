@@ -86,6 +86,7 @@
       "Read(~/.zshrc)",
       "Read(~/.config/zsh/**)",
       "Bash(git commit:*)",
+      "Bash(git ls-tree:*)",
       "mcp__context7__resolve-library-id",
       "mcp__context7__get-library-docs",
       "WebFetch",

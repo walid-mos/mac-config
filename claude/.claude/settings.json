@@ -114,12 +114,6 @@
     "CLAUDE_CODE_ENABLE_TELEMETRY": "0"
   },
   "sandbox": {
-    "enabled": true,
-    "autoAllowBashIfSandboxed": true,
-    "excludedCommands": ["docker", "kubectl"],
-    "network": {
-      "allowUnixSockets": [],
-      "allowLocalBinding": true
-    }
+    "enabled": false
   }
 }

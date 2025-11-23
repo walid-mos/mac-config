@@ -1,6 +1,8 @@
 {
+  "env": {
+    "CLAUDE_CODE_ENABLE_TELEMETRY": "0"
+  },
   "permissions": {
-    "defaultMode": "acceptEdits",
     "allow": [
       "Bash(pnpm :*)",
       "Bash(npm run :*)",
@@ -109,10 +111,8 @@
       "Bash(curl --form:*)",
       "Bash(curl -T:*)",
       "Bash(curl --upload-file:*)"
-    ]
-  },
-  "env": {
-    "CLAUDE_CODE_ENABLE_TELEMETRY": "0"
+    ],
+    "defaultMode": "acceptEdits"
   },
   "hooks": {
     "PreToolUse": [
@@ -128,5 +128,6 @@
   },
   "sandbox": {
     "enabled": false
-  }
+  },
+  "alwaysThinkingEnabled": true
 }

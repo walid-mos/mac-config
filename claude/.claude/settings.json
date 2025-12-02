@@ -31,6 +31,7 @@
       "Bash(xargs:*)",
       "Bash(sed:*)",
       "Bash(node:*)",
+      "Bash(python3:*)",
       "Bash(yamllint:*)",
       "Bash(docker ps:*)",
       "Bash(docker inspect:*)",
@@ -90,6 +91,7 @@
       "Bash(git commit:*)",
       "Bash(git ls-tree:*)",
       "Bash(git show:*)",
+      "Bash(nvim:*)",
       "mcp__context7__resolve-library-id",
       "mcp__context7__get-library-docs",
       "WebFetch",
@@ -124,10 +126,24 @@
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/context7-enhancer.py"
+          }
+        ]
+      }
     ]
   },
   "sandbox": {
     "enabled": false
   },
-  "alwaysThinkingEnabled": true
+  "alwaysThinkingEnabled": true,
+  "statusLine": {
+    "type": "command",
+    "command": "~/.claude/statusline.sh"
+  }
 }

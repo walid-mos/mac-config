@@ -7,7 +7,7 @@ return {
 
 	opts = {
 		preset = "modern", -- modern, classic, helix
-		delay = 500, -- Time in ms before which-key popup appears (increased from 300ms for comfort)
+		delay = 125, -- Time in ms before which-key popup appears (4x faster for quick access)
 
 		-- Notification settings
 		notify = true,
@@ -96,16 +96,14 @@ return {
 			{ "<leader>e", desc = "Open diagnostic float" },
 			{ "<leader>q", desc = "Open diagnostics list" },
 
-			-- Fuzzy finder (fzf)
+			-- Fuzzy finder (Telescope)
 			{ "<leader>f", group = "[F]ind" },
 			{ "<leader>fb", desc = "Find buffers" },
-			{ "<leader>fc", desc = "Commands" },
 			{ "<leader>ff", desc = "Find files" },
 			{ "<leader>fg", desc = "Live grep" },
 			{ "<leader>fh", desc = "Help tags" },
-			{ "<leader>fk", desc = "Keymaps" },
-			{ "<leader>fo", desc = "Recent files" },
-			{ "<leader>fr", desc = "Resume last search" },
+			{ "<leader>fr", desc = "LSP references" },
+			{ "<leader>fs", desc = "LSP document symbols" },
 			{ "<leader>fw", desc = "Grep word under cursor" },
 
 			-- Git hunks (when in git repo)

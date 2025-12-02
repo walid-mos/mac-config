@@ -4,7 +4,10 @@
 -- Step 1: Load core options (includes leader keys)
 require("core.options")
 
--- Step 2: Bootstrap Lazy.nvim
+-- Step 2: Load autocmds
+require("core.autocmd")
+
+-- Step 3: Bootstrap Lazy.nvim
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
 
 if not vim.loop.fs_stat(lazypath) then
@@ -21,7 +24,7 @@ end
 
 vim.opt.rtp:prepend(lazypath)
 
--- Step 3: Setup Lazy.nvim with auto-imports
+-- Step 4: Setup Lazy.nvim with auto-imports
 require("lazy").setup({
 	-- Auto-import all plugin specs from lua/plugins/ and lua/themes/
 	spec = {
@@ -71,5 +74,5 @@ require("lazy").setup({
 	lockfile = vim.fn.stdpath("config") .. "/lazy-lock.json",
 })
 
--- Step 4: Load keymaps after plugins are loaded
+-- Step 5: Load keymaps after plugins are loaded
 require("core.keymaps")

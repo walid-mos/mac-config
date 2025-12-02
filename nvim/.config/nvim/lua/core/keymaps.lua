@@ -20,6 +20,12 @@ keymap("n", "[l", ":lprev<CR>", { desc = 'Previous location list item' })
 keymap("n", "sv", ":vsplit<CR>", { desc = 'Vertical split' })
 keymap("n", "sn", ":split<CR>", { desc = 'Horizontal split' })
 
+-- Window navigation with Ctrl+hjkl
+keymap("n", "<C-h>", "<C-w>h", { desc = 'Move to left window' })
+keymap("n", "<C-j>", "<C-w>j", { desc = 'Move to window below' })
+keymap("n", "<C-k>", "<C-w>k", { desc = 'Move to window above' })
+keymap("n", "<C-l>", "<C-w>l", { desc = 'Move to right window' })
+
 -- Move lines up and down (Alt+arrows)
 keymap("n", "<A-Down>", ":m .+1<CR>==", { desc = 'Move line down' })
 keymap("n", "<A-Up>", ":m .-2<CR>==", { desc = 'Move line up' })
@@ -71,4 +77,4 @@ keymap({ "n", "o", "x" }, "L", "g_", { desc = 'Line end' })
 
 -- Note: LSP keymaps are configured in lua/plugins/lsp.lua (on_attach function)
 -- Note: Git keymaps are configured in lua/plugins/gitsigns.lua (on_attach function)
--- Note: Fuzzy finder keymaps are configured in lua/plugins/fzf.lua (keys section)
+-- Note: Fuzzy finder keymaps are configured in lua/plugins/telescope.lua

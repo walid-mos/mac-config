@@ -29,12 +29,6 @@ vim.opt.softtabstop = 4
 vim.opt.numberwidth = 4
 vim.opt.wrap = false
 
--- fold
-vim.opt.foldenable = true
-vim.opt.foldlevel = 99
-vim.opt.foldmethod = "expr"
-vim.opt.foldexpr = "nvim_treesitter#foldexpr()"
-
 -- screen
 vim.opt.scrolloff = 4
 vim.opt.sidescrolloff = 8
@@ -49,27 +43,13 @@ vim.opt.backup = false
 vim.opt.swapfile = false
 vim.opt.writebackup = false -- if a file is being edited by another program (or was written to file while editing with another program), it is not allowed to be edited
 
--- autoread file if updated
+-- Allow switching away from modified buffers without saving
+vim.opt.hidden = true
+
+-- Autoread file if updated
 vim.opt.autoread = true
-vim.cmd [[autocmd FocusGained,BufEnter * silent! checktime]]
 
--- Handle external file changes with confirmation
-vim.api.nvim_create_autocmd("FileChangedShell", {
-  callback = function()
-    local choice = vim.fn.confirm(
-      "File changed outside of Nvim. Reload?",
-      "&Yes\n&No\n&Load Both (diff)",
-      1
-    )
-    if choice == 1 then
-      vim.cmd("edit")
-    elseif choice == 3 then
-      vim.cmd("DiffOrig")
-    end
-  end,
-})
-
--- use number of spaces to insert <Tab>
+-- Use number of spaces to insert <Tab>
 vim.opt.expandtab = true
 
 -- Save undo history
@@ -84,7 +64,7 @@ vim.wo.signcolumn = 'yes'
 
 -- Decrease update time
 vim.opt.updatetime = 250
-vim.opt.timeoutlen = 500  -- Increased from 300ms for more comfortable leader key usage
+vim.opt.timeoutlen = 125  -- Fast key sequence timeout, synced with which-key delay
 
 -- Set completeopt to have a better completion experience
 vim.opt.completeopt = { "menuone", "noselect" }
@@ -107,25 +87,3 @@ vim.opt.fillchars:append {
 vim.opt.conceallevel = 0
 vim.opt.laststatus = 3
 vim.opt.shortmess:append "c"
-
--- [[ Highlight on yank ]]
--- See `:help vim.highlight.on_yank()`
-local highlight_group = vim.api.nvim_create_augroup('YankHighlight', { clear = true })
-vim.api.nvim_create_autocmd('TextYankPost', {
-  callback = function()
-    vim.highlight.on_yank()
-  end,
-  group = highlight_group,
-  pattern = '*',
-})
-
--- Fix Treesitter highlighter errors
-vim.api.nvim_create_autocmd('User', {
-  pattern = 'TSUpdate',
-  callback = function()
-    vim.schedule(function()
-      pcall(vim.cmd, 'TSBufDisable highlight')
-      pcall(vim.cmd, 'TSBufEnable highlight')
-    end)
-  end,
-})

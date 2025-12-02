@@ -32,7 +32,7 @@ alias gr="git rebase"
 alias gp="git push"
 
 # Tools
-alias upclaude="pnpm update -g @anthropic-ai/claude-code --latest"
+alias upclaude="curl -fsSL https://claude.ai/install.sh | sh -s"
 
 # FNM (Fast Node Manager) shortcuts
 alias fnmi="fnm install"

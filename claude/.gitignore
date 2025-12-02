@@ -1,0 +1,15 @@
+# Claude Code runtime files (not configuration)
+.claude/debug/
+.claude/downloads/
+.claude/file-history/
+.claude/history.jsonl
+.claude/plans/
+.claude/projects/
+.claude/session-env/
+.claude/shell-snapshots/
+.claude/statsig/
+.claude/todos/
+
+# Python cache
+__pycache__/
+*.pyc

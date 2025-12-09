@@ -46,7 +46,7 @@ git_pr_common::find_claude_cli() {
 # ============================================================================
 
 # Branch cache to avoid repeated git calls (namespaced to avoid conflicts)
-declare -A GIT_PR_COMMON_BRANCH_CACHE=()
+typeset -gA GIT_PR_COMMON_BRANCH_CACHE=()
 
 # Clear branch cache
 git_pr_common::clear_branch_cache() {

@@ -140,17 +140,35 @@ If pre-commit fails:
 
 ## Package Manager
 
-**ALWAYS use pnpm (if available), never npm or yarn:**
+**Detection Priority:**
+1. If `pnpm-lock.yaml` exists → Use **pnpm**
+2. If `package-lock.json` exists → Use **npm**
+3. If `yarn.lock` exists → Use **yarn**
+4. Default (no lockfile) → Use **pnpm**
+
+**Why this order?**
+- Respect the project's existing package manager choice
+- Lockfiles ensure reproducible builds - don't mix package managers
+- pnpm is preferred for new projects (faster, disk efficient)
 
 ```bash
-# ✅ Correct
+# ✅ Detect and use correct package manager
+# Check for lockfile first:
+ls pnpm-lock.yaml package-lock.json yarn.lock 2>/dev/null
+
+# pnpm project (pnpm-lock.yaml)
 pnpm install
 pnpm add package-name
 pnpm run build
 
-# ❌ Wrong
+# npm project (package-lock.json)
 npm install
-yarn add package-name
+npm add package-name
+npm run build
+
+# ❌ NEVER mix package managers
+# Don't run `pnpm install` in a project with package-lock.json
+# Don't run `npm install` in a project with pnpm-lock.yaml
 ```
 
 ## Quick Fix Exception

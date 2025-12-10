@@ -241,6 +241,60 @@ import type { Config } from './config'
 
 ---
 
+### ⛔ Using Barrel Files in Application Code
+
+**Anti-Pattern**:
+```typescript
+// components/index.ts (barrel file)
+export { Button } from './Button'
+export { Input } from './Input'
+export { Modal } from './Modal'
+export { Table } from './Table'
+// ... 50 more exports
+
+// Usage
+import { Button } from '@/components'
+```
+
+**Why It's Wrong**:
+- **Build performance**: Forces bundler to process ALL exports even when importing one component
+- **Circular dependencies**: Common cause of cryptic bundler errors
+- **Tree-shaking failure**: Bundlers include unused code because of barrel re-exports
+- **IDE navigation**: "Go to definition" lands on index.ts instead of actual source
+- **Slower TypeScript**: Must resolve entire export chain for type checking
+
+**Real-world impact**: Atlassian achieved 75% faster builds by removing barrel files from Jira frontend.
+
+**✅ Correct Approach**:
+```typescript
+// Direct imports from source files
+import { Button } from '@/components/Button'
+import { Input } from '@/components/Input'
+
+// Use TypeScript path aliases for cleaner imports
+// tsconfig.json: { "paths": { "@/components/*": ["src/components/*"] } }
+```
+
+**When Barrel Files ARE Appropriate**:
+```typescript
+// ✅ Library entry point (package.json main field)
+// packages/my-library/src/index.ts
+export { useQuery, useMutation } from './hooks'
+export type { QueryOptions, MutationOptions } from './types'
+
+// This is the PUBLIC API for library consumers
+// It's the ONLY place barrel files make sense
+```
+
+**Decision Framework**:
+1. Is this a library entry point defining public API? → Barrel file OK
+2. Is this application code? → Direct imports, no barrel files
+3. Are you creating index.ts in every folder? → Stop, use path aliases instead
+
+**Rule**: Never use barrel files in application code. Reserve them exclusively for library entry points.
+
+---
+
 ## Code Structure Anti-Patterns
 
 ### ⛔ Deeply Nested Code
@@ -436,5 +490,6 @@ if (isUserActive) { /* ... */ }
 8. ⛔ Creating functions in render → Use `useCallback` or define outside
 9. ⛔ Unclear variable names → Use descriptive names
 10. ⛔ Misleading boolean names → Use `is/has/can/should` prefix
+11. ⛔ Barrel files in application code → Direct imports with path aliases
 
 **Remember**: Type safety and code clarity are not optional. They prevent bugs and make code maintainable.

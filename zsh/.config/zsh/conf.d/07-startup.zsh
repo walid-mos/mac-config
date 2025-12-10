@@ -4,6 +4,13 @@
 # Shell startup display, editor config, and secret loading
 # =============================================================================
 
+# Ghostty shell integration (manual)
+# Required for CWD inheritance when creating new splits/tabs
+# Ghostty auto-injects this in direct shells, but not in exec zsh/tmux/etc.
+if [[ -n "$GHOSTTY_RESOURCES_DIR" ]]; then
+  source "$GHOSTTY_RESOURCES_DIR/shell-integration/zsh/ghostty-integration"
+fi
+
 # System info display (conditional)
 # Only show in interactive, non-nested shells
 if [[ -o interactive ]] && [[ -z "$TMUX" ]] && [[ -z "$NVIM" ]]; then
@@ -19,11 +26,6 @@ if [[ -n $SSH_CONNECTION ]]; then
   export EDITOR='vim'
 else
   export EDITOR='nvim'
-fi
-
-# Tmux config auto-reload (if running in tmux)
-if [[ -n "$TMUX" ]] && [[ -f ~/.config/tmux/tmux.conf ]]; then
-  tmux source-file ~/.config/tmux/tmux.conf >/dev/null 2>&1
 fi
 
 # Load secrets (API keys, tokens, etc.)

@@ -546,12 +546,11 @@ push_changes() {
 # MAIN SYNC FUNCTION
 # ============================================================================
 
-gsync() {
-    # Parse arguments
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            -h|--help)
-                cat <<EOF
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -h|--help)
+            cat <<EOF
 Git Sync - Synchronize current branch with parent branch using rebase
 
 USAGE:
@@ -612,111 +611,152 @@ NOTES:
     - Automatically updates parent branch before rebasing
     - Preserves your work if rebase fails
 EOF
-                return 0
-                ;;
-            *)
-                echo "❌ Unknown option: $1"
-                echo "Usage: gsync [-h|--help]"
-                return 1
-                ;;
-        esac
-    done
+            return 0
+            ;;
+        *)
+            echo "❌ Unknown option: $1"
+            echo "Usage: gsync [-h|--help]"
+            return 1
+            ;;
+    esac
+done
 
-    # Validate git repository
-    if ! is_git_repo; then
-        echo "❌ Not in a git repository"
-        return 1
-    fi
+# Validate git repository
+if ! is_git_repo; then
+    echo "❌ Not in a git repository"
+    return 1
+fi
 
-    # Get current branch
-    local current_branch=$(get_current_branch)
+# Get current branch
+local current_branch=$(get_current_branch)
 
-    if [ -z "$current_branch" ]; then
-        echo "❌ Not on any branch (detached HEAD state)"
-        return 1
-    fi
+if [ -z "$current_branch" ]; then
+    echo "❌ Not on any branch (detached HEAD state)"
+    return 1
+fi
 
-    echo "🎯 Current branch: $current_branch"
+echo "🎯 Current branch: $current_branch"
 
-    # Check for uncommitted changes
-    if has_uncommitted_changes; then
-        echo ""
-        echo "⚠️  You have uncommitted changes!"
-        echo ""
-        git status --short
-        echo ""
-        echo "💡 Please commit or stash your changes before syncing:"
-        echo "   - Commit: git add -A && git commit -m 'Your message'"
-        echo "   - Stash: git stash"
-        return 1
-    fi
-
-    # Detect or select parent branch
+# Check for uncommitted changes
+if has_uncommitted_changes; then
     echo ""
-    echo "🔍 Detecting parent branch..."
+    echo "⚠️  You have uncommitted changes!"
+    echo ""
+    git status --short
+    echo ""
+    echo "💡 Please commit or stash your changes before syncing:"
+    echo "   - Commit: git add -A && git commit -m 'Your message'"
+    echo "   - Stash: git stash"
+    return 1
+fi
 
-    local parent_branch=$(find_parent_branch "$current_branch")
+# Detect or select parent branch
+echo ""
+echo "🔍 Detecting parent branch..."
+
+local parent_branch=$(find_parent_branch "$current_branch")
+
+if [ -z "$parent_branch" ]; then
+    echo "⚠️  Could not auto-detect parent branch"
+    echo ""
+    parent_branch=$(select_parent_branch "$current_branch")
 
     if [ -z "$parent_branch" ]; then
-        echo "⚠️  Could not auto-detect parent branch"
+        echo "❌ No parent branch selected"
         echo ""
-        parent_branch=$(select_parent_branch "$current_branch")
+        echo "💡 Available parent branches: develop, main, master"
+        return 1
+    fi
+fi
 
-        if [ -z "$parent_branch" ]; then
-            echo "❌ No parent branch selected"
-            echo ""
-            echo "💡 Available parent branches: develop, main, master"
+echo "📡 Parent branch: $parent_branch"
+
+# Save current commit for potential rollback
+local original_commit=$(get_current_commit)
+echo "💾 Current commit: ${original_commit:0:7}"
+
+# Step 1: Fetch from origin
+echo ""
+if ! fetch_origin; then
+    return 1
+fi
+
+# Step 2: Pull parent branch
+if ! pull_parent_branch "$parent_branch"; then
+    return 1
+fi
+
+# Step 3: Check if branch was squashed
+echo ""
+echo "🔍 Checking for squash merge..."
+
+# First check: Are trees identical? (definitive squash)
+if has_identical_trees "$current_branch" "$parent_branch"; then
+    # Case A: Trees identical = complete squash merge, no new commits
+    # (commits exist in history but were already squashed)
+    handle_squashed_branch "$current_branch" "$parent_branch"
+    local action=$?
+
+    case $action in
+        1)
+            # Reset to parent
+            if reset_to_parent "$parent_branch"; then
+                echo ""
+                echo "✅ Branch reset to '$parent_branch'"
+                echo "   Proceeding to push changes..."
+            else
+                return 1
+            fi
+            # Don't return - continue to push step
+            ;;
+        2)
+            # Delete branch
+            if delete_current_branch "$current_branch" "$parent_branch"; then
+                echo ""
+                echo "✅ Sync completed! Branch deleted"
+            fi
+            return 0
+            ;;
+        *)
+            # Cancel
+            echo "❌ Operation cancelled"
+            return 0
+            ;;
+    esac
+
+# Second check: Minimal diff but different trees
+elif has_minimal_diff "$current_branch" "$parent_branch"; then
+    local new_commits=$(count_new_commits "$current_branch" "$parent_branch")
+
+    if [ "$new_commits" = "0" ]; then
+        # Minimal diff but no commits? Unlikely, but treat as normal rebase
+        echo "✅ Minimal changes detected, proceeding with normal rebase..."
+        if ! rebase_onto_parent "$parent_branch" "$original_commit"; then
             return 1
         fi
-    fi
-
-    echo "📡 Parent branch: $parent_branch"
-
-    # Save current commit for potential rollback
-    local original_commit=$(get_current_commit)
-    echo "💾 Current commit: ${original_commit:0:7}"
-
-    # Step 1: Fetch from origin
-    echo ""
-    if ! fetch_origin; then
-        return 1
-    fi
-
-    # Step 2: Pull parent branch
-    if ! pull_parent_branch "$parent_branch"; then
-        return 1
-    fi
-
-    # Step 3: Check if branch was squashed
-    echo ""
-    echo "🔍 Checking for squash merge..."
-
-    # First check: Are trees identical? (definitive squash)
-    if has_identical_trees "$current_branch" "$parent_branch"; then
-        # Case A: Trees identical = complete squash merge, no new commits
-        # (commits exist in history but were already squashed)
-        handle_squashed_branch "$current_branch" "$parent_branch"
+    else
+        # Case B: Minimal diff with new commits (possible partial squash)
+        handle_squashed_with_new_commits "$current_branch" "$parent_branch" "$new_commits"
         local action=$?
 
         case $action in
             1)
-                # Reset to parent
-                if reset_to_parent "$parent_branch"; then
+                # Cherry-pick
+                if reset_and_cherry_pick "$current_branch" "$parent_branch"; then
                     echo ""
-                    echo "✅ Branch reset to '$parent_branch'"
-                    echo "   Proceeding to push changes..."
+                    echo "✅ Sync completed! Ready to push"
+                    # Continue to push step below
                 else
                     return 1
                 fi
-                # Don't return - continue to push step
                 ;;
             2)
-                # Delete branch
-                if delete_current_branch "$current_branch" "$parent_branch"; then
-                    echo ""
-                    echo "✅ Sync completed! Branch deleted"
+                # Continue with risky rebase
+                echo ""
+                echo "⚠️  Continuing with rebase (may cause conflicts)..."
+                if ! rebase_onto_parent "$parent_branch" "$original_commit"; then
+                    return 1
                 fi
-                return 0
                 ;;
             *)
                 # Cancel
@@ -724,105 +764,63 @@ EOF
                 return 0
                 ;;
         esac
+    fi
+else
+    # Case C: Significant diff = normal branch (not squashed) - standard rebase
+    echo "✅ No squash merge detected, proceeding with normal rebase..."
 
-    # Second check: Minimal diff but different trees
-    elif has_minimal_diff "$current_branch" "$parent_branch"; then
-        local new_commits=$(count_new_commits "$current_branch" "$parent_branch")
+    if ! rebase_onto_parent "$parent_branch" "$original_commit"; then
+        return 1
+    fi
+fi
 
-        if [ "$new_commits" = "0" ]; then
-            # Minimal diff but no commits? Unlikely, but treat as normal rebase
-            echo "✅ Minimal changes detected, proceeding with normal rebase..."
-            if ! rebase_onto_parent "$parent_branch" "$original_commit"; then
+# Step 4: Push changes
+echo ""
+echo "🔍 Checking if push is needed..."
+
+# Check what kind of push we need
+needs_force_push "$current_branch"
+local push_status=$?
+
+case $push_status in
+    0)
+        # Force push needed
+        if ! push_changes "$current_branch" "force" "$parent_branch"; then
+            return 1
+        fi
+        ;;
+    1)
+        # Normal push is fine
+        if ! push_changes "$current_branch" "normal" "$parent_branch"; then
+            return 1
+        fi
+        ;;
+    2)
+        # Unknown error - might be that branch doesn't exist on remote
+        echo ""
+        echo "⚠️  Branch '$current_branch' may not exist on remote"
+        echo -n "   Push as new branch? (y/N): "
+        read -r confirm
+
+        if [[ "$confirm" =~ ^[Yy]$ ]]; then
+            echo ""
+            echo "🚀 Pushing new branch to remote..."
+            if git push -u origin "$current_branch"; then
+                echo "✅ Branch pushed and tracking set up"
+            else
+                echo "❌ Failed to push branch"
                 return 1
             fi
         else
-            # Case B: Minimal diff with new commits (possible partial squash)
-            handle_squashed_with_new_commits "$current_branch" "$parent_branch" "$new_commits"
-            local action=$?
-
-            case $action in
-                1)
-                    # Cherry-pick
-                    if reset_and_cherry_pick "$current_branch" "$parent_branch"; then
-                        echo ""
-                        echo "✅ Sync completed! Ready to push"
-                        # Continue to push step below
-                    else
-                        return 1
-                    fi
-                    ;;
-                2)
-                    # Continue with risky rebase
-                    echo ""
-                    echo "⚠️  Continuing with rebase (may cause conflicts)..."
-                    if ! rebase_onto_parent "$parent_branch" "$original_commit"; then
-                        return 1
-                    fi
-                    ;;
-                *)
-                    # Cancel
-                    echo "❌ Operation cancelled"
-                    return 0
-                    ;;
-            esac
-        fi
-    else
-        # Case C: Significant diff = normal branch (not squashed) - standard rebase
-        echo "✅ No squash merge detected, proceeding with normal rebase..."
-
-        if ! rebase_onto_parent "$parent_branch" "$original_commit"; then
+            echo "❌ Push cancelled"
+            echo ""
+            echo "💡 Your local branch has been rebased but not pushed."
+            echo "   You can push later with: git push -u origin $current_branch"
             return 1
         fi
-    fi
+        ;;
+esac
 
-    # Step 4: Push changes
-    echo ""
-    echo "🔍 Checking if push is needed..."
-
-    # Check what kind of push we need
-    needs_force_push "$current_branch"
-    local push_status=$?
-
-    case $push_status in
-        0)
-            # Force push needed
-            if ! push_changes "$current_branch" "force" "$parent_branch"; then
-                return 1
-            fi
-            ;;
-        1)
-            # Normal push is fine
-            if ! push_changes "$current_branch" "normal" "$parent_branch"; then
-                return 1
-            fi
-            ;;
-        2)
-            # Unknown error - might be that branch doesn't exist on remote
-            echo ""
-            echo "⚠️  Branch '$current_branch' may not exist on remote"
-            echo -n "   Push as new branch? (y/N): "
-            read -r confirm
-
-            if [[ "$confirm" =~ ^[Yy]$ ]]; then
-                echo ""
-                echo "🚀 Pushing new branch to remote..."
-                if git push -u origin "$current_branch"; then
-                    echo "✅ Branch pushed and tracking set up"
-                else
-                    echo "❌ Failed to push branch"
-                    return 1
-                fi
-            else
-                echo "❌ Push cancelled"
-                echo ""
-                echo "💡 Your local branch has been rebased but not pushed."
-                echo "   You can push later with: git push -u origin $current_branch"
-                return 1
-            fi
-            ;;
-    esac
-
-    echo ""
-    echo "✅ Sync completed successfully!"
-    echo "🎉 Branch '$current_branch' is now up to date with '$parent_branch'"
-}
+echo ""
+echo "✅ Sync completed successfully!"
+echo "🎉 Branch '$current_branch' is now up to date with '$parent_branch'"

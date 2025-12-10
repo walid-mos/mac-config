@@ -18,10 +18,10 @@ unalias wtp 2>/dev/null
 # ============================================================================
 
 # Worktrees base directory
-[[ -z "$WORKTREES_BASE" ]] && readonly WORKTREES_BASE="$HOME/development/worktrees"
+: ${WORKTREES_BASE:="$HOME/development/worktrees"}
 
 # State file for tracking worktrees
-[[ -z "$WORKTREE_STATE_FILE" ]] && readonly WORKTREE_STATE_FILE="$HOME/.config/worktree-state.json"
+: ${WORKTREE_STATE_FILE:="$HOME/.config/worktree-state.json"}
 
 # ============================================================================
 # UTILITY FUNCTIONS
@@ -714,66 +714,63 @@ wt_help() {
 # MAIN ENTRY POINT
 # ============================================================================
 
-# Main function
-wt() {
-    local command="$1"
+local command="$1"
 
-    # Only shift if there are arguments
-    if [ $# -gt 0 ]; then
-        shift
-    fi
+# Only shift if there are arguments
+if [ $# -gt 0 ]; then
+    shift
+fi
 
-    case "$command" in
-        new)
-            if ! validate_dependencies; then
-                return 1
-            fi
-            wt_new "$@"
-            ;;
-        switch)
-            if ! validate_dependencies; then
-                return 1
-            fi
-            wt_switch "$@"
-            ;;
-        list)
-            if ! is_git_repo; then
-                echo "❌ Not in a git repository"
-                return 1
-            fi
-            wt_list "$@"
-            ;;
-        status)
-            if ! is_git_repo; then
-                echo "❌ Not in a git repository"
-                return 1
-            fi
-            wt_status "$@"
-            ;;
-        clean)
-            if ! validate_dependencies; then
-                return 1
-            fi
-            wt_clean "$@"
-            ;;
-        prune)
-            if ! is_git_repo; then
-                echo "❌ Not in a git repository"
-                return 1
-            fi
-            wt_prune "$@"
-            ;;
-        help|--help|-h|"")
-            wt_help
-            ;;
-        *)
-            echo "❌ Unknown command: $command"
-            echo ""
-            wt_help
+case "$command" in
+    new)
+        if ! validate_dependencies; then
             return 1
-            ;;
-    esac
-}
+        fi
+        wt_new "$@"
+        ;;
+    switch)
+        if ! validate_dependencies; then
+            return 1
+        fi
+        wt_switch "$@"
+        ;;
+    list)
+        if ! is_git_repo; then
+            echo "❌ Not in a git repository"
+            return 1
+        fi
+        wt_list "$@"
+        ;;
+    status)
+        if ! is_git_repo; then
+            echo "❌ Not in a git repository"
+            return 1
+        fi
+        wt_status "$@"
+        ;;
+    clean)
+        if ! validate_dependencies; then
+            return 1
+        fi
+        wt_clean "$@"
+        ;;
+    prune)
+        if ! is_git_repo; then
+            echo "❌ Not in a git repository"
+            return 1
+        fi
+        wt_prune "$@"
+        ;;
+    help|--help|-h|"")
+        wt_help
+        ;;
+    *)
+        echo "❌ Unknown command: $command"
+        echo ""
+        wt_help
+        return 1
+        ;;
+esac
 
 # ============================================================================
 # CONVENIENCE ALIASES (as functions)

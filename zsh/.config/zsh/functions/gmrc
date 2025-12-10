@@ -235,26 +235,25 @@ gmrc::handle_create_mode() {
 # MAIN ENTRY POINT
 # ============================================================================
 
-gmrc() {
-    # Clear branch cache for fresh data
-    git_pr_common::clear_branch_cache
+# Clear branch cache for fresh data
+git_pr_common::clear_branch_cache
 
-    # Parse arguments
-    local update_only=false
-    local draft=false
+# Parse arguments
+local update_only=false
+local draft=false
 
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            -u|--update-description)
-                update_only=true
-                shift
-                ;;
-            --draft)
-                draft=true
-                shift
-                ;;
-            -h|--help)
-                cat <<EOF
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -u|--update-description)
+            update_only=true
+            shift
+            ;;
+        --draft)
+            draft=true
+            shift
+            ;;
+        -h|--help)
+            cat <<EOF
 Git MR Create with AI-powered title and description generation
 
 USAGE:
@@ -291,29 +290,28 @@ REQUIREMENTS:
     - Claude CLI
     - Git repository
 EOF
-                return 0
-                ;;
-            *)
-                echo "❌ Unknown option: $1"
-                echo "Usage: gmrc [-u|--update-description] [--draft] [-h|--help]"
-                return 1
-                ;;
-        esac
-    done
+            return 0
+            ;;
+        *)
+            echo "❌ Unknown option: $1"
+            echo "Usage: gmrc [-u|--update-description] [--draft] [-h|--help]"
+            return 1
+            ;;
+    esac
+done
 
-    # Validate dependencies
-    if ! gmrc::validate_dependencies; then
-        return 1
-    fi
+# Validate dependencies
+if ! gmrc::validate_dependencies; then
+    return 1
+fi
 
-    local current_branch=$(git branch --show-current)
-    echo "🎯 Current branch: $current_branch"
-    echo ""
+local current_branch=$(git branch --show-current)
+echo "🎯 Current branch: $current_branch"
+echo ""
 
-    # Route to appropriate handler
-    if [ "$update_only" = true ]; then
-        gmrc::handle_update_mode "$current_branch"
-    else
-        gmrc::handle_create_mode "$current_branch" "$draft"
-    fi
-}
+# Route to appropriate handler
+if [ "$update_only" = true ]; then
+    gmrc::handle_update_mode "$current_branch"
+else
+    gmrc::handle_create_mode "$current_branch" "$draft"
+fi

@@ -214,21 +214,20 @@ gprc::handle_create_mode() {
 # MAIN ENTRY POINT
 # ============================================================================
 
-gprc() {
-    # Clear branch cache for fresh data
-    git_pr_common::clear_branch_cache
+# Clear branch cache for fresh data
+git_pr_common::clear_branch_cache
 
-    # Parse arguments
-    local update_only=false
+# Parse arguments
+local update_only=false
 
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            -u|--update-description)
-                update_only=true
-                shift
-                ;;
-            -h|--help)
-                cat <<EOF
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -u|--update-description)
+            update_only=true
+            shift
+            ;;
+        -h|--help)
+            cat <<EOF
 Git PR Create with AI-powered title and description generation
 
 USAGE:
@@ -261,29 +260,28 @@ REQUIREMENTS:
     - Claude CLI
     - Git repository
 EOF
-                return 0
-                ;;
-            *)
-                echo "❌ Unknown option: $1"
-                echo "Usage: gprc [-u|--update-description] [-h|--help]"
-                return 1
-                ;;
-        esac
-    done
+            return 0
+            ;;
+        *)
+            echo "❌ Unknown option: $1"
+            echo "Usage: gprc [-u|--update-description] [-h|--help]"
+            return 1
+            ;;
+    esac
+done
 
-    # Validate dependencies
-    if ! gprc::validate_dependencies; then
-        return 1
-    fi
+# Validate dependencies
+if ! gprc::validate_dependencies; then
+    return 1
+fi
 
-    local current_branch=$(git branch --show-current)
-    echo "🎯 Current branch: $current_branch"
-    echo ""
+local current_branch=$(git branch --show-current)
+echo "🎯 Current branch: $current_branch"
+echo ""
 
-    # Route to appropriate handler
-    if [ "$update_only" = true ]; then
-        gprc::handle_update_mode "$current_branch"
-    else
-        gprc::handle_create_mode "$current_branch"
-    fi
-}
+# Route to appropriate handler
+if [ "$update_only" = true ]; then
+    gprc::handle_update_mode "$current_branch"
+else
+    gprc::handle_create_mode "$current_branch"
+fi

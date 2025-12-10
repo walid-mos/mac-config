@@ -12,6 +12,12 @@ claude/.claude/downloads/
 # Claude user config (stays in ~/, not in Stow)
 .claude.json
 
+# Claude plugins (runtime files)
+claude/.claude/plugins/
+
+# ZSH secrets (API keys)
+zsh/.config/zsh/secrets
+
 # Python cache files
 __pycache__/
 *.pyc

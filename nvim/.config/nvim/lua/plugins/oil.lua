@@ -79,6 +79,40 @@ return {
 				["_"] = { "actions.open_cwd", mode = "n", desc = "Open current working directory" },
 				["`"] = { "actions.cd", mode = "n", desc = "Change directory" },
 				["g."] = { "actions.toggle_hidden", mode = "n", desc = "Toggle hidden files" },
+			["gD"] = {
+				callback = function()
+					local oil = require("oil")
+					local entry = oil.get_cursor_entry()
+					if not entry then
+						vim.notify("No entry under cursor", vim.log.levels.WARN)
+						return
+					end
+
+					local dir = oil.get_current_dir()
+					local full_path = dir .. entry.name
+
+					local confirm = vim.fn.confirm("Force delete " .. entry.name .. "?", "&Yes\n&No", 2)
+
+					if confirm == 1 then
+						vim.fn.jobstart({ "rm", "-rf", full_path }, {
+							on_exit = function(_, code)
+								if code == 0 then
+									vim.schedule(function()
+										oil.discard_all_changes()
+										vim.notify("Deleted: " .. entry.name)
+									end)
+								else
+									vim.schedule(function()
+										vim.notify("Failed to delete: " .. entry.name, vim.log.levels.ERROR)
+									end)
+								end
+							end,
+						})
+					end
+				end,
+				desc = "Force delete (rm -rf) for large directories",
+				mode = "n",
+			},
 			},
 
 			-- Use default keymaps

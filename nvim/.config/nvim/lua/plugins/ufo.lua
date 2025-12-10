@@ -10,6 +10,10 @@ return {
 		-- Use Treesitter as primary provider, indent as fallback
 		-- Performance is better than foldmethod=nvim_treesitter#foldexpr()
 		provider_selector = function(bufnr, filetype, buftype)
+			-- Disable ufo for oil buffers (prevents mkview errors)
+			if filetype == "oil" then
+				return ""
+			end
 			return { "treesitter", "indent" }
 		end,
 	},

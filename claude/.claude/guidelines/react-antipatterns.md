@@ -247,6 +247,45 @@ function UserMenu() {
 
 ---
 
+### ⛔ File-Based Router Wrapper Files
+
+**Anti-Pattern**:
+```tsx
+// app/profile.tsx - Just re-exports from features
+import ProfileScreen from '@/features/profile/ProfileScreen'
+export default ProfileScreen
+
+// OR even worse - wrapper component
+export default function Profile() {
+  return <ProfileScreen />
+}
+```
+
+**Why It's Wrong**:
+- Adds unnecessary indirection layer
+- Extra file to maintain with no value
+- Violates KISS principle
+- File-based routing already provides the organization
+
+**✅ Correct Approach**:
+```tsx
+// app/profile.tsx - Contains the actual screen implementation
+export default function ProfileScreen() {
+  const { data } = useProfile()
+
+  return (
+    <View>
+      <ProfileHeader user={data} />
+      <ProfileContent />
+    </View>
+  )
+}
+```
+
+**Rule**: In file-based routing (Expo Router, Next.js App Router), put screen logic directly in route files. Don't create wrapper files that just import/re-export from `/features` or `/screens`.
+
+---
+
 ## State Management Anti-Patterns
 
 ### ⛔ Unnecessary State

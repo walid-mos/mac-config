@@ -638,6 +638,89 @@ function Dashboard() {
 
 **Why**: Hard to test, difficult to maintain, impossible to reuse, violates SRP
 
+### TypeScript Anti-Patterns
+
+**⛔ Type Assertions for Object Mutation**
+
+```typescript
+// ❌ BAD - Type assertion to add properties after creation
+const entry: LogEntry = {
+  level,
+  message,
+  timestamp: getCurrentTimestamp(),
+}
+
+if (scope !== undefined) {
+  ;(entry as { scope: string }).scope = scope
+}
+if (cleanObject !== undefined) {
+  ;(entry as { object: SomeType }).object = cleanObject
+}
+```
+
+**Why It's Wrong**:
+- Bypasses TypeScript's type system entirely with `as`
+- Object mutation after creation is fragile and error-prone
+- Inline type definitions (`{ scope: string }`) duplicate type information
+- Leading semicolon (`;(`) is a code smell indicating awkward control flow
+- No compile-time validation that the assignment is correct
+
+**✅ Correct Approaches**:
+
+**Pattern 1: Conditional Spread (Recommended)**
+```typescript
+const entry: LogEntry = {
+  level,
+  message,
+  timestamp: getCurrentTimestamp(),
+  ...(scope !== undefined && { scope }),
+  ...(cleanObject !== undefined && { object: cleanObject }),
+}
+```
+
+**Pattern 2: Discriminated Union (Best for Coupled Properties)**
+
+When properties are logically grouped (both present or both absent):
+
+```typescript
+// Interface design enforces: either both exist or neither
+type LogEntry =
+  | { level: Level; message: string; scope?: undefined; object?: undefined }
+  | { level: Level; message: string; scope: string; object: LogObject }
+
+// Usage - TypeScript enforces the constraint
+const entry: LogEntry = hasContext
+  ? { level, message, scope, object: cleanObject }
+  : { level, message }
+```
+
+**Pattern 3: Simple Optional Properties**
+
+When properties are truly independent:
+
+```typescript
+interface LogEntry {
+  level: Level
+  message: string
+  scope?: string        // Optional with ?
+  object?: LogObject    // Optional with ?
+}
+
+// Can omit optional properties entirely
+const entry: LogEntry = {
+  level,
+  message,
+  // scope and object simply not included
+}
+```
+
+**Decision Framework**:
+1. Properties always appear together → Discriminated Union
+2. Properties are independent → Simple optional (`?`)
+3. Building object dynamically → Conditional Spread
+
+**Rule**: Never use `as` to mutate objects. Design proper interfaces or use conditional spread.
+
 ---
 
 ## Configuration

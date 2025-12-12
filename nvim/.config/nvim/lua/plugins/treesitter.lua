@@ -5,8 +5,13 @@ return {
 	"nvim-treesitter/nvim-treesitter",
 	build = ":TSUpdate",
 	event = { "BufReadPost", "BufNewFile" },
+	dependencies = {
+		"JoosepAlviste/nvim-ts-context-commentstring",
+	},
 
 	config = function()
+		-- Skip backwards compatibility for ts_context_commentstring (faster)
+		vim.g.skip_ts_context_commentstring_module = true
 		require("nvim-treesitter.configs").setup({
 			-- Auto-install parsers for these languages
 			ensure_installed = {

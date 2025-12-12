@@ -467,6 +467,17 @@ Detailed coding standards are maintained in separate guideline files:
   - Mock cleanup (critical)
   - Testing best practices
 
+- **NextNode Logger**: `@claude/.claude/guidelines/nextnode-logger.md`
+  - FORBIDDEN: console.* when logger installed
+  - Global vs scoped logger patterns
+  - Structured logging with scope
+
+- **Data Fetching & Error Handling**: `@claude/.claude/guidelines/typescript-data-fetching.md`
+  - Discriminated unions for async state (idle/loading/success/error)
+  - Result pattern: tuple `[error, data]` preferred, object alternative
+  - NEVER throw in APIs/libs, return Result instead
+  - Error handling at client/UI boundary only
+
 ---
 
 ## GLOBAL ANTI-PATTERNS

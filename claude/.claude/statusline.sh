@@ -2,7 +2,8 @@
 input=$(cat)
 
 MODEL=$(echo "$input" | jq -r '.model.display_name')
-DIR=$(echo "$input" | jq -r '.workspace.current_dir')
+PROJECT_DIR=$(echo "$input" | jq -r '.workspace.project_dir')
+CURRENT_DIR=$(echo "$input" | jq -r '.workspace.current_dir')
 COST_RAW=$(echo "$input" | jq -r '.cost.total_cost_usd // 0')
 DURATION_MS=$(echo "$input" | jq -r '.cost.total_duration_ms // 0')
 LINES_ADDED=$(echo "$input" | jq -r '.cost.total_lines_added // 0')
@@ -24,21 +25,21 @@ DURATION=""
 
 # Build git status
 GIT_STATUS=""
-if git -C "$DIR" rev-parse --git-dir > /dev/null 2>&1; then
-    BRANCH=$(git -C "$DIR" branch --show-current 2>/dev/null)
+if git -C "$CURRENT_DIR" rev-parse --git-dir > /dev/null 2>&1; then
+    BRANCH=$(git -C "$CURRENT_DIR" branch --show-current 2>/dev/null)
     [ -z "$BRANCH" ] && BRANCH="HEAD"
 
     # Count modified, staged, untracked
-    MODIFIED=$(git -C "$DIR" diff --name-only 2>/dev/null | wc -l | tr -d ' ')
-    STAGED=$(git -C "$DIR" diff --cached --name-only 2>/dev/null | wc -l | tr -d ' ')
-    UNTRACKED=$(git -C "$DIR" ls-files --others --exclude-standard 2>/dev/null | wc -l | tr -d ' ')
+    MODIFIED=$(git -C "$CURRENT_DIR" diff --name-only 2>/dev/null | wc -l | tr -d ' ')
+    STAGED=$(git -C "$CURRENT_DIR" diff --cached --name-only 2>/dev/null | wc -l | tr -d ' ')
+    UNTRACKED=$(git -C "$CURRENT_DIR" ls-files --others --exclude-standard 2>/dev/null | wc -l | tr -d ' ')
 
     # Ahead/behind
-    AHEAD=$(git -C "$DIR" rev-list --count @{upstream}..HEAD 2>/dev/null || echo 0)
-    BEHIND=$(git -C "$DIR" rev-list --count HEAD..@{upstream} 2>/dev/null || echo 0)
+    AHEAD=$(git -C "$CURRENT_DIR" rev-list --count @{upstream}..HEAD 2>/dev/null || echo 0)
+    BEHIND=$(git -C "$CURRENT_DIR" rev-list --count HEAD..@{upstream} 2>/dev/null || echo 0)
 
     # Stash count
-    STASH=$(git -C "$DIR" stash list 2>/dev/null | wc -l | tr -d ' ')
+    STASH=$(git -C "$CURRENT_DIR" stash list 2>/dev/null | wc -l | tr -d ' ')
 
     # Build git indicators with symbols and spacing
     INDICATORS=""
@@ -59,7 +60,17 @@ fi
 
 # Build segments
 LEFT="$MODEL"
-CENTER="${DIR##*/}"
+
+# Build repo path display: "opened -> current" or just "current" if same
+OPENED_REPO="${PROJECT_DIR##*/}"
+CURRENT_REPO="${CURRENT_DIR##*/}"
+
+if [ "$PROJECT_DIR" = "$CURRENT_DIR" ]; then
+    CENTER="$CURRENT_REPO"
+else
+    CENTER="$OPENED_REPO -> $CURRENT_REPO"
+fi
+
 [ -n "$GIT_STATUS" ] && CENTER="$CENTER | $GIT_STATUS"
 RIGHT="\$${COST} | ${DURATION} | +${LINES_ADDED} -${LINES_REMOVED}"
 

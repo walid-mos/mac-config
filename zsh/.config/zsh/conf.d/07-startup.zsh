@@ -2,14 +2,8 @@
 # Startup & Miscellaneous
 # =============================================================================
 # Shell startup display, editor config, and secret loading
+# Note: Ghostty integration moved to 00-ghostty.zsh for early CWD tracking
 # =============================================================================
-
-# Ghostty shell integration (manual)
-# Required for CWD inheritance when creating new splits/tabs
-# Ghostty auto-injects this in direct shells, but not in exec zsh/tmux/etc.
-if [[ -n "$GHOSTTY_RESOURCES_DIR" ]]; then
-  source "$GHOSTTY_RESOURCES_DIR/shell-integration/zsh/ghostty-integration"
-fi
 
 # System info display (conditional)
 # Only show in interactive, non-nested shells

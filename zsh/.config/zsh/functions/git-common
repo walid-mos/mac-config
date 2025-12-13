@@ -228,7 +228,8 @@ git_pr_common::get_available_branches() {
             continue
         fi
         # Only add if branch doesn't exist locally and hasn't been seen yet
-        if git_pr_common::should_include_branch "$branch" "$current_branch" "$default_branch" && [[ -z "${seen_branches[$branch]}" ]] && ! git_pr_common::branch_exists_local_cached "$branch"; then
+        # Explicit current branch check to ensure we never show the remote tracking branch of the current branch
+        if [ "$branch" != "$current_branch" ] && git_pr_common::should_include_branch "$branch" "$current_branch" "$default_branch" && [[ -z "${seen_branches[$branch]}" ]] && ! git_pr_common::branch_exists_local_cached "$branch"; then
             branches+=("$branch (remote)")
             seen_branches["$branch"]=1
         fi

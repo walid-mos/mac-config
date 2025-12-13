@@ -1,6 +1,6 @@
 # Intelligent Refactoring Guidelines
 
-> For detailed refactoring analysis, use `@agent-code-refactor-specialist`
+> For detailed refactoring analysis, use `@agent-code-refactor`
 
 ## Core Principle: Intelligent DRY Application
 

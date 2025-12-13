@@ -36,8 +36,9 @@ keymap("v", "<A-Up>", ":m '<-2<CR>gv=gv", { desc = 'Move selection up' })
 keymap('n', 'go', 'o<Esc>k', { desc = 'Add one line after' })
 keymap('n', 'gO', 'O<Esc>j', { desc = 'Add one line before' })
 
--- Paste without yanking replaced text
-keymap("x", "p", [["_dP]], { desc = 'Paste without yanking' })
+-- Paste from yank register (so replaced text doesn't overwrite clipboard)
+keymap("x", "p", '"0p', { desc = 'Paste from yank register' })
+keymap("x", "P", '"0P', { desc = 'Paste from yank register (before)' })
 
 -- Clear search highlight
 keymap("n", "<leader>ch", ":noh<CR>", { desc = 'Clear highlight' })

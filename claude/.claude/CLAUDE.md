@@ -344,6 +344,64 @@ function process(input: string): Result {
 
 ---
 
+### Avoid Else Blocks (MANDATORY)
+
+**RULE**: Almost NEVER use `else`. Early returns eliminate the need for `else` in virtually all cases.
+
+#### Why No Else?
+
+- `else` creates implicit coupling between code branches
+- Early returns make each case independent and self-contained
+- Code reads top-to-bottom without mental "stack" of pending conditions
+- Impossible early return often signals bad architecture
+
+#### Pattern
+
+```typescript
+// ❌ BAD - Using else
+function getDiscount(user: User): number {
+  if (user.isPremium) {
+    return 0.2
+  } else if (user.isVeteran) {
+    return 0.15
+  } else {
+    return 0
+  }
+}
+
+// ✅ GOOD - Early returns, no else
+function getDiscount(user: User): number {
+  if (user.isPremium) return 0.2
+  if (user.isVeteran) return 0.15
+  return 0
+}
+
+// ❌ BAD - else in loop
+for (const item of items) {
+  if (item.isValid) {
+    process(item)
+  } else {
+    continue
+  }
+}
+
+// ✅ GOOD - Early continue, no else
+for (const item of items) {
+  if (!item.isValid) continue
+  process(item)
+}
+```
+
+#### Rare Exceptions
+
+`else` is acceptable ONLY when:
+- Both branches are equally complex AND mutually exclusive with no clear "primary" path
+- Ternary would be less readable for the use case
+
+**If early return is impossible:** This is often a sign of poor architecture. Consider refactoring the function structure first.
+
+---
+
 ## CRITICAL RULES
 
 ### Security (MANDATORY)

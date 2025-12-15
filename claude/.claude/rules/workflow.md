@@ -121,6 +121,39 @@ git commit -m "fix(api): handle null response from database"
 git commit -m "refactor(utils): extract validation logic"
 ```
 
+## Atomic Commits for Multi-Phase Plans
+
+When implementing a plan with multiple phases or significant complexity:
+
+1. **Ask the user**: "Should I commit atomically after each phase?"
+
+2. **If user says yes**:
+   - Complete each phase fully
+   - Run lint/type-check/test for that phase
+   - Create a focused, atomic commit
+   - Move to next phase
+
+3. **Benefits**:
+   - Easy to review changes incrementally
+   - Easy to revert specific phases if needed
+   - Clear git history showing logical progression
+   - Smaller, focused commits are easier to understand
+
+**Example workflow:**
+```bash
+# Phase 1: Add data models
+git commit -m "feat(models): add user and role entities"
+
+# Phase 2: Add service layer
+git commit -m "feat(services): add user authentication service"
+
+# Phase 3: Add API endpoints
+git commit -m "feat(api): add auth endpoints"
+
+# Phase 4: Add tests
+git commit -m "test(auth): add unit and integration tests"
+```
+
 ## Pre-commit Hooks
 
 **NEVER bypass pre-commit hooks:**

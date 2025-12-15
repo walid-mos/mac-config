@@ -294,6 +294,56 @@ Before creating a function, ask yourself:
 
 ---
 
+### Early Return Pattern (Guard Clauses)
+
+**RULE**: Handle simple/edge cases first with early returns. Keep main logic at base indentation.
+
+#### Why Early Returns?
+
+- Reduces nesting and cognitive load
+- Reader can "forget" edge cases after they're handled
+- Main logic flows naturally without indentation
+- Easier to trace execution path
+
+#### Pattern
+
+```typescript
+// ❌ BAD - Complex case first, nesting required
+function process(input: string): Result {
+  if (isComplex(input)) {
+    // 10+ lines of complex logic
+    // nested inside condition
+    return complexResult
+  }
+  return simpleResult
+}
+
+// ✅ GOOD - Simple case first, early return
+function process(input: string): Result {
+  if (!isComplex(input)) {
+    return simpleResult
+  }
+
+  // Complex logic at base indentation
+  // No nesting required
+  return complexResult
+}
+```
+
+#### When to Apply
+
+**Use Early Return When:**
+- Simple/edge case is 1-3 lines
+- Complex case is 5+ lines
+- Condition can be cleanly inverted
+
+**Keep Original When:**
+- Both branches are equally complex
+- Inversion makes condition unreadable
+- Short-circuit evaluation is needed
+
+---
+
 ## CRITICAL RULES
 
 ### Security (MANDATORY)
@@ -343,6 +393,55 @@ git checkout -b feature/user-authentication
 git checkout main
 # Start making changes directly on main
 ```
+
+### No Fallbacks (MANDATORY)
+
+**RULE**: NEVER add fallback values, default behaviors, or defensive defaults unless EXPLICITLY requested.
+
+**FORBIDDEN without explicit request:**
+- Default values for missing data (`?? 'default'`, `|| fallback`)
+- Fallback UI states ("No data available", placeholder content)
+- Alternative paths when primary fails
+- Graceful degradation logic
+- "Safe" defaults that mask potential issues
+
+**When to PROPOSE (not implement):**
+- API response could legitimately be empty
+- External dependency might be unavailable
+- User input could be missing
+
+**How to propose:**
+```
+Note: This could fail if X is missing. Should I add a fallback for that case?
+```
+
+**Examples:**
+
+```typescript
+// ❌ FORBIDDEN - Adding unrequested fallback
+async function getUser(id: string) {
+  const user = await db.findUser(id)
+  return user ?? { name: 'Unknown', email: '' }  // NO!
+}
+
+// ✅ CORRECT - Return what was requested
+async function getUser(id: string) {
+  return await db.findUser(id)
+}
+
+// ❌ FORBIDDEN - Defensive default
+const config = loadConfig() || DEFAULT_CONFIG  // NO!
+
+// ✅ CORRECT - Fail explicitly
+const config = loadConfig()
+if (!config) throw new Error('Config required')
+```
+
+**Why this matters:**
+- Fallbacks hide bugs and configuration issues
+- Unexpected defaults create silent failures
+- User should decide failure behavior, not Claude
+- "Defensive" code often masks real problems
 
 ### Git Workflow
 
@@ -412,6 +511,8 @@ git commit -m "fix(api): handle null response"
 - [ ] 🧪 Tests written
 - [ ] 🎯 Functions for features, not wrappers
 - [ ] 🏗️ Composition over inheritance
+- [ ] ⏎ Early returns for simple cases
+- [ ] 🚫 No fallbacks without explicit request
 
 **Before commit:**
 - [ ] ✅ Lint passed
@@ -427,6 +528,11 @@ git commit -m "fix(api): handle null response"
 Detailed coding standards are maintained in separate guideline files:
 
 ### Universal Standards
+- **Agent Design**: `@claude/.claude/guidelines/agents.md`
+  - Subagent capability for large codebases
+  - Tool selection and context management
+  - Partitioning strategies
+
 - **Naming Conventions**: `@claude/.claude/guidelines/naming-conventions.md`
   - File naming (PascalCase for components, kebab-case for pages)
   - Variable naming (camelCase, UPPER_CASE for globals)
@@ -648,6 +754,24 @@ function Dashboard() {
 ```
 
 **Why**: Hard to test, difficult to maintain, impossible to reuse, violates SRP
+
+**⛔ Unrequested Fallbacks**
+
+```typescript
+// ❌ BAD - Adding fallback without being asked
+const data = fetchData() ?? DEFAULT_DATA
+const name = user?.name || 'Anonymous'
+const items = response.items ?? []
+
+// ✅ GOOD - Explicit handling, let it fail
+const data = fetchData()
+if (!data) throw new Error('Data fetch failed')
+
+const name = user.name  // Will throw if undefined - that's correct
+const items = response.items  // Caller handles undefined if needed
+```
+
+**Why**: Fallbacks mask bugs, create silent failures, and add complexity the user didn't ask for
 
 ---
 

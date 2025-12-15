@@ -31,3 +31,7 @@ zinit light zsh-users/zsh-syntax-highlighting
 # Suggests commands from history as you type (gray text)
 zinit ice wait lucid atload"_zsh_autosuggest_start"
 zinit light zsh-users/zsh-autosuggestions
+
+# History search multi-word (interactive Ctrl+R with multi-word matching)
+# Type partial command, use Up/Down or Ctrl+R to search history
+zinit light zdharma-continuum/history-search-multi-word

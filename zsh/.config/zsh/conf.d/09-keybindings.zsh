@@ -44,13 +44,15 @@ bindkey "^K" kill-line             # Ctrl + K (kill line to end)
 # =============================================================================
 # History Navigation
 # =============================================================================
-bindkey "^[[A" up-line-or-history      # Up arrow
-bindkey "^[[B" down-line-or-history    # Down arrow
-bindkey "^P" up-line-or-history        # Ctrl + P (emacs-style)
-bindkey "^N" down-line-or-history      # Ctrl + N (emacs-style)
+# Prefix-based search: type partial command, Up/Down shows only matching entries
+bindkey "^[[A" history-beginning-search-backward  # Up arrow
+bindkey "^[[B" history-beginning-search-forward   # Down arrow
+bindkey "^P" history-beginning-search-backward    # Ctrl + P
+bindkey "^N" history-beginning-search-forward     # Ctrl + N
 
 # =============================================================================
 # Search
 # =============================================================================
-bindkey "^R" history-incremental-search-backward  # Ctrl + R (reverse search)
+# Ctrl+R uses history-search-multi-word plugin (multi-word AND matching)
+bindkey "^R" history-search-multi-word
 bindkey "^S" history-incremental-search-forward   # Ctrl + S (forward search)

@@ -1,7 +1,7 @@
 ---
 name: code-refactor
 description: Expert refactoring agent for comprehensive codebase analysis. Use when refactoring code, cleaning dead code, or improving code quality. Systematically analyzes entire projects or targeted zones without missing files. Use proactively after significant code changes.
-tools: Read, Edit, Grep, Glob, Bash
+tools: Read, Edit, Grep, Glob, Bash, Task
 model: inherit
 ---
 
@@ -70,6 +70,53 @@ Glob: **/*.rs
    ```
 
 **Output**: "Scope: X files. Entry points: [list]. Proceeding."
+
+### 1.4 Parallel Processing (Auto for 20+ Files)
+
+**Threshold:** If discovered files > 20, MUST partition and parallelize.
+
+**Partitioning Strategy (by directory):**
+1. Group files by top-level src/ subdirectory
+2. Each directory group becomes a subagent task
+3. Spawn subagents IN PARALLEL (single message, multiple Task calls)
+
+**Example for 47 files:**
+```
+src/components/ (12 files) -> Subagent 1
+src/utils/ (8 files) -> Subagent 2
+src/services/ (15 files) -> Subagent 3
+src/types/ (7 files) -> Subagent 4
+src/lib/ (5 files) -> Subagent 5
+```
+
+**Subagent Prompt Template:**
+```
+Analyze these files for dead code, unused imports, and quality issues:
+[FILE_LIST]
+
+Context:
+- Project type: [DETECTED_STACK]
+- Entry points: [ENTRY_POINTS]
+
+Rules:
+- Follow @claude/.claude/guidelines/refactoring.md
+- Report findings but DO NOT edit yet
+- Return structured list: file:line - issue - severity
+
+Categories to check:
+- Dead exports (not imported anywhere)
+- Unused imports within files
+- Unreachable code patterns
+- Bad fallbacks (per No Fallbacks rule)
+```
+
+**After all subagents complete:**
+1. Aggregate all findings from subagents
+2. Deduplicate (same issue found via different paths)
+3. Present consolidated report to user
+4. Execute edits sequentially (Phase 4)
+
+**For projects < 20 files:** Skip this section, proceed directly to Phase 2.
 
 ---
 
@@ -201,6 +248,83 @@ Grep: (str|int|bool|arr)[A-Z]
 
 ---
 
+## Phase 3.5: Fallback Detection (Anti-Pattern)
+
+Per user's No Fallbacks rule, detect ERROR-MASKING fallbacks (not legitimate ones).
+
+### BAD Fallbacks (Flag and Remove)
+
+```
+# Fake string defaults that hide missing data
+Grep: \?\?\s*['"][^'"]+['"]
+
+# Empty collections that silence errors
+Grep: \?\?\s*\[\]|\?\?\s*\{\}
+
+# OR with fake values
+Grep: \|\|\s*['"][^'"]+['"]|\|\|\s*\[\]|\|\|\s*\{\}
+
+# UI strings that mask errors
+Grep: ['"](?:No data|Unknown|N\/A|Not found|Loading failed)['"]
+```
+
+### ALLOWED Fallbacks (Skip These)
+
+Only these are TRULY safe - skip them:
+- `?? undefined` - Type conversion (null -> undefined)
+- Lines with `// intentional` comment - User explicitly acknowledged
+
+**Everything else should be flagged**, including:
+- `?? false`, `?? true` - Can mask missing boolean data
+- `?? 0` - Can mask missing numeric data
+- `process.env.X || 'value'` - Should crash if env missing
+- `defaultProps` - Often masks component bugs
+
+### Resolution Flow
+
+For each BAD fallback detected:
+1. Show file:line and code context
+2. Explain WHY it's problematic:
+   - "This masks missing user data"
+   - "API errors will be silently ignored"
+3. Auto-fix by:
+   - Removing the fallback
+   - Adding explicit error check if needed
+   - OR asking user if intentional
+
+### Fix Examples
+
+**Before (BAD):**
+```typescript
+const name = user?.name ?? 'Unknown'
+```
+
+**After (GOOD):**
+```typescript
+if (!user?.name) {
+  throw new Error('User name is required')
+}
+const name = user.name
+```
+
+**Or if truly optional:**
+```typescript
+// Intentional fallback: user name is optional in guest mode
+const displayName = user?.name ?? 'Guest'
+```
+
+### Summary Output
+
+```
+### Fallback Analysis
+- Bad fallbacks detected: X
+- Auto-fixed: Y
+- Kept (user confirmed intentional): Z
+- Legitimate (skipped): W
+```
+
+---
+
 ## Phase 4: Execute (Systematic)
 
 **Processing order:**
@@ -224,6 +348,45 @@ Grep: (str|int|bool|arr)[A-Z]
 
 ---
 
+## Completion Guarantee (MANDATORY)
+
+**Before reporting "Complete", you MUST verify 100% coverage.**
+
+### Verification Steps
+
+1. **Count files discovered in Phase 1:**
+   ```
+   Total files in scope: X
+   ```
+
+2. **Count files actually analyzed:**
+   - If parallel: sum files from all subagents
+   - If sequential: count files processed in Phase 2-4
+   ```
+   Files analyzed: Y
+   ```
+
+3. **Calculate coverage:**
+   ```
+   Coverage: Y/X = ?%
+   ```
+
+4. **If coverage < 100%:**
+   - Identify missed files
+   - Spawn additional subagent for remaining files
+   - Repeat until 100% coverage achieved
+
+### CRITICAL RULE
+
+**NEVER report "Refactoring Complete" with < 100% coverage.**
+
+If you cannot analyze all files in one pass:
+- Spawn additional subagents
+- Continue until every file is processed
+- Only then produce final report
+
+---
+
 ## Phase 5: Verification
 
 **Auto-detect and run:**
@@ -243,10 +406,12 @@ tsc --noEmit || mypy . || pyright
 ## Output Format
 
 ```
-## Refactoring Complete
+## Refactoring Complete (47/47 files - 100% coverage)
 
 ### Stats
-- Files analyzed: 47
+- Files discovered: 47
+- Files analyzed: 47 (100% coverage)
+- Subagents spawned: 5 (parallel processing)
 - Dead code removed: 12 items
 - Unused imports: 23 cleaned
 - Orphaned files: 2 removed

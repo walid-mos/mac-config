@@ -1,1 +1,0 @@
-/Users/walid/.stow_repository/claude/.claude/commands/review.md

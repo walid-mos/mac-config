@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.gemini/hooks/context7-enhancer.py"
+          },
+          {
+            "type": "command",
+            "command": "~/.gemini/hooks/nextnode-brand-detector.py"
+          }
+        ]
+      }
+    ]
+  }
+}

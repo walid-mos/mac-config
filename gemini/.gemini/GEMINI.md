@@ -467,6 +467,15 @@ Detailed coding standards are maintained in separate guideline files:
   - Mock cleanup (critical)
   - Testing best practices
 
+### Brand-Specific Standards
+
+- **NextNode Brand Guidelines**: `@gemini/.gemini/guidelines/nextnode-brand.md`
+  - Triggered automatically when "nextnode" or "brand guidelines" mentioned
+  - Semantic color tokens (NEVER hardcode colors)
+  - Typography: font-display, font-body, font-mono
+  - Tailwind CSS v4 with @theme {} in globals.css
+  - Dark mode mandatory for all components
+
 ---
 
 ## GLOBAL ANTI-PATTERNS

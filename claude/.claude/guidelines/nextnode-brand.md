@@ -19,13 +19,21 @@
 |-------|-------|------|-------|
 | `primary` | #0D9488 | #14B8A6 | Buttons, links, CTAs |
 | `accent` | #F97316 | #FB923C | Highlights, emphasis |
-| `background` | #F8FAFC | #0F172A | Page background |
+| `background` | #F8FAFC | #141A30 | Page background |
 | `foreground` | #0F172A | #F8FAFC | Text color |
 | `card` | #FFFFFF | #1E293B | Card backgrounds |
 | `muted` | #F1F5F9 | #1E293B | Disabled states |
 | `muted-foreground` | #64748B | #94A3B8 | Secondary text |
 | `border` | #E2E8F0 | #334155 | Borders |
 | `destructive` | #EF4444 | #F87171 | Errors, deletions |
+
+### Dark Navy
+
+The official dark mode background color from Brand Guidelines v2.0:
+
+| Name | Hex | Usage |
+|------|-----|-------|
+| Dark Navy | #141A30 | Dark mode backgrounds, social avatars |
 
 ### Teal Scale
 
@@ -221,22 +229,22 @@ orange-300: #FDBA74   orange-700: #C2410C
 
 ```css
 .dark {
-  --background: #0F172A;
+  --background: #141A30;           /* Dark Navy - from Brand Guidelines v2.0 */
   --foreground: #F8FAFC;
   --card: #1E293B;
   --card-foreground: #F8FAFC;
   --popover: #1E293B;
   --popover-foreground: #F8FAFC;
   --primary: #14B8A6;
-  --primary-foreground: #0F172A;
+  --primary-foreground: #141A30;   /* Dark Navy */
   --secondary: #334155;
   --secondary-foreground: #F8FAFC;
   --muted: #1E293B;
   --muted-foreground: #94A3B8;
   --accent: #FB923C;
-  --accent-foreground: #0F172A;
+  --accent-foreground: #141A30;    /* Dark Navy */
   --destructive: #F87171;
-  --destructive-foreground: #0F172A;
+  --destructive-foreground: #141A30; /* Dark Navy */
   --border: #334155;
   --input: #334155;
   --ring: #14B8A6;
@@ -272,37 +280,65 @@ ALL components must work in both light AND dark mode.
 
 ## Logo
 
-### SVG Symbol (NN)
+### Unified Gradient System (Brand Guidelines v2.0)
 
-```svg
-<svg viewBox="0 0 300 300" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <g transform="translate(0.5, 35)">
-    <path d="M160.934 172.786C160.934 174.336..." fill="#4FA79B"/>
-    <path d="M256.934 156.786C256.934 158.336..." fill="#4EA69A"/>
-  </g>
-</svg>
+The NextNode logo uses a **unified gradient** across both N letters, merged into a single SVG path for smooth, professional rendering without overlap artifacts.
+
+**Gradient Variants:**
+1. Teal gradient (primary)
+2. White (monochrome for dark backgrounds)
+3. Black (monochrome for print)
+
+### Logo Kit Structure
+
+```
+nextnode-brand-assets/
+├── icons/           → 3 SVG (Teal, White, Black)
+├── icons-text/      → 3 SVG (Symbol + "NextNode Solutions")
+├── logos-square/    → 3 SVG (400×400, for profiles)
+├── logos-landscape/ → 6 SVG (500×100, for headers)
+├── social/          → 2 SVG (Dark #141A30, Light #F8FAFC backgrounds)
+└── favicon/         → 1 SVG (32×32)
 ```
 
 ### Usage Rules
 
 **DO:**
+- Use original SVG files from the brand kit
 - Respect original proportions
 - Protection zone: 25% of logo height around it
-- Minimum size: 32x32px (digital), 15x15mm (print)
+- Choose variant appropriate for background contrast
+- Use Black version for B&W print
 
 **DON'T:**
-- Distort or stretch
-- Add effects (shadows, gradients, strokes)
-- Use non-official colors
-- Place on busy/low-contrast backgrounds
+- Modify the gradient colors
+- Distort or stretch the logo
+- Add effects (shadows, outlines, extra gradients)
+- Place on low-contrast backgrounds
+- Use below minimum size
+
+### Minimum Sizes
+
+| Context | Size |
+|---------|------|
+| Favicon | 32×32px |
+| Social icons | 48×48px |
+| Header | 40px height |
+| Print | 15×15mm |
 
 ### Logo Versions
 
 | Version | Usage | Background |
 |---------|-------|------------|
-| Teal (primary) | Standard usage | Any |
-| White | Photos, colored backgrounds | Dark only |
-| Black | B&W print | Light only |
+| Teal (gradient) | Standard digital usage | Any with contrast |
+| White | Dark backgrounds, photos | Dark Navy #141A30 |
+| Black | B&W print, documents | Light #F8FAFC |
+
+### Social Avatars (400×400)
+
+Ready-to-use avatars with opaque backgrounds:
+- **Dark**: #141A30 background
+- **Light**: #F8FAFC background
 
 ---
 

@@ -284,3 +284,59 @@ For critical production bugs:
 ## Enforcement
 
 These workflow rules are **MANDATORY** unless explicitly overridden by `/quick-fix` command for trivial changes.
+
+## Interactive Commands (CRITICAL)
+
+**RULE**: Claude's subshells do NOT support interactive input. Handle this properly.
+
+### Mandatory Protocol
+
+When a command requires interactivity:
+
+1. **First**: Check with Context7 if the CLI supports non-interactive flags/configs
+   - Many CLIs have `--yes`, `--no-input`, `--batch`, `-y` flags
+   - Some support config files or environment variables
+
+2. **If non-interactive mode exists**: Use it
+
+3. **If truly interactive**: IMMEDIATELY ask the user to run it manually
+   - Provide the exact command to run
+   - Explain what inputs are needed
+   - Wait for user to complete it
+
+### FORBIDDEN Behaviors
+
+**NEVER:**
+- Attempt to force interactive commands through subshells
+- Retry interactive commands hoping they'll work
+- Create workarounds that bypass the intended tool (e.g., writing code from scratch instead of using a generator CLI)
+- Pipe fake input to interactive prompts
+- Try to "solve" the interactivity problem with hacks
+
+### Examples
+
+```bash
+# ❌ FORBIDDEN - Trying to run interactive CLI
+npx create-next-app  # Interactive prompts - won't work
+
+# ✅ CORRECT - Check for non-interactive flags first
+npx create-next-app my-app --typescript --tailwind --eslint --app --use-pnpm
+
+# ❌ FORBIDDEN - Retrying or working around
+# "The CLI is interactive so I'll just write the boilerplate manually"
+
+# ✅ CORRECT - Ask user to run it
+# "This CLI requires interactive input. Please run:
+#    npx create-next-app
+#  and follow the prompts. Let me know when done."
+```
+
+### Common CLIs with Non-Interactive Modes
+
+- `npm init`: Use `npm init -y`
+- `pnpm create`: Often has `--yes` or specific flags
+- `npx create-*`: Usually has flags for all options
+- `gh`: Most commands support `--yes` or input via flags
+- `glab`: Similar to gh
+
+**Always check Context7 first for the specific CLI's documentation.**

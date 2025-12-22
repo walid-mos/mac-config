@@ -137,17 +137,21 @@
           {
             "type": "command",
             "command": "~/.claude/hooks/context7-enhancer.py"
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/nextnode-brand-detector.py"
           }
         ]
       }
     ]
   },
-  "sandbox": {
-    "enabled": false
-  },
-  "alwaysThinkingEnabled": true,
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline.sh"
-  }
+  },
+  "sandbox": {
+    "enabled": false
+  },
+  "alwaysThinkingEnabled": true
 }

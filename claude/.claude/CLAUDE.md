@@ -642,6 +642,15 @@ Detailed coding standards are maintained in separate guideline files:
   - NEVER throw in APIs/libs, return Result instead
   - Error handling at client/UI boundary only
 
+### Brand-Specific Standards
+
+- **NextNode Brand Guidelines**: `@claude/.claude/guidelines/nextnode-brand.md`
+  - Triggered automatically when "nextnode" or "brand guidelines" mentioned
+  - Semantic color tokens (NEVER hardcode colors)
+  - Typography: font-display, font-body, font-mono
+  - Tailwind CSS v4 with @theme {} in globals.css
+  - Dark mode mandatory for all components
+
 ---
 
 ## GLOBAL ANTI-PATTERNS

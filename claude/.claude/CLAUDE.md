@@ -556,6 +556,45 @@ git commit -m "fix(api): handle null response"
 - Use proactively when relevant
 - Prefer official libraries with high reputation
 
+### Context7 Anti-Hallucination Rules (CRITICAL)
+
+**RULE**: NEVER claim Context7 is unavailable without ACTUALLY calling the tool.
+
+**Trigger detection:**
+- The `context7-enhancer.py` hook adds `[Context7: library]` to prompts when libraries are detected
+- When you see `[Context7: ...]` in the prompt, this is your CUE to use Context7
+- When user explicitly says "use context7", "context7", etc., you MUST use it
+
+**MANDATORY behaviors:**
+
+1. **When `[Context7: ...]` appears in prompt OR user requests Context7:**
+   - You MUST call `resolve-library-id` or `get-library-docs`
+   - Do NOT skip this - the hook detected a library for a reason
+   - NEVER say "Context7 isn't available" without actually calling the tool
+
+2. **If first call fails, RETRY:**
+   - Keep retrying until it works or returns an actual MCP error
+   - Real errors have real error messages
+   - No error message = you hallucinated the failure
+
+3. **Common hallucination patterns - FORBIDDEN:**
+   - ❌ "Context7 isn't available, let me try another approach"
+   - ❌ "I don't have access to Context7"
+   - ❌ "Context7 MCP server is not configured"
+   - ❌ "Let me search manually instead"
+   - If you wrote any of these WITHOUT a tool call, you HALLUCINATED
+
+4. **Self-check before claiming failure:**
+   - Did I actually invoke `mcp__context7__resolve-library-id`?
+   - Did I actually invoke `mcp__context7__get-library-docs`?
+   - If NO to both: I am hallucinating. CALL THE TOOL NOW.
+
+**Why this matters:**
+- User has Context7 configured and working
+- Hook is detecting libraries correctly
+- Hallucinated errors waste time and frustrate the user
+- Actually calling the tool takes milliseconds
+
 ---
 
 ## QUICK REFERENCE

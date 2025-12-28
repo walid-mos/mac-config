@@ -10,10 +10,6 @@ for config in ~/.config/zsh/conf.d/*.zsh(N); do
   source "$config"
 done
 
-# Load custom functions (flat structure - zsh standard)
-fpath=(~/.config/zsh/functions $fpath)
-autoload -Uz ~/.config/zsh/functions/*(:t)
-
 # pnpm
 export PNPM_HOME="/Users/walid/Library/pnpm"
 case ":$PATH:" in

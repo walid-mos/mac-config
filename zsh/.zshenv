@@ -20,3 +20,7 @@ export PATH="$PNPM_HOME:$PATH"
 
 # Starship config location
 export STARSHIP_CONFIG="$HOME/.config/starship/starship.toml"
+
+# Custom functions (available in all shells including scripts)
+fpath=(~/.config/zsh/functions $fpath)
+autoload -Uz ~/.config/zsh/functions/*(:t)

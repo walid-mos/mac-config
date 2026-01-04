@@ -172,6 +172,7 @@ return {
 
 		-- Buffers
 		vim.keymap.set("n", "<leader>fb", builtin.buffers, { desc = "Find buffers" })
+		vim.keymap.set("n", "<leader><leader>", builtin.buffers, { desc = "Buffer list" })
 
 		-- LSP symbols and references
 		vim.keymap.set("n", "<leader>fs", builtin.lsp_document_symbols, { desc = "LSP document symbols" })

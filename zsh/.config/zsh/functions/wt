@@ -782,4 +782,3 @@ wtl() { wt list "$@"; }
 wtd() { wt status "$@"; }
 wtc() { wt clean "$@"; }
 wtp() { wt prune "$@"; }
-

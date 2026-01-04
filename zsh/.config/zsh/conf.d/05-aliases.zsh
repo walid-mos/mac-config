@@ -32,10 +32,13 @@ alias gr="git rebase"
 alias gp="git push"
 
 # Tools
-alias upclaude="curl -fsSL https://claude.ai/install.sh | sh -s"
+alias upclaude="rm -rf ~/.local/state/claude/locks && curl -fsSL https://claude.ai/install.sh | sh -s"
 
 # FNM (Fast Node Manager) shortcuts
 alias fnmi="fnm install"
 alias fnmu="fnm use"
 alias fnml="fnm list"
 alias nv="node --version"
+
+# Completion for git aliases
+compdef _git-switch gs

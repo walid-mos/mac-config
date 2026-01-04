@@ -22,5 +22,6 @@ export PATH="$PNPM_HOME:$PATH"
 export STARSHIP_CONFIG="$HOME/.config/starship/starship.toml"
 
 # Custom functions (available in all shells including scripts)
+# Note: Files starting with _ are completion functions handled by compinit
 fpath=(~/.config/zsh/functions $fpath)
-autoload -Uz ~/.config/zsh/functions/*(:t)
+autoload -Uz ~/.config/zsh/functions/[^_]*(:t)

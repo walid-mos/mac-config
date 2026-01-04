@@ -340,3 +340,55 @@ npx create-next-app my-app --typescript --tailwind --eslint --app --use-pnpm
 - `glab`: Similar to gh
 
 **Always check Context7 first for the specific CLI's documentation.**
+
+---
+
+## Plan Mode Workflow (MANDATORY)
+
+**RULE**: ALWAYS check existing plan file before writing a new plan.
+
+### Plan File Management Protocol
+
+When entering plan mode:
+
+1. **ALWAYS read the plan file first** (if it exists)
+2. **Compare** existing plan content vs new task requirements
+3. **Decide action:**
+   - **CLEAN**: If new task is completely unrelated → Delete old content, write new plan
+   - **UPDATE**: If new task modifies/extends existing plan → Update relevant sections
+   - **APPEND**: If new task adds to existing plan (multi-part work) → Append new section
+
+### Decision Framework
+
+Before writing to plan file, ask:
+
+1. Does the existing plan relate to the current task?
+   - NO → **CLEAN** (replace entirely)
+   - YES → Continue to step 2
+
+2. Does the new task supersede/replace the old plan?
+   - YES → **UPDATE** (rewrite with new approach)
+   - NO → Continue to step 3
+
+3. Does the new task add additional phases/steps?
+   - YES → **APPEND** (add new section)
+   - NO → **UPDATE** (modify existing)
+
+### FORBIDDEN Behaviors
+
+**NEVER:**
+- Write to plan file without reading it first
+- Blindly append to existing plan (causes mixed/confusing content)
+- Leave stale plan content mixed with new plan
+- Assume plan file is empty
+
+### Example
+
+```
+# Scenario: User had plan for "add authentication"
+# Now user asks for "refactor database schema"
+
+1. Read existing plan file → Contains auth implementation steps
+2. Compare → New task (database) is unrelated to auth
+3. Decision → CLEAN: Delete auth plan, write new database plan
+```

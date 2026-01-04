@@ -66,6 +66,7 @@
       "Bash(curl --head:*)",
       "Bash(curl -G:*)",
       "Bash(curl --get:*)",
+      "Bash(dasel:*)",
       "Bash(gh repo view:*)",
       "Bash(gh repo list:*)",
       "Bash(gh repo clone:*)",
@@ -88,6 +89,10 @@
       "Bash(gh config get:*)",
       "Read(~/**)",
       "Edit(~/**)",
+      "Write(~/**)",
+      "Read(//.claude/**)",
+      "Edit(//.claude/**)",
+      "Write(//.claude/**)",
       "Bash(git commit:*)",
       "Bash(git ls-tree:*)",
       "Bash(git show:*)",
@@ -95,7 +100,10 @@
       "mcp__context7__resolve-library-id",
       "mcp__context7__get-library-docs",
       "WebFetch",
-      "WebSearch"
+      "WebSearch",
+      "Bash(cloudflared:*)",
+      "Bash(stow:*)",
+      "Bash(cloudflared tunnel delete:*)"
     ],
     "deny": [
       "Bash(curl -X POST:*)",
@@ -114,11 +122,12 @@
       "Bash(curl -T:*)",
       "Bash(curl --upload-file:*)"
     ],
-    "defaultMode": "acceptEdits"
+    "defaultMode": "plan"
   },
   "hooks": {
     "PreToolUse": [
       {
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
@@ -149,6 +158,9 @@
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline.sh"
+  },
+  "enabledPlugins": {
+    "swift-lsp@claude-plugins-official": true
   },
   "sandbox": {
     "enabled": false

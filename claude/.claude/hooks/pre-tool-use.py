@@ -130,20 +130,26 @@ def command_is_denied(command, full_command, patterns):
     return False
 
 
+def no_opinion():
+    """Exit with no opinion, suppressing output to avoid visual noise"""
+    print(json.dumps({"suppressOutput": True, "continue": True}))
+    sys.exit(0)
+
+
 def main():
     """Main hook logic"""
     input_data = json.load(sys.stdin)
 
     # Only process Bash tool calls
     if input_data.get("tool_name") != "Bash":
-        return  # No opinion, let permissions system decide
+        no_opinion()
 
     command = input_data.get("tool_input", {}).get("command", "")
 
     # Check if it's a && or | chain
     if " && " not in command and " | " not in command:
         # Not a chain, let normal permissions handle it
-        return  # No opinion
+        no_opinion()
 
     # Load permission patterns from settings.json
     patterns = load_permission_patterns()
@@ -152,7 +158,7 @@ def main():
 
     if not allowed_patterns:
         # No patterns configured, let normal permissions handle it
-        return  # No opinion
+        no_opinion()
 
     # Extract individual commands from chain
     commands = extract_commands(command)
@@ -163,7 +169,7 @@ def main():
         if is_denied:
             # At least one command is denied - DO NOT approve
             # Let the normal permission system block it
-            return
+            no_opinion()
 
     # Check if ALL commands in chain are individually allowed
     all_allowed = all(
@@ -186,7 +192,7 @@ def main():
         sys.exit(0)
 
     # Not all commands allowed - do NOT approve, let permissions system decide
-    return
+    no_opinion()
 
 
 if __name__ == "__main__":

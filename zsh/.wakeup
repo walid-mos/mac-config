@@ -1,10 +1,4 @@
 #!/bin/bash
-# Sleepwatcher wake script - reconnect NAS shares after wake from sleep
-
-# Wait for network to stabilize
+# Reconnect NAS shares after wake from sleep
 sleep 3
-
-# Check if NAS is reachable before attempting mount
-if ping -c 1 -W 2 "${NAS_SERVER:-192.168.1.2}" &>/dev/null; then
-    /bin/zsh -c 'nasreco --quiet' &>/dev/null
-fi
+/Users/walid/.local/bin/mount-nas.sh 2>/dev/null

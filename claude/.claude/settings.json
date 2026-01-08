@@ -145,6 +145,10 @@
         "hooks": [
           {
             "type": "command",
+            "command": "~/.claude/hooks/project-detector.py"
+          },
+          {
+            "type": "command",
             "command": "~/.claude/hooks/context7-enhancer.py"
           },
           {

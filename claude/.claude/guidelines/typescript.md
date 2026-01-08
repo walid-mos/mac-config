@@ -1,3 +1,9 @@
+---
+triggers:
+  project: ["typescript", "react", "next", "node"]
+description: TypeScript coding standards
+---
+
 # TypeScript/JavaScript Coding Standards
 
 ## Core Language Rules

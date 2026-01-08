@@ -1,3 +1,9 @@
+---
+triggers:
+  project: ["vitest"]
+description: Vitest testing best practices
+---
+
 # Vitest Best Practices: Complete Testing Guide
 
 ## Core Testing Philosophy

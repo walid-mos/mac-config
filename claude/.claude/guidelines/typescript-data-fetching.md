@@ -1,3 +1,9 @@
+---
+triggers:
+  project: ["typescript", "react", "next", "node"]
+description: Data fetching and error handling patterns
+---
+
 # TypeScript Data Fetching & Error Handling
 
 ## Core Principle

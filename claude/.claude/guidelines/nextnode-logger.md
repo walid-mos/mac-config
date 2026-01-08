@@ -1,3 +1,9 @@
+---
+triggers:
+  keywords: ["nextnode", "@nextnode/logger"]
+description: NextNode logger usage guidelines
+---
+
 # @nextnode/logger Best Practices
 
 ## Critical Rule

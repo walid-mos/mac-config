@@ -1,3 +1,9 @@
+---
+triggers:
+  keywords: ["nextnode", "brand guidelines"]
+description: NextNode brand colors, typography, and design system
+---
+
 # NextNode Brand Guidelines
 
 > STRICT ENFORCEMENT: When working on NextNode projects, these rules are MANDATORY.

@@ -1,3 +1,9 @@
+---
+triggers:
+  project: ["tailwind"]
+description: Tailwind CSS best practices
+---
+
 # Tailwind CSS Guidelines
 
 ## Core Principles

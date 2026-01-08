@@ -40,6 +40,7 @@ return {
 					"--glob=!**/.DS_Store", -- Exclude macOS metadata
 					"--glob=!**/*.min.js", -- Exclude minified JS
 					"--glob=!**/*.min.css", -- Exclude minified CSS
+					"--glob=!**/*.md", -- Exclude markdown files
 				},
 
 				-- Path display: show filename first for better scanning

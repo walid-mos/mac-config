@@ -1,0 +1,84 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  "provider": {
+    "google-vertex": {}
+  },
+
+  "mcp": {
+    "context7": {
+      "type": "remote",
+      "url": "https://mcp.context7.com/mcp",
+      "enabled": true
+    }
+  },
+
+  "permission": {
+    "read": "allow",
+    "write": "allow",
+    "edit": "allow",
+    "bash": {
+      "git *": "allow",
+      "gh *": "allow",
+      "glab *": "allow",
+      "pnpm *": "allow",
+      "npm *": "allow",
+      "bun *": "allow",
+      "cargo *": "allow",
+      "docker ps*": "allow",
+      "docker inspect*": "allow",
+      "docker logs*": "allow",
+      "docker images*": "allow",
+      "docker build*": "allow",
+      "docker compose*": "allow",
+      "ls *": "allow",
+      "cat *": "allow",
+      "head *": "allow",
+      "tail *": "allow",
+      "rg *": "allow",
+      "grep *": "allow",
+      "find *": "allow",
+      "tree *": "allow",
+      "wc *": "allow",
+      "sort *": "allow",
+      "uniq *": "allow",
+      "which *": "allow",
+      "pwd": "allow",
+      "test *": "allow",
+      "node *": "allow",
+      "python3 *": "allow",
+      "stow *": "allow",
+      "curl -s*": "allow",
+      "curl -L*": "allow",
+      "curl -I*": "allow",
+      "curl --head*": "allow",
+      "curl -G*": "allow",
+      "curl -X POST*": "deny",
+      "curl -X PUT*": "deny",
+      "curl -X DELETE*": "deny",
+      "curl -X PATCH*": "deny",
+      "curl -d*": "deny",
+      "curl --data*": "deny",
+      "curl -F*": "deny",
+      "curl --form*": "deny",
+      "curl -o*": "deny",
+      "curl -O*": "deny",
+      "*": "ask"
+    },
+    "webfetch": "allow",
+    "doom_loop": "ask",
+    "external_directory": "ask"
+  },
+
+  "default_agent": "build",
+
+  "instructions": ["instructions/typescript.md", "instructions/refactoring.md"],
+
+  "autoupdate": true,
+  "share": "manual",
+
+  "compaction": {
+    "auto": true,
+    "prune": true
+  }
+}

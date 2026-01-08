@@ -22,3 +22,13 @@ zsh/.config/zsh/secrets
 __pycache__/
 *.pyc
 *.pyo
+
+# Node modules
+node_modules/
+
+# Claude runtime caches
+claude/.claude/cache/
+claude/.claude/paste-cache/
+
+# Local Claude settings at root (not in stow package)
+/.claude/

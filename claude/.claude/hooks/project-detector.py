@@ -202,11 +202,12 @@ def detect_config_files(root: Path) -> set[str]:
 
 def main() -> None:
     """Detect project type and output context."""
-    prompt = sys.stdin.read()
+    sys.stdin.read()
 
     root = find_project_root()
     if not root:
-        print(prompt)
+        output = {"continue": True, "suppressOutput": True}
+        print(json.dumps(output))
         return
 
     # Collect all detected technologies
@@ -219,9 +220,15 @@ def main() -> None:
 
     if detected:
         tech_list = ", ".join(sorted(detected))
-        print(f"[Project: {tech_list}]\n{prompt}")
+        output = {
+            "continue": True,
+            "suppressOutput": True,
+            "systemMessage": f"[Project: {tech_list}]",
+        }
     else:
-        print(prompt)
+        output = {"continue": True, "suppressOutput": True}
+
+    print(json.dumps(output))
 
 
 if __name__ == "__main__":

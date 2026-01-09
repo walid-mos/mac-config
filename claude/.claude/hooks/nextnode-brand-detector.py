@@ -6,6 +6,7 @@ brand guidelines enforcement instructions.
 
 Runs on UserPromptSubmit hook trigger.
 """
+import json
 import sys
 
 # Keywords that trigger brand guidelines enforcement
@@ -19,9 +20,8 @@ TRIGGER_KEYWORDS = [
     "nextnode.fr",
 ]
 
-# Strict enforcement message prepended to prompt
-ENFORCEMENT_MESSAGE = """<system-reminder>
-[NEXTNODE BRAND GUIDELINES - STRICT MODE ACTIVATED]
+# Strict enforcement message for Claude
+ENFORCEMENT_MESSAGE = """[NEXTNODE BRAND GUIDELINES - STRICT MODE ACTIVATED]
 
 You are working on a NextNode project. Follow these rules STRICTLY:
 
@@ -44,10 +44,7 @@ You are working on a NextNode project. Follow these rules STRICTLY:
    - Class-based: .dark on root element
    - Test BOTH modes
 
-Full guidelines: ~/.claude/guidelines/nextnode-brand.md
-</system-reminder>
-
-"""
+Full guidelines: ~/.claude/guidelines/nextnode-brand.md"""
 
 
 def should_enforce_brand(prompt: str) -> bool:
@@ -57,15 +54,19 @@ def should_enforce_brand(prompt: str) -> bool:
 
 
 def main() -> None:
-    """Read prompt from stdin, detect keywords, output enhanced prompt."""
+    """Read prompt from stdin, detect keywords, output JSON response."""
     prompt = sys.stdin.read()
 
     if should_enforce_brand(prompt):
-        # Log to stderr for visibility (appears in Claude Code output)
-        print("[NextNode Brand] Strict mode activated", file=sys.stderr)
-        print(ENFORCEMENT_MESSAGE + prompt)
+        output = {
+            "continue": True,
+            "suppressOutput": True,
+            "systemMessage": ENFORCEMENT_MESSAGE,
+        }
     else:
-        print(prompt)
+        output = {"continue": True, "suppressOutput": True}
+
+    print(json.dumps(output))
 
 
 if __name__ == "__main__":

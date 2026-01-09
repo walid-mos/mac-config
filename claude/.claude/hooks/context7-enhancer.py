@@ -13,15 +13,20 @@ Benefits:
 
 Runs on UserPromptSubmit hook trigger.
 """
+import json
 import sys
 
 
 def main() -> None:
     """Add Context7 availability reminder to prompt."""
-    prompt = sys.stdin.read()
+    sys.stdin.read()
 
-    # Simple reminder - Claude decides when to use Context7 based on context
-    print(f"[Context7 available for library/framework documentation]\n{prompt}")
+    output = {
+        "continue": True,
+        "suppressOutput": True,
+        "systemMessage": "[Context7 available for library/framework documentation]",
+    }
+    print(json.dumps(output))
 
 
 if __name__ == "__main__":

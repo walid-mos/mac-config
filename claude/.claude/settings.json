@@ -30,6 +30,7 @@
       "Bash(tree:*)",
       "Bash(xargs:*)",
       "Bash(sed:*)",
+      "Bash(perl:*)",
       "Bash(node:*)",
       "Bash(python3:*)",
       "Bash(yamllint:*)",

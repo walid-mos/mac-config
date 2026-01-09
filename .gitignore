@@ -29,6 +29,7 @@ node_modules/
 # Claude runtime caches
 claude/.claude/cache/
 claude/.claude/paste-cache/
+claude/.claude/image-cache/
 
 # Local Claude settings at root (not in stow package)
 /.claude/

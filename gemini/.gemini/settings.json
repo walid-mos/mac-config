@@ -1,5 +1,71 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(pnpm:*)",
+      "Bash(npm:*)",
+      "Bash(git:*)",
+      "Bash(gh:*)",
+      "Bash(glab:*)",
+      "Bash(fnm:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(pwd:*)",
+      "Bash(test:*)",
+      "Bash(which:*)",
+      "Bash(wc:*)",
+      "Bash(sort:*)",
+      "Bash(uniq:*)",
+      "Bash(tree:*)",
+      "Bash(node:*)",
+      "Bash(python3:*)",
+      "Bash(stow:*)",
+      "Bash(cargo:*)",
+      "Bash(docker ps:*)",
+      "Bash(docker inspect:*)",
+      "Bash(docker logs:*)",
+      "Bash(docker images:*)",
+      "Bash(docker build:*)",
+      "Bash(docker compose:*)",
+      "Bash(curl -s:*)",
+      "Bash(curl -L:*)",
+      "Bash(curl -I:*)",
+      "Bash(curl --head:*)",
+      "Bash(curl -G:*)",
+      "Read(//Users/**)",
+      "Edit(//Users/**)",
+      "Write(//Users/**)"
+    ],
+    "deny": [
+      "Bash(curl -X POST:*)",
+      "Bash(curl --request POST:*)",
+      "Bash(curl -X PUT:*)",
+      "Bash(curl -X DELETE:*)",
+      "Bash(curl -X PATCH:*)",
+      "Bash(curl -d:*)",
+      "Bash(curl --data:*)",
+      "Bash(curl -F:*)",
+      "Bash(curl --form:*)",
+      "Bash(curl -o:*)",
+      "Bash(curl -O:*)"
+    ]
+  },
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.gemini/hooks/pre-tool-use.py"
+          }
+        ]
+      }
+    ],
     "UserPromptSubmit": [
       {
         "hooks": [

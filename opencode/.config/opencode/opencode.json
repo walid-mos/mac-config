@@ -72,7 +72,7 @@
 
   "default_agent": "build",
 
-  "instructions": ["instructions/typescript.md", "instructions/refactoring.md"],
+  "instructions": [],
 
   "autoupdate": true,
   "share": "manual",

@@ -24,7 +24,7 @@ import shlex
 
 def load_permission_patterns():
     """Load both allowed and denied Bash patterns from settings.json"""
-    settings_path = os.path.expanduser("~/.claude/settings.json")
+    settings_path = os.path.expanduser("~/.gemini/settings.json")
 
     try:
         with open(settings_path) as f:

@@ -33,6 +33,7 @@ alias gp="git push"
 
 # Tools
 alias upclaude="rm -rf ~/.local/state/claude/locks && curl -fsSL https://claude.ai/install.sh | sh -s"
+alias ghclean="gh run list --limit 500 --json databaseId -q '.[].databaseId' | xargs -I {} gh run delete {}"
 
 # FNM (Fast Node Manager) shortcuts
 alias fnmi="fnm install"

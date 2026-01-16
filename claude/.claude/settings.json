@@ -167,5 +167,6 @@
   "sandbox": {
     "enabled": false
   },
-  "alwaysThinkingEnabled": true
+  "alwaysThinkingEnabled": true,
+  "autoUpdatesChannel": "latest"
 }

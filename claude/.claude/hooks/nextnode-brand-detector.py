@@ -55,7 +55,8 @@ def should_enforce_brand(prompt: str) -> bool:
 
 def main() -> None:
     """Read prompt from stdin, detect keywords, output JSON response."""
-    prompt = sys.stdin.read()
+    input_data = json.load(sys.stdin)
+    prompt = input_data.get("user_prompt", "")
 
     if should_enforce_brand(prompt):
         output = {

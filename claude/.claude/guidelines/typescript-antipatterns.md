@@ -199,6 +199,85 @@ const isUserActive = user.status === 'active'
 
 ---
 
+## JS Performance Micro-Optimizations
+
+### ⛔ Repeated Array Lookups in Loops
+```typescript
+// BAD - O(n) lookup each iteration = O(n²)
+users.forEach(user => {
+  const role = roles.find(r => r.userId === user.id)
+  // ...
+})
+
+// GOOD - Build Map once, O(1) lookups = O(n)
+const roleMap = new Map(roles.map(r => [r.userId, r]))
+users.forEach(user => {
+  const role = roleMap.get(user.id)
+  // ...
+})
+```
+
+### ⛔ Repeated Storage/Cookie Reads
+```typescript
+// BAD - Reads localStorage every render
+function Component() {
+  const theme = localStorage.getItem('theme')
+  return <div className={theme} />
+}
+
+// GOOD - Cache the read
+const cachedTheme = localStorage.getItem('theme')
+
+function Component() {
+  return <div className={cachedTheme} />
+}
+
+// GOOD - With React, use state or context
+const [theme] = useState(() => localStorage.getItem('theme'))
+```
+
+### ⛔ Mutating sort()
+```typescript
+// BAD - Mutates original array
+const sorted = items.sort((a, b) => a.name.localeCompare(b.name))
+
+// GOOD - toSorted() returns new array (ES2023+)
+const sorted = items.toSorted((a, b) => a.name.localeCompare(b.name))
+
+// GOOD - Spread for older environments
+const sorted = [...items].sort((a, b) => a.name.localeCompare(b.name))
+```
+
+### ⛔ RegExp in Loops
+```typescript
+// BAD - Creates new RegExp object each iteration
+items.forEach(item => {
+  if (/^user-\d+$/.test(item.id)) { /* ... */ }
+})
+
+// GOOD - Hoist RegExp outside loop
+const userIdPattern = /^user-\d+$/
+items.forEach(item => {
+  if (userIdPattern.test(item.id)) { /* ... */ }
+})
+```
+
+### ⛔ Sequential DOM Style Changes
+```typescript
+// BAD - Multiple reflows
+element.style.width = '100px'
+element.style.height = '100px'
+element.style.margin = '10px'
+
+// GOOD - Batch with cssText
+element.style.cssText = 'width: 100px; height: 100px; margin: 10px'
+
+// GOOD - Or use class toggle
+element.classList.add('expanded')
+```
+
+---
+
 ## Quick Reference
 
 | Anti-Pattern | Fix |
@@ -214,3 +293,8 @@ const isUserActive = user.status === 'active'
 | Inline functions | useCallback or external |
 | Generic names | Descriptive names |
 | enabled, active | isEnabled, isActive |
+| Array.find in loop | Build Map, O(1) lookups |
+| Repeated storage reads | Cache the value |
+| `sort()` mutation | `toSorted()` or spread |
+| RegExp in loop | Hoist outside loop |
+| Sequential style changes | `cssText` or class toggle |

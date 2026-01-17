@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Project type detection hook for smart guideline loading.
+"""Session initialization hook.
 
-Analyzes project files to detect frameworks/libraries in use.
-Outputs project context to help Claude load relevant guidelines.
+Runs ONCE at session start to detect project type and set up context.
+Replaces per-prompt project detection for better performance.
 
-Runs on UserPromptSubmit hook trigger.
+Runs on SessionStart hook trigger.
 """
 import json
 import os
@@ -74,12 +74,10 @@ def find_project_root() -> Path | None:
     """Find the project root by looking for common project files."""
     cwd = Path.cwd()
 
-    # Walk up from cwd looking for project markers
     for parent in [cwd] + list(cwd.parents):
         markers = ["package.json", "pyproject.toml", "Cargo.toml", "go.mod", ".git"]
         if any((parent / marker).exists() for marker in markers):
             return parent
-        # Stop at home directory
         if parent == Path.home():
             break
 
@@ -98,13 +96,11 @@ def detect_node_project(root: Path) -> set[str]:
         with open(package_json) as f:
             data = json.load(f)
 
-        # Check dependencies
         deps = data.get("dependencies", {})
         for dep, tech in DEPENDENCY_MAPPINGS.items():
             if dep in deps:
                 detected.add(tech)
 
-        # Check devDependencies
         dev_deps = data.get("devDependencies", {})
         for dep, tech in {**DEPENDENCY_MAPPINGS, **DEV_DEPENDENCY_MAPPINGS}.items():
             if dep in dev_deps:
@@ -126,7 +122,6 @@ def detect_python_project(root: Path) -> set[str]:
     if pyproject.exists() or requirements.exists():
         detected.add("python")
 
-    # Check for common Python frameworks
     if pyproject.exists():
         try:
             content = pyproject.read_text()
@@ -201,8 +196,9 @@ def detect_config_files(root: Path) -> set[str]:
 
 
 def main() -> None:
-    """Detect project type and output context."""
-    sys.stdin.read()
+    """Detect project type at session start."""
+    # SessionStart hook receives JSON input
+    json.load(sys.stdin)
 
     root = find_project_root()
     if not root:
@@ -223,10 +219,14 @@ def main() -> None:
         output = {
             "continue": True,
             "suppressOutput": True,
-            "systemMessage": f"[Project: {tech_list}]",
+            "systemMessage": f"[Session initialized - Project stack: {tech_list}]",
         }
     else:
-        output = {"continue": True, "suppressOutput": True}
+        output = {
+            "continue": True,
+            "suppressOutput": True,
+            "systemMessage": "[Session initialized - No specific project detected]",
+        }
 
     print(json.dumps(output))
 

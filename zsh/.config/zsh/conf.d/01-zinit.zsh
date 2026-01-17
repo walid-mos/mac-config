@@ -24,7 +24,7 @@ zinit snippet OMZP::git
 
 # Syntax highlighting (deferred after prompt)
 # Highlights commands as you type (green = valid, red = invalid)
-zinit ice wait lucid atinit"ZINIT[COMPINIT_OPTS]=-C; zicompinit; zicdreplay"
+zinit ice wait lucid atinit"zicompinit; zicdreplay"
 zinit light zsh-users/zsh-syntax-highlighting
 
 # Autosuggestions (deferred)

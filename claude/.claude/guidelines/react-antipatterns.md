@@ -224,6 +224,93 @@ afterEach(() => {
 
 ---
 
+## Re-render Optimization
+
+### ⛔ Direct setState (Stale Closure Risk)
+```tsx
+// BAD - Can use stale count in rapid clicks
+const handleClick = () => {
+  setCount(count + 1)
+}
+
+// GOOD - Functional update always uses latest
+const handleClick = () => {
+  setCount(prev => prev + 1)
+}
+```
+
+### ⛔ Eager State Initialization
+```tsx
+// BAD - expensiveCalc runs every render
+const [data, setData] = useState(expensiveCalc())
+
+// GOOD - Lazy initialization (runs once)
+const [data, setData] = useState(() => expensiveCalc())
+```
+
+### ⛔ Blocking Updates for Non-Urgent State
+```tsx
+// BAD - Blocks input while filtering large list
+const handleChange = (e) => {
+  setQuery(e.target.value)
+  setFilteredItems(filterItems(e.target.value)) // Expensive
+}
+
+// GOOD - startTransition for non-urgent updates
+import { startTransition } from 'react'
+
+const handleChange = (e) => {
+  setQuery(e.target.value) // Urgent: update input
+  startTransition(() => {
+    setFilteredItems(filterItems(e.target.value)) // Deferred
+  })
+}
+```
+
+### ⛔ Subscribing to Raw Store Values
+```tsx
+// BAD - Re-renders on any cart change
+const cart = useStore(state => state.cart)
+const hasItems = cart.length > 0
+
+// GOOD - Subscribe to derived boolean (fewer re-renders)
+const hasItems = useStore(state => state.cart.length > 0)
+```
+
+---
+
+## Rendering Patterns
+
+### ⛔ Logical AND (&&) with Numbers
+```tsx
+// BAD - Renders "0" when count is 0
+{count && <Items count={count} />}
+
+// GOOD - Explicit boolean conversion
+{count > 0 && <Items count={count} />}
+
+// GOOD - Ternary for clarity
+{count > 0 ? <Items count={count} /> : null}
+```
+
+### ⛔ Unmounting for Show/Hide
+```tsx
+// BAD - Loses state on hide, remounts on show
+{isVisible && <ExpensiveComponent />}
+
+// GOOD - CSS hide preserves state (React 19+)
+<Activity mode={isVisible ? 'visible' : 'hidden'}>
+  <ExpensiveComponent />
+</Activity>
+
+// GOOD - Manual CSS approach (pre-React 19)
+<div style={{ display: isVisible ? 'block' : 'none' }}>
+  <ExpensiveComponent />
+</div>
+```
+
+---
+
 ## Quick Reference
 
 | Anti-Pattern | Fix |
@@ -238,3 +325,9 @@ afterEach(() => {
 | Conditional hooks | Always call, conditionally use |
 | Missing deps | Include all in dependency array |
 | Index as key | Stable unique ID |
+| Direct setState | Functional update `prev => prev + 1` |
+| Eager state init | Lazy init `useState(() => calc())` |
+| Blocking updates | `startTransition` for non-urgent |
+| Raw store values | Subscribe to derived boolean |
+| `count && <C />` | `count > 0 && <C />` or ternary |
+| Unmount to hide | CSS display or Activity component |

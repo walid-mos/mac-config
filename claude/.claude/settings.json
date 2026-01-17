@@ -34,6 +34,8 @@
       "Bash(node:*)",
       "Bash(python3:*)",
       "Bash(yamllint:*)",
+      "Bash(zsh:*)",
+      "Bash(ssh:*)",
       "Bash(docker ps:*)",
       "Bash(docker inspect:*)",
       "Bash(docker logs:*)",
@@ -68,6 +70,7 @@
       "Bash(curl -G:*)",
       "Bash(curl --get:*)",
       "Bash(dasel:*)",
+      "Bash(jq:*)",
       "Bash(gh repo view:*)",
       "Bash(gh repo list:*)",
       "Bash(gh repo clone:*)",
@@ -88,9 +91,16 @@
       "Bash(gh api --method GET:*)",
       "Bash(gh auth status:*)",
       "Bash(gh config get:*)",
-      "Read(//Users/**)",
-      "Edit(//Users/**)",
-      "Write(//Users/**)",
+      "Read(~/**)",
+      "Edit(~/**)",
+      "Write(~/**)",
+      "Glob(~/**)",
+      "Grep(~/**)",
+      "Read(//tmp/**)",
+      "Edit(//tmp/**)",
+      "Write(//tmp/**)",
+      "Glob(//tmp/**)",
+      "Grep(//tmp/**)",
       "Bash(git commit:*)",
       "Bash(git ls-tree:*)",
       "Bash(git show:*)",
@@ -123,6 +133,18 @@
     "defaultMode": "plan"
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/session-init.py",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
@@ -141,14 +163,6 @@
     "UserPromptSubmit": [
       {
         "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/project-detector.py"
-          },
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/context7-enhancer.py"
-          },
           {
             "type": "command",
             "command": "~/.claude/hooks/nextnode-brand-detector.py"

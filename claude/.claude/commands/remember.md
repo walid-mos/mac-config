@@ -1,3 +1,8 @@
+---
+allowed-tools: Read, Edit, Glob, AskUserQuestion
+description: Save knowledge to Claude configuration for future sessions
+---
+
 # /remember
 
 Save knowledge to your Claude configuration for future sessions.

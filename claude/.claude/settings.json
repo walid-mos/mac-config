@@ -105,8 +105,6 @@
       "Bash(git ls-tree:*)",
       "Bash(git show:*)",
       "Bash(nvim:*)",
-      "mcp__context7__resolve-library-id",
-      "mcp__context7__get-library-docs",
       "WebFetch",
       "WebSearch",
       "Bash(cloudflared:*)",

@@ -109,7 +109,9 @@
       "WebSearch",
       "Bash(cloudflared:*)",
       "Bash(stow:*)",
-      "Bash(cloudflared tunnel delete:*)"
+      "Bash(cloudflared tunnel delete:*)",
+      "mcp__linear-server__*",
+      "mcp__github__*"
     ],
     "deny": [
       "Bash(curl -X POST:*)",

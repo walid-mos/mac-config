@@ -167,6 +167,28 @@ Detailed coding standards are maintained in separate guideline files:
 
 ---
 
+## Development Contexts
+
+Context files for different project categories. These are loaded automatically and provide awareness of the full development environment.
+
+### Root Context
+
+@~/.claude/contexts/development.md
+
+### Category Contexts
+
+@~/.claude/contexts/nextnode.md
+
+@~/.claude/contexts/saas.md
+
+@~/.claude/contexts/clients.md
+
+@~/.claude/contexts/apps.md
+
+@~/.claude/contexts/personal.md
+
+---
+
 ## Configuration
 
 ### Structure
@@ -175,6 +197,13 @@ Detailed coding standards are maintained in separate guideline files:
 ~/.claude/
 ├── CLAUDE.md           # This file (global)
 ├── settings.json       # Permissions, env, sandbox
+├── contexts/           # Development contexts
+│   ├── development.md
+│   ├── nextnode.md
+│   ├── saas.md
+│   ├── clients.md
+│   ├── apps.md
+│   └── personal.md
 ├── rules/              # Enforcement rules
 │   ├── workflow.md
 │   ├── security.md

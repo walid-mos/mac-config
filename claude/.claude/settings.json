@@ -114,7 +114,8 @@
       "Bash(echo:*)",
       "Bash(cloudflared tunnel delete:*)",
       "mcp__linear-server__*",
-      "mcp__context7__*"
+      "mcp__context7__*",
+      "mcp__github__*"
     ],
     "deny": [
       "Bash(curl -X POST:*)",

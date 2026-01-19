@@ -18,3 +18,7 @@ Development workspace at `~/Development/`.
 - TypeScript strict mode
 - Conventional commits
 - @nextnode/* packages where applicable
+
+## Infrastructure
+
+Self-hosted deployment platform details: @~/.claude/contexts/infrastructure.md

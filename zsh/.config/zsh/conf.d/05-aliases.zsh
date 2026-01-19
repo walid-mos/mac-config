@@ -40,6 +40,3 @@ alias fnmi="fnm install"
 alias fnmu="fnm use"
 alias fnml="fnm list"
 alias nv="node --version"
-
-# Completion for git aliases
-compdef _git-switch gs

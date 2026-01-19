@@ -13,6 +13,7 @@ alias c="tput reset"   # Clear terminal completely
 alias cdev="cd ~/Development"
 alias cdconfig="cd ~/.config/"
 alias cdstow="cd ~/.stow_repository/"
+alias zz="zi"  # Zoxide interactive selection (shorter)
 
 # Git aliases - override Oh-My-Zsh defaults
 # Free up 'gf' for our custom git-fetch-prune function

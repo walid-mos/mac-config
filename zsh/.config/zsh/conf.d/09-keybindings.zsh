@@ -5,6 +5,14 @@
 # Requires: macos-option-as-alt = left (or true) in Ghostty config
 # =============================================================================
 
+# =============================================================================
+# Word Style Configuration
+# =============================================================================
+# Use bash-style word boundaries (alphanumerics only)
+# Makes Alt+Backspace stop at /, ., :, etc. instead of deleting entire paths
+autoload -Uz select-word-style
+select-word-style bash
+
 # Use emacs key bindings (default, but explicit)
 bindkey -e
 

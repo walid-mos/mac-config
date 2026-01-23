@@ -1,123 +1,77 @@
 # Global Claude Code Instructions
 
-Universal instructions for Claude Code across all projects.
-
-## Communication Style
-
-- Concise and direct
-- No emojis unless explicitly requested
-- Focus on technical accuracy over validation
-- **English ONLY** - All responses, code, comments, commits in English
-- User may write in French, but Claude responds in English always
+## Communication
+- Concise and direct, no emojis
+- **English ONLY** - All responses, code, comments, commits
+- User may write in French, Claude responds in English
 
 ---
 
 ## CORE PRINCIPLES (MANDATORY)
 
-These principles are MANDATORY and must be applied to ALL code development.
+### Simplest but Never Easiest
+Choose the simplest solution that maintains quality and type safety. NEVER choose the easiest solution that compromises quality.
 
-### Development Philosophy: Simplest but Never Easiest
+**Decision Framework:**
+1. Does this maintain type safety?
+2. Does it solve the exact problem without over-engineering?
+3. Is it maintainable and readable?
+4. Will it scale appropriately?
 
-Always choose the simplest solution that maintains code quality and type safety. NEVER choose the easiest solution that compromises quality.
-
-**Decision Framework** - Before implementing, ask:
-1. Does this solution maintain type safety?
-2. Does this solution solve the exact problem without over-engineering?
-3. Is this solution maintainable and readable?
-4. Will this solution scale appropriately with the codebase?
-
-### DRY and SOLID
-
-**DRY**: Apply only when it provides real value, not just to reduce lines.
-- Repeated business logic with same behavior → Extract
-- Configuration-specific code → Don't extract
-- Similar-looking code with different semantics → Don't extract
-
-**SOLID**: Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion.
-
-See @~/.claude/guidelines/refactoring.md for detailed guidance.
+### DRY - Apply Intelligently
+- Repeated business logic with same behavior -> Extract
+- Configuration-specific code -> Don't extract
+- Similar-looking code with different semantics -> Don't extract
 
 ### Composition Over Inheritance
+Composition is PRIMARY. Inheritance ONLY for shallow (1-2 levels), true "is-a" relationships.
 
-Composition is the PRIMARY pattern for code reuse. Inheritance ONLY for shallow, true "is-a" relationships.
-
-**Use Composition When:**
-- Need code reuse without "is-a" relationship
-- Want runtime flexibility or behavior swapping
-- Components share behavior but aren't subtypes
-
-**Use Inheritance Only When:**
-- Genuine "is-a" relationship exists
-- Hierarchy stays shallow (1-2 levels max)
-- Base class designed for extension
-
-### Function Extraction Guidelines
-
-Functions exist to implement FEATURES through composition, not to wrap trivial operations.
-
-**Extract When:**
-- Feature implementation with real business logic
-- Required for DI, interfaces, or composition
-- Encapsulates complex logic (3+ meaningful lines)
-- Used in 3+ places with identical behavior
-- Function name adds significant semantic clarity
-
-**Don't Extract:**
-- Simple 1-2 line wrappers
-- Configuration getters
-- Single-use "helper" functions
+### Function Extraction
+Extract when: real business logic, DI/interfaces, 3+ meaningful lines, used in 3+ places.
+Don't extract: simple 1-2 line wrappers, config getters, single-use helpers.
 
 ### Early Returns & No Else
-
-**Early Returns**: Handle simple/edge cases first with early returns. Keep main logic at base indentation.
-
-**No Else**: Almost NEVER use `else`. Early returns eliminate the need for `else` in virtually all cases.
+Handle edge cases first with early returns. Almost NEVER use `else`.
 
 ---
 
 ## CRITICAL RULES
 
 ### Security
-
 @~/.claude/rules/security.md
 
 ### Branch Protection
-
 @~/.claude/rules/branch-protection.md
 
 ### No Fallbacks (MANDATORY)
-
-**RULE**: NEVER add fallback values, default behaviors, or defensive defaults unless EXPLICITLY requested.
-
-**FORBIDDEN without explicit request:**
-- Default values for missing data (`?? 'default'`, `|| fallback`)
-- Fallback UI states ("No data available", placeholder content)
-- Alternative paths when primary fails
-- Graceful degradation logic
-- "Safe" defaults that mask potential issues
-
-**When to PROPOSE (not implement):**
-- API response could legitimately be empty
-- External dependency might be unavailable
-- User input could be missing
-
-**How to propose:**
-```
-Note: This could fail if X is missing. Should I add a fallback for that case?
-```
-
-**Why this matters:**
-- Fallbacks hide bugs and configuration issues
-- Unexpected defaults create silent failures
-- User should decide failure behavior, not Claude
+NEVER add fallback values or defensive defaults without explicit request.
+- FORBIDDEN: `?? 'default'`, `|| fallback`, placeholder content
+- PROPOSE instead: "This could fail if X is missing. Should I add a fallback?"
 
 ### Git Workflow
-
 @~/.claude/rules/workflow.md
 
 ### Context7 Integration
+Use Context7 PROACTIVELY for library/framework documentation:
+1. `resolve-library-id` to get Context7-compatible ID
+2. `get-library-docs` to fetch documentation
+NEVER claim Context7 is unavailable without actually calling the tool.
 
-@~/.claude/rules/context7.md
+---
+
+## NAMING CONVENTIONS
+
+| Type | Convention | Example |
+|------|------------|---------|
+| Components | PascalCase | `UserProfile.tsx` |
+| Pages | kebab-case | `user-profile.tsx` |
+| Variables/const | camelCase | `userName`, `isActive` |
+| Global constants | UPPER_CASE | `API_BASE_URL` |
+| Functions | camelCase | `fetchUserData` |
+| Event handlers | handle + Action | `handleClick` |
+| Classes/Interfaces | PascalCase | `UserService` |
+| Booleans | is/has/can/should | `isEnabled`, `hasPermission` |
+| Arrays | plural nouns | `users`, `products` |
 
 ---
 
@@ -130,92 +84,61 @@ Note: This could fail if X is missing. Should I add a fallback for that case?
 **During development:**
 - [ ] Strong typing (no `any`)
 - [ ] Tests written
-- [ ] Functions for features, not wrappers
-- [ ] Composition over inheritance
 - [ ] Early returns for simple cases
 - [ ] No fallbacks without explicit request
 
 **Before commit:**
 - [ ] Lint passed
-- [ ] Type-check passed (if TypeScript)
+- [ ] Type-check passed
 - [ ] Tests passed
 - [ ] No secrets exposed
 - [ ] Conventional commit message
 
 ---
 
-## CODE STANDARDS
+## CONTEXT-AWARE GUIDELINES
 
-Detailed coding standards are maintained in separate guideline files:
+Claude auto-detects context via hooks and injects relevant rules:
+- **TypeScript/React/Tailwind** -> Hooks inject summaries
+- **NextNode projects** -> Brand guidelines activated
+- **Testing keywords** -> Vitest best practices injected
 
-### Universal Standards
-- **Agent Design**: @~/.claude/guidelines/agents.md
-- **Naming Conventions**: @~/.claude/guidelines/naming-conventions.md
-- **Refactoring Guidelines**: @~/.claude/guidelines/refactoring.md
-
-### Language/Framework-Specific Standards
-- **TypeScript/JavaScript**: @~/.claude/guidelines/typescript.md
-- **TypeScript Anti-Patterns**: @~/.claude/guidelines/typescript-antipatterns.md
-- **Tailwind CSS**: @~/.claude/guidelines/tailwind.md
-- **React Anti-Patterns**: @~/.claude/guidelines/react-antipatterns.md
-- **Vitest Testing**: @~/.claude/guidelines/vitest.md
-- **NextNode Logger**: @~/.claude/guidelines/nextnode-logger.md
-- **Data Fetching & Error Handling**: @~/.claude/guidelines/typescript-data-fetching.md
-
-### Brand-Specific Standards
-- **NextNode Brand Guidelines**: @~/.claude/guidelines/nextnode-brand.md
+For full details on any topic, use the corresponding skill:
+- `/typescript` - Full TS coding standards
+- `/react` - React anti-patterns
+- `/tailwind` - Tailwind guidelines
+- `/vitest` - Testing best practices
+- `/nextnode-brand` - Brand colors and typography
+- `/nextnode-logger` - Logger usage
+- `/infrastructure` - Server and deployment context
+- `/linear-specs` - Linear issue format
 
 ---
 
-## Development Contexts
+## AGENT DESIGN
 
-Context files for different project categories. These are loaded automatically and provide awareness of the full development environment.
-
-### Root Context
-
-@~/.claude/contexts/development.md
-
-### Category Contexts
-
-@~/.claude/contexts/nextnode.md
-
-@~/.claude/contexts/saas.md
-
-@~/.claude/contexts/clients.md
-
-@~/.claude/contexts/apps.md
-
-@~/.claude/contexts/personal.md
+Agents that crawl large codebases MUST spawn subagents:
+1. Include `Task` in tools list
+2. Partition by directory or file count
+3. Threshold: > 20 files -> parallelize
+4. Aggregate results before reporting
 
 ---
 
-## Configuration
-
-### Structure
+## CONFIGURATION
 
 ```
 ~/.claude/
-├── CLAUDE.md           # This file (global)
-├── settings.json       # Permissions, env, sandbox
-├── contexts/           # Development contexts
-│   ├── development.md
-│   ├── nextnode.md
-│   ├── saas.md
-│   ├── clients.md
-│   ├── apps.md
-│   └── personal.md
-├── rules/              # Enforcement rules
-│   ├── workflow.md
-│   ├── security.md
-│   ├── branch-protection.md
-│   └── context7.md
-└── guidelines/         # Detailed coding standards
+├── CLAUDE.md           # This file
+├── settings.json       # Permissions, env, hooks
+├── commands/           # Skills (/typescript, etc.)
+├── hooks/              # Detection hooks
+└── rules/              # Critical rules
+    ├── workflow.md
+    ├── security.md
+    └── branch-protection.md
 ```
 
-### Stow Deployment
-
-This file is managed by GNU Stow:
+Managed by GNU Stow:
 - Source: `~/.stow_repository/claude/.claude/CLAUDE.md`
-- Target: `~/.claude/CLAUDE.md`
-
-Deploy: `cd ~/.stow_repository && stow claude`
+- Deploy: `cd ~/.stow_repository && stow claude`

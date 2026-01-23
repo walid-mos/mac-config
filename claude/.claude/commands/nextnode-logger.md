@@ -1,44 +1,45 @@
 ---
-triggers:
-  keywords: ["nextnode", "@nextnode/logger"]
-description: NextNode logger usage guidelines
+allowed-tools: Read
+description: @nextnode/logger usage guidelines
 ---
 
-# @nextnode/logger Best Practices
+# /nextnode-logger
+
+Best practices for @nextnode/logger. When installed, `console.*` is FORBIDDEN.
+
+---
 
 ## Critical Rule
 
-**When `@nextnode/logger` is installed, `console.*` is FORBIDDEN.**
+**When `@nextnode/logger` is in package.json, `console.*` is FORBIDDEN.**
 
 ```typescript
-// ❌ FORBIDDEN - Never use console when logger is available
+// FORBIDDEN - Never use console when logger is available
 console.log('User created')
 console.warn('Config missing')
 console.error('Failed to process')
-console.debug('Debug info')
 
-// ✅ REQUIRED - Use @nextnode/logger
+// REQUIRED - Use @nextnode/logger
 import { logger } from '@nextnode/logger'
 
 logger.info('User created', { scope: 'auth' })
 logger.warn('Config missing', { scope: 'config' })
 logger.error('Failed to process', { scope: 'api' })
-logger.debug('Debug info', { scope: 'debug' })
 ```
+
+---
 
 ## Detection
 
-Check if `@nextnode/logger` is in `package.json` dependencies:
-- If present → Use logger exclusively
-- If absent → `console.*` is acceptable
+Check `package.json` dependencies:
+- If `@nextnode/logger` present -> Use logger exclusively
+- If absent -> `console.*` is acceptable
 
 ---
 
 ## Usage Patterns
 
 ### Global Logger (App-Wide Events)
-
-For application-level events (startup, shutdown, config):
 
 ```typescript
 import { logger } from '@nextnode/logger'
@@ -60,7 +61,6 @@ Each module/service MUST have its own scoped logger:
 ```typescript
 import { createLogger } from '@nextnode/logger'
 
-// Create at module level
 const authLogger = createLogger({ prefix: '[Auth]' })
 
 export class AuthService {
@@ -99,10 +99,10 @@ export class AuthService {
 **ALWAYS use structured data, NEVER string interpolation:**
 
 ```typescript
-// ❌ BAD - String interpolation
+// BAD - String interpolation
 logger.info(`User ${userId} logged in from ${ip}`)
 
-// ✅ GOOD - Structured data
+// GOOD - Structured data
 logger.info('User logged in', {
   scope: 'auth',
   details: { userId, ip, userAgent }
@@ -112,10 +112,10 @@ logger.info('User logged in', {
 **ALWAYS include scope:**
 
 ```typescript
-// ❌ BAD - No scope
+// BAD - No scope
 logger.info('Request processed')
 
-// ✅ GOOD - With scope
+// GOOD - With scope
 logger.info('Request processed', { scope: 'api' })
 ```
 
@@ -143,8 +143,6 @@ export class UserService {
 ---
 
 ## Testing
-
-Use testing utilities from `@nextnode/logger/testing`:
 
 ```typescript
 import { createSpyLogger } from '@nextnode/logger/testing'
@@ -174,13 +172,13 @@ describe('UserService', () => {
 **NEVER log sensitive data:**
 
 ```typescript
-// ❌ BAD - Logs password
+// BAD - Logs password
 logger.info('Login', { details: { email, password } })
 
-// ❌ BAD - Logs token
+// BAD - Logs token
 logger.debug('Auth header', { details: { authorization: req.headers.authorization } })
 
-// ✅ GOOD - Safe logging
+// GOOD - Safe logging
 logger.info('Login attempt', {
   scope: 'auth',
   details: { email, success: false, reason: 'invalid_password' }

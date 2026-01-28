@@ -1,26 +1,22 @@
 ---
+name: vitest
+description: Vitest testing best practices and patterns. Use when writing tests, discussing mocking strategies, or reviewing test code.
 allowed-tools: Read
-description: Vitest testing best practices and patterns
 ---
 
-# /vitest
+# Vitest Testing Guide
 
 Complete Vitest testing guide with best practices.
 
----
+## Quick Rules
 
-## Core Testing Philosophy
-
-- **Test behavior, not implementation**: Focus on what code does, not how
-- **Isolate dependencies**: Mock external dependencies
-- **Maintain test independence**: Each test runs independently
-- **Keep tests simple**: One assertion per test when possible
-
----
+- **Test behavior, not implementation**
+- **ALWAYS clean up mocks** - #1 cause of flaky tests
+- **Mock only external dependencies** (I/O, side effects)
+- **Keep pure functions and business logic real**
+- Use specific assertions (`toHaveBeenCalledTimes`) not manual inspection
 
 ## Mock Cleanup (CRITICAL)
-
-**ALWAYS clean up mocks between tests** - #1 cause of flaky tests:
 
 ```typescript
 // vitest.config.ts
@@ -41,8 +37,6 @@ afterEach(() => {
 })
 ```
 
----
-
 ## Function Mocking
 
 ```typescript
@@ -54,8 +48,6 @@ const mockFetch = vi.fn().mockResolvedValue({ ok: true })
 const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 const mathSpy = vi.spyOn(Math, 'random').mockReturnValue(0.5)
 ```
-
----
 
 ## Module Mocking
 
@@ -79,8 +71,6 @@ vi.mock('./utils', async () => {
 })
 ```
 
----
-
 ## Global Property Mocking
 
 ```typescript
@@ -88,17 +78,14 @@ describe('Environment Detection', () => {
   it('should detect browser environment', () => {
     vi.stubGlobal('process', undefined)
     vi.stubGlobal('window', { location: { href: 'https://example.com' } })
-    vi.stubGlobal('document', { createElement: vi.fn() })
 
     expect(detectEnvironment()).toBe('browser')
   })
 })
 
-// WRONG - Manual property manipulation
-Object.defineProperty(globalThis, 'window', { value: undefined }) // Hard to clean up
+// WRONG - Hard to clean up
+Object.defineProperty(globalThis, 'window', { value: undefined })
 ```
-
----
 
 ## Timer Mocking
 
@@ -119,15 +106,8 @@ describe('Async Operations', () => {
     await vi.advanceTimersByTimeAsync(1000)
     expect(callback).toHaveBeenCalled()
   })
-
-  it('should mock system time', () => {
-    vi.setSystemTime(new Date('2024-01-01'))
-    expect(new Date()).toEqual(new Date('2024-01-01'))
-  })
 })
 ```
-
----
 
 ## Network Mocking
 
@@ -146,43 +126,7 @@ it('should handle API success', async () => {
   const result = await apiCall('/users')
   expect(result.data).toBe('success')
 })
-
-// MSW for complex API mocking
-import { http, HttpResponse } from 'msw'
-import { setupServer } from 'msw/node'
-
-const server = setupServer(
-  http.get('/api/users', () => HttpResponse.json({ users: [] }))
-)
-
-beforeAll(() => server.listen())
-afterAll(() => server.close())
-afterEach(() => server.resetHandlers())
 ```
-
----
-
-## File System Mocking
-
-```typescript
-import { fs } from 'memfs'
-
-vi.mock('node:fs/promises', () => fs.promises)
-vi.mock('node:fs', () => fs)
-
-describe('File Operations', () => {
-  beforeEach(() => {
-    fs.mkdirSync('/test', { recursive: true })
-    fs.writeFileSync('/test/config.json', '{"setting": "value"}')
-  })
-
-  afterEach(() => {
-    fs.rmSync('/test', { recursive: true, force: true })
-  })
-})
-```
-
----
 
 ## Assertions
 
@@ -191,44 +135,37 @@ describe('File Operations', () => {
 expect(mockFunction).toHaveBeenCalledTimes(1)
 expect(mockFunction).toHaveBeenCalledWith('exact', 'arguments')
 expect(mockFunction).toHaveBeenNthCalledWith(2, 'second', 'call')
-expect(mockFunction).toHaveBeenLastCalledWith('last', 'call')
 
 // Asymmetric matchers
 expect(apiCall).toHaveBeenCalledWith({
   id: expect.any(String),
   timestamp: expect.any(Number),
-  metadata: expect.objectContaining({
-    source: 'test'
-  })
+  metadata: expect.objectContaining({ source: 'test' })
 })
 
-// WRONG - Manual call inspection
-expect(mockFunction.mock.calls).toHaveLength(1) // Use toHaveBeenCalledTimes
+// WRONG - Manual inspection
+expect(mockFunction.mock.calls).toHaveLength(1)
 ```
-
----
 
 ## Anti-Patterns
 
-### Testing Implementation vs Behavior
 ```typescript
-// WRONG - Testing implementation details
+// WRONG - Testing implementation
 it('should call private method', () => {
   const spy = vi.spyOn(instance, '_privateMethod')
   instance.publicMethod()
   expect(spy).toHaveBeenCalled()
 })
 
-// CORRECT - Test behavior and outcomes
+// CORRECT - Test behavior
 it('should process data correctly', () => {
   const result = instance.publicMethod(inputData)
   expect(result).toEqual(expectedOutput)
 })
 ```
 
-### Over-Mocking
 ```typescript
-// WRONG - Mocking everything
+// WRONG - Over-mocking
 vi.mock('./utils', () => ({
   validate: vi.fn().mockReturnValue(true),
   transform: vi.fn().mockReturnValue('transformed'),
@@ -238,33 +175,8 @@ vi.mock('./utils', () => ({
 // CORRECT - Mock only external dependencies
 vi.mock('./database') // Mock I/O
 vi.mock('./logger') // Mock side effects
-// Keep pure functions and business logic real
+// Keep pure functions real
 ```
-
----
-
-## Configuration
-
-```typescript
-export default defineConfig({
-  test: {
-    globals: true,
-    environment: 'node', // or 'jsdom'
-    restoreMocks: true,
-    clearMocks: true,
-    unstubGlobals: true,
-    mockReset: false, // Preserve mock implementations
-    coverage: {
-      provider: 'v8',
-      reporter: ['text', 'html', 'json'],
-      exclude: ['**/*.test.ts', '**/*.spec.ts', '**/node_modules/**']
-    },
-    setupFiles: ['./test/setup.ts'],
-  }
-})
-```
-
----
 
 ## Decision Framework
 

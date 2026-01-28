@@ -168,32 +168,6 @@
           }
         ]
       }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/nextnode-brand-detector.py"
-          },
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/typescript-detector.py"
-          },
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/react-detector.py"
-          },
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/tailwind-detector.py"
-          },
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/vitest-detector.py"
-          }
-        ]
-      }
     ]
   },
   "statusLine": {

@@ -69,6 +69,37 @@ git commit
 
 ---
 
+## YAML Validation (CRITICAL)
+
+**The ONLY way to validate `.yml` or `.yaml` files is `yamllint`.**
+
+```bash
+yamllint file.yml
+yamllint .github/workflows/
+```
+
+**FORBIDDEN:**
+- Using Python to parse/validate YAML
+- Using other YAML parsers for validation
+- Assuming YAML is valid without explicit check
+
+---
+
+## TOML Validation (CRITICAL)
+
+**The ONLY way to validate `.toml` files is `toml-test`.**
+
+```bash
+toml-test <decoder>
+```
+
+**FORBIDDEN:**
+- Using Python to parse/validate TOML
+- Using other TOML parsers for validation
+- Assuming TOML is valid without explicit check
+
+---
+
 ## Atomic Commits for Multi-Phase Plans
 
 Ask: "Should I commit atomically after each phase?"

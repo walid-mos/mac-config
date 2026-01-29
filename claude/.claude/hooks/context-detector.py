@@ -17,7 +17,8 @@ CONTEXTS = {
         "message": """[CONTEXT: SaaS Product]
 Project conventions:
 - Use @nextnode/* packages
-- Deployment: Railway or Vercel
+- Deployment: Hetzner VPS (ALWAYS use github-actions shared workflows)
+- NEVER create custom CI/CD - use existing shared workflows
 - DNS: Cloudflare
 - Follow NextNode brand guidelines
 - Use @nextnode/logger (no console.*)

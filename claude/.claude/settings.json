@@ -115,7 +115,8 @@
       "mcp__github__*",
       "mcp__dokploy__*",
       "mcp__cloudflare-observability__*",
-      "mcp__cloudflare-dns__*"
+      "mcp__cloudflare-dns__*",
+      "mcp__plane__*"
     ],
     "deny": [
       "Bash(curl -X POST:*)",

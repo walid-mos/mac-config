@@ -1,6 +1,6 @@
 ---
 name: doc-update
-description: Expert documentation agent for comprehensive project documentation generation. Analyzes codebases to generate or update README.md (user-focused), CLAUDE.md (Claude AI-optimized), and GEMINI.md (Gemini AI-optimized). Spawns parallel subagents for concurrent generation. Use after creating a new project or when documentation is outdated.
+description: Expert documentation agent for comprehensive project documentation generation. Analyzes codebases to generate or update README.md (user-focused) and CLAUDE.md (Claude AI-optimized). Spawns parallel subagents for concurrent generation. Use after creating a new project or when documentation is outdated.
 tools: Read, Grep, Glob, Bash, Task
 model: inherit
 ---
@@ -82,7 +82,6 @@ Glob: **/__tests__/**/*
 ```
 Glob: README*
 Glob: CLAUDE.md
-Glob: GEMINI.md
 Glob: CONTRIBUTING*
 Glob: LICENSE*
 Glob: CHANGELOG*
@@ -108,7 +107,6 @@ Glob: *.md
 2. **Existing Documentation**
    - `README.md` - Current state
    - `CLAUDE.md` - Current AI instructions
-   - `GEMINI.md` - Current Gemini instructions
 
 3. **Entry Points** - Core functionality
    - `src/index.ts`, `src/main.rs`, `src/__init__.py`
@@ -179,7 +177,6 @@ Grep: process\.env\.|std::env::var|os\.environ
 |------|--------|-------|
 | README.md | [Exists/Missing] | [X] |
 | CLAUDE.md | [Exists/Missing] | [X] |
-| GEMINI.md | [Exists/Missing] | [X] |
 
 **Detected Features**:
 - [Feature 1: e.g., "REST API with 12 endpoints"]
@@ -193,14 +190,13 @@ Spawning documentation subagents...
 
 ## Phase 2: Parallel Documentation Generation
 
-**CRITICAL**: After discovery, spawn 3 subagents IN PARALLEL in a single message.
+**CRITICAL**: After discovery, spawn 2 subagents IN PARALLEL in a single message.
 
 ### 2.1 Subagent Spawning
 
 In a SINGLE message with multiple Task calls, spawn:
 1. README subagent
 2. CLAUDE.md subagent
-3. GEMINI.md subagent
 
 **Skip subagents for files user didn't request** (see Targeting Modes).
 
@@ -399,41 +395,6 @@ Based on [DETECTED_STACK]:
 - Be specific to THIS project
 ```
 
-### 2.4 GEMINI.md Subagent Prompt
-
-```
-Generate AI-optimized GEMINI.md for this project.
-
-## Project Context
-[SAME AS CLAUDE.md PROMPT]
-
-## Requirements
-
-Generate token-efficient GEMINI.md optimized for Google Gemini AI.
-
-### Structure (mirrors CLAUDE.md):
-
-1. Project Overview
-2. Repository Structure
-3. Key Architectural Decisions
-4. Important Files & Locations
-5. Development Workflows
-6. Best Practices for Gemini
-7. Stack-Specific Rules
-8. Quick Reference
-
-### Gemini-Specific Considerations:
-- Clear task decomposition guidance
-- Explicit verification steps
-- Structured hierarchies
-- Step-by-step reasoning hints
-
-## Output Rules
-- Start with H1 "# Project Instructions for [PROJECT_NAME] (Gemini)"
-- Same token efficiency as CLAUDE.md
-- Gemini-specific phrasing where helpful
-```
-
 ---
 
 ## Phase 3: Draft Review
@@ -471,24 +432,12 @@ Review each draft below. Reply with your decision.
 
 ---
 
-### GEMINI.md Draft
-
-<details>
-<summary>Click to expand ([X] lines)</summary>
-
-[FULL GEMINI.MD CONTENT]
-
-</details>
-
----
-
 ## Available Actions
 
 Reply with:
-- **"Write all"** - Save all three files
+- **"Write all"** - Save both files
 - **"Write README"** - Save README.md only
-- **"Write AI docs"** - Save CLAUDE.md + GEMINI.md
-- **"Write [filename]"** - Save specific file
+- **"Write CLAUDE.md"** - Save CLAUDE.md only
 - **"Modify [filename]: [feedback]"** - Request changes
 - **"Cancel"** - Discard drafts
 ```
@@ -506,11 +455,9 @@ Based on response:
 
 | User Says | Mode | Subagents |
 |-----------|------|-----------|
-| "update docs" / "generate docs" | Full | README + CLAUDE + GEMINI |
+| "update docs" / "generate docs" | Full | README + CLAUDE |
 | "update readme" / "readme only" | README | README only |
-| "update ai docs" / "ai docs only" | AI Docs | CLAUDE + GEMINI |
-| "update claude.md" | Single | CLAUDE only |
-| "update gemini.md" | Single | GEMINI only |
+| "update claude.md" / "ai docs" | Single | CLAUDE only |
 
 **Mode Detection:**
 - Parse user request for keywords
@@ -530,7 +477,6 @@ Based on response:
 |------|--------|-------|----------|
 | README.md | Draft Ready | [X] | 10 |
 | CLAUDE.md | Draft Ready | [X] | 8 |
-| GEMINI.md | Draft Ready | [X] | 8 |
 
 Drafts presented above. Awaiting your decision.
 ```
@@ -557,7 +503,7 @@ Before presenting drafts, verify:
 - **Generic descriptions**: "This is a TypeScript project" - be specific
 - **Outdated examples**: Code must match current API
 - **Copy-paste from manifest**: Don't dump package.json dependencies
-- **Prose in AI docs**: CLAUDE.md/GEMINI.md should be scannable lists
+- **Prose in AI docs**: CLAUDE.md should be scannable lists
 - **Missing examples**: Every feature needs a code example
 
 ### Process Anti-Patterns

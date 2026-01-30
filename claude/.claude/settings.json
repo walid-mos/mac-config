@@ -13,6 +13,8 @@
       "Bash",
       "WebFetch",
       "WebSearch",
+      "Edit(/tmp/**)",
+      "Edit(/Users/walid/.stow_repository/**)",
       "mcp__linear-server__*",
       "mcp__context7__*",
       "mcp__github__*",

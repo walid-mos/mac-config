@@ -25,7 +25,9 @@ Project conventions:
 
 Products in this category:
 - kicked, next-boilerplate, nextnode-front
-- syneva, yasmine, youtube2text""",
+- syneva, yasmine, youtube2text
+
+Infrastructure: Use /infrastructure skill for server details, deployment workflows, and CI/CD guidance.""",
     },
     "~/Development/Nextnode/": {
         "name": "NextNode",

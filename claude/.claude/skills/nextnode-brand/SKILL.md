@@ -113,3 +113,55 @@ className="font-mono"     // JetBrains Mono
 - [ ] Uses correct font families
 - [ ] Works in light AND dark mode
 - [ ] Responsive
+
+## SVG Logos
+
+**Location**: `/Users/walid/Documents/NextNode/Branding/`
+
+### Color Gradient Reference
+
+| Name | Hex | Usage |
+|------|-----|-------|
+| Teal Dark | #0D9488 | Gradient start (primary) |
+| Teal Light | #14B8A6 | Gradient end (primary) |
+| Orange Dark | #F97316 | Gradient start (accent) |
+| Orange Light | #FB923C | Gradient end (accent) |
+
+### File Inventory (18 files)
+
+| File | Description |
+|------|-------------|
+| `favicon-16.svg` | Favicon 16x16 |
+| `favicon-32.svg` | Favicon 32x32 |
+| `icon-gradient.svg` | Icon with gradient |
+| `icon-orange.svg` | Icon in orange |
+| `icon-teal.svg` | Icon in teal |
+| `icon-white.svg` | Icon in white (dark backgrounds) |
+| `logo-gradient.svg` | Full logo with gradient |
+| `logo-orange.svg` | Full logo in orange |
+| `logo-teal.svg` | Full logo in teal |
+| `logo-white.svg` | Full logo in white (dark backgrounds) |
+| `wordmark-gradient.svg` | Text only with gradient |
+| `wordmark-orange.svg` | Text only in orange |
+| `wordmark-teal.svg` | Text only in teal |
+| `wordmark-white.svg` | Text only in white (dark backgrounds) |
+| `og-image-gradient.svg` | Open Graph image with gradient |
+| `og-image-orange.svg` | Open Graph image in orange |
+| `og-image-teal.svg` | Open Graph image in teal |
+| `og-image-white.svg` | Open Graph image in white |
+
+### Usage Guidelines
+
+| Context | Light Mode | Dark Mode |
+|---------|------------|-----------|
+| Header/Nav | `logo-teal.svg` | `logo-white.svg` |
+| Footer | `logo-gradient.svg` | `logo-white.svg` |
+| Favicon | `favicon-32.svg` | `favicon-32.svg` |
+| Social/OG | `og-image-gradient.svg` | `og-image-gradient.svg` |
+| App Icon | `icon-gradient.svg` | `icon-white.svg` |
+
+**Rules:**
+- Use `-white.svg` variants on dark backgrounds
+- Use `-gradient.svg` for marketing/hero sections
+- Use `-teal.svg` for standard brand presence
+- Use `-orange.svg` sparingly for accent/CTA contexts

@@ -3,7 +3,6 @@
     "CLAUDE_CODE_ENABLE_TELEMETRY": "0"
   },
   "permissions": {
-    "defaultMode": "plan",
     "allow": [
       "Read",
       "Edit",
@@ -61,7 +60,8 @@
       "Edit(.env.*)",
       "Edit(//Users/walid/.ssh/**)",
       "Edit(//Users/walid/.aws/**)"
-    ]
+    ],
+    "defaultMode": "plan"
   },
   "hooks": {
     "SessionStart": [
@@ -102,12 +102,17 @@
     "command": "~/.claude/statusline.sh"
   },
   "enabledPlugins": {
-    "swift-lsp@claude-plugins-official": true
+    "swift-lsp@claude-plugins-official": true,
+    "claude-mem@thedotmack": true,
+    "plugin-dev@claude-plugins-official": true
   },
   "sandbox": {
     "enabled": true,
     "autoAllowBashIfSandboxed": true,
-    "excludedCommands": ["docker", "git"]
+    "excludedCommands": [
+      "docker",
+      "git"
+    ]
   },
   "alwaysThinkingEnabled": true,
   "autoUpdatesChannel": "latest"

@@ -23,12 +23,6 @@ NEVER add fallback values or defensive defaults without explicit request.
 - FORBIDDEN: `?? 'default'`, `|| fallback`, placeholder content
 - PROPOSE instead: "This could fail if X is missing. Should I add a fallback?"
 
-## Critical Rules
-
-@~/.claude/rules/security.md
-@~/.claude/rules/branch-protection.md
-@~/.claude/rules/workflow.md
-
 ## Naming Conventions
 
 | Type | Convention | Example |
@@ -43,50 +37,11 @@ NEVER add fallback values or defensive defaults without explicit request.
 | Booleans | is/has/can/should | `isEnabled`, `hasPermission` |
 | Arrays | plural nouns | `users`, `products` |
 
-## Quick Reference
-
-**Before ANY work:**
-- [ ] Not on main/develop branch?
-- [ ] Pre-commit hooks enabled?
-
-**During development:**
-- [ ] Strong typing (no `any`)
-- [ ] Tests written
-- [ ] Early returns for simple cases
-- [ ] No fallbacks without explicit request
-
-**Before commit:**
-- [ ] Lint passed
-- [ ] Type-check passed
-- [ ] Tests passed
-- [ ] No secrets exposed
-- [ ] Conventional commit message
-
 ## Context7 Integration
 
 Use Context7 PROACTIVELY for library/framework documentation:
 1. `resolve-library-id` to get Context7-compatible ID
 2. `get-library-docs` to fetch documentation
-
-## Skills
-
-Dev standards (auto-loaded based on context):
-- `/typescript` - TypeScript coding standards
-- `/react` - React anti-patterns
-- `/tailwind` - Tailwind guidelines
-- `/vitest` - Testing best practices
-
-NextNode projects:
-- `/nextnode-brand` - Brand colors and typography
-- `/nextnode-logger` - Logger usage
-
-Workflows (user-invoked):
-- `/interview` - In-depth feature interview to create specs
-- `/infrastructure` - Server and deployment context
-- `/linear-specs` - Linear issue format
-- `/fix-reviews` - Fix PR review comments
-- `/remember` - Save knowledge for future sessions
-- `/planification` - Save plans to organized folder
 
 ## Configuration
 

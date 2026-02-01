@@ -38,88 +38,15 @@ Files that should NEVER be committed:
 
 ## Best Practices
 
-### Use Environment Variables
-
-**Bad:**
-```typescript
-const apiKey = "sk-1234567890abcdef";
-```
-
-**Good:**
-```typescript
-const apiKey = process.env.API_KEY;
-if (!apiKey) {
-  throw new Error("API_KEY environment variable not set");
-}
-```
-
-### Git Configuration
-
-Add to `.gitignore`:
-```
-.env
-.env.*
-!.env.example
-.envrc
-secrets/
-credentials.json
-*.key
-*.pem
-```
-
-### Environment File Templates
-
-Provide `.env.example` with placeholder values:
-```bash
-# .env.example
-API_KEY=your_api_key_here
-DATABASE_URL=postgresql://localhost:5432/mydb
-```
+- Use environment variables for secrets (never hardcode)
+- Provide `.env.example` templates (without real values)
+- Add sensitive patterns to `.gitignore`
 
 ## Code Security
 
-### Input Validation
-
-Always validate and sanitize user input:
-```typescript
-// Validate before use
-function processUserInput(input: string): string {
-  // Sanitize
-  const sanitized = input.trim().replace(/[<>]/g, '');
-
-  // Validate
-  if (sanitized.length === 0 || sanitized.length > 1000) {
-    throw new Error("Invalid input length");
-  }
-
-  return sanitized;
-}
-```
-
-### SQL Injection Prevention
-
-**Bad:**
-```typescript
-const query = `SELECT * FROM users WHERE id = ${userId}`;
-```
-
-**Good:**
-```typescript
-const query = "SELECT * FROM users WHERE id = ?";
-db.query(query, [userId]);
-```
-
-### XSS Prevention
-
-Escape user content before rendering:
-```typescript
-// Use framework escaping (React auto-escapes)
-<div>{userContent}</div>
-
-// Or manual escaping
-import DOMPurify from 'dompurify';
-const clean = DOMPurify.sanitize(dirty);
-```
+- **Input validation:** Sanitize and validate all user input
+- **SQL injection:** Use parameterized queries, never string interpolation
+- **XSS prevention:** Use framework escaping (React auto-escapes) or DOMPurify
 
 ## OWASP Top 10 Awareness
 

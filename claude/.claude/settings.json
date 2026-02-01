@@ -6,6 +6,7 @@
     "allow": [
       "Skill",
       "mcp__plugin_*",
+      "Plugin:*",
       "Read",
       "Edit",
       "Write",

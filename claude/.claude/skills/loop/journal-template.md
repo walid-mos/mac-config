@@ -1,12 +1,16 @@
-# Debug Journal: {BUG_DESCRIPTION}
+# Iteration Journal: {GOAL_DESCRIPTION}
 
 > Created: {TIMESTAMP}
-> Skill: bugfix-loop
+> Skill: loop
 
-## Test Command
+## Goal
+
+{GOAL_DESCRIPTION}
+
+## Verification Command
 
 ```bash
-{TEST_COMMAND}
+{VERIFICATION_COMMAND}
 ```
 
 ## Configuration
@@ -24,7 +28,7 @@
 
 ## Current Understanding
 
-<!-- Refined understanding of the bug, updated each iteration -->
+<!-- Refined understanding of the task, updated each iteration -->
 
 Initial state: Investigating...
 
@@ -32,7 +36,7 @@ Initial state: Investigating...
 
 ## Archive Notes
 
-<!-- Filled in when bug is fixed -->
-<!-- - Fix location: -->
-<!-- - Root cause: -->
-<!-- - Time to fix: -->
+<!-- Filled in when goal is achieved -->
+<!-- - Files changed: -->
+<!-- - Root cause/solution: -->
+<!-- - Time to complete: -->

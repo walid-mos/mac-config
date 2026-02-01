@@ -128,9 +128,9 @@
       "docker",
       "git"
     ],
-    "allowedHosts": [
-      "*"
-    ]
+    "network": {
+      "allowedDomains": ["*"]
+    }
   },
   "alwaysThinkingEnabled": true,
   "autoUpdatesChannel": "latest"

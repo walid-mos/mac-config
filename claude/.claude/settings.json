@@ -5,8 +5,8 @@
   "permissions": {
     "allow": [
       "Skill",
-      "mcp__plugin_*",
       "Plugin:*",
+      "mcp__*",
       "Read",
       "Edit",
       "Write",
@@ -16,14 +16,7 @@
       "WebFetch",
       "WebSearch",
       "Edit(/tmp/**)",
-      "Edit(/Users/walid/.stow_repository/**)",
-      "mcp__linear-server__*",
-      "mcp__context7__*",
-      "mcp__github__*",
-      "mcp__dokploy__*",
-      "mcp__cloudflare-observability__*",
-      "mcp__cloudflare-dns__*",
-      "mcp__plane__*"
+      "Edit(/Users/walid/.stow_repository/**)"
     ],
     "deny": [
       "Bash(rm -rf /)",
@@ -125,13 +118,22 @@
   "sandbox": {
     "enabled": true,
     "autoAllowBashIfSandboxed": true,
-    "excludedCommands": [
-      "docker",
-      "git"
-    ],
     "network": {
-      "allowedDomains": ["*"]
-    }
+      "allowedDomains": [
+        "*",
+        "github.com",
+        "*.github.com",
+        "api.github.com",
+        "gitlab.com",
+        "*.gitlab.com"
+      ]
+    },
+    "excludedCommands": [
+      "docker:*",
+      "git:*",
+      "gh:*",
+      "glab:*"
+    ]
   },
   "alwaysThinkingEnabled": true,
   "autoUpdatesChannel": "latest"

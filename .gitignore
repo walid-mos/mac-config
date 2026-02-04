@@ -30,6 +30,7 @@ node_modules/
 claude/.claude/cache/
 claude/.claude/paste-cache/
 claude/.claude/image-cache/
+claude/.claude/security_warnings_state_*.json
 
 # Local Claude settings at root (not in stow package)
 /.claude/

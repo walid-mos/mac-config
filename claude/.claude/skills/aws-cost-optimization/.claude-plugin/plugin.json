@@ -1,0 +1,8 @@
+{
+  "name": "aws-cost-optimization",
+  "description": "AWS cost optimization and FinOps workflows with automated analysis scripts",
+  "version": "1.0.0",
+  "author": {
+    "name": "DevOps Skills Team"
+  }
+}

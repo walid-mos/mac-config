@@ -142,3 +142,31 @@ Decision framework:
 - Writing plan without reading first
 - Blindly appending to existing plan
 - Leaving stale content mixed with new plan
+
+---
+
+## Infrastructure Fixes (CRITICAL)
+
+**A manual fix on deployed infrastructure is NOT a fix.**
+
+Any change made directly on:
+- Terraform-managed resources
+- GitHub Actions workflows
+- VPS/servers (SSH, console)
+- Docker containers/Swarm
+- Cloud provider consoles
+
+**Is only a temporary workaround until the fix is in code.**
+
+**MANDATORY Protocol:**
+1. Apply manual fix if urgent (to restore service)
+2. **Immediately** reproduce the fix in source (Terraform, workflow, Packer, etc.)
+3. Deploy via proper pipeline to validate
+4. Document the incident if recurrent
+
+**FORBIDDEN:**
+- Claiming an issue is "fixed" after manual intervention only
+- Closing tickets without code-level fix
+- Forgetting to backport manual changes to IaC
+
+**The only real fix is a committed, deployed change.**

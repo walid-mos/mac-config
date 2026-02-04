@@ -90,6 +90,15 @@
             "command": "~/.claude/hooks/fallback-detector.py"
           }
         ]
+      },
+      {
+        "matcher": "mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/auto-approve-mcp.sh"
+          }
+        ]
       }
     ]
   },
@@ -109,10 +118,10 @@
     "commit-commands@claude-plugins-official": true,
     "security-guidance@claude-plugins-official": true,
     "superpowers@claude-plugins-official": true,
-    "supabase@claude-plugins-official": true,
+    "supabase@claude-plugins-official": false,
     "claude-md-management@claude-plugins-official": true,
     "rust-analyzer-lsp@claude-plugins-official": true,
-    "stripe@claude-plugins-official": true,
+    "stripe@claude-plugins-official": false,
     "claude-code-setup@claude-plugins-official": true
   },
   "sandbox": {

@@ -1,0 +1,236 @@
+name: Terragrunt CI/CD
+
+on:
+  pull_request:
+    branches: [main, master]
+    paths:
+      - '**.tf'
+      - '**.hcl'
+      - '**.tfvars'
+  push:
+    branches: [main, master]
+    paths:
+      - '**.tf'
+      - '**.hcl'
+      - '**.tfvars'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+
+env:
+  TF_VERSION: '1.5.0'
+  TG_VERSION: '0.55.0'
+  WORKING_DIR: 'environments'  # Base directory for environments
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+jobs:
+  detect-changes:
+    name: Detect Changed Modules
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      has-changes: ${{ steps.set-matrix.outputs.has-changes }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get Changed Files
+        id: changed-files
+        uses: tj-actions/changed-files@v42
+        with:
+          files: |
+            **/*.tf
+            **/*.hcl
+            **/*.tfvars
+
+      - name: Set Matrix
+        id: set-matrix
+        run: |
+          # Find all directories with terragrunt.hcl that have changes
+          changed_dirs=$(echo "${{ steps.changed-files.outputs.all_changed_files }}" | tr ' ' '\n' | xargs -I {} dirname {} | grep -E "environments/(dev|staging|prod)" | sort -u | jq -R -s -c 'split("\n")[:-1]')
+
+          if [ "$changed_dirs" = "[]" ]; then
+            echo "has-changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "has-changes=true" >> $GITHUB_OUTPUT
+            echo "matrix={\"directory\":$changed_dirs}" >> $GITHUB_OUTPUT
+          fi
+
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Setup Terragrunt
+        run: |
+          wget -q https://github.com/gruntwork-io/terragrunt/releases/download/v${{ env.TG_VERSION }}/terragrunt_linux_amd64
+          chmod +x terragrunt_linux_amd64
+          sudo mv terragrunt_linux_amd64 /usr/local/bin/terragrunt
+          terragrunt --version
+
+      - name: Terragrunt Format Check
+        run: terragrunt hclfmt --terragrunt-check
+        working-directory: ${{ env.WORKING_DIR }}
+        continue-on-error: true
+
+      - name: Terragrunt Validate All
+        run: terragrunt run-all validate --terragrunt-non-interactive
+        working-directory: ${{ env.WORKING_DIR }}
+
+  plan:
+    name: Plan - ${{ matrix.directory }}
+    runs-on: ubuntu-latest
+    needs: [detect-changes, validate]
+    if: needs.detect-changes.outputs.has-changes == 'true'
+    strategy:
+      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Setup Terragrunt
+        run: |
+          wget -q https://github.com/gruntwork-io/terragrunt/releases/download/v${{ env.TG_VERSION }}/terragrunt_linux_amd64
+          chmod +x terragrunt_linux_amd64
+          sudo mv terragrunt_linux_amd64 /usr/local/bin/terragrunt
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Terragrunt Plan
+        id: plan
+        run: |
+          terragrunt run-all plan --terragrunt-non-interactive -out=tfplan 2>&1 | tee plan_output.txt
+        working-directory: ${{ matrix.directory }}
+        continue-on-error: true
+
+      - name: Upload Plan Output
+        uses: actions/upload-artifact@v4
+        with:
+          name: plan-${{ hashFiles(matrix.directory) }}
+          path: ${{ matrix.directory }}/plan_output.txt
+          retention-days: 5
+
+      - name: Comment PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const planPath = '${{ matrix.directory }}/plan_output.txt';
+            let plan = 'Plan output not available';
+
+            try {
+              plan = fs.readFileSync(planPath, 'utf8');
+              const maxLength = 65000;
+              plan = plan.length > maxLength ? plan.substring(0, maxLength) + '\n... (truncated)' : plan;
+            } catch (error) {
+              plan = 'Error reading plan output: ' + error.message;
+            }
+
+            const output = `#### Terragrunt Plan for \`${{ matrix.directory }}\`
+            <details><summary>Show Plan</summary>
+
+            \`\`\`terraform
+            ${plan}
+            \`\`\`
+
+            </details>
+
+            *Workflow: ${{ github.workflow }}, Actor: @${{ github.actor }}*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            });
+
+  apply:
+    name: Apply - ${{ matrix.directory }}
+    runs-on: ubuntu-latest
+    needs: [detect-changes]
+    if: |
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')) ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
+    strategy:
+      matrix:
+        directory: ${{ github.event_name == 'workflow_dispatch' && fromJson(format('["environments/{0}"]', github.event.inputs.environment)) || fromJson(needs.detect-changes.outputs.matrix).directory }}
+      fail-fast: false
+      max-parallel: 1  # Apply one at a time
+    environment:
+      name: production  # Configure approval in GitHub settings
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Setup Terragrunt
+        run: |
+          wget -q https://github.com/gruntwork-io/terragrunt/releases/download/v${{ env.TG_VERSION }}/terragrunt_linux_amd64
+          chmod +x terragrunt_linux_amd64
+          sudo mv terragrunt_linux_amd64 /usr/local/bin/terragrunt
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Terragrunt Apply
+        run: |
+          terragrunt run-all apply --terragrunt-non-interactive -auto-approve
+        working-directory: ${{ matrix.directory }}
+
+      - name: Notify Success
+        if: success()
+        run: echo "✅ Terragrunt apply completed for ${{ matrix.directory }}"
+
+      - name: Notify Failure
+        if: failure()
+        run: echo "❌ Terragrunt apply failed for ${{ matrix.directory }}"

@@ -20,7 +20,17 @@
 
 ## Iterations
 
-<!-- Each iteration is appended below -->
+<!-- Each iteration format:
+### Iteration N - TIMESTAMP
+**Observation:** [actual error/behavior]
+**Hypothesis:** [what we think is wrong]
+**Context7:** [library looked up, or "Not used" with reason]
+**Action:** [what we changed]
+**Action Type:** durable/temporary
+**Justification:** [why action is valid]
+**Files Changed:** [list]
+**Result:** PASS/FAIL - [details]
+-->
 
 ## Approaches Already Tried
 

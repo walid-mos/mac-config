@@ -14,6 +14,7 @@ Loop on ANY task until verification succeeds. Maintains an iteration journal for
 1. **Durable changes only** - Temporary fixes don't count
 2. **Journal every iteration** - Context survives even if you don't
 3. **No circular attempts** - Check journal before repeating approaches
+4. **Context7 on uncertainty** - Fetch docs when unsure or stuck on same error twice
 
 ## Invocation
 
@@ -27,6 +28,47 @@ Loop on ANY task until verification succeeds. Maintains an iteration journal for
 - `/loop --max-iterations=10 "E2E suite green" playwright test`
 - `/loop "Terraform apply succeeds" terraform apply -auto-approve`
 - `/loop "Fix login flow" npm run test:unit -- --grep "login"`
+
+## Context7 Integration
+
+### When to Trigger
+
+Context7 lookup is **mandatory** in these situations:
+
+1. **Consecutive same error** - If iteration N and N-1 have the same error pattern
+2. **Uncertain about API/syntax** - When the fix involves library/framework APIs
+3. **Deprecation warnings** - When errors mention deprecated methods
+4. **Version mismatch hints** - When errors suggest version incompatibility
+
+### How to Use
+
+```
+1. resolve-library-id: Get Context7-compatible library ID
+2. get-library-docs: Fetch relevant documentation
+3. Apply learnings to form NEW hypothesis
+```
+
+### Detection Logic (Parent)
+
+```
+BEFORE spawning subagent:
+  IF iteration > 1:
+    previous_error = journal.iterations[iteration-1].observation
+    current_error = journal.iterations[iteration-2].observation  # from last run
+    IF similar_error_pattern(previous_error, current_error):
+      SET context7_required = true
+      INCLUDE in subagent prompt: "MANDATORY: Use Context7 before attempting fix"
+```
+
+### Subagent Context7 Protocol
+
+When Context7 is required or uncertainty exists:
+
+1. Identify the library/framework involved in the error
+2. Call `resolve-library-id` with library name
+3. Call `get-library-docs` with topic relevant to the error
+4. Form hypothesis based on CURRENT documentation (not cached knowledge)
+5. Document Context7 findings in journal
 
 ## Workflow (Subagent Architecture)
 
@@ -70,18 +112,25 @@ WHILE iteration < max_iterations:
       ## Instructions
 
       1. **Read the journal** - Do NOT repeat approaches that already failed
-      2. **Run verification** - Observe the actual failure/error
-      3. **Form a NEW hypothesis** - Must differ from previous attempts
-      4. **Make DURABLE changes** - Use Edit/Write tools on project files
+      2. **Check for repeated errors** - If last 2 iterations have same error pattern:
+         - MANDATORY: Use Context7 before attempting any fix
+         - resolve-library-id → get-library-docs for relevant library
+         - Document Context7 findings in your response
+      3. **Run verification** - Observe the actual failure/error
+      4. **Form a NEW hypothesis** - Must differ from previous attempts
+         - If uncertain about API/syntax: Use Context7 first
+         - If error mentions deprecation: Use Context7 first
+      5. **Make DURABLE changes** - Use Edit/Write tools on project files
          - Changes must be reproducible and version-controlled
          - NO temporary fixes (manual state corrections, service restarts)
          - NO environment-specific hacks
-      5. **Run verification again** - Confirm your changes work
-      6. **Return structured result:**
+      6. **Run verification again** - Confirm your changes work
+      7. **Return structured result:**
          - result: PASS or FAIL
          - action_type: "durable" or "temporary"
          - action_justification: WHY this action is valid for the goal
          - files_changed: list of files modified
+         - context7_used: true/false (and what was looked up)
          - findings: what you learned (for journal)
     """
   )
@@ -162,6 +211,7 @@ Location: `.claude/iteration-journal.md` (project root)
 ### Iteration 1 - 2026-02-01T23:45:00Z
 **Observation:** Error: Missing binding for KV namespace
 **Hypothesis:** wrangler.toml missing KV binding configuration
+**Context7:** Not used (first iteration, clear error)
 **Action:** Added KV binding to wrangler.toml
 **Action Type:** durable
 **Justification:** Config file change is version-controlled
@@ -241,6 +291,9 @@ Watch for these patterns that indicate problems:
 | "Same approach but with more logging" | Not a new hypothesis | Check journal, try different approach |
 | "Verification passes now" (after Bash commands) | Suspicious | Verify action_type is "durable" |
 | Iteration 5+ with similar errors | Circular attempts | Step back, re-read full journal |
+| Same error 2x without Context7 | Skipped documentation | MUST use Context7 before next attempt |
+| Guessing API syntax | Uncertainty | Use Context7 to verify correct usage |
+| "I think the method is..." | Assumption | Context7 lookup required |
 
 ## Example Flow
 

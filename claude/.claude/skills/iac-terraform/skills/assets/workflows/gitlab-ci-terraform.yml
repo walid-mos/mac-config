@@ -1,0 +1,184 @@
+# GitLab CI/CD Pipeline for Terraform
+
+variables:
+  TF_VERSION: "1.5.0"
+  TF_ROOT: ${CI_PROJECT_DIR}  # Change to your terraform directory
+  TF_STATE_NAME: default
+
+image:
+  name: hashicorp/terraform:$TF_VERSION
+  entrypoint: [""]
+
+cache:
+  key: "$CI_COMMIT_REF_SLUG"
+  paths:
+    - ${TF_ROOT}/.terraform
+
+before_script:
+  - cd ${TF_ROOT}
+  - terraform --version
+
+stages:
+  - validate
+  - lint
+  - security
+  - plan
+  - apply
+
+# Validate Terraform configuration
+validate:
+  stage: validate
+  script:
+    - terraform fmt -check -recursive
+    - terraform init -backend=false
+    - terraform validate
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+
+# Lint with tflint
+tflint:
+  stage: lint
+  image:
+    name: ghcr.io/terraform-linters/tflint:latest
+    entrypoint: [""]
+  script:
+    - cd ${TF_ROOT}
+    - tflint --init
+    - tflint -f compact
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+
+# Security scan with Checkov
+checkov:
+  stage: security
+  image:
+    name: bridgecrew/checkov:latest
+    entrypoint: [""]
+  script:
+    - checkov -d ${TF_ROOT} --framework terraform --output cli --soft-fail
+  allow_failure: true
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+
+# Plan Terraform changes
+plan:
+  stage: plan
+  script:
+    - terraform init
+    - terraform plan -out=tfplan
+    - terraform show -no-color tfplan > plan_output.txt
+  artifacts:
+    name: plan
+    paths:
+      - ${TF_ROOT}/tfplan
+      - ${TF_ROOT}/plan_output.txt
+    reports:
+      terraform: ${TF_ROOT}/tfplan
+    expire_in: 7 days
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: manual
+
+# Apply Terraform changes (manual trigger for production)
+apply:
+  stage: apply
+  script:
+    - terraform init
+    - terraform apply -auto-approve
+  dependencies:
+    - plan
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: manual
+  environment:
+    name: production
+    action: start
+
+# Destroy infrastructure (manual trigger, protected)
+destroy:
+  stage: apply
+  script:
+    - terraform init
+    - terraform destroy -auto-approve
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: manual
+  environment:
+    name: production
+    action: stop
+
+# ========================================
+# Multi-Environment Example
+# ========================================
+# Uncomment and customize for multiple environments
+
+# .plan_template: &plan_template
+#   stage: plan
+#   script:
+#     - terraform init
+#     - terraform workspace select ${TF_WORKSPACE} || terraform workspace new ${TF_WORKSPACE}
+#     - terraform plan -out=tfplan -var-file=environments/${TF_WORKSPACE}.tfvars
+#   artifacts:
+#     paths:
+#       - ${TF_ROOT}/tfplan
+#     expire_in: 7 days
+
+# .apply_template: &apply_template
+#   stage: apply
+#   script:
+#     - terraform init
+#     - terraform workspace select ${TF_WORKSPACE}
+#     - terraform apply -auto-approve tfplan
+#   when: manual
+
+# plan:dev:
+#   <<: *plan_template
+#   variables:
+#     TF_WORKSPACE: dev
+#   rules:
+#     - if: '$CI_COMMIT_BRANCH == "develop"'
+
+# apply:dev:
+#   <<: *apply_template
+#   variables:
+#     TF_WORKSPACE: dev
+#   rules:
+#     - if: '$CI_COMMIT_BRANCH == "develop"'
+#   environment:
+#     name: dev
+
+# plan:staging:
+#   <<: *plan_template
+#   variables:
+#     TF_WORKSPACE: staging
+#   rules:
+#     - if: '$CI_COMMIT_BRANCH == "staging"'
+
+# apply:staging:
+#   <<: *apply_template
+#   variables:
+#     TF_WORKSPACE: staging
+#   rules:
+#     - if: '$CI_COMMIT_BRANCH == "staging"'
+#   environment:
+#     name: staging
+
+# plan:prod:
+#   <<: *plan_template
+#   variables:
+#     TF_WORKSPACE: prod
+#   rules:
+#     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+
+# apply:prod:
+#   <<: *apply_template
+#   variables:
+#     TF_WORKSPACE: prod
+#   rules:
+#     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+#   environment:
+#     name: production

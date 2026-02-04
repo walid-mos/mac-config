@@ -1,0 +1,92 @@
+# ArgoCD 3.x Installation with best practices
+# Updated for ArgoCD v3.1+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argocd
+---
+# Install ArgoCD using official manifests
+# kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.1.9/manifests/install.yaml
+
+# Configuration with ArgoCD 3.x best practices
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cmd-params-cm
+  namespace: argocd
+data:
+  # Enable fine-grained RBAC (ArgoCD 3.0+)
+  server.enable.gzip: "true"
+  # Resource exclusions (default in 3.x)
+  resource.exclusions: |
+    - apiGroups:
+      - ""
+      kinds:
+      - Endpoints
+      - EndpointSlice
+      clusters:
+      - "*"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+  namespace: argocd
+data:
+  # Annotation-based tracking (default in ArgoCD 3.x)
+  application.resourceTrackingMethod: annotation
+
+  # Resource exclusions for performance
+  resource.exclusions: |
+    - apiGroups:
+      - "*"
+      kinds:
+      - Lease
+      clusters:
+      - "*"
+---
+# Expose ArgoCD Server (choose one method)
+
+# Option 1: LoadBalancer
+apiVersion: v1
+kind: Service
+metadata:
+  name: argocd-server-lb
+  namespace: argocd
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: argocd-server
+
+# Option 2: Ingress (recommended)
+# ---
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: argocd-server-ingress
+#   namespace: argocd
+#   annotations:
+#     cert-manager.io/cluster-issuer: letsencrypt-prod
+#     nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+#     nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+# spec:
+#   ingressClassName: nginx
+#   rules:
+#   - host: argocd.example.com
+#     http:
+#       paths:
+#       - path: /
+#         pathType: Prefix
+#         backend:
+#           service:
+#             name: argocd-server
+#             port:
+#               number: 443
+#   tls:
+#   - hosts:
+#     - argocd.example.com
+#     secretName: argocd-server-tls

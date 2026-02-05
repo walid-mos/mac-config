@@ -1,8 +1,0 @@
-{
-  "name": "gitops-workflows",
-  "description": "GitOps workflows with ArgoCD and Flux CD including multi-cluster management, secrets, and progressive delivery",
-  "version": "1.0.0",
-  "author": {
-    "name": "DevOps Claude Skills"
-  }
-}

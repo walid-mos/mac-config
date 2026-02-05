@@ -6,15 +6,17 @@
     "allow": [
       "Skill",
       "Plugin:*",
-      "mcp__*",
+      "mcp__plugin_context7_context7",
+      "mcp__plugin_claude-mem_mcp-search",
+      "mcp__plugin_playwright_playwright",
       "Read",
       "Edit",
       "Write",
       "Glob",
       "Grep",
       "Bash",
-      "WebFetch",
-      "WebSearch",
+      "WebFetch(*)",
+      "WebSearch(*)",
       "Edit(/tmp/**)",
       "Edit(/Users/walid/.stow_repository/**)"
     ],
@@ -88,15 +90,6 @@
           {
             "type": "command",
             "command": "~/.claude/hooks/fallback-detector.py"
-          }
-        ]
-      },
-      {
-        "matcher": "mcp__.*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/auto-approve-mcp.sh"
           }
         ]
       }

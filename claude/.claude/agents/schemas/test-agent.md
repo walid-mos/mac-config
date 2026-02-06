@@ -88,6 +88,7 @@ interface TestTaskResult {
 
 type TestTaskStatus =
   | 'tests-written'                 // tdd-strict: all failing (red)
+  | 'tests-written-partial'         // tdd-strict: some failing (red), some pre-covered (kept for unique coverage)
   | 'outlines-written'              // tdd-flexible: skeletons with TODOs
   | 'tests-complete'                // All passing (green)
   | 'noted'                         // post-code: noted, no files yet

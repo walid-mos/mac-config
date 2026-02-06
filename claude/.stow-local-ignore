@@ -1,0 +1,14 @@
+# Machine-specific state — do not stow
+\.claude/plugins/cache
+\.claude/plugins/installed_plugins\.json
+\.claude/plugins/install-counts-cache\.json
+\.claude/history\.jsonl
+\.claude/debug
+\.claude/todos
+\.claude/session-env
+\.claude/shell-snapshots
+\.claude/file-history
+\.claude/cache
+\.claude/paste-cache
+\.claude/plans
+\.claude/projects

@@ -53,8 +53,12 @@ The test suite is written **FIRST**, completely, before any Code Agent touches i
 
 1. **Analyze the spec** for the task item. Identify every behavior, input, output, error path, and edge case.
 2. **Write the full test file** following the standards from the loaded skill (vitest or playwright).
-3. **Run the tests to confirm they ALL FAIL** (red phase): `vitest run <file> --reporter=verbose`
-   - This step is **mandatory**. Tests MUST fail before handoff. If any test passes, it means the test is not testing new behavior — remove or rethink it.
+3. **Run the tests to confirm they fail** (red phase): `vitest run <file> --reporter=verbose`
+   - This step is **mandatory**. Evaluate each passing test individually:
+     - **Duplicate coverage** (existing tests already cover the same behavior): **remove it** — it adds no value.
+     - **Unique coverage** (edge case, error path, or boundary not tested elsewhere, but code from a prior iteration already satisfies it): **keep it** — it protects against regressions.
+   - Flag kept-but-passing tests in your output as `status: 'pre-covered'` with a note explaining why they add value.
+   - Tests that fail (red) proceed normally to the Code Agent.
 4. **Report to Lead Agent** with: test file paths, total test count, brief summary of behaviors covered.
 5. **Monitor for violations**: If a Code Agent modifies ANY test file during strict TDD, immediately send a TDD VIOLATION alert.
 6. **After Code Agent signals completion**, run the full suite again. If tests pass → done. If tests fail → send failing output to the Code Agent for another iteration (max 3 cycles, then escalate).
@@ -148,6 +152,12 @@ ALL task assignments and completion reports go through Lead. Always include:
 ### With Planification Agent (via team messages in Phase A)
 
 Use the `SPEC_FEEDBACK` / `SPEC_CLARIFICATION` protocol defined in [`schemas/team-protocols.md`](./schemas/team-protocols.md) instead of the legacy format below. The structured message format ensures the Planification Agent can parse and respond programmatically.
+
+**Spec feedback is non-blocking.** After sending feedback:
+1. Mark each affected test as `it.todo('description')` with a comment referencing the feedback ID (e.g., `// blocked on SF-001`)
+2. Record the feedback ID in `blockedItems[].specFeedbackRef` in your output
+3. **Continue writing all remaining non-blocked tests** — do not wait for a response
+4. The Lead Agent owns the resolution lifecycle. You will be re-spawned with updated spec sections when clarification arrives.
 
 ### TDD Violation Alert
 

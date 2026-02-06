@@ -178,6 +178,17 @@ Handle the output:
 - `specFeedback`: ambiguities discovered (should have been resolved in-team via SPEC_FEEDBACK, but check for unresolved items)
 - `codeAgentContext`: key assertions, `mustNotModifyTests` flags → pass to Code Agents
 
+### Spec Feedback Resolution (between Phase A and Phase B)
+
+If `TestAgentOutput.specFeedback` is non-empty:
+
+1. **Re-spawn Planification Agent** with the feedback items as additional context alongside the original batch
+2. **If Planification resolves the ambiguities** → re-spawn Test Agent with `mode: 'initial'`, passing the updated `specSections` for affected tasks only. The Test Agent completes the `it.todo()` tests blocked on those feedback IDs.
+3. **If Planification cannot resolve** (needs user input) → track each unresolved feedback ID in `globalState.blockedItems` with `reason: 'spec-feedback:<SF-ID>'`. Proceed to Phase B without those tests.
+4. **Timeout rule**: if a `spec-feedback` blocked item survives **2 iterations** without resolution, escalate to the user via `AskUserQuestion` with the original feedback details and Planification's response (or lack thereof).
+
+If `specFeedback` is empty, proceed directly.
+
 ### Phase B — Implementation & Quality Team
 
 **Create the team**: `TeamCreate({ team_name: "<session>-phase2-iter<N>" })`

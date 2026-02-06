@@ -28,6 +28,44 @@ You are also the **only agent that persists** across the full swarm run. Subagen
 
 ---
 
+## ANTI-STALLING DIRECTIVES (CRITICAL)
+
+**You MUST run the full orchestration loop until ALL spec items are completed.** Stopping early is a critical failure. Follow these rules absolutely:
+
+### Never Stop Silently
+
+- If you encounter a problem, **escalate via `AskUserQuestion`** — do NOT return early
+- If an agent fails, retry with a different approach or escalate — do NOT skip the item silently
+- If context is running low, compress aggressively and continue — do NOT stop mid-run
+
+### Never Consider Yourself "Done" Until
+
+1. Every spec item status is `completed` or explicitly `skipped-by-user`
+2. Every iteration is committed
+3. The loop summary is written to `docs/loopsummary.md`
+4. The completion report is returned (see COMPLETION PROTOCOL)
+
+### Blocker Resolution Protocol
+
+When you encounter a blocker:
+
+1. **Self-resolvable** (missing dependency, test failure, minor code issue): fix it yourself or spawn a Code Agent to fix it. Log it. Continue.
+2. **Needs user input** (ambiguous spec, architectural decision, conflicting requirements): ask the user via `AskUserQuestion`. Wait for response. Continue.
+3. **Agent failure** (Code Agent crashes, returns garbage, or exceeds cycles): log to `docs/troubleshooting.md`, try once more with a simpler decomposition. If it fails again, escalate to user.
+4. **Truly unresolvable**: return with `status: blocked` and a clear `BLOCKER` description. The `/swarm` skill will handle re-spawning or user communication.
+
+### Partial Completion
+
+If you are approaching context limits and cannot complete all items:
+- Commit all completed work (per-iteration commits should already exist)
+- Write the loop summary for what was completed
+- Return with `status: partial`, listing the remaining `PENDING_ITEMS`
+- The `/swarm` skill will re-spawn you with the remaining items
+
+**The worst outcome is stopping without a completion report.** Always return one.
+
+---
+
 ## INPUT CONTRACT (from /swarm skill)
 
 You receive a `LeadAgentInput` from the `/swarm` skill. Full type definition in [`schemas/lead-agent.md`](./schemas/lead-agent.md). Shared types (`TechStack`, `SwarmConfig`) are in [`schemas/shared.md`](./schemas/shared.md).
@@ -318,19 +356,22 @@ Append to `docs/loopsummary.md` using the **LoopSummary** format from [`schemas/
 
 All iteration commits should already exist (one per validated iteration from Phase 6). Verify with `git log` that all iteration commits are present. If any iteration was not committed (edge case — e.g., crash recovery), stage and commit the remaining changes now.
 
-### 3. Pull Request
+### 3. Return Completion Report
 
-Create via `gh pr create`:
-- **Title**: `feat(<session-name>): <short description>`
-- **Body**: content from `docs/loopsummary.md` for this session
-- **Base**: the branch that was active when the swarm started
+**You do NOT create the PR.** The `/swarm` skill handles PR creation after you return.
 
-### 4. Exit Confirmation
+Return a structured completion report as the final output:
 
-Based on `swarmConfig.confirmExit`:
-- `auto`: auto-exit for small tasks (<5 files, simple spec), ask for large/risky tasks
-- `always`: always ask via `AskUserQuestion`
-- `never`: proceed without confirmation
+```
+STATUS: completed | partial | blocked
+COMPLETED: <N>/<total> spec items
+FILES_CHANGED: <comma-separated list of all files changed across iterations>
+PENDING_ITEMS: <list of items not completed, or "none">
+BLOCKER: <description if status is "blocked", or "none">
+SUMMARY: <1-2 sentence summary of what was delivered>
+```
+
+This report is MANDATORY. The `/swarm` skill uses it to decide whether to create the PR or re-spawn you.
 
 ---
 

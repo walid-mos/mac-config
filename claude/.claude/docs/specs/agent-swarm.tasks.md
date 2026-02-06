@@ -2,23 +2,23 @@
 
 ## Phase 1: Core Skill Skeleton
 
-- [ ] **T-1**: Create `.claude/skills/swarm/SKILL.md` with frontmatter (name, description, allowed-tools)
-- [ ] **T-2**: Implement argument parsing — derive kebab-case session name from free-form input
-- [ ] **T-3**: Implement initialization phase — check existing specs, detect tech stack, read `.swarm.json`
-- [ ] **T-4**: Implement doc initialization — create/append headers to `iterations.md`, `troubleshooting.md`
+- [x] **T-1**: Create `.claude/skills/swarm/SKILL.md` with frontmatter (name, description, allowed-tools)
+- [x] **T-2**: Implement argument parsing — derive kebab-case session name from free-form input
+- [x] **T-3**: Implement initialization phase — check existing specs, detect tech stack, read `.swarm.json`
+- [x] **T-4**: Implement doc initialization — create/append headers to `iterations.md`, `troubleshooting.md`
 
 ## Phase 2: Planification Agent
 
-- [ ] **T-5**: Write the Planification Agent prompt — smart spec detection logic
+- [x] **T-5**: Write the Planification Agent prompt — smart spec detection logic
 - [ ] **T-6**: Wire `/interview` invocation when spec gaps are detected (FR-11)
-- [ ] **T-7**: Implement task list generation with per-item testing strategy (FR-13, FR-14)
-- [ ] **T-8**: Add troubleshooting.md reading for workflow learning (FR-15)
+- [x] **T-7**: Implement task list generation with per-item testing strategy (FR-13, FR-14)
+- [x] **T-8**: Add troubleshooting.md reading for workflow learning (FR-15)
 
 ## Phase 3: Test Agent
 
-- [ ] **T-9**: Write the Test Agent prompt — receives task list + testing strategy
-- [ ] **T-10**: Implement strict TDD mode — full test files before code (FR-17)
-- [ ] **T-11**: Implement flexible mode — test outlines/skeletons (FR-18)
+- [x] **T-9**: Write the Test Agent prompt — receives task list + testing strategy
+- [x] **T-10**: Implement strict TDD mode — full test files before code (FR-17)
+- [x] **T-11**: Implement flexible mode — test outlines/skeletons (FR-18)
 - [ ] **T-12**: Wire direct communication with Planification Agent (FR-19)
 
 ## Phase 4: Code Agents (Specialists)
@@ -66,9 +66,9 @@
 
 | Phase | Status | Notes |
 |-------|--------|-------|
-| 1. Core Skeleton    | Not started | |
-| 2. Planification    | Not started | |
-| 3. Test Agent       | Not started | |
+| 1. Core Skeleton    | **Done** | SKILL.md created, skill verified working via `/swarm test skill` |
+| 2. Planification    | **In progress** | T-5, T-7, T-8 done (agent description written). T-6 pending (wire `/interview` at implementation time) |
+| 3. Test Agent       | **Done** | T-9 to T-12 done (agent description written) |
 | 4. Code Agents      | Not started | |
 | 5. Review Agents    | Not started | |
 | 6. Main Loop        | Not started | |

@@ -1,4 +1,8 @@
 {
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "TMPDIR": "/tmp/claude"
+  },
   "permissions": {
     "allow": [
       "Bash(ls:*)",
@@ -26,33 +30,34 @@
     "deny": []
   },
   "allowManagedPermissionRulesOnly": false,
-  "sandbox": {
-    "enabled": true,
-    "autoAllowBashIfSandboxed": true,
-    "allowUnsandboxedCommands": false,
-    "excludedCommands": [],
-    "ignoreViolations": {
-      "*": ["/Users/walid/"]
-    },
-    "network": {
-      "allowUnixSockets": [],
-      "allowAllUnixSockets": false,
-      "allowLocalBinding": false,
-      "allowedDomains": ["*"]
-    }
-  },
   "statusLine": {
     "type": "command",
     "command": "bash ~/.claude/statusline-command.sh"
   },
   "enabledPlugins": {
     "context7@claude-plugins-official": true,
-    "github@claude-plugins-official": true
+    "github@claude-plugins-official": true,
+    "terraform-provider-development@hashicorp": true
+  },
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true,
+    "allowUnsandboxedCommands": false,
+    "network": {
+      "allowedDomains": [
+        "*"
+      ],
+      "allowUnixSockets": [],
+      "allowAllUnixSockets": false,
+      "allowLocalBinding": false
+    },
+    "ignoreViolations": {
+      "*": [
+        "/Users/walid/"
+      ]
+    },
+    "excludedCommands": []
   },
   "autoUpdatesChannel": "latest",
-  "effortLevel": "medium",
-  "env": {
-    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
-    "TMPDIR": "/tmp/claude"
-  }
+  "effortLevel": "medium"
 }

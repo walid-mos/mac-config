@@ -79,6 +79,54 @@ Tests written AFTER the Code Agent finishes. **Default strategy for E2E tests.**
 
 ---
 
+## TEAM COMMUNICATION
+
+When running as a teammate in a Phase A team, you communicate via `SendMessage`.
+
+> **Protocol reference**: All messages follow the formats in [`schemas/team-protocols.md`](./schemas/team-protocols.md).
+
+### Streaming Intake Mode
+
+In a Phase A team, you receive task specs **incrementally** from the Planification Agent instead of waiting for the full plan:
+
+1. **On `TASK_SPEC_READY`** from `planification`:
+   - Immediately begin writing tests for the received TaskItem + TestingBriefItem
+   - Follow the testing strategy specified in the TestingBriefItem
+   - Do NOT wait for subsequent specs — work on what you have
+
+2. **On `ALL_SPECS_COMPLETE`** from `planification`:
+   - Cross-check coverage: verify all tasks have tests written
+   - Finalize output: aggregate all test results into `TestAgentOutput`
+   - Mark TEST task as completed with output in task metadata
+
+3. **Send `SPEC_FEEDBACK`** to `planification` when you discover gaps:
+   - Send the message and continue writing tests for other tasks
+   - When `SPEC_CLARIFICATION` arrives, update affected tests accordingly
+
+### Outgoing Messages
+
+| Message | Recipient | When |
+|---------|-----------|------|
+| `SPEC_FEEDBACK` | `planification` | Spec gap found while writing tests |
+
+### Incoming Messages
+
+| Message | From | Action |
+|---------|------|--------|
+| `TASK_SPEC_READY` | `planification` | Immediately write tests for this task |
+| `ALL_SPECS_COMPLETE` | `planification` | Cross-check coverage, finalize output |
+| `SPEC_CLARIFICATION` | `planification` | Update affected tests with the clarification |
+| `shutdown_request` | Lead Agent | Respond with `shutdown_response` (`approve: true`) |
+
+### Task Completion
+
+Before marking your TEST task as completed:
+1. Write the full `TestAgentOutput` to task metadata via `TaskUpdate` with the `metadata` parameter
+2. Ensure all test files are written and test results are recorded
+3. Mark the TEST task as `completed`
+
+---
+
 ## Communication Protocol
 
 ### With Lead Agent (primary channel)
@@ -97,17 +145,9 @@ ALL task assignments and completion reports go through Lead. Always include:
 - NEVER modify implementation code
 - Track cycle count per test — escalate after 3 failures on the same test
 
-### With Planification Agent (direct — spec feedback ONLY)
+### With Planification Agent (via team messages in Phase A)
 
-When you discover issues while writing tests:
-```
-SPEC FEEDBACK from Test Agent:
-- Task: <task item reference>
-- Issue type: <missing edge case | ambiguous behavior | contradictory requirement | unspecified boundary>
-- Details: <specific description>
-- Suggestion: <proposed clarification>
-- Impact: <which tests are blocked — listed as it.todo()>
-```
+Use the `SPEC_FEEDBACK` / `SPEC_CLARIFICATION` protocol defined in [`schemas/team-protocols.md`](./schemas/team-protocols.md) instead of the legacy format below. The structured message format ensures the Planification Agent can parse and respond programmatically.
 
 ### TDD Violation Alert
 

@@ -270,11 +270,67 @@ interface ReviewIssue {
 
 ---
 
-## Communication Protocol
+## TEAM COMMUNICATION
 
-- **Primary channel**: SendMessage to Lead Agent
+When running as a teammate in a Phase B team, you communicate via `SendMessage`.
+
+> **Protocol reference**: All messages follow the formats in [`schemas/team-protocols.md`](./schemas/team-protocols.md).
+
+### Phase B Workflow
+
+1. **Wait for your REVIEW task to become unblocked** — all IMPL tasks must complete first
+2. **Receive `IMPL_COMPLETE` messages** from Code Agents as they finish (informational — your task unblocking is managed by task dependencies)
+3. **Perform your review** using the standard review checklist
+4. **Dispatch quick-fixes directly** to Code Agents via `FIX_REQUIRED` — no Lead Agent involvement needed
+5. **Handle fix responses** — verify or reject each fix
+6. **Create escalation tasks** for significant/critical issues that Code Agents should not fix directly
+7. **Write output to task metadata** and mark REVIEW task as completed
+
+### Inner Fix Loop (Self-Managing)
+
+For **quick-fix** severity issues:
+
+1. Send `FIX_REQUIRED` directly to the responsible Code Agent (identified by which agent created the file)
+2. Wait for `FIX_APPLIED` response
+3. Re-read the fixed files and verify the fix
+4. Send `FIX_VERIFIED` if correct, or `FIX_REJECTED` with reason if insufficient
+5. **Max 3 fix cycles per issue** — after 3 rejected attempts, create an escalation task instead
+
+For **significant/critical** issues:
+- Do NOT send to Code Agents
+- Create an escalation task in the shared task list with subject `ESCALATION: <issue type> — <description>`
+- Include full issue details in the task description
+
+### Outgoing Messages
+
+| Message | Recipient | When |
+|---------|-----------|------|
+| `FIX_REQUIRED` | `code-agent-*` | Quick-fix issue found during review |
+| `FIX_VERIFIED` | `code-agent-*` | Fix confirmed correct after re-read |
+| `FIX_REJECTED` | `code-agent-*` | Fix insufficient, include reason and cycle count |
+
+### Incoming Messages
+
+| Message | From | Action |
+|---------|------|--------|
+| `IMPL_COMPLETE` | `code-agent-*` | Note file changes (informational) |
+| `FIX_APPLIED` | `code-agent-*` | Re-read files, verify fix, send VERIFIED or REJECTED |
+| `shutdown_request` | Lead Agent | Respond with `shutdown_response` (`approve: true`) |
+
+### Task Completion
+
+Before marking your REVIEW task as completed:
+1. Ensure all quick-fix loops are resolved (verified or escalated)
+2. Write the full `ReviewAgentOutput` to task metadata via `TaskUpdate` with the `metadata` parameter
+3. Mark the REVIEW task as `completed`
+
+---
+
+## Legacy Communication Protocol
+
+- **Primary channel**: SendMessage to Lead Agent (used when NOT in a Phase B team)
 - **Sub-agents**: Task tool with Explore sub-agents (read-only research)
-- **Direct channel to Code Agent**: When the Lead forwards fix instructions from your review to a Code Agent, and the Code Agent has a question about your finding, you may receive a message. Respond with clarification only — never with code.
+- **Direct channel to Code Agent**: In Phase B teams, use the FIX_REQUIRED/FIX_APPLIED protocol above. Outside of teams, the Lead forwards fix instructions.
 
 ---
 

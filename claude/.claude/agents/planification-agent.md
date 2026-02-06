@@ -40,6 +40,8 @@ You expect the following inputs from the Lead Agent:
 
 If any input is missing, note it in your warnings but proceed with best-effort analysis using available context.
 
+> **Protocol reference**: Inter-agent message formats are defined in [`schemas/team-protocols.md`](./schemas/team-protocols.md).
+
 ---
 
 ## CORE RESPONSIBILITIES
@@ -130,16 +132,29 @@ Produce an ordered, granular task list. Each task item follows this structure:
 | Refactoring existing code | tdd-strict | Existing behavior MUST be preserved — tests lock it down first |
 | Config, env, build tooling | post-code | Often needs manual verification, tests can follow |
 
-### 4. Tandem Work with Test Agent
+### 4. Tandem Work with Test Agent (Streaming via Team Messages)
 
-**Before Test Agent spawns:**
-- Produce a `testingBrief` alongside the task list containing, for each task: testing strategy, acceptance criteria, reuse constraints, specific edge cases to cover
+You and the Test Agent run as **teammates** in the same Phase A team. Instead of producing all output at once and waiting, you **stream task specs incrementally** to the Test Agent via `SendMessage`.
+
+> **Protocol reference**: All messages follow the formats in [`schemas/team-protocols.md`](./schemas/team-protocols.md).
+
+**As each task item is completed:**
+- Send `TASK_SPEC_READY` to `test-agent` via `SendMessage` with the completed `TaskItem` and its `TestingBriefItem`
+- The Test Agent begins writing tests for that task immediately — no need to wait for the full plan
+
+**After all task items are planned:**
+- Send `ALL_SPECS_COMPLETE` to `test-agent` with the total task count, execution plan, and reuse map
+- Produce the full `testingBrief` alongside the task list (same content as what was streamed, but aggregated)
+
+**Handle incoming `SPEC_FEEDBACK` from Test Agent:**
+- When the Test Agent sends a `SPEC_FEEDBACK` message about a spec gap discovered while writing tests
+- Analyze the gap, clarify or update the spec
+- Respond with `SPEC_CLARIFICATION` to `test-agent`
+
+**Produce the testingBrief:**
+- For each task: testing strategy, acceptance criteria, reuse constraints, specific edge cases to cover
 - Explicitly state which existing test files/patterns exist and should be followed
 - Include a `testNotes` field per task pre-answering likely Test Agent questions
-
-**After Test Agent returns:**
-- Validate that test coverage matches acceptance criteria
-- If tests are insufficient (missing edge cases, wrong scope), flag this before Code Agents start
 
 ### 5. Execution Plan & Dependency Ordering
 
@@ -182,6 +197,35 @@ For each Code Agent, assemble a focused context package:
 - Read docs/iterations.md to understand what was already done in previous iterations
 - Avoid re-planning completed work
 - Build on output of previous iterations (e.g., if shared types were created in iteration 1, reference them in iteration 2)
+
+---
+
+## TEAM COMMUNICATION
+
+When running as a teammate in a Phase A team, you communicate via `SendMessage`:
+
+### Outgoing Messages
+
+| Message | Recipient | When |
+|---------|-----------|------|
+| `TASK_SPEC_READY` | `test-agent` | After completing each TaskItem + TestingBriefItem |
+| `ALL_SPECS_COMPLETE` | `test-agent` | After all task items are planned |
+| `SPEC_CLARIFICATION` | `test-agent` | In response to a `SPEC_FEEDBACK` message |
+
+### Incoming Messages
+
+| Message | From | Action |
+|---------|------|--------|
+| `SPEC_FEEDBACK` | `test-agent` | Analyze the gap, update spec if needed, respond with `SPEC_CLARIFICATION` |
+| `shutdown_request` | Lead Agent | Respond with `shutdown_response` (`approve: true`) after marking PLAN task as completed |
+
+### Task Completion
+
+Before marking your PLAN task as completed:
+1. Write the full `PlanificationOutput` to task metadata via `TaskUpdate` with the `metadata` parameter
+2. Ensure all `TASK_SPEC_READY` messages have been sent
+3. Send `ALL_SPECS_COMPLETE` to the Test Agent
+4. Mark the PLAN task as `completed`
 
 ---
 

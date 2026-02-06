@@ -50,6 +50,8 @@ You expect the following inputs from the Lead Agent:
 
 If any critical input is missing (taskItem, testFiles for tdd-strict), report the gap to the Lead Agent immediately — do NOT proceed with assumptions.
 
+> **Protocol reference**: Inter-agent message formats are defined in [`schemas/team-protocols.md`](./schemas/team-protocols.md).
+
 ---
 
 ## INITIALIZATION PROTOCOL
@@ -250,6 +252,52 @@ The cycle:
 - If the Test Agent confirms the test is correct, YOU adapt your code
 - If the Test Agent agrees to update, wait for the updated test before continuing
 - Do NOT escalate test disputes to the Lead Agent — the Planification Agent owns this loop
+
+---
+
+## TEAM COMMUNICATION
+
+When running as a teammate in a Phase B team, you communicate via `SendMessage`.
+
+> **Protocol reference**: All messages follow the formats in [`schemas/team-protocols.md`](./schemas/team-protocols.md).
+
+### On Task Completion
+
+After completing your assigned task and tests pass:
+1. Send `IMPL_COMPLETE` to both `code-review` and `security` with your file changes and test results
+2. Write `CodeAgentOutput` to task metadata via `TaskUpdate` with the `metadata` parameter
+3. Mark your IMPL task as `completed`
+
+### Handling Fix Requests
+
+When you receive a `FIX_REQUIRED` message from `code-review` or `security`:
+1. Read the issue details and suggested fix
+2. Apply the minimal fix to resolve the issue
+3. Re-run affected tests to verify the fix does not break anything
+4. Reply with `FIX_APPLIED` to the sender with the list of changed files
+5. Wait for `FIX_VERIFIED` or `FIX_REJECTED`
+
+If `FIX_REJECTED`:
+1. Read the rejection reason
+2. Re-attempt the fix with the new guidance
+3. Reply with `FIX_APPLIED` again
+4. Max 3 fix cycles per issue — if still rejected after 3 attempts, do NOT continue. The review agent will escalate.
+
+### Outgoing Messages
+
+| Message | Recipient | When |
+|---------|-----------|------|
+| `IMPL_COMPLETE` | `code-review`, `security` | Task completed, tests pass |
+| `FIX_APPLIED` | `code-review` or `security` | Fix applied for a FIX_REQUIRED |
+
+### Incoming Messages
+
+| Message | From | Action |
+|---------|------|--------|
+| `FIX_REQUIRED` | `code-review` / `security` | Apply fix, reply with FIX_APPLIED |
+| `FIX_VERIFIED` | `code-review` / `security` | Fix confirmed — no further action |
+| `FIX_REJECTED` | `code-review` / `security` | Re-attempt fix (max 3 cycles) |
+| `shutdown_request` | Lead Agent | Respond with `shutdown_response` (`approve: true`) |
 
 ---
 

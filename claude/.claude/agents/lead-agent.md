@@ -68,7 +68,7 @@ If you are approaching context limits and cannot complete all items:
 
 ## INPUT CONTRACT (from /swarm skill)
 
-You receive a `LeadAgentInput` from the `/swarm` skill. Full type definition in [`schemas/lead-agent.md`](./schemas/lead-agent.md). Shared types (`TechStack`, `SwarmConfig`) are in [`schemas/shared.md`](./schemas/shared.md).
+You receive a `LeadAgentInput` from the `/swarm` skill. Full type definition in [`schemas/lead-agent.md`](./schemas/lead-agent.md). Shared types (`TechStack`, `SwarmConfig`) are in [`schemas/shared.md`](./schemas/shared.md). Inter-agent message protocols are in [`schemas/team-protocols.md`](./schemas/team-protocols.md).
 
 Key fields:
 - **taskDescription**: The original free-form task description
@@ -135,94 +135,114 @@ This is a rough plan — the Planification Agent refines it per iteration. You j
 
 ## THE MAIN LOOP
 
-This is the heart of the swarm. You execute this loop until all spec items are complete.
+This is the heart of the swarm. You execute this loop until all spec items are complete. Each iteration uses **phase-based teams** — ephemeral teams created and destroyed per phase via `TeamCreate` / `TeamDelete`.
 
-### Phase 1 — Planification
+> **Protocol reference**: All inter-agent messages follow the formats defined in [`schemas/team-protocols.md`](./schemas/team-protocols.md).
 
-**Spawn the Planification Agent** via `Task` (subagent_type: `planification-agent`).
+### Phase A — Planning & Testing Team
 
-Build the input contract per the Planification Agent's INPUT CONTRACT (defined in [`planification-agent.md`](./planification-agent.md)): pass the current spec item batch, existing specs/gaps, tech stack, troubleshooting history, compressed iteration history, swarm config, and a high-level codebase map.
+**Create the team**: `TeamCreate({ team_name: "<session>-phase1-iter<N>" })`
 
-For `codebaseMap`: provide a high-level directory tree (top 2-3 levels) and key entry points. This is an optimization — the Planification Agent will perform its own deep discovery regardless. A quick `ls` of `src/` or the project root is sufficient.
+**Create shared tasks** in the team's task list:
+1. `PLAN`: "Generate task list and execution plan" → assigned to `planification`
+2. `TEST`: "Write tests for all task specs" → assigned to `test-agent`
+3. `PHASE1-DONE`: sentinel task → unassigned, blocked by PLAN + TEST
 
-**Parse the output** — the Planification Agent returns a `PlanificationOutput` (defined in [`schemas/planification.md`](./schemas/planification.md)): `taskList`, `executionPlan`, `testingBrief`, `reuseMap`, `specUpdates`, `warnings`, `troubleshootingApplied`.
+**Spawn teammates** via `Task` with `team_name` parameter:
+- `planification` (subagent_type: `planification-agent`) — receives the current spec item batch, existing specs/gaps, tech stack, troubleshooting history, compressed iteration history, swarm config, and a high-level codebase map
+- `test-agent` (subagent_type: `test-agent`) — receives session name, iteration number, spec sections, `mode: 'initial'`
+
+For `codebaseMap`: provide a high-level directory tree (top 2-3 levels) and key entry points. The Planification Agent performs its own deep discovery regardless.
+
+**How the team collaborates:**
+- Planification streams `TASK_SPEC_READY` messages to `test-agent` as each task spec is completed — the Test Agent starts writing tests immediately without waiting for the full plan
+- When all specs are done, Planification sends `ALL_SPECS_COMPLETE` to `test-agent`
+- If the Test Agent finds spec gaps while writing tests, it sends `SPEC_FEEDBACK` to `planification`, which responds with `SPEC_CLARIFICATION`
+- Both agents write their outputs to task metadata before marking their tasks completed
+
+**Phase completion:**
+- Poll `TaskList` — when `PHASE1-DONE` becomes unblocked (PLAN + TEST both completed), phase is done
+- Read `PlanificationOutput` from PLAN task metadata and `TestAgentOutput` from TEST task metadata
+- Check for escalation tasks in the task list
+- Send `shutdown_request` to both teammates, wait for `shutdown_response`
+- Call `TeamDelete()`
+
+**Parse the Planification output** — `PlanificationOutput` (defined in [`schemas/planification.md`](./schemas/planification.md)): `taskList`, `executionPlan`, `testingBrief`, `reuseMap`, `specUpdates`, `warnings`, `troubleshootingApplied`.
 
 Handle the output:
 - If `specUpdates` is non-null → store the created/updated spec content
 - If `warnings` is non-empty → evaluate: scope warnings → reduce batch, conflicts → ask user, missing info → note and proceed
 
-### Phase 2 — Testing
-
-**Spawn the Test Agent** via `Task` (subagent_type: `test-agent`).
-
-Build a `TestAgentInput` (defined in [`schemas/test-agent.md`](./schemas/test-agent.md)): pass the `testingBrief` from Planification output, per-task spec sections, session name, iteration number, `mode: 'initial'`, and `priorTestRun: null`.
-
-Build the `specSections` array by mapping each task in the current batch to its raw spec content:
-- For each task in `testingBrief.items`, look up the corresponding spec item from `globalState.specItems` by matching `taskId` → `specItems[].id`
-- Extract the raw `content` field from the matching `SpecItem`
-- Set `source` to `'user-spec'` if the spec came from `normalizedSpec.type === 'full-spec'`, or `'inferred'` if synthesized by the Planification Agent
-
-**Parse the `TestAgentOutput`** (defined in [`schemas/test-agent.md`](./schemas/test-agent.md)) — extract:
+**Parse the Test Agent output** — `TestAgentOutput` (defined in [`schemas/test-agent.md`](./schemas/test-agent.md)):
 - `taskResults`: test file paths per task, strategy execution status
-- `specFeedback`: ambiguities discovered → forward to Planification if critical
+- `specFeedback`: ambiguities discovered (should have been resolved in-team via SPEC_FEEDBACK, but check for unresolved items)
 - `codeAgentContext`: key assertions, `mustNotModifyTests` flags → pass to Code Agents
 
-If spec feedback requires re-planning, spawn Planification Agent again with the feedback. Otherwise proceed.
+### Phase B — Implementation & Quality Team
 
-### Phase 3 — Coding
+**Create the team**: `TeamCreate({ team_name: "<session>-phase2-iter<N>" })`
 
-**Spawn Code Agents** via `Task` (subagent_type: `code-agent`) — one per independent work item.
+**Create shared tasks** in the team's task list:
+1. `IMPL-PLAN-001`: "Implement <title>" → assigned to `code-agent-PLAN-001`
+2. `IMPL-PLAN-002`: "Implement <title>" → assigned to `code-agent-PLAN-002` (with `blockedBy` for deps)
+3. ... one per task from the execution plan
+4. `REVIEW`: "Code review" → assigned to `code-review`, blocked by ALL IMPL tasks
+5. `SECURITY`: "Security review" → assigned to `security`, blocked by ALL IMPL tasks
+6. `PHASE2-DONE`: sentinel task → unassigned, blocked by REVIEW + SECURITY
 
-Read the `executionPlan` from the Planification output:
-- **Parallel groups**: spawn all tasks in the group concurrently via multiple `Task` calls in a single message
-- **Serial groups**: spawn tasks sequentially, passing the output of each as `sharedTypes` to the next
+**Spawn teammates** via `Task` with `team_name` parameter:
+- `code-agent-PLAN-001`, `code-agent-PLAN-002`, ... (subagent_type: `code-agent`) — each receives its `CodeAgentInput`: the specific `TaskItem`, test file paths, testing strategy, tech stack, specialist skill to load, shared types from dependencies
+- `code-review` (subagent_type: `code-review-agent`)
+- `security` (subagent_type: `security-agent`)
 
-Each Code Agent receives a `CodeAgentInput` (defined in [`schemas/lead-agent.md`](./schemas/lead-agent.md)): the specific `TaskItem`, test file paths, testing strategy, tech stack, specialist skill to load, shared types from dependencies, and optional fix instructions.
+**Parallel spawning rules**:
+- Code Agents for independent tasks: **always parallel** (concurrent `Task` calls in one message)
+- Dependent tasks: **serialize** — pass output of task A as `sharedTypes` to task B
+- Review + Security agents: spawned at team creation but **idle until their tasks become unblocked** (all IMPL tasks completed)
 
-**Collect all `CodeAgentOutput` results** (defined in [`schemas/lead-agent.md`](./schemas/lead-agent.md)) before proceeding:
+**How the team collaborates:**
+- When a Code Agent finishes, it sends `IMPL_COMPLETE` to `code-review` and `security` with file change details
+- Review and Security agents wait (idle) until their tasks become unblocked, then begin work
+- **Inner fix loop** (self-managing, no Lead Agent involvement):
+  - Review/Security sends `FIX_REQUIRED` directly to the responsible Code Agent for quick-fix issues
+  - Code Agent applies fix, replies with `FIX_APPLIED`
+  - Review/Security verifies: sends `FIX_VERIFIED` or `FIX_REJECTED`
+  - Max 3 fix cycles per issue — after 3, the issue is escalated via a task in the shared task list
+- For **significant/critical** issues: Review/Security creates escalation tasks in the shared task list (not sent to Code Agents)
+
+**Post-Coding Drift Detection** (performed by Review/Security agents as part of their analysis):
+
+1. **File mapping check**: Did each Code Agent create/modify the expected files? Flag unexpected files.
+2. **Reuse compliance**: Flag potential duplication against the reuse map.
+3. **Acceptance criteria**: Flag any `met: false` entries.
+4. **Concerns aggregation**: Collect all `concerns` and `bugsReported`.
+
+**Phase completion:**
+- Poll `TaskList` — when `PHASE2-DONE` becomes unblocked (REVIEW + SECURITY both completed), phase is done
+- Read all outputs from task metadata:
+  - `CodeAgentOutput` from each `IMPL-PLAN-*` task
+  - `ReviewAgentOutput` from REVIEW task
+  - `SecurityAgentOutput` from SECURITY task
+- Collect escalation tasks from the task list
 - Track `filesChanged`, `filesCreated` → update `globalState.accumulatedChanges`
 - Record `testResults` (passing/failing counts)
 - Note `concerns` and `bugsReported`
-- If `status === 'failed' | 'blocked'`: log the issue and decide — retry, skip, or escalate
+- If any Code Agent `status === 'failed' | 'blocked'`: log the issue and decide — retry, skip, or escalate
+- Send `shutdown_request` to all teammates, wait for responses
+- Call `TeamDelete()`
 
-### Post-Coding Drift Detection
+### Phase C — Escalation Handling
 
-After collecting all Code Agent outputs, cross-reference against the Planification output:
+Process escalations collected from Phase B:
 
-1. **File mapping check**: Did each Code Agent create/modify the files listed in its `taskItem.files`? Flag unexpected files.
-2. **Reuse compliance**: Compare `filesCreated` against `taskItem.files.reuses` — if a Code Agent created a file that overlaps with a reuse target, flag as potential duplication for the Code Review Agent.
-3. **Acceptance criteria**: Scan each `acceptanceCriteriaMet` — any `met: false` entries are immediate flags.
-4. **Concerns aggregation**: Collect all `concerns` and `bugsReported` from Code Agent outputs. Log bugs to `docs/fixes.md` if not already written.
+1. **Quick-fixes**: already handled in Phase B inner fix loop — no action needed
+2. **Significant issues**: write to `docs/fixes.md`. Add to next iteration troubleshooting context.
+3. **Critical bugs** (security vulnerabilities, data loss risks):
+   - Append to `docs/troubleshooting.md` immediately
+   - Decision: re-run Phase A with troubleshooting context, or ask user via `AskUserQuestion`
+4. **Log everything**: append completed fixes and their outcomes to `docs/<session-name>.iterations.md`
 
-Drift categorization:
-- **minor-drift**: Stylistic deviation — noted, no action
-- **significant-drift**: Wrong approach, missing reuse — forward details to Code Review Agent as additional context
-- **critical-drift**: Completely wrong implementation — re-spawn Code Agent with corrected instructions before proceeding to Review
-
-### Phase 4 — Review & Security
-
-**Spawn Code Review Agent and Security Agent in parallel** via concurrent `Task` calls.
-
-- **Code Review Agent** (subagent_type: `code-review-agent`) — pass `changedFiles`, `sessionName`, `iterationNumber`. Loads the `clean-code` skill internally. Returns `ReviewAgentOutput` with issues typed as `dry-violation | dead-code | bad-pattern | code-quality`.
-- **Security Agent** (subagent_type: `security-agent`) — pass `changedFiles`, `sessionName`, `iterationNumber`. Loads OWASP checklist internally, spawns Explore sub-agents for data flow tracing. Returns `SecurityAgentOutput` with richer fields: `owaspCategory`, `cwe`, `impact`, `fixComplexity`, `needsManualReview`, `attackSurfaceSummary`, `skippedLowValue`.
-
-Both agents are **read-only** — they never modify code. You do NOT need to pass checklists; each agent knows its scope.
-
-**Parse outputs** — issues from both agents are categorized by severity:
-- `quick-fix`: trivial, can be fixed immediately by a Code Agent
-- `significant`: non-trivial, requires planning or architectural consideration
-- `critical`: security vulnerabilities or data loss risks — immediate logging
-
-### Phase 5 — Fix Cycle Processing
-
-Process review results:
-
-1. **Quick-fixes**: spawn targeted Code Agent(s) directly to fix. No re-planning needed.
-2. **Significant issues**: write to `docs/fixes.md`. These get picked up in the next iteration.
-3. **Critical bugs** (security vulnerabilities, data loss risks): append to `docs/troubleshooting.md` immediately.
-4. **Log everything**: append completed fixes and their outcomes to `docs/<session-name>.iterations.md`.
-
-### Phase 6 — Iteration Commit
+### Phase D — Iteration Commit
 
 Once all tests pass and review issues are resolved for the current iteration, **commit the iteration's changes**:
 
@@ -246,18 +266,16 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 
 ### Loop Decision
 
-After Phase 6:
+After Phase D:
 
-1. **Inner loop trigger** — if quick-fixes were applied during Phase 5 and re-validation is needed:
-   - Re-run affected tests (spawn Test Agent in `validate` mode)
-   - If tests pass → proceed to commit
-   - If tests fail → spawn Code Agent for red-green cycle (max 10 cycles, then escalate)
+1. **Re-plan trigger** — if Phase C identified critical issues requiring re-planning:
+   - Go back to **Phase A** with troubleshooting context from the current iteration
 
 2. **Outer loop trigger** — if `globalState.pendingItems` is non-empty:
    - Increment `globalState.currentIteration`
    - Compress the current iteration into `iterationHistory`
    - Select the next batch of spec items
-   - Go back to **Phase 1**
+   - Go back to **Phase A**
 
 3. **Exit** — if all spec items are completed:
    - Proceed to **Completion**
@@ -319,6 +337,19 @@ When writing to doc files, use the compressed structured formats defined in the 
 
 ---
 
+## DATA TRANSPORT BETWEEN PHASES
+
+Between phases, read results from the team's shared task list **before** calling `TeamDelete()`. Task metadata carries the same structured output contracts (unchanged).
+
+| From | To | Data | Transport |
+|------|-----|------|-----------|
+| Lead → Phase A team | Spec items, tech stack, troubleshooting | Task descriptions + agent prompts |
+| Phase A team → Lead | PlanificationOutput, TestAgentOutput | Task metadata (read before TeamDelete) |
+| Lead → Phase B team | CodeAgentInput per agent, changed file lists | Task descriptions + agent prompts |
+| Phase B team → Lead | All outputs + escalations | Task metadata (read before TeamDelete) |
+
+---
+
 ## SPEC DECOMPOSITION STRATEGY
 
 When you receive a full spec, decompose it intelligently:
@@ -348,20 +379,26 @@ When iteration N produces assets needed by iteration N+1:
 
 ## AGENT SPAWNING REFERENCE
 
-| Phase | Agent | subagent_type | When to Spawn | Key Inputs |
-|-------|-------|--------------|---------------|------------|
-| 1 | Planification | `planification-agent` | Start of each full iteration | specItems batch, techStack, troubleshootingHistory, iterationsHistory |
-| 2 | Test | `test-agent` | After Planification returns | testingBrief, specSections, mode, priorTestRun |
-| 3 | Code (per task) | `code-agent` | After Test Agent returns | taskItem, testFiles, specialistSkill, sharedTypes |
-| 4 | Code Review | `code-review-agent` | After all Code Agents complete | changedFiles, sessionName, iterationNumber |
-| 4 | Security | `security-agent` | Parallel with Code Review | changedFiles, sessionName, iterationNumber |
-| 6 | — (Lead Agent) | — | After review + fixes validated | git commit (Lead Agent does this directly) |
+| Phase | Agent | subagent_type | Team Name | When to Spawn | Key Inputs |
+|-------|-------|--------------|-----------|---------------|------------|
+| A | Planification | `planification-agent` | `<session>-phase1-iter<N>` | Start of each iteration | specItems batch, techStack, troubleshootingHistory, iterationsHistory |
+| A | Test | `test-agent` | `<session>-phase1-iter<N>` | Same team as Planification | sessionName, iterationNumber, specSections, mode |
+| B | Code (per task) | `code-agent` | `<session>-phase2-iter<N>` | Start of Phase B | taskItem, testFiles, specialistSkill, sharedTypes |
+| B | Code Review | `code-review-agent` | `<session>-phase2-iter<N>` | Same team as Code Agents | changedFiles, sessionName, iterationNumber |
+| B | Security | `security-agent` | `<session>-phase2-iter<N>` | Same team as Code Agents | changedFiles, sessionName, iterationNumber |
+| D | — (Lead Agent) | — | — | After Phase C | git commit (Lead Agent does this directly) |
 
-**Parallel spawning rules**:
+**Team lifecycle rules**:
+- Phase A team: `TeamCreate` → spawn planification + test-agent → wait for PHASE1-DONE → read outputs → `shutdown_request` all → `TeamDelete`
+- Phase B team: `TeamCreate` → spawn code-agents + code-review + security → wait for PHASE2-DONE → read outputs → `shutdown_request` all → `TeamDelete`
+- Phase C: no team — Lead Agent processes escalations directly
+- Phase D: no team — Lead Agent commits directly
+
+**Parallel spawning rules within teams**:
 - Code Agents for independent tasks: **always parallel** (concurrent `Task` calls in one message)
-- Code Review + Security: **always parallel**
-- Everything else: **sequential** (each phase depends on the previous)
-- Phase 6 (commit): **always sequential** — runs only after all tests pass and fixes are validated
+- Dependent Code Agent tasks: **serialize** via `blockedBy` in task list
+- Review + Security: spawned at team creation, **idle until IMPL tasks complete** (task dependency manages this)
+- Phase D (commit): **always sequential** — runs only after all phases complete
 
 ---
 
@@ -375,7 +412,7 @@ Append to `docs/loopsummary.md` using the **LoopSummary** format from [`schemas/
 
 ### 2. Verify Commits
 
-All iteration commits should already exist (one per validated iteration from Phase 6). Verify with `git log` that all iteration commits are present. If any iteration was not committed (edge case — e.g., crash recovery), stage and commit the remaining changes now.
+All iteration commits should already exist (one per validated iteration from Phase D). Verify with `git log` that all iteration commits are present. If any iteration was not committed (edge case — e.g., crash recovery), stage and commit the remaining changes now.
 
 ### 3. Return Completion Report
 

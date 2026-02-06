@@ -20,7 +20,8 @@
       "Bash(file:*)",
       "Bash(head:*)",
       "Bash(mv:*)",
-      "WebFetch(*)"
+      "WebFetch(*)",
+      "WebSearch(*)"
     ],
     "deny": []
   },

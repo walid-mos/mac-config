@@ -1,7 +1,7 @@
 # Shared Agent Schemas
 
 > Cross-boundary types used by multiple agents.
-> This file is loaded by: Planification Agent, Test Agent.
+> This file is loaded by: Lead Agent, Planification Agent, Test Agent.
 
 ---
 
@@ -10,6 +10,40 @@
 ```typescript
 type TestingStrategy = 'tdd-strict' | 'tdd-flexible' | 'post-code'
 type AssetType = 'component' | 'hook' | 'utility' | 'service' | 'type' | 'config' | 'style' | 'test-utility'
+type IssueSeverity = 'quick-fix' | 'significant' | 'critical'
+```
+
+---
+
+## TechStack
+
+Detected project tech stack — produced by Lead Agent, consumed by all agents.
+
+```typescript
+interface TechStack {
+  languages: string[]                   // e.g., ["typescript", "css"]
+  frameworks: string[]                  // e.g., ["astro", "react"]
+  testRunner: string | null             // e.g., "vitest"
+  packageManager: string                // e.g., "pnpm"
+  buildTool: string | null              // e.g., "vite"
+  configs: string[]                     // Detected config file paths
+}
+```
+
+---
+
+## SwarmConfig
+
+Resolved `.swarm.json` merged with defaults — produced by Lead Agent, consumed by Planification Agent.
+
+```typescript
+interface SwarmConfig {
+  specialists: string[]                 // e.g., ["typescript", "react", "astro"] — or auto-detect
+  defaultTestStrategy: 'tdd-strict' | 'tdd-flexible' | 'configurable'
+  autoCommit: boolean                   // Default: true
+  prOnComplete: boolean                 // Default: true
+  confirmExit: 'auto' | 'always' | 'never'  // Default: "auto"
+}
 ```
 
 ---

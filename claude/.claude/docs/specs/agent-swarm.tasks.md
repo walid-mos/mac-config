@@ -35,34 +35,34 @@ The Lead Agent is the SKILL.md prompt itself — it IS the execution context whe
 
 ### 5a: Agent Spawning & Result Processing
 
-- [ ] **T-18**: Implement Planification Agent spawning — build the full input contract (`taskDescription`, `specItems`, `techStack`, `troubleshootingHistory`, `iterationsHistory`, `swarmConfig`, `codebaseMap`) and parse the structured output (`taskList`, `executionPlan`, `testingBrief`, `reuseMap`, `specUpdates`, `warnings`) (FR-9, FR-10)
-- [ ] **T-19**: Implement Test Agent spawning — pass task list + testing strategies + spec sections from Planification output, parse `TestAgentOutput` (`taskResults`, `summary`, `codeAgentContext`), handle spec feedback loop back to Planification if needed (FR-16, FR-19)
-- [ ] **T-20**: Implement Code Agent spawning — route each task to the right specialist based on `executionPlan.parallel` / `executionPlan.serial`, load domain skill per specialist (e.g., `typescript`, `react`, `astro`), pass test files + reuse map + anti-pattern directives as context, collect all results (FR-20, FR-21, FR-23, FR-24, FR-25)
-- [ ] **T-21**: Implement Review Agent spawning — spawn Code Review + Security agents in parallel via concurrent `Task` calls, pass all changed files, parse categorized issues (`quick-fix` vs `significant`) (FR-26, FR-31)
+- [x] **T-18**: Implement Planification Agent spawning — build the full input contract (`taskDescription`, `specItems`, `techStack`, `troubleshootingHistory`, `iterationsHistory`, `swarmConfig`, `codebaseMap`) and parse the structured output (`taskList`, `executionPlan`, `testingBrief`, `reuseMap`, `specUpdates`, `warnings`) (FR-9, FR-10)
+- [x] **T-19**: Implement Test Agent spawning — pass task list + testing strategies + spec sections from Planification output, parse `TestAgentOutput` (`taskResults`, `summary`, `codeAgentContext`), handle spec feedback loop back to Planification if needed (FR-16, FR-19)
+- [x] **T-20**: Implement Code Agent spawning — route each task to the right specialist based on `executionPlan.parallel` / `executionPlan.serial`, load domain skill per specialist (e.g., `typescript`, `react`, `astro`), pass test files + reuse map + anti-pattern directives as context, collect all results (FR-20, FR-21, FR-23, FR-24, FR-25)
+- [x] **T-21**: Implement Review Agent spawning — spawn Code Review + Security agents in parallel via concurrent `Task` calls, pass all changed files, parse categorized issues (`quick-fix` vs `significant`) (FR-26, FR-31)
 
 ### 5b: Loop Control & State Management
 
-- [ ] **T-22**: Implement fix cycle processing — for `quick-fix` issues: spawn Code Agent directly; for `significant` issues: write to `docs/fixes.md`; for critical bugs: append to `docs/troubleshooting.md`; log all completed fixes in `docs/iterations.md` (FR-28, FR-29, FR-34)
-- [ ] **T-23**: Implement inner loop (short loop) — after review phase, if updates exist, loop back to Code Agents + Tests only (skip re-planning) (FR-35)
-- [ ] **T-24**: Implement outer loop (full loop) — after fixes resolved, if more spec items remain, loop back to Planification with updated state (FR-36)
-- [ ] **T-25**: Implement iteration state tracking — maintain current iteration number, completed spec items, pending spec items, accumulated file changes, test results across iterations
-- [ ] **T-26**: Implement recurring issue detection — track fix patterns across iterations, if same issue type appears 3+ times: stop looping, escalate to user via `AskUserQuestion`, log pattern in `docs/troubleshooting.md`
+- [x] **T-22**: Implement fix cycle processing — for `quick-fix` issues: spawn Code Agent directly; for `significant` issues: write to `docs/fixes.md`; for critical bugs: append to `docs/troubleshooting.md`; log all completed fixes in `docs/iterations.md` (FR-28, FR-29, FR-34)
+- [x] **T-23**: Implement inner loop (short loop) — after review phase, if updates exist, loop back to Code Agents + Tests only (skip re-planning) (FR-35)
+- [x] **T-24**: Implement outer loop (full loop) — after fixes resolved, if more spec items remain, loop back to Planification with updated state (FR-36)
+- [x] **T-25**: Implement iteration state tracking — maintain current iteration number, completed spec items, pending spec items, accumulated file changes, test results across iterations
+- [x] **T-26**: Implement recurring issue detection — track fix patterns across iterations, if same issue type appears 3+ times: stop looping, escalate to user via `AskUserQuestion`, log pattern in `docs/troubleshooting.md`
 
 ### 5c: Context Budget Management
 
-- [ ] **T-27**: Implement context compression between iterations — keep latest iteration in full detail, summarize previous iterations to key outcomes only, preserve full task list and progress state (FR-39)
-- [ ] **T-28**: Implement iteration logging — append structured session headers and iteration summaries to `docs/iterations.md` after each iteration completes
+- [x] **T-27**: Implement context compression between iterations — keep latest iteration in full detail, summarize previous iterations to key outcomes only, preserve full task list and progress state (FR-39)
+- [x] **T-28**: Implement iteration logging — append structured session headers and iteration summaries to `docs/iterations.md` after each iteration completes
 
 ### 5d: Batching & Spec Item Routing
 
-- [ ] **T-29**: Implement spec item batching — analyze total spec items, determine batch size per iteration (based on complexity and dependencies), pass only the current batch to Planification Agent
-- [ ] **T-30**: Implement inter-iteration context passing — when iteration N produces shared types/interfaces, pass them as `existingAssets` to iteration N+1's Planification input
+- [x] **T-29**: Implement spec item batching — analyze total spec items, determine batch size per iteration (based on complexity and dependencies), pass only the current batch to Planification Agent
+- [x] **T-30**: Implement inter-iteration context passing — when iteration N produces shared types/interfaces, pass them as `existingAssets` to iteration N+1's Planification input
 
 ## Phase 6: Review Agents
 
-- [ ] **T-31**: Write the Code Review Agent prompt — DRY, dead code, bad patterns, output categorized as `quick-fix` / `significant` (FR-27)
-- [ ] **T-32**: Write the Security Agent prompt — OWASP, injection, insecure defaults, hardcoded secrets, output categorized as `quick-fix` / `significant` (FR-32)
-- [ ] **T-33**: Define review agent output contract — shared structure for both agents: `{ issues: [{ type, severity, file, line, description, suggestedFix, category: "quick-fix" | "significant" }] }`
+- [x] **T-31**: Write the Code Review Agent prompt — DRY, dead code, bad patterns, output categorized as `quick-fix` / `significant` (FR-27)
+- [x] **T-32**: Write the Security Agent prompt — OWASP, injection, insecure defaults, hardcoded secrets, output categorized as `quick-fix` / `significant` (FR-32)
+- [x] **T-33**: Define review agent output contract — shared structure for both agents: `{ issues: [{ type, severity, file, line, description, suggestedFix, category: "quick-fix" | "significant" }] }`
 
 ## Phase 7: Completion
 
@@ -91,7 +91,7 @@ The Lead Agent is the SKILL.md prompt itself — it IS the execution context whe
 | 2. Planification    | **In progress** | T-5, T-7, T-8 done (agent description written). T-6 pending (wire `/interview` at implementation time) |
 | 3. Test Agent       | **Done** | T-9 to T-12 done (agent description written) |
 | 4. Code Agents      | **In progress** | T-13, T-14, T-16, T-17 done (agent description written). T-15 pending (wire skill loading in Lead Agent orchestration) |
-| 5. Lead Agent Orch. | Not started | Core orchestration: agent spawning (5a), loop control (5b), context mgmt (5c), batching (5d). This is the implementation heart of the swarm. |
-| 6. Review Agents    | Not started | Code Review + Security agent prompts and output contract |
+| 5. Lead Agent Orch. | **Done** | Lead Agent description (`lead-agent.md`) + schema (`schemas/lead-agent.md`) written. All spawning contracts (5a), loop control (5b), context mgmt (5c), batching (5d) fully specified. Wiring happens at runtime. |
+| 6. Review Agents    | **Done** | T-31 (`code-review-agent.md`), T-32 (`security-agent.md`), T-33 (output contracts in `schemas/lead-agent.md`) all done |
 | 7. Completion       | Not started | Exit logic, loopsummary, git commit, PR creation |
 | 8. Testing          | Not started | Smoke, loop, multi-iteration, edge case validation |

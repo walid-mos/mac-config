@@ -5,27 +5,17 @@
   },
   "permissions": {
     "allow": [
-      "Bash(ls:*)",
+      "Bash",
       "Read",
       "Edit",
       "Write",
-      "mcp__plugin_context7_context7__*",
-      "Bash(mkdir:*)",
-      "Bash(stow:*)",
-      "Bash(echo:*)",
-      "Bash(claude:*)",
-      "mcp__plugin_github_github__*",
-      "Bash(cd:*)",
       "Glob",
       "Grep",
-      "Bash(git:*)",
       "Skill",
-      "Bash(cat:*)",
-      "Bash(file:*)",
-      "Bash(head:*)",
-      "Bash(mv:*)",
-      "WebFetch(*)",
-      "WebSearch(*)"
+      "WebFetch",
+      "WebSearch",
+      "mcp__plugin_context7_context7__*",
+      "mcp__plugin_github_github__*"
     ],
     "deny": []
   },
@@ -42,21 +32,15 @@
   "sandbox": {
     "enabled": true,
     "autoAllowBashIfSandboxed": true,
-    "allowUnsandboxedCommands": false,
+    "allowUnsandboxedCommands": true,
     "network": {
-      "allowedDomains": [
-        "*"
-      ],
-      "allowUnixSockets": [],
-      "allowAllUnixSockets": false,
-      "allowLocalBinding": false
+      "allowedDomains": ["*"],
+      "allowAllUnixSockets": true,
+      "allowLocalBinding": true
     },
     "ignoreViolations": {
-      "*": [
-        "/Users/walid/"
-      ]
-    },
-    "excludedCommands": []
+      "*": ["/Users/walid/"]
+    }
   },
   "autoUpdatesChannel": "latest",
   "effortLevel": "medium"

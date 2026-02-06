@@ -10,7 +10,7 @@
 ## Phase 2: Planification Agent
 
 - [x] **T-5**: Write the Planification Agent prompt — smart spec detection logic
-- [ ] **T-6**: Wire `/interview` invocation when spec gaps are detected (FR-11)
+- [x] **T-6**: Wire `/interview` invocation when spec gaps are detected (FR-11)
 - [x] **T-7**: Implement task list generation with per-item testing strategy (FR-13, FR-14)
 - [x] **T-8**: Add troubleshooting.md reading for workflow learning (FR-15)
 
@@ -19,13 +19,13 @@
 - [x] **T-9**: Write the Test Agent prompt — receives task list + testing strategy
 - [x] **T-10**: Implement strict TDD mode — full test files before code (FR-17)
 - [x] **T-11**: Implement flexible mode — test outlines/skeletons (FR-18)
-- [ ] **T-12**: Wire direct communication with Planification Agent (FR-19)
+- [x] **T-12**: Wire direct communication with Planification Agent (FR-19)
 
 ## Phase 4: Code Agents (Specialists)
 
 - [x] **T-13**: Implement auto-detection of tech stack → specialist routing (FR-21)
 - [x] **T-14**: Implement `.swarm.json` config override for specialists (FR-22)
-- [ ] **T-15**: Wire existing skills as specialist context (typescript, react, astro, etc.) (FR-23)
+- [x] **T-15**: Wire existing skills as specialist context (typescript, react, astro, etc.) (FR-23)
 - [x] **T-16**: Implement parallel Task spawning for independent work items (FR-20)
 - [x] **T-17**: Handle interconnected tasks — serialize with shared context (FR-25)
 
@@ -66,14 +66,14 @@ The Lead Agent is the SKILL.md prompt itself — it IS the execution context whe
 
 ## Phase 7: Completion
 
-- [ ] **T-34**: Implement exit condition logic — `auto`: auto-exit for small tasks (< 5 files, simple spec), ask confirmation for large/risky; `always`: always ask via `AskUserQuestion`; `never`: proceed without confirmation (FR-40)
-- [ ] **T-35**: Implement `loopsummary.md` generation — tasks completed, iteration count, files changed, test counts, changes summary, issues encountered (FR-41)
-- [ ] **T-36**: Implement git commit — stage only changed files, descriptive message from session name + summary, no `--force` / `--no-verify` (FR-42)
-- [ ] **T-37**: Implement PR creation via `gh pr create` — title from session name, body from loopsummary.md session content (FR-43)
+- [x] **T-34**: Implement exit condition logic — `auto`: auto-exit for small tasks (< 5 files, simple spec), ask confirmation for large/risky; `always`: always ask via `AskUserQuestion`; `never`: proceed without confirmation (FR-40)
+- [x] **T-35**: Implement `loopsummary.md` generation — tasks completed, iteration count, files changed, test counts, changes summary, issues encountered (FR-41)
+- [x] **T-36**: Implement git commit — stage only changed files, descriptive message from session name + summary, no `--force` / `--no-verify` (FR-42)
+- [x] **T-37**: Implement PR creation via `gh pr create` — title from session name, body from loopsummary.md session content (FR-43)
 
 ## Phase 8: Testing & Validation
 
-- [ ] **T-38**: Create a dummy test project with a small spec (2-3 FRs, single specialist)
+- [x] **T-38**: Create a dummy test project with a small spec (2-3 FRs, single specialist)
 - [ ] **T-39**: Smoke test — run `/swarm` on the test project, verify single-iteration happy path (planification → tests → code → review → commit)
 - [ ] **T-40**: Loop test — intentionally leave issues for review agents to catch, verify inner loop triggers and resolves
 - [ ] **T-41**: Multi-iteration test — spec with 5+ items requiring batching, verify outer loop and inter-iteration context passing

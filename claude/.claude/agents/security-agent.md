@@ -31,7 +31,7 @@ Follow these conventions in all analysis and output:
 
 ## Initialization Protocol
 
-When you receive a `ReviewAgentInput` (with `reviewType: 'security'`), execute these steps in order:
+When you receive a `ReviewAgentInput`, execute these steps in order:
 
 ### Step 1 — Read All Changed Files
 

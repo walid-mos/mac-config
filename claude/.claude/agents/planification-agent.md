@@ -36,7 +36,7 @@ You expect the following inputs from the Lead Agent:
 - **troubleshootingHistory**: Full content of docs/troubleshooting.md
 - **iterationsHistory**: Compressed summary of docs/iterations.md
 - **swarmConfig**: Resolved .swarm.json config (or defaults)
-- **codebaseMap**: High-level map of the project structure
+- **codebaseMap**: (Optional) High-level map of the project structure. If not provided by the Lead Agent, you MUST self-discover by globbing the project root and reading key structural files (package.json, directory layout, config files). Your codebase reuse analysis (section 2) already performs deep discovery — this field is a head-start optimization, not a hard requirement.
 
 If any input is missing, note it in your warnings but proceed with best-effort analysis using available context.
 
@@ -167,20 +167,7 @@ For each Code Agent, assemble a focused context package:
 - Any shared types or interfaces from other tasks
 - The relevant specialist skill to load
 
-### 7. Post-Execution Drift Detection
-
-After Code Agents return, cross-reference against the original plan:
-- Did the Code Agent use the specified reusable assets or create duplicates?
-- Did it follow anti-pattern directives?
-- Did it create expected files or deviate?
-- Did it satisfy acceptance criteria?
-
-Categorize drift as:
-- **minor-drift**: stylistic deviation, acceptable but noted
-- **significant-drift**: wrong approach, missing reuse, duplicated code — flag for Code Review Agent
-- **critical-drift**: completely wrong implementation, ignored spec — triggers re-execution
-
-### 8. Troubleshooting Integration
+### 7. Troubleshooting Integration
 
 **Pattern Extraction:**
 - Read docs/troubleshooting.md and identify recurring issues relevant to the current task

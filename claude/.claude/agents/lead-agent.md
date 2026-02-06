@@ -143,6 +143,8 @@ This is the heart of the swarm. You execute this loop until all spec items are c
 
 Build the input contract per the Planification Agent's INPUT CONTRACT (defined in [`planification-agent.md`](./planification-agent.md)): pass the current spec item batch, existing specs/gaps, tech stack, troubleshooting history, compressed iteration history, swarm config, and a high-level codebase map.
 
+For `codebaseMap`: provide a high-level directory tree (top 2-3 levels) and key entry points. This is an optimization — the Planification Agent will perform its own deep discovery regardless. A quick `ls` of `src/` or the project root is sufficient.
+
 **Parse the output** — the Planification Agent returns a `PlanificationOutput` (defined in [`schemas/planification.md`](./schemas/planification.md)): `taskList`, `executionPlan`, `testingBrief`, `reuseMap`, `specUpdates`, `warnings`, `troubleshootingApplied`.
 
 Handle the output:
@@ -154,6 +156,11 @@ Handle the output:
 **Spawn the Test Agent** via `Task` (subagent_type: `test-agent`).
 
 Build a `TestAgentInput` (defined in [`schemas/test-agent.md`](./schemas/test-agent.md)): pass the `testingBrief` from Planification output, per-task spec sections, session name, iteration number, `mode: 'initial'`, and `priorTestRun: null`.
+
+Build the `specSections` array by mapping each task in the current batch to its raw spec content:
+- For each task in `testingBrief.items`, look up the corresponding spec item from `globalState.specItems` by matching `taskId` → `specItems[].id`
+- Extract the raw `content` field from the matching `SpecItem`
+- Set `source` to `'user-spec'` if the spec came from `normalizedSpec.type === 'full-spec'`, or `'inferred'` if synthesized by the Planification Agent
 
 **Parse the `TestAgentOutput`** (defined in [`schemas/test-agent.md`](./schemas/test-agent.md)) — extract:
 - `taskResults`: test file paths per task, strategy execution status
@@ -177,6 +184,20 @@ Each Code Agent receives a `CodeAgentInput` (defined in [`schemas/lead-agent.md`
 - Record `testResults` (passing/failing counts)
 - Note `concerns` and `bugsReported`
 - If `status === 'failed' | 'blocked'`: log the issue and decide — retry, skip, or escalate
+
+### Post-Coding Drift Detection
+
+After collecting all Code Agent outputs, cross-reference against the Planification output:
+
+1. **File mapping check**: Did each Code Agent create/modify the files listed in its `taskItem.files`? Flag unexpected files.
+2. **Reuse compliance**: Compare `filesCreated` against `taskItem.files.reuses` — if a Code Agent created a file that overlaps with a reuse target, flag as potential duplication for the Code Review Agent.
+3. **Acceptance criteria**: Scan each `acceptanceCriteriaMet` — any `met: false` entries are immediate flags.
+4. **Concerns aggregation**: Collect all `concerns` and `bugsReported` from Code Agent outputs. Log bugs to `docs/fixes.md` if not already written.
+
+Drift categorization:
+- **minor-drift**: Stylistic deviation — noted, no action
+- **significant-drift**: Wrong approach, missing reuse — forward details to Code Review Agent as additional context
+- **critical-drift**: Completely wrong implementation — re-spawn Code Agent with corrected instructions before proceeding to Review
 
 ### Phase 4 — Review & Security
 

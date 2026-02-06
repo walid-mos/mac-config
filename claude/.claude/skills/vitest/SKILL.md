@@ -65,6 +65,7 @@ Before writing any test, pass ALL 4 gates:
 - `vi.hoisted()` for shared module-level mocks
 - Prefer dependency injection over `vi.mock()` — easier to test, easier to read
 - If you mock more than 2 things in a test, the unit is too coupled — refactor the code
+- **3-mock threshold**: If a test requires 3+ mocks, add `// WARNING: over-mocked — code coupling issue, consider refactoring` and flag to team lead
 
 ## Assertions
 
@@ -90,9 +91,69 @@ Before writing any test, pass ALL 4 gates:
 - `vi.waitFor()` for eventually-consistent behavior (DOM updates, debounced calls)
 - `vi.advanceTimersByTime(ms)` over `vi.runAllTimers()` for precise control
 - Test both resolve and reject paths for async functions
+- Clean up in `afterEach`: cancel pending timers, abort controllers, unmount components
 
 ## Test File Organization
 
 - Colocate test files next to source: `user-service.ts` → `user-service.test.ts`
 - One test file per source file — split if test file exceeds 300 lines
-- Group test utilities in `__test-utils__/` directories, not generic `utils/`
+- **300-line split rule**: When splitting, group by behavior. Shared factories and helpers go to `__test-utils__/` directories, not generic `utils/`
+
+## TDD Template
+
+Reference structure for strict TDD workflows:
+
+```typescript
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+
+// Factory functions at top
+const createTestData = (overrides = {}) => ({
+  // sensible defaults representing valid state
+  ...overrides,
+})
+
+describe('<Feature> — <behavior group>', () => {
+  beforeEach(() => {
+    // shared setup — reset state, seed mocks
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('<scenario> — <expected outcome>', () => {
+    // Arrange
+    const input = createTestData()
+
+    // Act
+    const result = functionUnderTest(input)
+
+    // Assert
+    expect(result).toEqual(expected)
+  })
+
+  describe('edge cases', () => {
+    it('handles empty input', () => { /* ... */ })
+    it('handles null/undefined', () => { /* ... */ })
+    it('handles boundary values', () => { /* ... */ })
+  })
+
+  describe('error paths', () => {
+    it('throws on invalid input', () => { /* ... */ })
+    it('returns fallback on failure', () => { /* ... */ })
+  })
+})
+```
+
+## Anti-Patterns — NEVER Do These
+
+1. NEVER test implementation details — no internal state, private methods, CSS classes, DOM structure
+2. NEVER use snapshot tests for components — they break on every change, nobody reads the diff
+3. NEVER use `getByTestId` as default query strategy — it masks a11y issues
+4. NEVER leave `vi.mock()` without `vi.restoreAllMocks()` in `afterEach`
+5. NEVER write tests just for coverage numbers — every test must pass the 4-gate decision framework
+6. NEVER use `any` in test types — use test-specific types or `unknown` with type guards
+7. NEVER use external `.snap` files — inline snapshots only (`toMatchInlineSnapshot()`)
+8. NEVER share mutable state between tests — each test must be independent
+9. NEVER use `fireEvent` when `userEvent` is available
+10. NEVER mock pure functions or internal modules

@@ -18,18 +18,21 @@
       "Skill",
       "Bash(cat:*)",
       "Bash(file:*)",
-      "Bash(head:*)"
+      "Bash(head:*)",
+      "Bash(mv:*)",
+      "WebFetch(*)"
     ],
-    "deny": [
-      "Bash(rm:*)"
-    ]
+    "deny": []
   },
-  "allowManagedPermissionRulesOnly": true,
+  "allowManagedPermissionRulesOnly": false,
   "sandbox": {
     "enabled": true,
-    "autoAllowBashIfSandboxed": false,
+    "autoAllowBashIfSandboxed": true,
     "allowUnsandboxedCommands": false,
     "excludedCommands": [],
+    "ignoreViolations": {
+      "*": ["/Users/walid/"]
+    },
     "network": {
       "allowUnixSockets": [],
       "allowAllUnixSockets": false,

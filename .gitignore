@@ -1,3 +1,5 @@
+.DS_Store
+
 # Claude: track config, ignore runtime data
 claude/.claude/projects/
 claude/.claude/debug/

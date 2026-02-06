@@ -6,9 +6,11 @@ argument-hint: [task description]
 allowed-tools: Task, Read, Glob, Grep, Write, Edit, Bash, Skill, AskUserQuestion
 ---
 
-# Swarm Skill — Lead Agent
+# Swarm Skill — Launcher
 
-Orchestrate a team of specialized agents (Planification, Test, Code, Review, Security) to autonomously work through development tasks. You are the Lead Agent — you read specs, manage state, delegate work via the `Task` tool, and loop until all spec items are complete.
+This skill is a thin launcher. It prepares the context, spawns the **Lead Agent** via `Task`, and handles PR creation when the Lead Agent finishes.
+
+**You do NOT orchestrate the work yourself.** You prepare inputs, spawn the Lead Agent, and handle post-completion actions.
 
 ## Argument Parsing
 
@@ -21,199 +23,238 @@ Examples:
 - `/swarm refactor the payment module` → `refactor-payment-module`
 - `/swarm fix broken dark mode toggle` → `fix-dark-mode-toggle`
 
-## Initialization
+## Step 1 — Gather Context & Ensure Specs
 
-### 1. Spec Detection
+Perform 1a through 1d in parallel, then run 1e (spec qualification) sequentially.
 
-Check for existing specs that cover the task:
+### 1a. Spec Detection
 
 1. Glob `docs/specs/*.spec.md`
-2. Read any matching specs and assess coverage
-3. If a complete spec exists — use it directly, skip to planning
-4. If partial coverage — note the gaps for the Planification Agent
-5. If no spec exists — the Planification Agent will handle it
+2. Read any matching specs that relate to the task description
+3. Preliminary classification: `found` or `not-found`
 
-### 2. Tech Stack Detection
+### 1b. Tech Stack Detection
 
-Analyze the codebase to determine the project's tech stack:
+Build a `TechStack` object (see `agents/schemas/shared.md`):
 
 - Read `package.json` (dependencies, devDependencies, scripts)
 - Glob for framework config files (`astro.config.*`, `next.config.*`, `vite.config.*`, `tsconfig.json`, `tailwind.config.*`, `dagger.*`)
 - Scan file extensions to identify languages in use
-- Store the detected stack for routing work to the right specialist agents
+- Detect test runner from config or devDependencies (`vitest`, `jest`, `playwright`)
+- Detect package manager from lock files (`pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`)
+- Detect build tool from config (`vite`, `webpack`, `turbopack`)
 
-### 3. Configuration
-
-Check for an optional `.swarm.json` at project root:
-
-```json
-{
-  "specialists": ["typescript", "astro", "react"],
-  "defaultTestStrategy": "tdd-flexible",
-  "autoCommit": true,
-  "prOnComplete": true,
-  "confirmExit": "auto"
+Result:
+```
+TechStack {
+  languages: string[]
+  frameworks: string[]
+  testRunner: string | null
+  packageManager: string
+  buildTool: string | null
+  configs: string[]         // Paths of detected config files
 }
 ```
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `specialists` | auto-detect | Which skill-based specialists are available |
-| `defaultTestStrategy` | `"configurable"` | Default testing approach (Planification Agent can override per task) |
-| `autoCommit` | `true` | Auto-commit on completion |
-| `prOnComplete` | `true` | Create PR on completion |
-| `confirmExit` | `"auto"` | When to ask user confirmation before ending (`auto`, `always`, `never`) |
+### 1c. Configuration
 
-If `.swarm.json` is missing or has invalid fields, fall back to auto-detection and defaults. Warn about invalid specialist names but continue.
+Read `.swarm.json` at project root (if it exists), merge with defaults to produce a `SwarmConfig`:
 
-### 4. Documentation Initialization
-
-Create or append headers to the persistent documentation files:
-
-```markdown
-## Session: <session-name> — <ISO-8601 timestamp>
+```
+SwarmConfig {
+  specialists: string[]                     // Default: auto-detect from tech stack
+  defaultTestStrategy: "tdd-strict" | "tdd-flexible" | "configurable"  // Default: "configurable"
+  autoCommit: boolean                       // Default: true
+  prOnComplete: boolean                     // Default: true
+  confirmExit: "auto" | "always" | "never"  // Default: "auto"
+}
 ```
 
-Files to initialize:
-- `docs/iterations.md` — persistent, append mode — log of each iteration
-- `docs/troubleshooting.md` — persistent, append mode — significant bugs and issues
-- `docs/loopsummary.md` — persistent, append mode — final summary (written at completion)
-- `docs/fixes.md` — loop-scoped, fresh each review cycle — current fixes to apply
+If `.swarm.json` is missing or has invalid fields, fall back to defaults. Warn about invalid specialist names but continue.
 
-Create the `docs/` directory if it does not exist.
+### 1d. Record the Base Branch
 
-## Orchestration Loop
+Run `git branch --show-current` and store the result as `baseBranch`. This is the branch the PR will target.
 
-### Phase 1: Planification
+### 1e. Spec Qualification (sequential — depends on 1a)
 
-Spawn the **Planification Agent** via `Task`:
-- Pass: task description, detected specs (or gaps), tech stack, contents of `docs/troubleshooting.md` (lessons from past runs)
-- The Planification Agent will:
-  - Assess spec completeness
-  - Invoke `/interview` via the `Skill` tool if gaps exist (or create a minimal inline spec if user declines)
-  - Produce an ordered task list with testing strategy per item (`tdd-strict`, `tdd-flexible`, or `post-code`)
-  - Return: task list, testing strategies, any updated spec content
+This step determines the `NormalizedSpec` that will be passed to the Lead Agent. **The Lead Agent must receive a complete, actionable spec.** The `/interview` skill is the mechanism to ensure this.
 
-### Phase 2: Testing
+#### Case 1: No spec found (`not-found` from 1a)
 
-Spawn the **Test Agent** via `Task`:
-- Pass: task list, testing strategies, relevant spec sections, tech stack
-- The Test Agent will:
-  - For `tdd-strict` items: write complete test files before any code
-  - For `tdd-flexible` items: write test outlines/skeletons
-  - For `post-code` items: note what to test after implementation
-  - Return: test file paths, test outlines, testing context for Code Agents
+**`/interview` is MANDATORY.** Invoke it immediately:
 
-### Phase 3: Coding
-
-Spawn **Code Agents** via `Task` — one per independent work item, in parallel:
-- Route each item to the right specialist based on the files involved and the detected tech stack
-- Pass: task item, test files/outlines, relevant spec section, shared context (types, interfaces) if tasks are interconnected
-- Each Code Agent loads its domain skill (e.g., `typescript`, `react`, `astro`) for standards
-- For interconnected tasks: serialize instead of parallelize, passing output of one as input to the next
-- Collect all results before proceeding
-
-### Phase 4: Review and Security
-
-Spawn the **Code Review Agent** and **Security Agent** in parallel via `Task`:
-
-**Code Review Agent** receives all changed files and checks for:
-- DRY violations
-- Useless fallbacks and dead code
-- Bad patterns and code quality issues
-- Returns: list of issues categorized as `quick-fix` or `significant`
-
-**Security Agent** receives all changed files and checks for:
-- OWASP top 10 vulnerabilities
-- Injection risks, insecure defaults, missing input validation
-- Hardcoded secrets or credentials
-- Returns: list of issues categorized as `quick-fix` or `significant`
-
-### Phase 5: Fix Cycle
-
-Process review results:
-
-1. **Quick fixes**: spawn Code Agent(s) directly to fix trivial issues immediately
-2. **Significant issues**: write to `docs/fixes.md` for the next iteration
-3. **Critical/persistent bugs**: append to `docs/troubleshooting.md`
-4. **All completed fixes**: log in `docs/iterations.md`
-
-### Loop Decision
-
-After the fix cycle:
-
-1. If Review or Security returned updates → **short loop**: go back to Phase 3 (Code Agents + Tests only, no re-planning)
-2. If all fixes are resolved but more spec items remain → **full loop**: go back to Phase 1 (Planification decides what to delegate next)
-3. If nothing remains → proceed to **Completion**
-
-### Recurring Issue Detection
-
-Track fix patterns across iterations. If the same issue type appears 3+ times:
-- Stop looping on that issue
-- Escalate to the user via `AskUserQuestion`
-- Log the pattern in `docs/troubleshooting.md`
-
-### Context Management
-
-Between iterations, compress the iteration history:
-- Keep the latest iteration in full detail
-- Summarize previous iterations to key outcomes only
-- Preserve the full task list and current progress state
-
-## Completion
-
-### 1. Write Summary
-
-Append the final summary to `docs/loopsummary.md`:
-
-```markdown
-## Session: <session-name> — <ISO-8601 timestamp>
-
-### Summary
-- Tasks completed: X/Y
-- Iterations: N
-- Files changed: [list]
-- Tests: passed/failed/skipped counts
-
-### Changes
-- [Brief description of each major change]
-
-### Issues Encountered
-- [Any significant issues and how they were resolved]
+```
+Skill: interview
+Args: <task description>
 ```
 
-### 2. Git Commit
+Wait for the interview to complete. It will produce `docs/specs/<feature-name>.spec.md`. Read the produced file.
 
-Create a git commit covering all changes:
-- Use a descriptive commit message derived from the session name and summary
-- Stage only the files that were changed during this swarm session
-- Never use `--force`, `--no-verify`, or other destructive flags
+Result: `NormalizedSpec = { type: "full-spec", content: <file contents>, path: <file path> }`
 
-### 3. Pull Request
+#### Case 2: Spec found (`found` from 1a)
 
-Create a PR via `gh pr create`:
-- Title: derived from session name
-- Body: content from `docs/loopsummary.md` for this session
-- Base branch: the branch that was active when the swarm started
+Read the spec and assess its completeness against these criteria:
 
-### 4. Exit Confirmation
+1. **Has Functional Requirements** — at least one `FR-*` or equivalent numbered requirement
+2. **Has Data Model** — entities, fields, types described (if applicable to the task)
+3. **Has Acceptance Criteria** — clear, testable conditions for "done"
+4. **No Open Questions** — the `## Open Questions` section is empty or absent
+5. **Covers the task scope** — the spec FRs actually address the task description (not a different feature)
+
+**If ALL criteria pass**: the spec is complete.
+
+Result: `NormalizedSpec = { type: "full-spec", content: <file contents>, path: <file path> }`
+
+**If ANY criteria fail**: gaps exist. Invoke `/interview` in **deepen** mode to fill them:
+
+```
+Skill: interview
+Args: <task description> — deepening existing spec at <spec path>
+```
+
+The interview will enrich the existing spec via Edit. Read the updated file afterward.
+
+Result: `NormalizedSpec = { type: "full-spec", content: <updated contents>, path: <file path> }`
+
+> **Note**: After Step 1e, the `NormalizedSpec` should ALWAYS be `full-spec`. The `partial-spec` and `no-spec` types exist in the schema for edge cases (user explicitly skips interview), but the default flow always produces a full spec.
+
+## Step 2 — Create Feature Branch
+
+Create and switch to a feature branch for this swarm session:
+
+```bash
+git checkout -b feat/<session-name>
+```
+
+If the branch already exists, switch to it instead of creating a new one.
+
+## Step 3 — Spawn the Lead Agent
+
+Spawn the Lead Agent via `Task` with `subagent_type: "lead-agent"`.
+
+Build the prompt as a structured `LeadAgentInput` (see `agents/schemas/lead-agent.md`):
+
+```
+## LeadAgentInput
+
+### taskDescription
+<original free-form task description>
+
+### sessionName
+<kebab-case session name>
+
+### normalizedSpec
+type: full-spec
+path: <path to spec file>
+content:
+---
+<full contents of the spec file>
+---
+
+### techStack
+languages: [<detected languages>]
+frameworks: [<detected frameworks>]
+testRunner: <detected or null>
+packageManager: <detected>
+buildTool: <detected or null>
+configs: [<list of detected config file paths>]
+
+### swarmConfig
+specialists: [<resolved list or "auto-detect">]
+defaultTestStrategy: <resolved value>
+autoCommit: <resolved value>
+prOnComplete: <resolved value>
+confirmExit: <resolved value>
+
+### existingDocs
+troubleshooting: <contents of docs/troubleshooting.md, or "null">
+iterations: <contents of docs/<session-name>.iterations.md if resuming, or "null">
+
+## CRITICAL INSTRUCTIONS
+
+- You MUST complete ALL spec items before returning. Do NOT stop early.
+- If you encounter a blocker, escalate via AskUserQuestion — do NOT silently stop.
+- Run the full orchestration loop: Planification → Testing → Coding → Review → Fix → repeat until done.
+- Commit each validated iteration.
+- Write the loop summary to docs/loopsummary.md before returning.
+- When you are done, return a structured completion report:
+  STATUS: completed | partial | blocked
+  COMPLETED: <N>/<total> spec items
+  FILES_CHANGED: <comma-separated list>
+  PENDING_ITEMS: <list or "none">
+  BLOCKER: <description or "none">
+  SUMMARY: <1-2 sentence summary>
+```
+
+## Step 4 — Handle Lead Agent Result
+
+When the Lead Agent returns, parse its completion report.
+
+### If status is "completed"
+
+All spec items are done. Proceed to Step 5 (PR Creation).
+
+### If status is "partial"
+
+Some items remain. Evaluate:
+
+1. Read the Lead Agent's output to understand what was completed and what remains
+2. If remaining items are blocked by user decisions → ask the user via `AskUserQuestion`
+3. If remaining items failed due to technical issues → re-spawn the Lead Agent with:
+   - Only the pending items
+   - The troubleshooting history (updated with what failed)
+   - A directive to focus on the remaining work
+4. Repeat until all items are done or the user decides to stop
+
+### If status is "blocked"
+
+The Lead Agent hit an unresolvable issue:
+
+1. Present the blocker to the user via `AskUserQuestion`
+2. Based on user response:
+   - **Fix and retry**: re-spawn Lead Agent with updated context
+   - **Skip blocked items**: proceed to PR with partial completion
+   - **Abort**: stop without PR
+
+## Step 5 — Pull Request Creation
+
+Once the Lead Agent has completed (or the user accepts partial completion):
+
+### 5a. Exit Confirmation
 
 Based on `confirmExit` config:
-- `auto`: auto-exit for small tasks (< 5 files changed, simple spec), ask confirmation for large/risky tasks
-- `always`: always ask via `AskUserQuestion` before committing and creating PR
+- `auto`: auto-proceed for small tasks (< 5 files changed), ask for large tasks
+- `always`: always ask via `AskUserQuestion`
 - `never`: proceed without confirmation
+
+### 5b. Create the PR
+
+1. Push the feature branch: `git push -u origin feat/<session-name>`
+2. Read `docs/loopsummary.md` for the PR body content
+3. Create the PR:
+
+```bash
+gh pr create \
+  --title "feat(<session-name>): <short description>" \
+  --body "$(cat docs/loopsummary.md)" \
+  --base <baseBranch> \
+  --head feat/<session-name>
+```
+
+4. Return the PR URL to the user.
 
 ## Edge Cases
 
-- **No spec exists and user skips interview**: create a minimal inline spec from the task description and proceed
-- **All Code Agents fail**: log to `docs/troubleshooting.md` and ask the user for guidance via `AskUserQuestion`
-- **Context window approaching limit**: compress iteration history aggressively, keep only current state and latest iteration
-- **Interconnected tasks across specialists**: serialize dependent tasks, pass shared context between them
-- **`.swarm.json` has invalid specialist**: warn and fall back to auto-detection for that specialist
+- **Lead Agent returns without completion report**: treat as "partial", check `docs/loopsummary.md` and `git log` to assess what was done, then re-spawn if needed
+- **Lead Agent context exhaustion**: if the agent hits context limits mid-run, it should have committed per-iteration; re-spawn with remaining items and troubleshooting history
+- **No changes made**: if no files were changed, do not create an empty PR — inform the user
+- **PR creation fails**: show the error to the user, provide the manual command to run
 
 ## Constraints
 
 - Never run destructive commands: no `rm -rf`, no `git push --force`, no `git reset --hard`, no branch deletion
-- Git operations are limited to: commit and PR creation
-- Follow OWASP top 10 guidelines — the Security Agent enforces this
+- Git operations are limited to: branch creation, commit, push, and PR creation
+- The skill is a launcher — all implementation work happens in the Lead Agent and its sub-agents
 - Never commit secrets or credentials

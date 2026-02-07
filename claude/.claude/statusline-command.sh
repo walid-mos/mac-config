@@ -6,7 +6,7 @@ input=$(cat)
 
 # Extract context data
 cwd=$(echo "$input" | jq -r '.workspace.current_dir')
-base_dir=$(echo "$input" | jq -r '.workspace.base_dir // empty')
+base_dir=$(echo "$input" | jq -r '.workspace.project_dir // .workspace.base_dir // empty')
 model=$(echo "$input" | jq -r '.model.display_name')
 remaining=$(echo "$input" | jq -r '.context_window.remaining_percentage // empty')
 message=$(echo "$input" | jq -r '.message // empty')
@@ -14,13 +14,12 @@ message=$(echo "$input" | jq -r '.message // empty')
 # Claude Code version
 cc_version=$(claude --version 2>/dev/null | head -1 | sed 's/ .*//')
 
-# Directory display: show base -> current if cd'd elsewhere
+# Directory display: show project -> subdir only when cwd differs from project_dir
 dir_name=$(basename "$cwd")
 if [ -n "$base_dir" ] && [ "$cwd" != "$base_dir" ]; then
   base_name=$(basename "$base_dir")
-  # Shorten cwd with ~ for home
-  short_cwd="${cwd/#$HOME/~}"
-  dir_name="(${base_name} -> ${short_cwd})"
+  rel_path="${cwd#$base_dir/}"
+  dir_name="(${base_name} -> ${rel_path})"
 fi
 
 # Colors

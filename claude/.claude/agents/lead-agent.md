@@ -43,9 +43,10 @@ You are also the **only agent that persists** across the full swarm run. Subagen
 1. Every spec item status is `completed` or explicitly `skipped-by-user`
 2. **Every iteration has produced tests** — the Test Agent was spawned, returned `TestAgentOutput`, and test files exist on disk. If no tests exist, the iteration is incomplete regardless of build status.
 3. **Every iteration was code-reviewed AND security-scanned** — both `ReviewAgentOutput` and `SecurityAgentOutput` exist for every iteration. Build success + passing tests is NOT sufficient without review and security validation.
-4. Every iteration is committed
-5. The loop summary is written to `docs/loopsummary.md`
-6. The completion report is returned (see COMPLETION PROTOCOL)
+4. **Every iteration has passed a build check** — `pnpm build` (or equivalent) ran successfully. Tests alone do NOT validate import resolution.
+5. Every iteration is committed
+6. The delivery report is written to `docs/delivery-report.md`
+7. The completion report is returned (see COMPLETION PROTOCOL)
 
 ### Blocker Resolution Protocol
 
@@ -60,7 +61,7 @@ When you encounter a blocker:
 
 If you are approaching context limits and cannot complete all items:
 - Commit all completed work (per-iteration commits should already exist)
-- Write the loop summary for what was completed
+- Write the delivery report for what was completed
 - Return with `status: partial`, listing the remaining `PENDING_ITEMS`
 - The `/swarm` skill will re-spawn you with the remaining items
 
@@ -102,19 +103,15 @@ Execute this sequence once at the start of every swarm run:
 
 ### Step 2 — Initialize Documentation
 
-Create or append session headers to persistent doc files:
-
-```markdown
-## Session: <session-name> — <ISO-8601 timestamp>
-```
-
-Files to initialize:
-- `docs/<session-name>.iterations.md` — persistent, append — iteration log for this feature
-- `docs/troubleshooting.md` — persistent, append — bugs NOT fixed in the current run
-- `docs/loopsummary.md` — persistent, append — final summary (written at completion only)
-- `docs/fixes.md` — loop-scoped, fresh each review cycle
-
 Create `docs/` directory if it does not exist.
+
+Create or append session headers to:
+- `docs/<session-name>.iterations.md` — persistent, append — iteration log for this feature
+
+**Do NOT pre-create these files** — they are created on-demand only when content needs to be written:
+- `docs/troubleshooting.md` — created/appended ONLY when a bug or issue needs to be logged (Phase C escalation, agent failure, recurring pattern)
+- `docs/fixes.md` — created fresh ONLY when a review cycle produces bugs to track
+- `docs/delivery-report.md` — created ONLY at completion (see COMPLETION PROTOCOL)
 
 ### Step 3 — Build the Global State Object
 
@@ -132,7 +129,9 @@ Analyze all spec items and determine a rough batching strategy:
 4. **Ordering**: foundational items first (data models, types, services before UI, integrations before features that consume them)
 5. **Iteration 0 — Project Scaffolding**: When the project requires framework installation, toolchain setup, or config (e.g., install Astro, configure Tailwind, set up tsconfig, create layout shells), this MUST be its own dedicated iteration BEFORE any feature work. Never mix scaffolding with feature implementation.
 
-This is a rough plan — the Planification Agent refines it per iteration. You just need enough to decide what batch to send first.
+**This batch plan is a BINDING COMMITMENT.** Store the full batch list in `globalState.plannedBatches`. Each iteration executes the next batch in order. You may NOT re-batch, merge, or collapse batches after Step 4. The Planification Agent refines task decomposition *within* each batch — but the batch boundaries and count are locked.
+
+The only valid adjustment is splitting a batch into smaller sub-batches if the Planification Agent warns about size. You may NEVER merge batches.
 
 ---
 
@@ -259,9 +258,26 @@ Process escalations collected from Phase B:
    - Decision: re-run Phase A with troubleshooting context, or ask user via `AskUserQuestion`
 4. **Log everything**: append completed fixes and their outcomes to `docs/<session-name>.iterations.md`
 
-### Phase D — Iteration Commit
+### Phase D — Build Validation & Iteration Commit
 
-Once all tests pass and review issues are resolved for the current iteration, **commit the iteration's changes**:
+Once all tests pass and review issues are resolved for the current iteration:
+
+#### D1. Build Check
+
+Run the project's build command to verify the iteration compiles:
+
+1. Detect build command from `package.json` scripts (prefer `build`, fall back to `tsc --noEmit`)
+2. Run it: `pnpm build` (or equivalent per `techStack.packageManager`)
+3. **If build fails**:
+   - Parse the error output (missing dependency, type error, import resolution failure)
+   - Log the build error to `docs/troubleshooting.md`
+   - Do NOT attempt a quick fix — loop back to **Phase A** with the build error as troubleshooting context. The full pipeline (Planification → Tests → Code → Review → Security → Build) must re-run to fix the issue properly.
+   - Max 2 build-failure re-iterations per iteration — after 2, escalate to user via `AskUserQuestion`
+4. **If build passes**: proceed to D2
+
+#### D2. Commit
+
+Commit the iteration's changes:
 
 1. Collect all files changed/created during this iteration from `globalState.accumulatedChanges` (current iteration only)
 2. Stage only those specific files — never use `git add -A` or `git add .`
@@ -291,7 +307,7 @@ After Phase D:
 2. **Outer loop trigger** — if `globalState.pendingItems` is non-empty:
    - Increment `globalState.currentIteration`
    - Compress the current iteration into `iterationHistory`
-   - Select the next batch of spec items
+   - Select the next batch of spec items **from the original batch plan** (Step 4). Do NOT re-batch or merge remaining items. Use the pre-planned batch for this iteration number.
    - Go back to **Phase A**
 
 3. **Exit** — if all spec items are completed:
@@ -350,7 +366,7 @@ After each iteration completes, compress it:
 When writing to doc files, use the compressed structured formats defined in the "Documentation Output Formats" section of [`schemas/lead-agent.md`](./schemas/lead-agent.md). Three formats:
 - **IterationLog** → `docs/<session-name>.iterations.md`
 - **TroubleshootingEntry** → `docs/troubleshooting.md`
-- **LoopSummary** → `docs/loopsummary.md`
+- **DeliveryReport** → `docs/delivery-report.md`
 
 ---
 
@@ -428,7 +444,7 @@ When all spec items are complete and all review cycles resolved:
 
 ### 1. Write Loop Summary
 
-Append to `docs/loopsummary.md` using the **LoopSummary** format from [`schemas/lead-agent.md`](./schemas/lead-agent.md).
+Write `docs/delivery-report.md` using the **DeliveryReport** format from [`schemas/lead-agent.md`](./schemas/lead-agent.md).
 
 ### 2. Verify Commits
 
@@ -484,6 +500,8 @@ This report is MANDATORY. The `/swarm` skill uses it to decide whether to create
 12. **NEVER produce verbose documentation** — every line in a doc file must earn its tokens
 13. **NEVER lose track of state** — `globalState` is your single source of truth, always keep it current
 14. **NEVER batch more than 5 spec items in a single iteration** — if you think items "must" go together and the count exceeds 5, your coupling analysis is wrong. Decompose. A landing page with 12 FRs is 3-5 iterations minimum, not 1.
+15. **NEVER collapse planned iterations** — if Step 4 produces N batches, you MUST execute N iterations. After completing iteration 1, you do NOT get to re-evaluate and merge batches 2-5 into a single iteration. The batch plan from Step 4 is a commitment, not a suggestion. The only valid reason to adjust is if the Planification Agent returns warnings about batch sizing — and even then, you may only split batches smaller, never merge them larger.
+16. **NEVER commit without a passing build** — every iteration MUST pass `pnpm build` (or the project's build command) before committing. Tests passing is necessary but NOT sufficient. The build command validates import resolution, type checking, and bundling — things that mocked test environments skip.
 
 ---
 

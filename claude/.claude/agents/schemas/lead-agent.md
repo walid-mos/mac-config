@@ -64,6 +64,13 @@ interface GlobalState {
   iterationHistory: IterationSummary[]  // Compressed summaries of past iterations
   recurringIssues: RecurringIssue[]     // Issue pattern tracking
   sharedAssets: SharedAsset[]           // Types/interfaces produced by previous iterations
+  plannedBatches: PlannedBatch[]       // LOCKED batch plan from Step 4 — never merge, only split
+}
+
+interface PlannedBatch {
+  iteration: number                     // 1-indexed iteration number
+  specItemIds: string[]                 // Spec item IDs in this batch
+  status: 'pending' | 'in-progress' | 'completed'
 }
 
 interface SpecItem {
@@ -279,20 +286,31 @@ interface SecurityIssue {
 - **Related spec items**: <IDs>
 ```
 
-### LoopSummary (appended to `docs/loopsummary.md`)
+### DeliveryReport (written to `docs/delivery-report.md` at completion)
 
 ```markdown
 ## Session: <session-name> — <ISO-8601 timestamp>
 
-### Summary
-- Spec items completed: <X/Y>
-- Iterations: <N>
-- Files changed: <count> | Files created: <count>
-- Tests: <passing>/<total> (<failing> failing, <skipped> skipped)
+### What Was Delivered
+- <concrete deliverable 1 — what the user can now use/see>
+- <concrete deliverable 2>
+- ...
 
-### Changes
-- <one-line per major change>
+### Architecture Decisions
+- <decision made> — <why this approach, what was considered>
+- ...
+
+### Per-Iteration Breakdown
+| Iter | Spec Items | Tasks | Tests | Review Issues | Status |
+|------|-----------|-------|-------|--------------|--------|
+| 1    | FR-1, FR-2 | 3    | 15/15 | 0 quick, 0 sig | complete |
+| 2    | FR-3, FR-4, FR-5 | 5 | 28/28 | 1 quick, 0 sig | complete |
+
+### Known Limitations
+- <limitation or trade-off — what was intentionally NOT done and why>
+- "none" if clean delivery
 
 ### Issues Encountered
-- <issue> → <resolution or "logged in troubleshooting.md">
+- <issue> → <resolution>
+- "none" if clean run
 ```

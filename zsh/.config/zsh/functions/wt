@@ -157,11 +157,21 @@ branch_exists() {
 
 # Create new worktree
 wt_new() {
-    local branch_name="$1"
+    local branch_name=""
+    local auto_yes=false
+
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -y|--yes) auto_yes=true; shift ;;
+            -*) echo "❌ Unknown option: $1"; return 1 ;;
+            *) branch_name="$1"; shift ;;
+        esac
+    done
 
     if [ -z "$branch_name" ]; then
         echo "❌ Branch name required"
-        echo "Usage: wt new <branch-name>"
+        echo "Usage: wt new <branch-name> [-y|--yes]"
         return 1
     fi
 
@@ -174,6 +184,15 @@ wt_new() {
 
     # Check if worktree already exists
     if [ -d "$worktree_path" ]; then
+        if [ "$auto_yes" = true ]; then
+            if cd "$worktree_path" 2>/dev/null; then
+                echo "✅ Worktree already exists, switched to: $worktree_path"
+            else
+                echo "❌ Failed to switch to worktree: $worktree_path"
+                return 1
+            fi
+            return 0
+        fi
         echo "⚠️  Worktree already exists at: $worktree_path"
         echo -n "📂 Navigate to it? (Y/n): "
         read -r response
@@ -218,31 +237,31 @@ wt_new() {
             return 1
         fi
     else
-        echo "⚠️  Branch does not exist"
-        echo -n "📝 Create new branch from current HEAD? (Y/n): "
-        read -r response
-        case $response in
-            [Nn]|no)
-                echo "❌ Operation cancelled"
-                return 0
-                ;;
-            *)
-                if git worktree add -b "$branch_name" "$worktree_path"; then
-                    add_to_state "$project" "$branch_name" "$worktree_path" "$git_root"
-                    if cd "$worktree_path" 2>/dev/null; then
-                        echo ""
-                        echo "✅ Branch and worktree created and switched!"
-                        echo "📍 You are now in: $worktree_path"
-                    else
-                        echo ""
-                        echo "⚠️  Worktree created but failed to switch to: $worktree_path"
-                    fi
-                else
-                    echo "❌ Failed to create worktree"
-                    return 1
-                fi
-                ;;
-        esac
+        if [ "$auto_yes" = false ]; then
+            echo "⚠️  Branch does not exist"
+            echo -n "📝 Create new branch from current HEAD? (Y/n): "
+            read -r response
+            case $response in
+                [Nn]|no)
+                    echo "❌ Operation cancelled"
+                    return 0
+                    ;;
+            esac
+        fi
+        if git worktree add -b "$branch_name" "$worktree_path"; then
+            add_to_state "$project" "$branch_name" "$worktree_path" "$git_root"
+            if cd "$worktree_path" 2>/dev/null; then
+                echo ""
+                echo "✅ Branch and worktree created and switched!"
+                echo "📍 You are now in: $worktree_path"
+            else
+                echo ""
+                echo "⚠️  Worktree created but failed to switch to: $worktree_path"
+            fi
+        else
+            echo "❌ Failed to create worktree"
+            return 1
+        fi
     fi
 }
 
@@ -391,6 +410,18 @@ wt_status() {
 
 # Clean up worktrees
 wt_clean() {
+    local auto_yes=false
+    local -a target_branches=()
+
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -y|--yes) auto_yes=true; shift ;;
+            -*) echo "❌ Unknown option: $1"; return 1 ;;
+            *) target_branches+=("$1"); shift ;;
+        esac
+    done
+
     local worktrees=$(get_project_worktrees)
     local project=$(get_project_name)
 
@@ -399,49 +430,77 @@ wt_clean() {
         return 0
     fi
 
-    echo "🧹 Cleanup mode for project: $project"
-    echo ""
-    echo "Select worktrees to remove (Space to select, Enter to confirm):"
-    echo ""
+    local selected=""
 
-    local selected=$(echo "$worktrees" | while IFS='|' read -r wt_path branch; do
-        echo "$branch|$wt_path"
-    done | fzf \
-        --multi \
-        --prompt="Select worktrees to remove: " \
-        --height=60% \
-        --border \
-        --header="Space to select, Enter to confirm, Ctrl-C to cancel" \
-        --preview='echo "Branch: {1}\nPath: {2}"' \
-        --preview-window=up:3 \
-        --delimiter='|')
+    if [ ${#target_branches[@]} -gt 0 ]; then
+        # Non-interactive: resolve branch names to branch|path pairs
+        for target in "${target_branches[@]}"; do
+            local found=false
+            while IFS='|' read -r wt_path branch; do
+                if [ "$branch" = "$target" ]; then
+                    if [ -n "$selected" ]; then
+                        selected="${selected}\n${branch}|${wt_path}"
+                    else
+                        selected="${branch}|${wt_path}"
+                    fi
+                    found=true
+                    break
+                fi
+            done <<< "$worktrees"
+            if [ "$found" = false ]; then
+                echo "⚠️  No worktree found for branch: $target"
+            fi
+        done
 
-    if [ -z "$selected" ]; then
-        echo "❌ No worktrees selected"
-        return 0
+        if [ -z "$selected" ]; then
+            echo "❌ No matching worktrees found"
+            return 1
+        fi
+    else
+        # Interactive mode with fzf
+        echo "🧹 Cleanup mode for project: $project"
+        echo ""
+        echo "Select worktrees to remove (Space to select, Enter to confirm):"
+        echo ""
+
+        selected=$(echo "$worktrees" | while IFS='|' read -r wt_path branch; do
+            echo "$branch|$wt_path"
+        done | fzf \
+            --multi \
+            --prompt="Select worktrees to remove: " \
+            --height=60% \
+            --border \
+            --header="Space to select, Enter to confirm, Ctrl-C to cancel" \
+            --preview='echo "Branch: {1}\nPath: {2}"' \
+            --preview-window=up:3 \
+            --delimiter='|')
+
+        if [ -z "$selected" ]; then
+            echo "❌ No worktrees selected"
+            return 0
+        fi
+    fi
+
+    if [ "$auto_yes" = false ]; then
+        echo ""
+        echo "📋 Worktrees to remove:"
+        echo -e "$selected" | while IFS='|' read -r branch wt_path; do
+            echo "  - $branch ($wt_path)"
+        done
+        echo ""
+        echo -n "⚠️  Remove these worktrees? (Y/n): "
+        read -r confirm
+
+        case $confirm in
+            [Nn]|no)
+                echo "❌ Operation cancelled"
+                return 0
+                ;;
+        esac
     fi
 
     echo ""
-    echo "📋 Worktrees to remove:"
-    while IFS='|' read -r branch wt_path; do
-        echo "  - $branch ($wt_path)"
-    done <<< "$selected"
-    echo ""
-    echo -n "⚠️  Remove these worktrees? (Y/n): "
-    read -r confirm
-
-    case $confirm in
-        [Nn]|no)
-            echo "❌ Operation cancelled"
-            return 0
-            ;;
-        *)
-            # Default to yes for empty input or anything else
-            ;;
-    esac
-
-    echo ""
-    while IFS='|' read -r branch wt_path; do
+    echo -e "$selected" | while IFS='|' read -r branch wt_path; do
         echo "🗑️  Removing worktree: $branch"
         if git worktree remove "$wt_path" --force 2>/dev/null; then
             echo "   ✅ Removed from git"
@@ -455,7 +514,7 @@ wt_clean() {
         fi
 
         remove_from_state "$project" "$branch"
-    done <<< "$selected"
+    done
 
     echo ""
     echo "✅ Cleanup complete!"
@@ -675,20 +734,26 @@ wt_help() {
     echo "    wt <command> [options]"
     echo ""
     echo "COMMANDS:"
-    echo "    new <branch>      Create new worktree for branch"
-    echo "    switch            Switch to existing worktree (interactive)"
-    echo "    list              List all worktrees for current project"
-    echo "    status            Show git status for all worktrees"
-    echo "    clean             Remove worktrees (interactive)"
-    echo "    prune [-i]        Auto-remove worktrees AND branches deleted on remote"
-    echo "    help              Show this help message"
+    echo "    new <branch> [-y]       Create new worktree for branch"
+    echo "    switch [branch]         Switch to existing worktree (interactive without args)"
+    echo "    list                    List all worktrees for current project"
+    echo "    status                  Show git status for all worktrees"
+    echo "    clean [branches] [-y]   Remove worktrees (interactive without args)"
+    echo "    prune [-i]              Auto-remove worktrees AND branches deleted on remote"
+    echo "    help                    Show this help message"
+    echo ""
+    echo "OPTIONS:"
+    echo "    -y, --yes         Auto-confirm all prompts (non-interactive mode)"
     echo ""
     echo "EXAMPLES:"
     echo "    wt new feature-auth              Create worktree for branch 'feature-auth'"
+    echo "    wt new feature-auth -y           Create worktree, auto-confirm (for scripts/CI)"
     echo "    wt switch                        Interactive worktree selection"
+    echo "    wt switch feature-auth           Direct switch (already non-interactive)"
     echo "    wt list                          List all worktrees"
     echo "    wt status                        Show status of all worktrees"
-    echo "    wt clean                         Clean up worktrees (keeps local branches)"
+    echo "    wt clean                         Clean up worktrees interactively (keeps local branches)"
+    echo "    wt clean feature-auth -y         Remove specific worktree without prompts"
     echo "    wt prune                         Remove worktrees + local branches for deleted remotes"
     echo "    wt prune -i                      Interactive prune (confirm each individually)"
     echo ""
@@ -749,7 +814,20 @@ case "$command" in
         wt_status "$@"
         ;;
     clean)
-        if ! validate_dependencies; then
+        # Skip fzf check if branch names are provided as arguments
+        local has_branch_args=false
+        for arg in "$@"; do
+            case $arg in
+                -y|--yes|-*) ;;
+                *) has_branch_args=true; break ;;
+            esac
+        done
+        if [ "$has_branch_args" = false ]; then
+            if ! validate_dependencies; then
+                return 1
+            fi
+        elif ! is_git_repo; then
+            echo "❌ Not in a git repository"
             return 1
         fi
         wt_clean "$@"

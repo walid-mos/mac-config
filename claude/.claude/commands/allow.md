@@ -26,8 +26,10 @@ Examples:
   /allow context7          → allow "mcp__plugin_context7_context7__*"
   /allow edit /tmp         → allow "Edit(/tmp/**)"
   /allow web fetch         → allow "WebFetch(*)"
+  /allow domain github.com → allow "WebFetch(domain:github.com)"
 
 Paste mode: Copy a Claude permission prompt and paste it as the argument.
+  Supports standard tool prompts AND "Network request outside of sandbox" prompts.
 ```
 
 ## Step 2: Detect mode
@@ -38,6 +40,19 @@ Look at the raw `$ARGUMENTS` text:
 - **Manual Mode**: Single-line or no indented lines. Go to Step 3B.
 
 ## Step 3A: Paste Mode parsing
+
+The pasted text may be one of two formats:
+
+### Format 1: Network request outside of sandbox
+
+If the pasted text contains "Network request outside of sandbox" or "Host:" followed by a domain, this is a **sandbox network prompt**. Parse it:
+1. Extract the domain from the `Host:` line (e.g. `api.github.com`).
+2. Target list = `allow` (unless prefixed with deny/blacklist).
+3. Resolve to pattern: `WebFetch(domain:<domain>)`
+4. **Additionally**: read `~/.claude/settings.json` and check if `sandbox.network.allowedDomains` exists. If the domain (or `"*"`) is NOT already in the array, add the domain to `allowedDomains` too. This covers both the tool permission and sandbox network layers.
+5. Go to Step 4.
+
+### Format 2: Standard tool permission prompt
 
 The pasted text looks like a Claude permission prompt:
 ```
@@ -83,6 +98,8 @@ Go to Step 4.
 | `grep` (alone) | `Grep` |
 | `notebook` or `notebookedit` | `NotebookEdit` |
 | `webfetch` or `web fetch` | `WebFetch(*)` |
+| `webfetch <domain>` or `web fetch <domain>` | `WebFetch(domain:<domain>)` |
+| `domain <domain>` or `host <domain>` | `WebFetch(domain:<domain>)` — also add to `sandbox.network.allowedDomains` |
 | `websearch` or `web search` | `WebSearch(*)` |
 | `skill` | `Skill` |
 | `task` | `Task` |

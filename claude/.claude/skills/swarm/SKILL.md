@@ -72,9 +72,11 @@ SwarmConfig {
 
 If `.swarm.json` is missing or has invalid fields, fall back to defaults. Warn about invalid specialist names but continue.
 
-### 1d. Record the Base Branch
+### 1d. Record the Base Branch and Project Directory
 
 Run `git branch --show-current` and store the result as `baseBranch`. This is the branch the PR will target.
+
+Also store `pwd` as `projectDir`. This is needed to return to the original directory after worktree cleanup in Step 5c.
 
 ### 1e. Spec Qualification (sequential — depends on 1a)
 
@@ -120,15 +122,34 @@ Result: `NormalizedSpec = { type: "full-spec", content: <updated contents>, path
 
 > **Note**: After Step 1e, the `NormalizedSpec` should ALWAYS be `full-spec`. The `partial-spec` and `no-spec` types exist in the schema for edge cases (user explicitly skips interview), but the default flow always produces a full spec.
 
-## Step 2 — Create Feature Branch
+## Step 2 — Create Worktree
 
-Create and switch to a feature branch for this swarm session:
+Create an isolated worktree for this swarm session using the `wt` function. This ensures parallel `/swarm` invocations on the same project don't conflict.
+
+### 2a. Verify `wt` is available
 
 ```bash
-git checkout -b feat/<session-name>
+type wt
 ```
 
-If the branch already exists, switch to it instead of creating a new one.
+If `wt` is not found, fall back to `git checkout -b feat/<session-name>` and warn the user that parallel swarms won't be isolated.
+
+### 2b. Create the worktree
+
+```bash
+wt new feat/<session-name> -y
+```
+
+This will:
+- Create the branch `feat/<session-name>` from current HEAD (if it doesn't exist)
+- Create an isolated worktree at `~/development/worktrees/<project>-feat-<session-name>/`
+- Change directory to the worktree
+
+If the worktree already exists (resuming a session), `-y` auto-navigates to it.
+
+### 2c. Record the worktree path
+
+Store the worktree path (`pwd` after `wt new`) as `worktreePath` for cleanup in Step 5.
 
 ## Step 3 — Spawn the Lead Agent
 
@@ -178,7 +199,7 @@ iterations: <contents of docs/<session-name>.iterations.md if resuming, or "null
 - If you encounter a blocker, escalate via AskUserQuestion — do NOT silently stop.
 - Run the full orchestration loop: Planification → Testing → Coding → Review → Fix → repeat until done.
 - Commit each validated iteration.
-- Write the loop summary to docs/loopsummary.md before returning.
+- Write the delivery report to docs/delivery-report.md before returning.
 - When you are done, return a structured completion report:
   STATUS: completed | partial | blocked
   COMPLETED: <N>/<total> spec items
@@ -232,28 +253,43 @@ Based on `confirmExit` config:
 ### 5b. Create the PR
 
 1. Push the feature branch: `git push -u origin feat/<session-name>`
-2. Read `docs/loopsummary.md` for the PR body content
+2. Read `docs/delivery-report.md` for the PR body content
 3. Create the PR:
 
 ```bash
 gh pr create \
   --title "feat(<session-name>): <short description>" \
-  --body "$(cat docs/loopsummary.md)" \
+  --body "$(cat docs/delivery-report.md)" \
   --base <baseBranch> \
   --head feat/<session-name>
 ```
 
 4. Return the PR URL to the user.
 
+### 5c. Worktree Cleanup
+
+If a worktree was created in Step 2 (i.e., `wt` was available):
+
+1. Change back to the original project directory (the `baseBranch` repo root)
+2. Clean up the worktree:
+
+```bash
+cd <original-project-dir>
+wt clean feat/<session-name> -y
+```
+
+This removes the worktree directory but keeps the branch (which is now on the remote via the PR).
+
 ## Edge Cases
 
-- **Lead Agent returns without completion report**: treat as "partial", check `docs/loopsummary.md` and `git log` to assess what was done, then re-spawn if needed
+- **Lead Agent returns without completion report**: treat as "partial", check `docs/delivery-report.md` and `git log` to assess what was done, then re-spawn if needed
 - **Lead Agent context exhaustion**: if the agent hits context limits mid-run, it should have committed per-iteration; re-spawn with remaining items and troubleshooting history
 - **No changes made**: if no files were changed, do not create an empty PR — inform the user
 - **PR creation fails**: show the error to the user, provide the manual command to run
 
 ## Constraints
 
+- **`/swarm` ALWAYS executes the full flow** — Steps 1 through 5 must run every time. NEVER stop after gathering context to display a summary, dashboard, or status overview. The purpose of `/swarm` is to deliver working code, not to report on the project state. If spec detection finds nothing, proceed to `/interview`. If `/interview` completes, proceed to the Lead Agent. There is no valid reason to stop before Step 3.
 - Never run destructive commands: no `rm -rf`, no `git push --force`, no `git reset --hard`, no branch deletion
 - Git operations are limited to: branch creation, commit, push, and PR creation
 - The skill is a launcher — all implementation work happens in the Lead Agent and its sub-agents

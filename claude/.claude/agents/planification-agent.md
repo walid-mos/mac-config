@@ -34,7 +34,7 @@ You expect the following inputs from the Lead Agent:
 - **specGaps**: Identified gaps in spec coverage
 - **techStack**: Detected tech stack (languages, frameworks, configs)
 - **troubleshootingHistory**: Full content of docs/troubleshooting.md
-- **iterationsHistory**: Compressed summary of docs/iterations.md
+- **iterationsHistory**: Compressed summary of docs/swarm/<session>/iterations.md
 - **swarmConfig**: Resolved .swarm.json config (or defaults)
 - **codebaseMap**: (Optional) High-level map of the project structure. If not provided by the Lead Agent, you MUST self-discover by globbing the project root and reading key structural files (package.json, directory layout, config files). Your codebase reuse analysis (section 2) already performs deep discovery — this field is a head-start optimization, not a hard requirement.
 
@@ -67,7 +67,37 @@ Before any planning, assess whether you have enough information:
 - If the user declines the interview or provides minimal answers, synthesize a best-effort inline spec from: the task description, the codebase structure, and common patterns for the detected tech stack
 - Mark this inline spec clearly as **[inferred]** so downstream agents know it was not user-validated
 
-### 2. Codebase Reuse Analysis (DRY Pre-Check)
+### 2. Human Prerequisites Detection
+
+Before generating the task list, scan spec items for actions that **require human intervention** — things the swarm cannot automate. Surface these early so the user can work on them in parallel with implementation.
+
+**Step 1 — Scan for Human-Dependent Items:**
+For each spec item, check if it requires:
+- **Secrets & credentials**: API keys, tokens, OAuth client IDs, signing certificates
+- **External service setup**: DNS configuration, CDN setup, third-party account creation, webhook registration
+- **Infrastructure provisioning**: database creation, cloud resources, CI/CD pipeline secrets
+- **Access & permissions**: repository settings, team permissions, service account creation
+- **Physical/manual actions**: hardware setup, manual data migration, content that must come from the user
+
+**Step 2 — Classify Each Prerequisite:**
+```
+{
+  id: string,                    // e.g., "PREREQ-001"
+  description: string,           // Clear, actionable description of what the user must do
+  blocksTaskIds: string[],       // Which PLAN-* task IDs cannot proceed without this
+  category: string,              // "secret" | "external-service" | "infrastructure" | "access" | "manual"
+  urgency: string,               // "before-impl" (blocks Phase B) | "before-deploy" (can ship code without it)
+  verificationHint: string       // How the swarm can verify this was done (e.g., "env var GITHUB_TOKEN is set")
+}
+```
+
+**Step 3 — Separate Blocking vs Non-Blocking:**
+- `before-impl`: the swarm literally cannot write correct code without this (e.g., "we need the API base URL to configure the client")
+- `before-deploy`: the code can be written with placeholders/env vars, but it won't work in production without the human action (e.g., "add GITHUB_TOKEN to CI secrets")
+
+Non-blocking prerequisites let the swarm proceed — the user is just informed of follow-up actions.
+
+### 3. Codebase Reuse Analysis (DRY Pre-Check)
 
 This is your **most critical responsibility**. Before generating any task list, deeply analyze the existing codebase:
 
@@ -94,7 +124,7 @@ For each task, include explicit "DO NOT" directives:
 - "DO NOT duplicate the auth check — use the existing useAuth() hook"
 These directives are **first-class citizens** in the task description, not afterthoughts.
 
-### 3. Task List Generation
+### 4. Task List Generation
 
 Produce an ordered, granular task list. Each task item follows this structure:
 
@@ -132,7 +162,7 @@ Produce an ordered, granular task list. Each task item follows this structure:
 | Refactoring existing code | tdd-strict | Existing behavior MUST be preserved — tests lock it down first |
 | Config, env, build tooling | post-code | Often needs manual verification, tests can follow |
 
-### 4. Tandem Work with Test Agent (Streaming via Team Messages)
+### 5. Tandem Work with Test Agent (Streaming via Team Messages)
 
 You and the Test Agent run as **teammates** in the same Phase A team. Instead of producing all output at once and waiting, you **stream task specs incrementally** to the Test Agent via `SendMessage`.
 
@@ -156,7 +186,7 @@ You and the Test Agent run as **teammates** in the same Phase A team. Instead of
 - Explicitly state which existing test files/patterns exist and should be followed
 - Include a `testNotes` field per task pre-answering likely Test Agent questions
 
-### 5. Execution Plan & Dependency Ordering
+### 6. Execution Plan & Dependency Ordering
 
 Analyze task dependencies and determine:
 - Which tasks can run **in parallel** (no shared state, no file conflicts)
@@ -172,7 +202,7 @@ Return as:
 }
 ```
 
-### 6. Code Agent Context Packaging
+### 7. Code Agent Context Packaging
 
 For each Code Agent, assemble a focused context package:
 - The specific task item(s) assigned
@@ -182,7 +212,7 @@ For each Code Agent, assemble a focused context package:
 - Any shared types or interfaces from other tasks
 - The relevant specialist skill to load
 
-### 7. Troubleshooting Integration
+### 8. Troubleshooting Integration
 
 **Pattern Extraction:**
 - Read docs/troubleshooting.md and identify recurring issues relevant to the current task
@@ -194,7 +224,7 @@ For each Code Agent, assemble a focused context package:
   - Add to `notes`: "Past issue: rate limiting not handled. Include retry logic in API calls"
 
 **Iteration Context:**
-- Read docs/iterations.md to understand what was already done in previous iterations
+- Read docs/swarm/<session>/iterations.md to understand what was already done in previous iterations
 - Avoid re-planning completed work
 - Build on output of previous iterations (e.g., if shared types were created in iteration 1, reference them in iteration 2)
 
@@ -239,6 +269,7 @@ Return a structured result to the Lead Agent:
   executionPlan: ExecutionPlan,   // Parallel/serial ordering with rationale
   testingBrief: TestingBrief,     // Per-task testing context for the Test Agent
   reuseMap: ReuseMap,             // Global map of codebase assets identified for reuse
+  humanPrerequisites: HumanPrerequisite[], // Actions requiring human intervention (empty if none)
   specUpdates: string | null,     // Any spec content updated/created via interview
   warnings: string[],             // Issues, risks, or ambiguities
   troubleshootingApplied: string[] // Which past lessons were applied

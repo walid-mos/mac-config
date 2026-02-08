@@ -120,6 +120,15 @@ The interview will enrich the existing spec via Edit. Read the updated file afte
 
 Result: `NormalizedSpec = { type: "full-spec", content: <updated contents>, path: <file path> }`
 
+After obtaining the `NormalizedSpec` (in both Case 1 and Case 2), copy the spec into the session folder and mark the original as processed:
+
+1. Create `docs/swarm/<session-name>/` directory (via `mkdir -p`)
+2. Copy the spec file to `docs/swarm/<session-name>/spec.md`
+3. Prepend a processing banner to the **original** spec file using Edit:
+   ```
+   <!-- PROCESSED BY SWARM: <session-name> — <ISO-8601 timestamp> -->
+   ```
+
 > **Note**: After Step 1e, the `NormalizedSpec` should ALWAYS be `full-spec`. The `partial-spec` and `no-spec` types exist in the schema for edge cases (user explicitly skips interview), but the default flow always produces a full spec.
 
 ## Step 2 — Create Worktree
@@ -191,7 +200,7 @@ confirmExit: <resolved value>
 
 ### existingDocs
 troubleshooting: <contents of docs/troubleshooting.md, or "null">
-iterations: <contents of docs/<session-name>.iterations.md if resuming, or "null">
+iterations: <contents of docs/swarm/<session-name>/iterations.md if resuming, or "null">
 
 ## CRITICAL INSTRUCTIONS
 
@@ -199,7 +208,7 @@ iterations: <contents of docs/<session-name>.iterations.md if resuming, or "null
 - If you encounter a blocker, escalate via AskUserQuestion — do NOT silently stop.
 - Run the full orchestration loop: Planification → Testing → Coding → Review → Fix → repeat until done.
 - Commit each validated iteration.
-- Write the delivery report to docs/delivery-report.md before returning.
+- Write the delivery report to docs/swarm/<session-name>/delivery-report.md before returning.
 - When you are done, return a structured completion report:
   STATUS: completed | partial | blocked
   COMPLETED: <N>/<total> spec items
@@ -253,13 +262,13 @@ Based on `confirmExit` config:
 ### 5b. Create the PR
 
 1. Push the feature branch: `git push -u origin feat/<session-name>`
-2. Read `docs/delivery-report.md` for the PR body content
+2. Read `docs/swarm/<session-name>/delivery-report.md` for the PR body content
 3. Create the PR:
 
 ```bash
 gh pr create \
   --title "feat(<session-name>): <short description>" \
-  --body "$(cat docs/delivery-report.md)" \
+  --body "$(cat docs/swarm/<session-name>/delivery-report.md)" \
   --base <baseBranch> \
   --head feat/<session-name>
 ```
@@ -282,7 +291,7 @@ This removes the worktree directory but keeps the branch (which is now on the re
 
 ## Edge Cases
 
-- **Lead Agent returns without completion report**: treat as "partial", check `docs/delivery-report.md` and `git log` to assess what was done, then re-spawn if needed
+- **Lead Agent returns without completion report**: treat as "partial", check `docs/swarm/<session-name>/delivery-report.md` and `git log` to assess what was done, then re-spawn if needed
 - **Lead Agent context exhaustion**: if the agent hits context limits mid-run, it should have committed per-iteration; re-spawn with remaining items and troubleshooting history
 - **No changes made**: if no files were changed, do not create an empty PR — inform the user
 - **PR creation fails**: show the error to the user, provide the manual command to run

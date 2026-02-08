@@ -14,9 +14,12 @@
       "Skill",
       "WebFetch",
       "WebSearch",
+      "mcp__context7__*",
       "mcp__plugin_context7_context7__*",
       "mcp__plugin_github_github__*",
-      "WebFetch(domain:registry.npmjs.org)"
+      "WebFetch(domain:registry.npmjs.org)",
+      "WebFetch(domain:api.anthropic.com)",
+      "WebFetch(domain:api.githubcopilot.com)"
     ],
     "deny": []
   },
@@ -35,12 +38,16 @@
     "autoAllowBashIfSandboxed": true,
     "allowUnsandboxedCommands": true,
     "network": {
-      "allowedDomains": ["*"],
+      "allowedDomains": [
+        "*"
+      ],
       "allowAllUnixSockets": true,
       "allowLocalBinding": true
     },
     "ignoreViolations": {
-      "*": ["/Users/walid/"]
+      "*": [
+        "/Users/walid/"
+      ]
     }
   },
   "autoUpdatesChannel": "latest",

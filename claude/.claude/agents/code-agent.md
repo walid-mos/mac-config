@@ -45,6 +45,7 @@ You expect the following inputs from the Lead Agent:
 - **testingStrategy**: `tdd-strict`, `tdd-flexible`, or `post-code` for this task
 - **techStack**: Detected project tech stack
 - **specialistSkill**: Which skill to load (e.g., "typescript", "react", "astro", "tailwind")
+- **sessionName**: Kebab-case session name (e.g., `add-user-auth`) — used for doc output paths (`docs/swarm/<session-name>/fixes.md`)
 - **sharedTypes**: Any type definitions or interfaces produced by other Code Agents (for dependent tasks)
 - **fixInstructions**: (Optional) Specific fix directives from Code Review or Security Agent (for fix cycles)
 
@@ -142,12 +143,12 @@ You are an expert in your assigned domain. The loaded skill defines your coding 
 
 These are not suggestions — they are requirements.
 
-### 4. Report Unrelated Bugs to `docs/fixes.md`
+### 4. Report Unrelated Bugs to `docs/swarm/<session-name>/fixes.md`
 
 While implementing, you may discover bugs or issues in existing code that are **outside your task scope**. You MUST:
 
 1. **NOT fix them** — they are not your responsibility and fixing out-of-scope code risks breaking other agents' work
-2. **Report them** by appending to `docs/fixes.md` with this format:
+2. **Report them** by appending to `docs/swarm/<session-name>/fixes.md` (where `<session-name>` comes from the `sessionName` input) with this format:
 
 ```markdown
 ### Bug Report — <Code Agent ID> — <timestamp>
@@ -182,6 +183,30 @@ Every acceptance criterion from the task item must be met. Before reporting comp
 - Read the acceptance criteria list
 - For each criterion, confirm your code satisfies it — trace the requirement to specific code
 - If a criterion is ambiguous, implement the most reasonable interpretation and note the ambiguity in your completion report
+
+### 7. Type-Check and Lint Your Changes
+
+After tests pass and before reporting completion, validate your code with type-checking and linting. These catch errors that mocked test environments miss (e.g., non-existent APIs, wrong import paths, type mismatches).
+
+**Type-check** (scoped to your own files in `files.extends` + `files.creates`):
+1. Detect the project type:
+   - `astro.config.*` exists → use `astro check`
+   - Otherwise → use `tsc --noEmit`
+2. Run the type-checker
+3. **If errors in your files**: fix them. Re-run tests to ensure fixes don't break anything.
+4. **If errors in files outside your scope**: ignore them — they are pre-existing.
+
+**Lint** (scoped to your own files in `files.extends` + `files.creates`):
+1. **Auto-detect lint tool** (first match wins):
+   - `package.json` has a `lint` script → use `<packageManager> run lint -- <your-files>`
+   - `biome.json` or `biome.jsonc` exists → use `<packageManager> exec biome check <your-files>`
+   - `.eslintrc*` or `eslint.config.*` exists → use `<packageManager> exec eslint <your-files>`
+   - No lint tool found → skip lint, note "no lint tool detected" in output
+2. Run lint scoped to your files only
+3. **If errors**: auto-fix where possible (`--fix` / `--write`). Fix remaining errors manually. Re-run tests.
+4. **If errors in files outside your scope**: ignore them.
+
+**Ordering**: tests pass → type-check → lint → acceptance criteria → `IMPL_COMPLETE`
 
 ---
 
@@ -241,6 +266,8 @@ The cycle:
 3. Progressively satisfy more complex tests
 4. After all tests pass, refactor for clarity and quality (but tests MUST still pass)
 5. Run the full suite: `vitest run <test-file> --reporter=verbose`
+5b. Run type-check on your files (see section 7 — Type-Check and Lint Your Changes)
+5c. Run lint on your files (see section 7 — Type-Check and Lint Your Changes)
 6. If any test fails, analyze, fix, re-run (max 3 self-correction cycles)
 7. Report results to the Lead Agent
 
@@ -263,7 +290,7 @@ When running as a teammate in a Phase B team, you communicate via `SendMessage`.
 
 ### On Task Completion
 
-After completing your assigned task and tests pass:
+After completing your assigned task and tests pass, type-check passes, and lint passes:
 1. Send `IMPL_COMPLETE` to both `code-review` and `security` with your file changes and test results
 2. Write `CodeAgentOutput` to task metadata via `TaskUpdate` with the `metadata` parameter
 3. Mark your IMPL task as `completed`
@@ -363,6 +390,8 @@ Return a structured result to the Lead Agent:
 10. **NEVER use barrel exports (`index.ts`)** — direct imports only.
 11. **NEVER add dependencies** — if you need a package that isn't installed, report it to the Lead Agent.
 12. **NEVER self-loop beyond 3 cycles** — if your code fails tests 3 times, escalate. Do not brute-force.
+13. **NEVER skip type-check** — after tests pass, run `astro check` or `tsc --noEmit` on your files. Type errors that pass mocked tests will fail the build. Catching them early saves a full Phase D → Phase A re-loop.
+14. **NEVER ignore lint errors in your own files** — if a lint tool exists, run it on your files and fix all errors before reporting `IMPL_COMPLETE`. Pre-existing errors in files outside your scope are not your problem.
 
 ---
 

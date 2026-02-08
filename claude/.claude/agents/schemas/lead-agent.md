@@ -3,7 +3,7 @@
 > Input/output contracts and internal state for the Lead Agent.
 > This file is loaded by: Lead Agent only.
 > For shared types (TaskItem, TestingBrief, TestingStrategy), see `shared.md`.
-> For Planification output types (PlanificationOutput, ExecutionPlan, ReuseMap), see `planification.md`.
+> For Planification output types (PlanificationOutput, ExecutionPlan, ReuseMap, HumanPrerequisite), see `planification.md`.
 > For Test Agent types (TestAgentInput, TestAgentOutput), see `test-agent.md`.
 
 ---
@@ -44,7 +44,7 @@ interface SwarmConfig {
 
 interface ExistingDocs {
   troubleshooting: string | null        // Contents of docs/troubleshooting.md
-  iterations: string | null             // Contents of docs/<session>.iterations.md (if resuming)
+  iterations: string | null             // Contents of docs/swarm/<session>/iterations.md (if resuming)
 }
 ```
 
@@ -65,6 +65,7 @@ interface GlobalState {
   recurringIssues: RecurringIssue[]     // Issue pattern tracking
   sharedAssets: SharedAsset[]           // Types/interfaces produced by previous iterations
   plannedBatches: PlannedBatch[]       // LOCKED batch plan from Step 4 — never merge, only split
+  humanPrerequisites: HumanPrerequisite[] // From PlanificationOutput — before-deploy items for delivery report
 }
 
 interface PlannedBatch {
@@ -103,6 +104,8 @@ interface IterationSummary {
   testsPassing: number
   testsFailing: number
   reviewIssues: { quickFix: number; significant: number; security: number }
+  lintPassed: boolean                   // Whether project-wide lint passed for this iteration
+  buildPassed: boolean                  // Whether project build passed for this iteration
   status: 'complete' | 'partial'
   oneLineSummary: string                // e.g., "4 tasks done (auth-service, login-form), 12 tests pass, 0 issues"
 }
@@ -130,6 +133,7 @@ interface SharedAsset {
 ```typescript
 interface CodeAgentInput {
   taskItem: TaskItem                    // From PlanificationOutput.taskList — see shared.md
+  sessionName: string                   // Kebab-case session name — for doc output paths (docs/swarm/<session>/fixes.md)
   testFiles: string[]                   // Paths from TestAgentOutput
   testingStrategy: TestingStrategy      // From shared.md
   techStack: TechStack
@@ -169,7 +173,22 @@ interface CodeAgentOutput {
     met: boolean
     notes: string
   }>
-  bugsReported: number                  // Count of bugs written to docs/fixes.md
+  typeCheckResult: {
+    ran: boolean                         // Whether type-check was executed
+    tool: string | null                  // e.g., "astro check", "tsc --noEmit"
+    passed: boolean
+    errorCount: number
+    errors: string[]                     // Truncated list of error messages (max 10)
+  }
+  lintResult: {
+    ran: boolean                         // Whether lint was executed
+    tool: string | null                  // e.g., "biome", "eslint", "package.json lint script"
+    passed: boolean
+    errorCount: number
+    warningCount: number
+    autoFixed: number                    // Count of issues auto-fixed via --fix/--write
+  }
+  bugsReported: number                  // Count of bugs written to docs/swarm/<session>/fixes.md
   concerns: string[]
   sharedOutput: {                       // Assets produced for dependent tasks
     exports: string[]
@@ -259,7 +278,7 @@ interface SecurityIssue {
 
 ## Documentation Output Formats
 
-### IterationLog (written to `docs/<session-name>.iterations.md`)
+### IterationLog (written to `docs/swarm/<session-name>/iterations.md`)
 
 ```markdown
 ### Iteration <N> — <ISO-8601 timestamp>
@@ -267,6 +286,8 @@ interface SecurityIssue {
 **Tasks**: <count> (<specialist breakdown>)
 **Tests**: <written>/<passing>/<failing>
 **Review**: <quick-fixes applied>/<significant logged>/<security issues>
+**Lint**: <passed | failed | skipped (no tool)>
+**Build**: <passed | failed>
 **Code changes**:
 - <file path>: <one-line description>
 **Bugs fixed**:
@@ -274,7 +295,7 @@ interface SecurityIssue {
 **Status**: <complete | partial — reason>
 ```
 
-### TroubleshootingEntry (appended to `docs/troubleshooting.md`)
+### TroubleshootingEntry (appended to `docs/troubleshooting.md` — append-only via Edit, NEVER Write)
 
 ```markdown
 ### <Issue title> — <session-name> iter <N> — <ISO-8601 timestamp>
@@ -286,7 +307,7 @@ interface SecurityIssue {
 - **Related spec items**: <IDs>
 ```
 
-### DeliveryReport (written to `docs/delivery-report.md` at completion)
+### DeliveryReport (written to `docs/swarm/<session-name>/delivery-report.md` at completion)
 
 ```markdown
 ## Session: <session-name> — <ISO-8601 timestamp>
@@ -305,6 +326,10 @@ interface SecurityIssue {
 |------|-----------|-------|-------|--------------|--------|
 | 1    | FR-1, FR-2 | 3    | 15/15 | 0 quick, 0 sig | complete |
 | 2    | FR-3, FR-4, FR-5 | 5 | 28/28 | 1 quick, 0 sig | complete |
+
+### Manual Follow-Up Actions
+- <action the user must perform before deployment — from humanPrerequisites with urgency "before-deploy">
+- "none" if no human prerequisites were detected
 
 ### Known Limitations
 - <limitation or trade-off — what was intentionally NOT done and why>

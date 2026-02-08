@@ -47,6 +47,21 @@ interface ReuseMap {
 
 ---
 
+## HumanPrerequisite
+
+```typescript
+interface HumanPrerequisite {
+  id: string                        // e.g., "PREREQ-001"
+  description: string               // Actionable description of what the user must do
+  blocksTaskIds: string[]           // PLAN-* IDs that cannot proceed without this
+  category: 'secret' | 'external-service' | 'infrastructure' | 'access' | 'manual'
+  urgency: 'before-impl' | 'before-deploy'
+  verificationHint: string          // How the swarm can verify completion (e.g., "env var X is set")
+}
+```
+
+---
+
 ## Planification Output (complete shape)
 
 ```typescript
@@ -55,6 +70,7 @@ interface PlanificationOutput {
   executionPlan: ExecutionPlan
   testingBrief: TestingBrief        // Defined in shared.md
   reuseMap: ReuseMap
+  humanPrerequisites: HumanPrerequisite[]  // Empty array if none detected
   specUpdates: string | null
   warnings: string[]
   troubleshootingApplied: string[]

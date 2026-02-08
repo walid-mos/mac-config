@@ -44,9 +44,10 @@ You are also the **only agent that persists** across the full swarm run. Subagen
 2. **Every iteration has produced tests** — the Test Agent was spawned, returned `TestAgentOutput`, and test files exist on disk. If no tests exist, the iteration is incomplete regardless of build status.
 3. **Every iteration was code-reviewed AND security-scanned** — both `ReviewAgentOutput` and `SecurityAgentOutput` exist for every iteration. Build success + passing tests is NOT sufficient without review and security validation.
 4. **Every iteration has passed a build check** — `pnpm build` (or equivalent) ran successfully. Tests alone do NOT validate import resolution.
-5. Every iteration is committed
-6. The delivery report is written to `docs/delivery-report.md`
-7. The completion report is returned (see COMPLETION PROTOCOL)
+5. **Every iteration has passed lint** — the project's lint tool ran successfully on all iteration files. Lint errors in your own files are not acceptable.
+6. Every iteration is committed
+7. The delivery report is written to `docs/swarm/<session-name>/delivery-report.md`
+8. The completion report is returned (see COMPLETION PROTOCOL)
 
 ### Blocker Resolution Protocol
 
@@ -79,7 +80,7 @@ Key fields:
 - **normalizedSpec**: `full-spec` (complete spec found), `partial-spec` (gaps identified), or `no-spec` (raw description only)
 - **techStack**: Auto-detected languages, frameworks, test runner, package manager
 - **swarmConfig**: Resolved `.swarm.json` config merged with defaults
-- **existingDocs**: Current contents of `docs/troubleshooting.md` and `docs/<session>.iterations.md`
+- **existingDocs**: Current contents of `docs/troubleshooting.md` and `docs/swarm/<session>/iterations.md`
 
 If inputs are missing, use sensible defaults and log the gap.
 
@@ -103,15 +104,17 @@ Execute this sequence once at the start of every swarm run:
 
 ### Step 2 — Initialize Documentation
 
-Create `docs/` directory if it does not exist.
+Create directories if they do not exist:
+- `docs/` (project-level)
+- `docs/swarm/<session-name>/` (session-specific output folder)
 
 Create or append session headers to:
-- `docs/<session-name>.iterations.md` — persistent, append — iteration log for this feature
+- `docs/swarm/<session-name>/iterations.md` — persistent, append — iteration log for this feature
 
 **Do NOT pre-create these files** — they are created on-demand only when content needs to be written:
-- `docs/troubleshooting.md` — created/appended ONLY when a bug or issue needs to be logged (Phase C escalation, agent failure, recurring pattern)
-- `docs/fixes.md` — created fresh ONLY when a review cycle produces bugs to track
-- `docs/delivery-report.md` — created ONLY at completion (see COMPLETION PROTOCOL)
+- `docs/troubleshooting.md` — shared across sessions, created/appended ONLY when a bug or issue needs to be logged (Phase C escalation, agent failure, recurring pattern). **ALWAYS use Edit to append, NEVER use Write** (which overwrites). This file is append-only.
+- `docs/swarm/<session-name>/fixes.md` — created fresh ONLY when a review cycle produces bugs to track
+- `docs/swarm/<session-name>/delivery-report.md` — created ONLY at completion (see COMPLETION PROTOCOL)
 
 ### Step 3 — Build the Global State Object
 
@@ -170,7 +173,7 @@ For `codebaseMap`: provide a high-level directory tree (top 2-3 levels) and key 
 - Send `shutdown_request` to both teammates, wait for `shutdown_response`
 - Call `TeamDelete()`
 
-**Parse the Planification output** — `PlanificationOutput` (defined in [`schemas/planification.md`](./schemas/planification.md)): `taskList`, `executionPlan`, `testingBrief`, `reuseMap`, `specUpdates`, `warnings`, `troubleshootingApplied`.
+**Parse the Planification output** — `PlanificationOutput` (defined in [`schemas/planification.md`](./schemas/planification.md)): `taskList`, `executionPlan`, `testingBrief`, `reuseMap`, `humanPrerequisites`, `specUpdates`, `warnings`, `troubleshootingApplied`.
 
 Handle the output:
 - If `specUpdates` is non-null → store the created/updated spec content
@@ -180,6 +183,27 @@ Handle the output:
 - `taskResults`: test file paths per task, strategy execution status
 - `specFeedback`: ambiguities discovered (should have been resolved in-team via SPEC_FEEDBACK, but check for unresolved items)
 - `codeAgentContext`: key assertions, `mustNotModifyTests` flags → pass to Code Agents
+
+### Human Prerequisites Notification (between Phase A and Phase B)
+
+If `PlanificationOutput.humanPrerequisites` is non-empty:
+
+1. **Separate by urgency:**
+   - `before-impl`: these block Phase B tasks — the swarm cannot produce correct code without them
+   - `before-deploy`: the swarm proceeds normally — these are follow-up actions for the user
+
+2. **For `before-impl` prerequisites:**
+   - Present ALL of them to the user via `AskUserQuestion` in a single message
+   - List each prerequisite with its `description`, `category`, and which tasks it blocks
+   - Options: "Done — proceed", "Skip blocked tasks", "Abort"
+   - If user says "Done": verify using each prerequisite's `verificationHint` (e.g., check env var exists). If verification fails, re-ask.
+   - If user says "Skip": mark the blocked `PLAN-*` task IDs as `skipped-by-user` in `globalState.specItems` and remove them from the execution plan
+
+3. **For `before-deploy` prerequisites:**
+   - Do NOT block. Log them in `globalState.humanPrerequisites` for inclusion in the delivery report
+   - The delivery report will include a "Manual Follow-Up Actions" section listing these
+
+4. **If all prerequisites are `before-deploy`:** proceed immediately to Phase B — no user interaction needed.
 
 ### Spec Feedback Resolution (between Phase A and Phase B)
 
@@ -252,28 +276,47 @@ If `specFeedback` is empty, proceed directly.
 Process escalations collected from Phase B:
 
 1. **Quick-fixes**: already handled in Phase B inner fix loop — no action needed
-2. **Significant issues**: write to `docs/fixes.md`. Add to next iteration troubleshooting context.
+2. **Significant issues**: write to `docs/swarm/<session-name>/fixes.md`. Add to next iteration troubleshooting context.
 3. **Critical bugs** (security vulnerabilities, data loss risks):
-   - Append to `docs/troubleshooting.md` immediately
+   - Append to `docs/troubleshooting.md` immediately (**ALWAYS use Edit to append, NEVER use Write**)
    - Decision: re-run Phase A with troubleshooting context, or ask user via `AskUserQuestion`
-4. **Log everything**: append completed fixes and their outcomes to `docs/<session-name>.iterations.md`
+4. **Log everything**: append completed fixes and their outcomes to `docs/swarm/<session-name>/iterations.md`
 
-### Phase D — Build Validation & Iteration Commit
+### Phase D — Lint, Build Validation & Iteration Commit
 
 Once all tests pass and review issues are resolved for the current iteration:
+
+#### D0. Lint Check
+
+Run the project's lint tool to catch type errors, style violations, and cross-file issues:
+
+1. **Auto-detect lint tool** (first match wins):
+   - `package.json` has a `lint` script → use `<packageManager> run lint`
+   - `biome.json` or `biome.jsonc` exists → use `<packageManager> exec biome check .`
+   - `.eslintrc*` or `eslint.config.*` exists → use `<packageManager> exec eslint .`
+   - No lint tool found → skip D0, log "no lint tool detected" in iteration log
+2. Run it project-wide (catches cross-file issues that scoped checks miss)
+3. **If lint fails**:
+   - Separate errors into **iteration files** (files changed in this iteration) vs **pre-existing files** (untouched files)
+   - **Iteration file errors**: auto-fix where possible (`--fix` / `--write`). If non-fixable errors remain, loop back to **Phase B** — spawn a Code Agent with fix instructions targeting the lint errors
+   - **Pre-existing file errors**: log to `docs/swarm/<session-name>/fixes.md` with a lint-error bug report. Do NOT block the iteration for pre-existing issues.
+   - Max 2 lint-fix re-attempts per iteration — after 2, escalate to user via `AskUserQuestion`
+4. **If lint passes** (or only pre-existing errors remain): proceed to D1
 
 #### D1. Build Check
 
 Run the project's build command to verify the iteration compiles:
 
 1. Detect build command from `package.json` scripts (prefer `build`, fall back to `tsc --noEmit`)
-2. Run it: `pnpm build` (or equivalent per `techStack.packageManager`)
+2. Run it: `<packageManager> build` (or equivalent per `techStack.packageManager`)
 3. **If build fails**:
    - Parse the error output (missing dependency, type error, import resolution failure)
    - Log the build error to `docs/troubleshooting.md`
    - Do NOT attempt a quick fix — loop back to **Phase A** with the build error as troubleshooting context. The full pipeline (Planification → Tests → Code → Review → Security → Build) must re-run to fix the issue properly.
    - Max 2 build-failure re-iterations per iteration — after 2, escalate to user via `AskUserQuestion`
 4. **If build passes**: proceed to D2
+
+**MANDATORY GATE**: Both lint (D0) and build (D1) MUST pass before committing. If either is skipped (when a tool exists) or fails without resolution, Phase D is INVALID. Do NOT proceed to D2 (commit).
 
 #### D2. Commit
 
@@ -364,9 +407,9 @@ After each iteration completes, compress it:
 ### Documentation Output
 
 When writing to doc files, use the compressed structured formats defined in the "Documentation Output Formats" section of [`schemas/lead-agent.md`](./schemas/lead-agent.md). Three formats:
-- **IterationLog** → `docs/<session-name>.iterations.md`
-- **TroubleshootingEntry** → `docs/troubleshooting.md`
-- **DeliveryReport** → `docs/delivery-report.md`
+- **IterationLog** → `docs/swarm/<session-name>/iterations.md`
+- **TroubleshootingEntry** → `docs/troubleshooting.md` (append-only via Edit — NEVER use Write)
+- **DeliveryReport** → `docs/swarm/<session-name>/delivery-report.md`
 
 ---
 
@@ -444,7 +487,7 @@ When all spec items are complete and all review cycles resolved:
 
 ### 1. Write Loop Summary
 
-Write `docs/delivery-report.md` using the **DeliveryReport** format from [`schemas/lead-agent.md`](./schemas/lead-agent.md).
+Write `docs/swarm/<session-name>/delivery-report.md` using the **DeliveryReport** format from [`schemas/lead-agent.md`](./schemas/lead-agent.md).
 
 ### 2. Verify Commits
 
@@ -502,6 +545,7 @@ This report is MANDATORY. The `/swarm` skill uses it to decide whether to create
 14. **NEVER batch more than 5 spec items in a single iteration** — if you think items "must" go together and the count exceeds 5, your coupling analysis is wrong. Decompose. A landing page with 12 FRs is 3-5 iterations minimum, not 1.
 15. **NEVER collapse planned iterations** — if Step 4 produces N batches, you MUST execute N iterations. After completing iteration 1, you do NOT get to re-evaluate and merge batches 2-5 into a single iteration. The batch plan from Step 4 is a commitment, not a suggestion. The only valid reason to adjust is if the Planification Agent returns warnings about batch sizing — and even then, you may only split batches smaller, never merge them larger.
 16. **NEVER commit without a passing build** — every iteration MUST pass `pnpm build` (or the project's build command) before committing. Tests passing is necessary but NOT sufficient. The build command validates import resolution, type checking, and bundling — things that mocked test environments skip.
+17. **NEVER commit without passing lint** — every iteration MUST pass the project's lint tool (when one exists) before committing. Lint catches type errors, unused imports, and style violations that tests and builds may miss. Pre-existing lint errors in untouched files do not block, but lint errors in iteration files are a hard gate.
 
 ---
 
@@ -557,7 +601,7 @@ Follow these conventions in all documentation, logging, and agent prompts:
 | Element | Convention | Example |
 |---|---|---|
 | Session names | kebab-case | `add-user-auth` |
-| Doc files | kebab-case | `add-user-auth.iterations.md` |
+| Doc files | kebab-case | `swarm/add-user-auth/iterations.md` |
 | Spec item refs | Original IDs | `FR-5`, `US-3` |
 | Task item refs | PLAN-NNN | `PLAN-001` |
 | Iteration refs | Iter N | `Iter 1`, `Iter 2` |

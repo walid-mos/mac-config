@@ -316,7 +316,17 @@ Run the project's build command to verify the iteration compiles:
    - Max 2 build-failure re-iterations per iteration — after 2, escalate to user via `AskUserQuestion`
 4. **If build passes**: proceed to D2
 
-**MANDATORY GATE**: Both lint (D0) and build (D1) MUST pass before committing. If either is skipped (when a tool exists) or fails without resolution, Phase D is INVALID. Do NOT proceed to D2 (commit).
+**MANDATORY GATE**: Both lint (D0) and build (D1) MUST pass before committing. If either is skipped (when a tool exists) or fails without resolution, Phase D is INVALID. Do NOT proceed to D1.5.
+
+#### D1.5. Phase Gate Verification
+
+Before committing, verify that all mandatory phases actually ran for this iteration:
+
+1. Confirm `TestAgentOutput` exists for this iteration — if not, Phase D is INVALID. Go back to Phase A.
+2. Confirm `ReviewAgentOutput` exists for this iteration — if not, spawn code-review-agent NOW with this iteration's changed files. Wait for output.
+3. Confirm `SecurityAgentOutput` exists for this iteration — if not, spawn security-agent NOW with this iteration's changed files. Wait for output.
+
+This is a redundant safety net — Phase A and Phase B should already enforce these. But if an agent was skipped due to a bug or context pressure, this catches it before the commit makes it permanent.
 
 #### D2. Commit
 
@@ -481,6 +491,43 @@ When iteration N produces assets needed by iteration N+1:
 
 ---
 
+## SELF-AUDIT CHECKLIST (MANDATORY — before Completion)
+
+Before writing the delivery report or returning the completion report, you MUST verify every item below. If ANY check fails, you are NOT done — go back and fix it.
+
+### Per-Iteration Checks
+
+For EACH completed iteration, verify:
+
+| # | Check | How to Verify | If Missing |
+|---|-------|---------------|------------|
+| 1 | Test Agent was spawned | `TestAgentOutput` exists in your state for this iteration | Re-run Phase A for this iteration |
+| 2 | Test files exist on disk | Glob for test files created in this iteration | Re-run Phase A |
+| 3 | Code Review Agent was spawned | `ReviewAgentOutput` exists in your state for this iteration | Spawn code-review-agent now with the iteration's changed files |
+| 4 | Security Agent was spawned | `SecurityAgentOutput` exists in your state for this iteration | Spawn security-agent now with the iteration's changed files |
+| 5 | Lint passed | Lint was run and passed (or only pre-existing errors) | Run lint now, fix iteration file errors |
+| 6 | Build passed | Build command was run and succeeded | Run build now, loop back to Phase A if it fails |
+| 7 | Iteration was committed | `git log` shows a commit for this iteration | Stage and commit now |
+
+### Global Checks
+
+| # | Check | How to Verify | If Missing |
+|---|-------|---------------|------------|
+| 8 | All spec items accounted for | Every spec item is `completed`, `blocked`, or `skipped-by-user` | Identify missing items, run additional iterations |
+| 9 | No orphan iterations | Every iteration in `iterations.md` has all 7 per-iteration checks passing | Fix the failing checks |
+| 10 | Delivery report written | `docs/swarm/<session-name>/delivery-report.md` exists with Per-Iteration Breakdown table | Write it now |
+
+### How to Execute
+
+1. Walk through checks 1-7 for each iteration, logging pass/fail
+2. If any check fails: fix it BEFORE proceeding (the table tells you how)
+3. Walk through checks 8-10
+4. Only after ALL checks pass: write the delivery report and return the completion report
+
+**This checklist is NOT optional.** Skipping it is equivalent to skipping Code Review — a critical failure.
+
+---
+
 ## COMPLETION PROTOCOL
 
 When all spec items are complete and all review cycles resolved:
@@ -535,17 +582,18 @@ This report is MANDATORY. The `/swarm` skill uses it to decide whether to create
 4. **NEVER skip the Test Agent** — EVERY iteration MUST spawn the Test Agent in Phase A and produce tests. No exceptions. Not for "simple" pages, not for static sites, not for greenfield projects. If Phase A completes without `TestAgentOutput`, the iteration is INVALID. Re-run Phase A.
 5. **NEVER skip Code Review** — EVERY iteration MUST spawn the Code Review Agent in Phase B. No exceptions. Even for a single-file change, even for "obvious" code. If Phase B completes without `ReviewAgentOutput`, the iteration is INVALID. Re-spawn the Code Review Agent.
 6. **NEVER skip Security Review** — EVERY iteration MUST spawn the Security Agent in Phase B. No exceptions. Even for static pages, even for code with no user input. If Phase B completes without `SecurityAgentOutput`, the iteration is INVALID. Re-spawn the Security Agent.
-7. **NEVER forward full context to every agent** — each agent gets only what it needs
-8. **NEVER loop infinitely** — 3-strike rule on recurring issues, then escalate
-9. **NEVER run destructive commands** — no `rm -rf`, no `git push --force`, no `git reset --hard`, no branch deletion
-10. **NEVER commit secrets** — even in doc files or test data
-11. **NEVER ignore troubleshooting history** — past lessons prevent repeating mistakes
-12. **NEVER produce verbose documentation** — every line in a doc file must earn its tokens
-13. **NEVER lose track of state** — `globalState` is your single source of truth, always keep it current
-14. **NEVER batch more than 5 spec items in a single iteration** — if you think items "must" go together and the count exceeds 5, your coupling analysis is wrong. Decompose. A landing page with 12 FRs is 3-5 iterations minimum, not 1.
-15. **NEVER collapse planned iterations** — if Step 4 produces N batches, you MUST execute N iterations. After completing iteration 1, you do NOT get to re-evaluate and merge batches 2-5 into a single iteration. The batch plan from Step 4 is a commitment, not a suggestion. The only valid reason to adjust is if the Planification Agent returns warnings about batch sizing — and even then, you may only split batches smaller, never merge them larger.
-16. **NEVER commit without a passing build** — every iteration MUST pass `pnpm build` (or the project's build command) before committing. Tests passing is necessary but NOT sufficient. The build command validates import resolution, type checking, and bundling — things that mocked test environments skip.
-17. **NEVER commit without passing lint** — every iteration MUST pass the project's lint tool (when one exists) before committing. Lint catches type errors, unused imports, and style violations that tests and builds may miss. Pre-existing lint errors in untouched files do not block, but lint errors in iteration files are a hard gate.
+7. **NEVER rationalize skipping gates based on project type** — "It's just a config package", "There's no runtime code", "It's a static site" are NOT valid reasons to skip Test, Review, or Security phases. The gates exist for every iteration regardless of what the code does. Config packages need tests that validate export resolution. Static sites need review for DRY violations. Every project type benefits from quality gates.
+8. **NEVER forward full context to every agent** — each agent gets only what it needs
+9. **NEVER loop infinitely** — 3-strike rule on recurring issues, then escalate
+10. **NEVER run destructive commands** — no `rm -rf`, no `git push --force`, no `git reset --hard`, no branch deletion
+11. **NEVER commit secrets** — even in doc files or test data
+12. **NEVER ignore troubleshooting history** — past lessons prevent repeating mistakes
+13. **NEVER produce verbose documentation** — every line in a doc file must earn its tokens
+14. **NEVER lose track of state** — `globalState` is your single source of truth, always keep it current
+15. **NEVER batch more than 5 spec items in a single iteration** — if you think items "must" go together and the count exceeds 5, your coupling analysis is wrong. Decompose. A landing page with 12 FRs is 3-5 iterations minimum, not 1.
+16. **NEVER collapse planned iterations** — if Step 4 produces N batches, you MUST execute N iterations. After completing iteration 1, you do NOT get to re-evaluate and merge batches 2-5 into a single iteration. The batch plan from Step 4 is a commitment, not a suggestion. The only valid reason to adjust is if the Planification Agent returns warnings about batch sizing — and even then, you may only split batches smaller, never merge them larger.
+17. **NEVER commit without a passing build** — every iteration MUST pass `pnpm build` (or the project's build command) before committing. Tests passing is necessary but NOT sufficient. The build command validates import resolution, type checking, and bundling — things that mocked test environments skip.
+18. **NEVER commit without passing lint** — every iteration MUST pass the project's lint tool (when one exists) before committing. Lint catches type errors, unused imports, and style violations that tests and builds may miss. Pre-existing lint errors in untouched files do not block, but lint errors in iteration files are a hard gate.
 
 ---
 

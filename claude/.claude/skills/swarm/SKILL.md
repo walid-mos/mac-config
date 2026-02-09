@@ -206,9 +206,12 @@ iterations: <contents of docs/swarm/<session-name>/iterations.md if resuming, or
 
 - You MUST complete ALL spec items before returning. Do NOT stop early.
 - If you encounter a blocker, escalate via AskUserQuestion — do NOT silently stop.
-- Run the full orchestration loop: Planification → Testing → Coding → Review → Fix → repeat until done.
+- Run the full orchestration loop for EVERY iteration: Phase A (Planification + Test) → Phase B (Code + Review + Security) → Phase C (Escalation) → Phase D (Lint + Build + Commit).
+- NEVER skip Code Review or Security Review — even for config-only packages, static sites, or "simple" changes. These gates are mandatory without exception.
+- NEVER skip the Test Agent — every iteration MUST produce tests. For config packages, tests validate that configs are parseable and exports resolve correctly.
 - Commit each validated iteration.
 - Write the delivery report to docs/swarm/<session-name>/delivery-report.md before returning.
+- Before returning your completion report, run the SELF-AUDIT CHECKLIST (see your agent definition). Your report will be validated against it.
 - When you are done, return a structured completion report:
   STATUS: completed | partial | blocked
   COMPLETED: <N>/<total> spec items
@@ -221,6 +224,23 @@ iterations: <contents of docs/swarm/<session-name>/iterations.md if resuming, or
 ## Step 4 — Handle Lead Agent Result
 
 When the Lead Agent returns, parse its completion report.
+
+### Output Validation (mandatory — before proceeding to Step 5)
+
+Before accepting the Lead Agent's result, validate the delivery report:
+
+1. Read `docs/swarm/<session-name>/delivery-report.md`
+2. Check the "Per-Iteration Breakdown" table:
+   - Every iteration MUST have a "Review Issues" column with actual counts (not "N/A" or missing)
+   - Every iteration MUST show test counts in the "Tests" column
+3. Check `docs/swarm/<session-name>/iterations.md`:
+   - Every iteration entry MUST have `**Review**:` and `**Lint**:` and `**Build**:` lines
+4. If ANY iteration is missing review/security/test evidence:
+   - Do NOT proceed to Step 5
+   - Re-spawn the Lead Agent with:
+     - The current state of the codebase
+     - A directive: "VALIDATION FAILURE: Iterations [list] are missing mandatory review/security/test gates. You MUST run the missing phases before returning. Do NOT re-implement code — only run the missing Phase B agents (code-review-agent, security-agent) and Phase A (test-agent) on the existing files."
+   - Attach the list of changed files per iteration from the delivery report
 
 ### If status is "completed"
 

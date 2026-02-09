@@ -14,9 +14,6 @@
       "Skill",
       "WebFetch",
       "WebSearch",
-      "mcp__context7__*",
-      "mcp__plugin_context7_context7__*",
-      "mcp__plugin_github_github__*",
       "WebFetch(domain:registry.npmjs.org)",
       "WebFetch(domain:api.anthropic.com)",
       "WebFetch(domain:api.githubcopilot.com)"
@@ -29,9 +26,9 @@
     "command": "bash ~/.claude/statusline-command.sh"
   },
   "enabledPlugins": {
+    "terraform-provider-development@hashicorp": true,
     "context7@claude-plugins-official": true,
-    "github@claude-plugins-official": true,
-    "terraform-provider-development@hashicorp": true
+    "github@claude-plugins-official": true
   },
   "sandbox": {
     "enabled": true,

@@ -12,6 +12,7 @@ autoload-dirs:
 Lightweight hub that auto-loads on every NextNode/SaaS project. For detailed references, see sibling skills:
 - **`/nextnode-infra`** — CI/CD pipeline, Dagger modules, Terraform, VPS, monitoring, DNS/SSL
 - **`/nextnode-brand`** — color palette, typography, logos, branding rules
+- **`/email-manager`** — template-first email sending with React Email (auto-loaded when `@nextnode-solutions/email-manager` is in `package.json`)
 
 ## Project Discovery (Dynamic)
 
@@ -50,7 +51,20 @@ When this skill auto-loads, Claude MUST dynamically discover all local projects 
 - **No barrel exports** — direct imports only
 - **Conventional Commits** required for semantic-release
 - **@nextnode-solutions/standards** — MANDATORY in every project (oxlint + oxfmt + TypeScript + Tailwind + Vitest + commitlint). See `/standards` skill for full details.
-- **pnpm** as package manager
+- **pnpm ONLY** — ALWAYS use `pnpm`, NEVER `npm` or `yarn`. This applies to all commands: install, add, remove, run, exec, dlx, etc.
+
+## Default Scripts
+
+All NextNode projects use these standard pnpm scripts unless the project's `CLAUDE.md` explicitly overrides them:
+
+| Command        | Purpose          |
+|----------------|------------------|
+| `pnpm lint`    | Lint the codebase |
+| `pnpm test`    | Run tests         |
+| `pnpm build`   | Build the project |
+| `pnpm dev`     | Start dev server  |
+
+> **Override rule:** If the project's `CLAUDE.md` defines different script names or flags, use those instead. The project-level `CLAUDE.md` always takes precedence.
 
 ## Quick Reference: Adding a New App
 

@@ -39,6 +39,19 @@ You are also the **only agent that persists** across the full bugfix run. Subage
 - If an agent fails, retry with a different approach or escalate — do NOT skip phases
 - If context is running low, compress aggressively and continue — do NOT stop mid-run
 
+### NEVER Classify Verification Failures as "Another Bug" (ABSOLUTE RULE)
+
+**If ANY verification check fails after a fix attempt — tests, build, CI, monitoring, review, security — that failure is YOUR problem.** It is part of the current bug scope. You MUST re-enter Phase C to fix it.
+
+- A fix that introduces test failures is NOT a successful fix — it is a FAILED fix attempt → go to C3
+- A fix that breaks the build is NOT a successful fix — it is a FAILED fix attempt → go to C3
+- A fix that fails CI is NOT a successful fix — it is a FAILED fix attempt → go to C3
+- A fix that triggers review/security issues is NOT a successful fix — it is a FAILED fix attempt → go to C3
+
+**You are NEVER allowed to say "this is a different/separate/unrelated bug" about a failure that appeared AFTER your fix.** If it was not failing before your fix and it is failing after, YOUR FIX CAUSED IT. Fix it.
+
+The ONLY exception is FR-13 (unrelated bugs discovered during INVESTIGATION, Phase A) — those go to `fixes.md`. But once you are in the fix loop (Phase C), every failure that appears is your responsibility until ALL checks pass.
+
 ### Never Consider Yourself "Done" Until
 
 1. The bug is verified fixed (all verification checks pass)
@@ -224,10 +237,24 @@ BugfixAgentOutput {
 
 Run verification checks in fast-fail order:
 
-**Step 1 — Tests** (cheapest check first):
-1. Run repro test (if available): must now PASS
-2. Run full test suite: `<testRunner> run` — no regressions allowed
-3. If tests fail → go to C3
+**Step 1 — Monitoring (MANDATORY AT EVERY ITERATION)**:
+
+Run ALL configured monitoring checks from `bugfixConfig.monitoring` BEFORE any other verification. This is non-negotiable — monitoring runs at EVERY fix attempt, not just at the end.
+
+1. **Local Tests** (if `monitoring.localTests: true`):
+   - Run `<testRunner> run` (or the project-appropriate equivalent)
+   - For Terraform projects: run `terraform validate` AND `terraform plan` (dry-run) in the affected environment
+   - If tests/validation fail → go to C3
+2. **GitHub Actions** (if `monitoring.ghActions: true`):
+   - Push the current state: `git push`
+   - Check CI status: `gh run list --branch fix/<session-name> --limit 5 --json status,conclusion,name`
+   - Wait for runs to complete. If any fail → go to C3
+3. **Live URL** (if `monitoring.liveUrl` is set):
+   - `curl -s -o /dev/null -w "%{http_code}" <liveUrl>` — expect 200
+   - If not 200 → go to C3
+4. **App Logs** (if `monitoring.logFiles` is non-empty):
+   - `tail -n 50 <logFile>` — scan for new errors matching the bug pattern
+   - If new errors found → go to C3
 
 **Step 2 — Build**:
 1. Run build command: `<packageManager> run build` (or `tsc --noEmit`)
@@ -253,6 +280,8 @@ If review or security finds issues:
 - **Significant/critical**: go to C3
 
 **If ALL verification checks pass → Phase D** (bug is fixed)
+
+**CRITICAL — Any single check failure = FAILED fix attempt.** Do NOT rationalize the failure as unrelated. Do NOT log it to fixes.md. Do NOT return early. Go to C3 and loop. The fix is not complete until EVERY check passes.
 
 #### C3 — Fix Failed
 
@@ -362,9 +391,9 @@ If the Bugfix Agent reported concerns or the Investigator found unrelated issues
 - Format: bug report per issue (location, type, description, impact, suggested fix)
 - **Never fix these** — stay focused on the target bug
 
-### Phase E — Monitoring (FR-9)
+### Phase E — Final Monitoring (FR-9)
 
-Post-fix, pre-merge monitoring to verify the fix holds.
+**Note**: Monitoring already runs at EVERY fix attempt in Phase C2 Step 1. Phase E is the FINAL pre-merge monitoring pass after all cleanup (debug stripping, lint fixes) is complete. This is a confirmation that the delivered code still passes all checks.
 
 **Only run monitoring checks that are configured and available.** Skip any source that is not configured or not applicable.
 
@@ -402,10 +431,10 @@ tail -n 50 <logFile>
 ```
 Scan for new errors matching the bug pattern.
 
-#### E3 — Evaluate Monitoring
+#### E3 — Evaluate Monitoring (MANDATORY RE-ENTRY ON FAILURE)
 
 - **All checks pass**: Bug is fixed and verified. Return success.
-- **Any check fails**: Log the failure. Re-enter **Phase C** with monitoring failure context. The fix did not hold — more investigation and fixing needed.
+- **Any check fails**: Log the failure. **IMMEDIATELY re-enter Phase C** with monitoring failure context. The fix did not hold — more investigation and fixing needed. **You are NOT done. Do NOT return a completion report. Do NOT classify this as a different bug. Re-enter Phase C NOW.**
 - **Monitoring not configured**: Skip Phase E entirely, proceed to completion.
 
 ---
@@ -462,7 +491,7 @@ All documentation goes to `docs/bugfix/<session-name>/`:
 | Bug requires DB migration | Flag concern, ask user via AskUserQuestion |
 | Multiple interrelated bugs | Focus on reported bug, log related bugs to fixes.md (FR-13) |
 | Flaky test | Investigator uses git bisect + repeated runs to isolate |
-| Fix introduces new failures | Must fix both — the new failure becomes part of the bug scope |
+| Fix introduces new failures | **MANDATORY: re-enter Phase C.** The new failure IS part of the bug scope. NEVER classify post-fix failures as "another bug" or log them to fixes.md. Your fix caused the regression — fix it before proceeding. |
 | Debug instrumentation masks fix | Re-investigate — the fix was dependent on debug code |
 | Investigator returns low confidence | Retry investigation once with refined focus, then proceed with best-effort |
 | All monitoring sources fail | Re-enter Phase C with monitoring context |
@@ -482,6 +511,9 @@ All documentation goes to `docs/bugfix/<session-name>/`:
 9. **NEVER forward full context to every agent** — each agent gets only what it needs
 10. **NEVER run destructive commands** — no `rm -rf`, no `git push --force`, no `git reset --hard`
 11. **NEVER commit secrets** — even in investigation logs or RCA
+12. **NEVER skip monitoring at any fix iteration** — `bugfixConfig.monitoring` checks (localTests, ghActions, liveUrl, logFiles) run at EVERY C2 verification step, not just in Phase E. For Terraform: this means `terraform validate` + `terraform plan` after every fix attempt.
+13. **NEVER classify a post-fix verification failure as "another bug" or "unrelated"** — if a check was passing before your fix and fails after, YOUR FIX BROKE IT. Re-enter Phase C. The only bugs that go to fixes.md are ones found during Phase A investigation that are unrelated to the target bug AND pre-existing (not caused by your fix).
+14. **NEVER return a completion report while any verification check is failing** — STATUS: fixed requires ALL checks to pass. No exceptions. No "it's fixed but there's also this other issue". Fix everything or keep looping.
 
 ---
 

@@ -196,6 +196,8 @@ troubleshooting: <contents of docs/troubleshooting.md, or "null">
 - Quality gates (test, code review, security) are MANDATORY on every fix attempt.
 - Write the RCA to docs/bugfix/<session-name>/rca.md before returning.
 - Commit the fix with a clear message.
+- **ABSOLUTE RULE — VERIFICATION FAILURES ARE YOUR PROBLEM**: If ANY verification check fails after a fix attempt (tests, build, CI, monitoring, review, security), you MUST re-enter Phase C. You are NEVER allowed to classify a post-fix failure as "another bug" or "unrelated". If it was passing before your fix and failing after, YOUR FIX CAUSED IT — fix it. The ONLY bugs that go to fixes.md are pre-existing issues found during Phase A investigation.
+- **NEVER return STATUS: fixed while any check is failing.** Loop until everything passes.
 - When you are done, return a structured completion report:
   STATUS: fixed | not-fixed | blocked
   FIX_DESCRIPTION: <1-2 sentence description of the fix>

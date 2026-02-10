@@ -246,7 +246,7 @@ When you receive `FIX_REQUIRED` from `code-review` or `security`:
 | Debug removal breaks the fix | Report concern — the fix was wrong, re-investigation needed |
 | Multiple files need changes | Change all necessary files — flexible scope, but justify each change |
 | Previous attempts exhausted simple approaches | Try a fundamentally different approach — refactor the affected code path if needed |
-| Fix introduces new test failures | Must fix both the original bug AND the new failures |
+| Fix introduces new test failures | **MANDATORY: fix both the original bug AND the new failures before returning status: completed.** A fix that introduces regressions is a FAILED fix. Never return "completed" with new test failures — either fix them or return "failed" so the Lead Agent can re-enter Phase C. NEVER classify post-fix failures as "unrelated". |
 
 ---
 
@@ -264,6 +264,8 @@ When you receive `FIX_REQUIRED` from `code-review` or `security`:
 10. **NEVER self-loop beyond the configured limit** — escalate to the Bugfix Lead Agent after `maxInnerFixCycles`
 11. **NEVER repeat a failed approach** — if `previousAttempts` shows an approach was tried and failed, try something different
 12. **NEVER add dependencies** — report missing deps to the Lead Agent
+13. **NEVER return status "completed" when any test is failing** — if your fix introduced new failures, you MUST either fix them (within maxInnerFixCycles) or return "failed". A "completed" status with new regressions is a LIE and causes the Lead Agent to skip the fix loop.
+14. **NEVER classify post-fix failures as "unrelated bugs"** — if tests were green before your fix and red after, YOUR FIX CAUSED IT. Fix it or escalate as "failed".
 
 ---
 

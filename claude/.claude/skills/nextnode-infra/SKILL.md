@@ -182,7 +182,7 @@ The infrastructure repo's `pipeline.yml` also accepts `release_mode` directly vi
 | Project Type | Actions |
 |-------------|---------|
 | **Package** | Lint -> Test -> Build -> semantic-release (npm publish + GitHub Release) |
-| **App** | Lint -> Test -> Build -> Deploy dev -> [Manual approval] -> Deploy prod |
+| **App** | Lint -> Test -> Build -> Deploy dev -> Ensure prod env -> [Manual approval] -> Deploy prod |
 
 ### Commit Convention
 
@@ -200,7 +200,7 @@ Seven TypeScript modules in `infrastructure/dagger-modules/`:
 | **pipeline** | `plan(config, eventName, ref, prLabels, releaseMode)`, `lint()`, `test()`, `build()` | Reads nextnode.toml, outputs job matrix. `releaseMode` accepts `"none"`, `"release"`, `"canary"` |
 | **npm** | `publish()`, `canaryPublish()` | semantic-release with zero config in repos |
 | **docker** | `build()`, `buildAndPush()`, `export()` | Docker image build, GHCR push, and tarball export |
-| **vps** | `provisionAndDeploy(config, source, environment, tfSource, ...secrets, appSecrets, force)`, `provision()`, `deploy()`, `status()`, `rollback()`, `destroy()` | Terraform provisioning + SSH deployment. Internally: `ensureWorkspace()`, `lookupCloudflareZoneId()`, `lookupHetznerSshKeyIds()`, `generateTailscaleAuthKey()`, `cleanupDuplicateDnsRecords()`, `buildEnvFile()` |
+| **vps** | `provisionAndDeploy(config, source, environment, tfSource, ...secrets, appSecrets, force)`, `provision()`, `deploy()`, `status()`, `rollback()`, `destroy()`, `cleanupDns(domain, cloudflareToken)` | Terraform provisioning + SSH deployment + DNS management via Cloudflare API. Internally: `ensureWorkspace()`, `lookupCloudflareZoneId()`, `lookupHetznerSshKeyIds()`, `generateTailscaleAuthKey()`, `upsertDnsRecord()`, `getTailscaleIp()`, `buildEnvFile()` |
 | **dns** | `verifyPropagation()`, `verifyTxt()`, `lookup()` | DNS verification (Terraform creates, Dagger verifies) |
 | **secrets** | `inject()`, `verify()`, `rotate()` | SSH-based secret injection to VPS |
 | **monitoring** | `deploy()`, `update()`, `status()`, `annotate()`, `notifyDeploy()` | Monitoring stack + Grafana annotations |
@@ -231,7 +231,8 @@ ci.yml (per-repo template)
         │     └─> publish (Dagger npm.publish() via semantic-release)
         ├─> pipeline-app.yml (if app + release)
         │     ├─> deploy-dev (Dagger vps.provisionAndDeploy())
-        │     └─> deploy-prod (requires "production" environment approval)
+        │     ├─> ensure-prod-environment (auto-configure GitHub environment protection)
+        │     └─> deploy-prod (requires "production" environment approval via vars.PROD_REVIEWER_ID)
         └─> rollback (workflow_dispatch only, Dagger vps.rollback())
 ```
 
@@ -242,7 +243,7 @@ Located in `infrastructure/terraform/`:
 | Module | Provider | Resources |
 |--------|----------|-----------|
 | `modules/vps` | Hetzner | `hcloud_server`, `hcloud_firewall` |
-| `modules/dns` | Cloudflare | `cloudflare_zone`, `cloudflare_dns_record`, `cloudflare_zone_dnssec` |
+| `modules/dns` | Cloudflare | `cloudflare_zone`, `cloudflare_dns_record`, `cloudflare_zone_dnssec` (used by environments only — apps use Dagger DNS) |
 | `modules/ssl` | Cloudflare | `cloudflare_zone_setting` (Full Strict, TLS 1.2+, HTTPS rewrites) |
 | `modules/volume` | Hetzner | `hcloud_volume` (ext4, automount) |
 
@@ -270,11 +271,14 @@ GitHub Actions triggers Dagger VPS module (provision-and-deploy)
   -> Auto-create workspace if needed (TF Cloud API)
   -> Look up Cloudflare zone ID from domain (API)
   -> Look up Hetzner SSH key IDs (API)
-  -> Clean up duplicate DNS A records for domain (Cloudflare API)
   -> Generate ephemeral Tailscale auth key from OAuth credentials
-  -> terraform plan (with TF_VAR_* from config)
+  -> terraform plan (with TF_VAR_* — VPS + volume only, no DNS)
   -> terraform apply only if changes detected (skip if no diff)
   -> Read TF state outputs (VPS IP)
+  -> DNS management (Dagger, via Cloudflare API):
+     -> If no domain: skip DNS
+     -> If internal: getTailscaleIp() via SSH → upsertDnsRecord(tailscaleIp, proxied=false)
+     -> If public: upsertDnsRecord(vpsIp, proxied=true)
   -> Build .env: auto-inject ALL GitHub secrets (minus infra) + DOMAIN/PUBLIC_SITE_URL/APP_PORT
   -> Wait for SSH (up to 18 attempts, 10s intervals)
   -> Deploy: scp files + docker compose up -d --build (via SSH, namespaced in /opt/apps/<app>/)
@@ -284,10 +288,10 @@ GitHub Actions triggers Dagger VPS module (provision-and-deploy)
 
 | Workspace | Contents |
 |-----------|----------|
-| `nextnode-shared-dev` | Shared dev VPS, Traefik, base DNS |
-| `nextnode-shared-prod` | Shared prod VPS, Traefik, base DNS |
+| `nextnode-shared-dev` | Shared dev VPS, Traefik (DNS managed by Dagger) |
+| `nextnode-shared-prod` | Shared prod VPS, Traefik (DNS managed by Dagger) |
 | `nextnode-monitoring` | Monitoring VPS + volume |
-| `nextnode-<app>` | Per-app dedicated VPS + volume + DNS (on-demand) |
+| `nextnode-<app>` | Per-app dedicated VPS + volume (DNS managed by Dagger) |
 
 Workspaces are auto-created by Dagger (`ensureWorkspace()`). No manual bootstrap needed.
 
@@ -325,8 +329,9 @@ Workspaces are auto-created by Dagger (`ensureWorkspace()`). No manual bootstrap
 - **Traefik ACME** — origin certs via Let's Encrypt DNS challenge (wildcard `*.nextnode.fr`)
 - **Full (Strict) SSL mode** — origin cert validation required
 - **Public apps** — orange cloud (Cloudflare proxied, CDN + DDoS protection)
-- **Internal apps** — grey cloud (DNS points to Tailscale IP)
-- Terraform OWNS all DNS records (`prevent_destroy = true`)
+- **Internal apps** — grey cloud (DNS points to Tailscale IP via `getTailscaleIp()`)
+- **DNS ownership**: Dagger VPS module manages app DNS records via Cloudflare API (`upsertDnsRecord`). Terraform only manages environment-level DNS (zones, DNSSEC).
+- **Cleanup**: `cleanupDns(domain, cloudflareToken)` deletes A records for an app domain
 
 ## GitHub Org Secrets
 
@@ -341,3 +346,9 @@ Workspaces are auto-created by Dagger (`ensureWorkspace()`). No manual bootstrap
 | `VPS_SSH_KEY` | SSH private key for deploy user |
 | `SLACK_BOT_TOKEN` | Slack notifications + alerts |
 | `GRAFANA_API_KEY` | Grafana annotations API |
+
+### GitHub Actions Variables (per-repo)
+
+| Variable | Purpose |
+|----------|---------|
+| `PROD_REVIEWER_ID` | GitHub user ID of the required reviewer for prod deployments. Set via repo Settings → Variables. The `ensure-prod-environment` job auto-configures the `production` environment with this reviewer. |

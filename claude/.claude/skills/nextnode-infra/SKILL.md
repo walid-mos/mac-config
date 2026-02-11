@@ -13,7 +13,7 @@ NextNode uses a **config-as-code driven, zero-manual-UI** infrastructure:
 
 - **GitHub Actions** — CI/CD orchestration with a single reusable workflow
 - **Dagger 0.19.11** (TypeScript SDK) — composable CI/CD modules for build, test, deploy
-- **Terraform 1.9** (TF Cloud backend) — VPS provisioning (Hetzner) + DNS/SSL (Cloudflare)
+- **Terraform 1.9** (TF Cloud backend) — VPS provisioning (Hetzner); DNS managed by Dagger via Cloudflare API
 - **Docker Compose** — app deployment on each VPS
 - **Caddy** — native reverse proxy (xcaddy + Cloudflare DNS plugin), automatic SSL via ACME DNS-01
 - **Tailscale** — secure internal mesh network (all VPSes connected)
@@ -200,8 +200,8 @@ Seven TypeScript modules in `infrastructure/dagger-modules/`:
 | **pipeline** | `plan(config, eventName, ref, prLabels, releaseMode)`, `lint()`, `test()`, `build()` | Reads nextnode.toml, outputs job matrix. `releaseMode` accepts `"none"`, `"release"`, `"canary"` |
 | **npm** | `publish()`, `canaryPublish()` | semantic-release with zero config in repos |
 | **docker** | `build()`, `buildAndPush()`, `export()` | Docker image build, GHCR push, and tarball export |
-| **vps** | `provisionAndDeploy(config, source, environment, tfSource, ...secrets, appSecrets, force)`, `provision()`, `deploy()`, `status()`, `rollback()`, `destroy()`, `generateOriginCert(domain, cloudflareToken, vpsHost, sshKey)`, `cleanupDns(domain, cloudflareToken)` | Terraform provisioning + SSH deployment + DNS management via Cloudflare API. `deploy()` auto-creates `/etc/caddy/sites/` and deploys Caddyfile snippets. `destroy()` passes placeholder TF vars (state-driven). Internally: `ensureWorkspace()`, `lookupCloudflareZoneId()`, `lookupHetznerSshKeyIds()`, `generateTailscaleAuthKey()`, `upsertDnsRecord()`, `getTailscaleIp()`, `buildEnvFile()`, `deleteTailscaleDevice()` |
-| **dns** | `verifyPropagation()`, `verifyTxt()`, `lookup()`, `setupEmail(domain, cloudflareToken, dkimNames, dkimValues, dmarcEmail)` | DNS verification + email DNS setup (SPF, DKIM, DMARC for Resend) |
+| **vps** | `provisionAndDeploy(config, source, environment, tfSource, ...secrets, appSecrets, force)`, `provision()`, `deploy()`, `status()`, `rollback()`, `destroy()`, `generateOriginCert(domain, cloudflareToken, vpsHost, sshKey)`, `cleanupDns(domain, cloudflareToken)` | Terraform provisioning + SSH deployment + DNS management via Cloudflare API. `deploy()` auto-creates `/etc/caddy/sites/` and deploys Caddyfile snippets. `destroy()` passes placeholder TF vars (state-driven). Internally: `ensureWorkspace()`, `lookupCloudflareZoneId()`, `lookupHetznerSshKeyIds()`, `generateTailscaleAuthKey()`, `upsertDnsRecord()` (with CNAME conflict detection), `getTailscaleIp()`, `buildEnvFile()`, `deleteTailscaleDevice()`, `generateBasicAuthUsers()` |
+| **dns** | `verifyPropagation()`, `verifyTxt()`, `lookup()`, `setupEmail(domain, cloudflareToken, dkimNames, dkimValues, dmarcEmail)` | DNS verification only (no record management — that's in VPS module) + email DNS setup (SPF, DKIM, DMARC for Resend) |
 | **secrets** | `inject()`, `verify()`, `rotate()` | SSH-based secret injection to VPS |
 | **monitoring** | `deploy()`, `update()`, `status()`, `annotate()`, `notifyDeploy()` | Monitoring stack + Grafana annotations |
 
@@ -235,36 +235,41 @@ ci.yml (per-repo template)
               └─> deploy-prod (requires "production" environment approval)
 
 Standalone action workflows (infrastructure repo, workflow_dispatch):
-  action-rollback.yml     — inputs: app, env → Dagger vps.rollback()
-  action-setup-email.yml  — inputs: domain, dkim_names, dkim_values, dmarc_email → Dagger dns.setupEmail()
-  action-destroy-vps.yml  — inputs: app, env, domain → Dagger vps.destroy() + vps.cleanupDns()
-                            Workspace auto-derived: nextnode-{app} or nextnode-shared-{env}
+  action-rollback.yml        — inputs: app, env → Dagger vps.rollback()
+  action-setup-email.yml     — inputs: domain, dkim_names, dkim_values, dmarc_email → Dagger dns.setupEmail()
+  action-destroy-vps.yml     — inputs: app, env, domain → Dagger vps.destroy() + vps.cleanupDns()
+                               Workspace auto-derived: nextnode-{app} or nextnode-shared-{env}
+  pipeline-monitoring.yml    — inputs: action (provision-and-deploy | update | destroy) → Dagger vps module for monitoring stack
 ```
 
-## Terraform Modules
+## Terraform Structure
 
 Located in `infrastructure/terraform/`:
 
-| Module | Provider | Resources |
-|--------|----------|-----------|
-| `modules/vps` | Hetzner | `hcloud_server`, `hcloud_firewall` |
-| `modules/dns` | Cloudflare | `cloudflare_zone`, `cloudflare_dns_record`, `cloudflare_zone_dnssec` (used by environments only — apps use Dagger DNS) |
-| `modules/ssl` | Cloudflare | `cloudflare_zone_setting` (Full Strict, TLS 1.2+, HTTPS rewrites) |
-| `modules/volume` | Hetzner | `hcloud_volume` (ext4, automount) |
+```
+terraform/
+├── apps/          # Variable-driven app infrastructure (vps + volume composition)
+├── modules/
+│   ├── vps/       # Hetzner VPS: hcloud_server, hcloud_firewall
+│   └── volume/    # Hetzner volume: hcloud_volume (ext4, automount)
+└── global/        # Cloudflare zone-level settings (zones, DNSSEC, SSL mode)
+```
 
-**Environments:** `terraform/environments/prod/` and `terraform/environments/monitoring/`
+- **No DNS/SSL Terraform modules** — DNS records are managed by Dagger VPS module via Cloudflare API
+- **No environments/ dirs** — replaced by TF Cloud workspaces (variable-driven approach)
+- **One `apps/` module** used by ALL apps — TF Cloud workspaces isolate state per app
 
 ## VPS Setup (cloud-init)
 
-Every VPS is provisioned with Ubuntu 24.04 and auto-configured via `templates/cloud-init.yml`:
+Every VPS is provisioned with **Debian 12** and auto-configured via `templates/cloud-init.yml`:
 
 - **Docker** + docker-compose-plugin
 - **Caddy** (built natively via xcaddy with Cloudflare DNS plugin)
 - **Tailscale** (ephemeral auth key, auto-joins tailnet)
 - **Grafana Alloy** agent (auto-discovers all Docker containers)
-- **UFW** firewall (22, 80, 443, 8443 + tailscale0)
+- **fail2ban** for SSH protection
 - **deploy** user (docker + sudo groups)
-- **Unattended upgrades**
+- **Automatic security updates**
 
 ## docker-compose.yml Standard (App)
 

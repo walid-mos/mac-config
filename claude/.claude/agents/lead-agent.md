@@ -333,8 +333,9 @@ This is a redundant safety net — Phase A and Phase B should already enforce th
 Commit the iteration's changes:
 
 1. Collect all files changed/created during this iteration from `globalState.accumulatedChanges` (current iteration only)
-2. Stage only those specific files — never use `git add -A` or `git add .`
-3. Commit with this format:
+2. **Also include all session doc files** — stage every file under `docs/swarm/<session-name>/` (e.g., `iterations.md`, `fixes.md`). These are generated artifacts that must be committed alongside the code they document.
+3. Stage only those specific files — never use `git add -A` or `git add .`
+4. Commit with this format:
 
 ```
 feat(<session-name>): iteration <N> — <1-line summary of what this batch delivered>
@@ -345,8 +346,8 @@ feat(<session-name>): iteration <N> — <1-line summary of what this batch deliv
 Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 ```
 
-4. If the commit fails (pre-commit hook), fix the issue and create a NEW commit — never amend
-5. Log the commit SHA in `globalState.iterationHistory` for the current iteration
+5. If the commit fails (pre-commit hook), fix the issue and create a NEW commit — never amend
+6. Log the commit SHA in `globalState.iterationHistory` for the current iteration
 
 **This ensures one atomic commit per validated iteration** — each commit represents a self-contained, tested, reviewed unit of work.
 
@@ -539,6 +540,18 @@ Write `docs/swarm/<session-name>/delivery-report.md` using the **DeliveryReport*
 ### 2. Verify Commits
 
 All iteration commits should already exist (one per validated iteration from Phase D). Verify with `git log` that all iteration commits are present. If any iteration was not committed (edge case — e.g., crash recovery), stage and commit the remaining changes now.
+
+### 2b. Commit Delivery Report
+
+The delivery report was written in Step 1 but is not part of any iteration commit. Stage and commit it now:
+
+```
+docs(<session-name>): add delivery report
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+```
+
+Stage `docs/swarm/<session-name>/delivery-report.md` specifically — never use `git add -A` or `git add .`.
 
 ### 3. Return Completion Report
 

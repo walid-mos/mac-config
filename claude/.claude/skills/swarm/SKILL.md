@@ -120,14 +120,7 @@ The interview will enrich the existing spec via Edit. Read the updated file afte
 
 Result: `NormalizedSpec = { type: "full-spec", content: <updated contents>, path: <file path> }`
 
-After obtaining the `NormalizedSpec` (in both Case 1 and Case 2), copy the spec into the session folder and mark the original as processed:
-
-1. Create `docs/swarm/<session-name>/` directory (via `mkdir -p`)
-2. Copy the spec file to `docs/swarm/<session-name>/spec.md`
-3. Prepend a processing banner to the **original** spec file using Edit:
-   ```
-   <!-- PROCESSED BY SWARM: <session-name> — <ISO-8601 timestamp> -->
-   ```
+After obtaining the `NormalizedSpec` (in both Case 1 and Case 2), store the spec path as `specPath` for later use. Do NOT copy or modify files yet — that happens after the worktree is created (Step 2d).
 
 > **Note**: After Step 1e, the `NormalizedSpec` should ALWAYS be `full-spec`. The `partial-spec` and `no-spec` types exist in the schema for edge cases (user explicitly skips interview), but the default flow always produces a full spec.
 
@@ -159,6 +152,27 @@ If the worktree already exists (resuming a session), `-y` auto-navigates to it.
 ### 2c. Record the worktree path
 
 Store the worktree path (`pwd` after `wt new`) as `worktreePath` for cleanup in Step 5.
+
+### 2d. Prepare spec files and initial commit
+
+Now that we're on the feature branch, prepare the spec files and commit them:
+
+1. Create `docs/swarm/<session-name>/` directory (via `mkdir -p`)
+2. Copy the spec file to `docs/swarm/<session-name>/spec.md`
+3. Prepend a processing banner to the **original** spec file using Edit:
+   ```
+   <!-- PROCESSED BY SWARM: <session-name> — <ISO-8601 timestamp> -->
+   ```
+4. Stage and commit the spec files:
+   - Stage the original spec file (`specPath`) and the session copy (`docs/swarm/<session-name>/spec.md`)
+   - Commit with format:
+   ```
+   docs(<session-name>): add spec
+
+   Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+   ```
+
+This ensures the spec is committed on the feature branch before any implementation begins.
 
 ## Step 3 — Spawn the Lead Agent
 

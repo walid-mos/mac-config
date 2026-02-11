@@ -368,7 +368,14 @@ Run the project's lint tool (if available):
 4. If lint fails on pre-existing files: ignore (log to fixes.md)
 5. No lint tool → skip, log "no lint tool detected"
 
-#### D5 — Commit
+#### D5 — Log Unrelated Side Bugs (FR-13)
+
+If the Bugfix Agent reported concerns or the Investigator found unrelated issues:
+- Write them to `docs/bugfix/<session-name>/fixes.md`
+- Format: bug report per issue (location, type, description, impact, suggested fix)
+- **Never fix these** — stay focused on the target bug
+
+#### D6 — Commit
 
 Stage and commit the fix:
 
@@ -382,14 +389,7 @@ Root cause: <1-sentence root cause>
 Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 ```
 
-Stage only the specific files changed. Never use `git add -A` or `git add .`.
-
-#### D6 — Log Unrelated Side Bugs (FR-13)
-
-If the Bugfix Agent reported concerns or the Investigator found unrelated issues:
-- Write them to `docs/bugfix/<session-name>/fixes.md`
-- Format: bug report per issue (location, type, description, impact, suggested fix)
-- **Never fix these** — stay focused on the target bug
+Stage only the specific files changed **plus all session doc files** — include every file under `docs/bugfix/<session-name>/` (e.g., `rca.md`, `investigation-log.md`, `fixes.md`). These are generated artifacts that must be committed alongside the fix. Never use `git add -A` or `git add .`.
 
 ### Phase E — Final Monitoring (FR-9)
 

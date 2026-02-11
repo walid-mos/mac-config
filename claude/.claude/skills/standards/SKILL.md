@@ -1,15 +1,13 @@
 ---
 name: standards
-description: "NextNode standards enforcement. Auto-load on ANY NextNode/SaaS project to ensure @nextnode-solutions/standards is installed, configured, and used — no exceptions."
-user-invocable: true
+description: "@nextnode-solutions/standards package reference — exports, config setup, formatting rules. For compliance auditing, see /nextnode-standards."
+user-invocable: false
 autoload-dirs:
   - /Users/walid/Development/nextnode
   - /Users/walid/Development/saas
 ---
 
-# @nextnode-solutions/standards — MANDATORY Enforcement
-
-**This skill is auto-loaded on every NextNode and SaaS project. No exceptions.**
+# @nextnode-solutions/standards — Package Reference
 
 `@nextnode-solutions/standards` is the centralized development standards package for all NextNode projects. It provides shared configs for linting, formatting, TypeScript, Tailwind, testing, and commit conventions.
 
@@ -18,21 +16,11 @@ autoload-dirs:
 - **Required peer deps:** `oxlint` (required), `oxfmt` (required)
 - **Optional peer deps:** `tailwindcss`, `vitest`, `@commitlint/cli`, `@commitlint/config-conventional`
 
----
-
-## 1. Compliance Check (run on auto-load)
-
-When this skill loads, **immediately verify** the current project is compliant:
-
-1. Read `package.json` — check that `@nextnode-solutions/standards` is in `devDependencies`
-2. If **missing**: warn the user and offer to install it (see section 3)
-3. If **present**: verify all config files extend from `@nextnode-solutions/standards` (see section 4)
-
-**Never silently skip this check.** If the project has a `package.json` and is under a NextNode/SaaS directory, it MUST use `@nextnode-solutions/standards`.
+> **Compliance auditing** is handled by `/nextnode-standards` (auto-loaded + user-invocable). This skill is a reference for the package exports and config patterns.
 
 ---
 
-## 2. Available Exports
+## 1. Available Exports
 
 | Import Path | What It Provides | Config File |
 |---|---|---|
@@ -49,7 +37,7 @@ When this skill loads, **immediately verify** the current project is compliant:
 
 ---
 
-## 3. Installation
+## 2. Installation
 
 ```bash
 pnpm add -D @nextnode-solutions/standards oxlint oxfmt
@@ -70,7 +58,7 @@ pnpm add -D @commitlint/cli @commitlint/config-conventional husky lint-staged be
 
 ---
 
-## 4. Configuration Setup Per Tool
+## 3. Configuration Setup Per Tool
 
 ### 4.1 oxlint — `oxlint.json`
 
@@ -217,7 +205,7 @@ export { default } from '@nextnode-solutions/standards/lint-staged'
 
 ---
 
-## 5. Required `package.json` Scripts
+## 4. Required `package.json` Scripts
 
 Every project MUST have these scripts:
 
@@ -245,7 +233,7 @@ Add if using vitest:
 
 ---
 
-## 6. Husky Git Hooks
+## 5. Husky Git Hooks
 
 After installing husky, set up hooks:
 
@@ -265,7 +253,7 @@ pnpm exec commitlint --edit $1
 
 ---
 
-## 7. Formatting Rules for Code Generation
+## 6. Formatting Rules for Code Generation
 
 When generating or editing code in any NextNode project, **always follow the oxfmt config**:
 
@@ -283,7 +271,7 @@ When generating or editing code in any NextNode project, **always follow the oxf
 
 ---
 
-## 8. When Creating a New NextNode Project
+## 7. When Creating a New NextNode Project
 
 When scaffolding a new project, **always set up @nextnode-solutions/standards from the start**:
 
@@ -297,7 +285,7 @@ When scaffolding a new project, **always set up @nextnode-solutions/standards fr
 
 ---
 
-## 9. Project Overrides
+## 8. Project Overrides
 
 Projects MAY extend/override specific rules in their local config files, but they MUST always extend from `@nextnode-solutions/standards` as the base. Direct configs that don't extend from standards are **not allowed**.
 

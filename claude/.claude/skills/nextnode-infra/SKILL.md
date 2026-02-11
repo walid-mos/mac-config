@@ -15,7 +15,7 @@ NextNode uses a **config-as-code driven, zero-manual-UI** infrastructure:
 - **Dagger 0.19.11** (TypeScript SDK) — composable CI/CD modules for build, test, deploy
 - **Terraform 1.9** (TF Cloud backend) — VPS provisioning (Hetzner) + DNS/SSL (Cloudflare)
 - **Docker Compose** — app deployment on each VPS
-- **Traefik v3** — reverse proxy, automatic SSL via Let's Encrypt DNS challenge
+- **Caddy** — native reverse proxy (xcaddy + Cloudflare DNS plugin), automatic SSL via ACME DNS-01
 - **Tailscale** — secure internal mesh network (all VPSes connected)
 - **Grafana Alloy** — push-based observability agent on every VPS
 
@@ -167,7 +167,7 @@ The `release_mode` input allows manually triggering releases/canary publishes:
 | `release` | Lint -> Test -> Build -> Full release (semantic-release for packages, deploy for apps) |
 | `canary` | Lint -> Test -> Build -> Canary publish (`0.0.0-canary.<sha>`) — packages only |
 
-The infrastructure repo's `pipeline.yml` also accepts `release_mode` directly via its own `workflow_dispatch` (for rollback operations, it has separate `action`, `app`, `env` inputs).
+The infrastructure repo has separate action workflows for manual operations (see Infrastructure Actions below).
 
 ### What happens on PR
 
@@ -200,8 +200,8 @@ Seven TypeScript modules in `infrastructure/dagger-modules/`:
 | **pipeline** | `plan(config, eventName, ref, prLabels, releaseMode)`, `lint()`, `test()`, `build()` | Reads nextnode.toml, outputs job matrix. `releaseMode` accepts `"none"`, `"release"`, `"canary"` |
 | **npm** | `publish()`, `canaryPublish()` | semantic-release with zero config in repos |
 | **docker** | `build()`, `buildAndPush()`, `export()` | Docker image build, GHCR push, and tarball export |
-| **vps** | `provisionAndDeploy(config, source, environment, tfSource, ...secrets, appSecrets, force)`, `provision()`, `deploy()`, `status()`, `rollback()`, `destroy()`, `cleanupDns(domain, cloudflareToken)` | Terraform provisioning + SSH deployment + DNS management via Cloudflare API. Internally: `ensureWorkspace()`, `lookupCloudflareZoneId()`, `lookupHetznerSshKeyIds()`, `generateTailscaleAuthKey()`, `upsertDnsRecord()`, `getTailscaleIp()`, `buildEnvFile()` |
-| **dns** | `verifyPropagation()`, `verifyTxt()`, `lookup()` | DNS verification (Terraform creates, Dagger verifies) |
+| **vps** | `provisionAndDeploy(config, source, environment, tfSource, ...secrets, appSecrets, force)`, `provision()`, `deploy()`, `status()`, `rollback()`, `destroy()`, `generateOriginCert(domain, cloudflareToken, vpsHost, sshKey)`, `cleanupDns(domain, cloudflareToken)` | Terraform provisioning + SSH deployment + DNS management via Cloudflare API. `deploy()` auto-creates `/etc/caddy/sites/` and deploys Caddyfile snippets. `destroy()` passes placeholder TF vars (state-driven). Internally: `ensureWorkspace()`, `lookupCloudflareZoneId()`, `lookupHetznerSshKeyIds()`, `generateTailscaleAuthKey()`, `upsertDnsRecord()`, `getTailscaleIp()`, `buildEnvFile()`, `deleteTailscaleDevice()` |
+| **dns** | `verifyPropagation()`, `verifyTxt()`, `lookup()`, `setupEmail(domain, cloudflareToken, dkimNames, dkimValues, dmarcEmail)` | DNS verification + email DNS setup (SPF, DKIM, DMARC for Resend) |
 | **secrets** | `inject()`, `verify()`, `rotate()` | SSH-based secret injection to VPS |
 | **monitoring** | `deploy()`, `update()`, `status()`, `annotate()`, `notifyDeploy()` | Monitoring stack + Grafana annotations |
 
@@ -221,19 +221,24 @@ const isCanary = (eventName === "pull_request" && type === "package" && canaryEn
 
 ```
 ci.yml (per-repo template)
-  └─> pipeline.yml (reusable, in infrastructure repo)
+  └─> pipeline.yml (reusable workflow_call, in infrastructure repo)
         ├─> Plan job (Dagger pipeline.plan())
         ├─> Lint job
         ├─> Test job
         ├─> Build job
-        ├─> pipeline-package.yml (if package + release/canary)
+        ├─> [Internal] pipeline-package.yml (if package + release/canary)
         │     ├─> canary-publish (Dagger npm.canaryPublish())
         │     └─> publish (Dagger npm.publish() via semantic-release)
-        ├─> pipeline-app.yml (if app + release)
-        │     ├─> deploy-dev (Dagger vps.provisionAndDeploy())
-        │     ├─> ensure-prod-environment (auto-configure GitHub environment protection)
-        │     └─> deploy-prod (requires "production" environment approval via vars.PROD_REVIEWER_ID)
-        └─> rollback (workflow_dispatch only, Dagger vps.rollback())
+        └─> [Internal] pipeline-app.yml (if app + release)
+              ├─> deploy-dev (Dagger vps.provisionAndDeploy())
+              ├─> ensure-prod-environment (auto-configure GitHub environment with NextNodeSolutions/core team approval)
+              └─> deploy-prod (requires "production" environment approval)
+
+Standalone action workflows (infrastructure repo, workflow_dispatch):
+  action-rollback.yml     — inputs: app, env → Dagger vps.rollback()
+  action-setup-email.yml  — inputs: domain, dkim_names, dkim_values, dmarc_email → Dagger dns.setupEmail()
+  action-destroy-vps.yml  — inputs: app, env, domain → Dagger vps.destroy() + vps.cleanupDns()
+                            Workspace auto-derived: nextnode-{app} or nextnode-shared-{env}
 ```
 
 ## Terraform Modules
@@ -254,11 +259,43 @@ Located in `infrastructure/terraform/`:
 Every VPS is provisioned with Ubuntu 24.04 and auto-configured via `templates/cloud-init.yml`:
 
 - **Docker** + docker-compose-plugin
+- **Caddy** (built natively via xcaddy with Cloudflare DNS plugin)
 - **Tailscale** (ephemeral auth key, auto-joins tailnet)
 - **Grafana Alloy** agent (auto-discovers all Docker containers)
 - **UFW** firewall (22, 80, 443, 8443 + tailscale0)
 - **deploy** user (docker + sudo groups)
 - **Unattended upgrades**
+
+## docker-compose.yml Standard (App)
+
+Every app repo MUST have a `docker-compose.yml` at root. Caddy runs **natively on the VPS** (not in Docker) and reverse-proxies to `localhost:PORT` — so apps do NOT need a `proxy-public` external network.
+
+```yaml
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: <project-name>        # From nextnode.toml [project].name
+    restart: unless-stopped
+    env_file:
+      - .env                              # Auto-injected by Dagger at deploy time
+    ports:
+      - '${APP_PORT:-4321}:${APP_PORT:-4321}'
+    healthcheck:
+      test: ['CMD', 'node', '-e', "require('http').get('http://localhost:${APP_PORT:-4321}',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+```
+
+**Key rules:**
+- **No `proxy-public` network** — Caddy is native, not containerized. It reaches the app via host port mapping.
+- **`env_file: .env`** — Dagger builds and SCPs the `.env` at deploy time (secrets + auto-injected vars).
+- **`container_name`** — matches `[project].name` from `nextnode.toml`.
+- **`restart: unless-stopped`** — standard restart policy for all production services.
+- **Port** — use `${APP_PORT:-<default>}` with the default from `nextnode.toml [app].port`.
 
 ## Deployment Flow (App)
 
@@ -288,8 +325,8 @@ GitHub Actions triggers Dagger VPS module (provision-and-deploy)
 
 | Workspace | Contents |
 |-----------|----------|
-| `nextnode-shared-dev` | Shared dev VPS, Traefik (DNS managed by Dagger) |
-| `nextnode-shared-prod` | Shared prod VPS, Traefik (DNS managed by Dagger) |
+| `nextnode-shared-dev` | Shared dev VPS, Caddy (DNS managed by Dagger) |
+| `nextnode-shared-prod` | Shared prod VPS, Caddy (DNS managed by Dagger) |
 | `nextnode-monitoring` | Monitoring VPS + volume |
 | `nextnode-<app>` | Per-app dedicated VPS + volume (DNS managed by Dagger) |
 
@@ -326,12 +363,14 @@ Workspaces are auto-created by Dagger (`ensureWorkspace()`). No manual bootstrap
 ## DNS & SSL Strategy
 
 - **Cloudflare Universal SSL** — edge certs (free, auto-managed)
-- **Traefik ACME** — origin certs via Let's Encrypt DNS challenge (wildcard `*.nextnode.fr`)
+- **Caddy ACME** — origin certs via Let's Encrypt DNS-01 challenge (Cloudflare DNS plugin)
+- **Cloudflare Origin Certs** — for internal apps, generated via `vps.generateOriginCert()` (15-year validity), stored at `/etc/caddy/certs/` on VPS
 - **Full (Strict) SSL mode** — origin cert validation required
 - **Public apps** — orange cloud (Cloudflare proxied, CDN + DDoS protection)
 - **Internal apps** — grey cloud (DNS points to Tailscale IP via `getTailscaleIp()`)
 - **DNS ownership**: Dagger VPS module manages app DNS records via Cloudflare API (`upsertDnsRecord`). Terraform only manages environment-level DNS (zones, DNSSEC).
 - **Cleanup**: `cleanupDns(domain, cloudflareToken)` deletes A records for an app domain
+- **Caddy sites**: Per-app Caddyfile snippets deployed to `/etc/caddy/sites/{app}.caddy`, Caddy reloaded via `systemctl reload caddy`
 
 ## GitHub Org Secrets
 
@@ -347,8 +386,6 @@ Workspaces are auto-created by Dagger (`ensureWorkspace()`). No manual bootstrap
 | `SLACK_BOT_TOKEN` | Slack notifications + alerts |
 | `GRAFANA_API_KEY` | Grafana annotations API |
 
-### GitHub Actions Variables (per-repo)
+### Production Approval Gate
 
-| Variable | Purpose |
-|----------|---------|
-| `PROD_REVIEWER_ID` | GitHub user ID of the required reviewer for prod deployments. Set via repo Settings → Variables. The `ensure-prod-environment` job auto-configures the `production` environment with this reviewer. |
+The `ensure-environments` job in `pipeline.yml` auto-configures the `production` GitHub environment with the **NextNodeSolutions/core** team as required reviewers. No per-repo variable needed — uses a GitHub App token to resolve the team ID via API.

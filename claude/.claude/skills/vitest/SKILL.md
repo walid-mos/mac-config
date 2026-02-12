@@ -36,6 +36,19 @@ user-invocable: false
 - NEVER test 1:1 mirrors of implementation (copy-pasting the function logic into the test)
 - NEVER test trivial getters/setters or simple wrappers
 - NEVER write a test just to increase coverage — coverage is a side effect, not a goal
+- NEVER test CI/CD pipelines, build configs, or deployment scripts — these are validated by running them, not by unit tests
+- NEVER test infrastructure code (Terraform, Dagger modules, Docker configs) with unit tests — infra is tested by deploying it
+- NEVER test static config files (tsconfig, eslint, vite.config, etc.) — the tool that consumes the config validates it
+- NEVER test that config values haven't changed (snapshot-testing a config = test that breaks on every legitimate update)
+- NEVER test simple re-exports, type aliases, or constant declarations
+
+## Resilience Rules
+
+- NEVER assert on exact config values, version strings, or counts that change with normal project evolution
+- NEVER write tests that assert "nothing was added/removed/changed" — these break on every legitimate update and provide zero regression protection
+- Prefer asserting on **behavior** ("calling X with Y produces Z") over **structure** ("object has exactly these 5 keys")
+- Use `expect.objectContaining()` and `expect.arrayContaining()` to test what matters without breaking on additions
+- If a test would break when a teammate adds a new feature/option/field, it's a bad test — delete it
 
 ## Decision Framework
 

@@ -306,7 +306,7 @@ services:
 
 ```
 GitHub Actions triggers Dagger VPS module (provision-and-deploy)
-  -> Parse nextnode.toml config (regex-based in Dagger, smol-toml in shared lib)
+  -> Parse nextnode.toml config (smol-toml — both root and Dagger parsers; Dagger embeds defaults due to module isolation)
   -> Resolve server tier (shared vs dedicated)
   -> Determine VPS name: custom-<app> (dedicated) or shared-<env> (shared)
   -> Determine TF Cloud workspace: nextnode-<app> (dedicated) or nextnode-shared-<env> (shared)
@@ -339,7 +339,7 @@ Workspaces are auto-created by Dagger (`ensureWorkspace()`). No manual bootstrap
 
 ## Monitoring Stack
 
-**Centralized monitoring VPS** (cpx21, nbg1) running:
+**Centralized monitoring VPS** (cx23, nbg1) running:
 
 | Component | Port | Purpose |
 |-----------|------|---------|
@@ -376,6 +376,30 @@ Workspaces are auto-created by Dagger (`ensureWorkspace()`). No manual bootstrap
 - **DNS ownership**: Dagger VPS module manages app DNS records via Cloudflare API (`upsertDnsRecord`). Terraform only manages environment-level DNS (zones, DNSSEC).
 - **Cleanup**: `cleanupDns(domain, cloudflareToken)` deletes A records for an app domain
 - **Caddy sites**: Per-app Caddyfile snippets deployed to `/etc/caddy/sites/{app}.caddy`, Caddy reloaded via `systemctl reload caddy`
+- **CNAME conflict detection**: `upsertDnsRecord()` auto-detects and deletes conflicting CNAME records before creating A records (prevents migration issues from Railway/Vercel)
+
+## Dev Environment Auth
+
+Non-prod deployments can be protected with Caddy basic auth via org-level GitHub secrets:
+
+| Secret | User | Purpose |
+|--------|------|---------|
+| `DEV_PREVIEW_PASSWORD` | `preview` | Share with clients for preview access |
+| `DEV_PASSWORD` | `dev` | Internal team access |
+
+- VPS module's `generateBasicAuthUsers()` generates bcrypt hashes via `htpasswd` at deploy time
+- Injects `basic_auth` block into Caddyfile for non-prod environments when domain is set and passwords are provided
+- Graceful fallback: if passwords not set, deploys without auth
+
+## VPS Module Internals
+
+Key internal helpers (not public API, but important for understanding the module):
+
+- `upsertDnsRecord()` — Create/update Cloudflare DNS records, auto-detects and removes conflicting CNAME records
+- `deleteTailscaleDevice()` — Deletes existing Tailscale devices by hostname before reprovisioning (prevents duplicate registrations like shared-dev, shared-dev-1)
+- `generateBasicAuthUsers()` — Generates bcrypt hashes for dev environment basic auth
+- `ensureWorkspace()` — Auto-creates TF Cloud workspace if needed
+- `buildEnvFile()` — Constructs .env from GitHub secrets + auto-injected vars
 
 ## GitHub Org Secrets
 
@@ -390,6 +414,8 @@ Workspaces are auto-created by Dagger (`ensureWorkspace()`). No manual bootstrap
 | `VPS_SSH_KEY` | SSH private key for deploy user |
 | `SLACK_BOT_TOKEN` | Slack notifications + alerts |
 | `GRAFANA_API_KEY` | Grafana annotations API |
+| `DEV_PREVIEW_PASSWORD` | Optional — basic auth for `preview` user on non-prod environments |
+| `DEV_PASSWORD` | Optional — basic auth for `dev` user on non-prod environments |
 
 ### Production Approval Gate
 

@@ -47,6 +47,5 @@
       ]
     }
   },
-  "autoUpdatesChannel": "latest",
-  "effortLevel": "medium"
+  "autoUpdatesChannel": "latest"
 }

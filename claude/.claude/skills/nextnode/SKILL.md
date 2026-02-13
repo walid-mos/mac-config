@@ -14,14 +14,14 @@ autoload-dirs:
 NextNode uses a **config-as-code driven, zero-manual-UI** infrastructure:
 
 - **GitHub Actions** — CI/CD orchestration with a single reusable workflow
-- **Dagger** (TypeScript SDK) — composable CI/CD modules for build, test, deploy
-- **Terraform** — VPS provisioning (Hetzner) + DNS/SSL (Cloudflare)
+- **`infra` CLI** (TypeScript, citty) — CI/CD engine in `packages/cli/` — provision, deploy, destroy, rollback, build, lint, test, publish
+- **Terraform 1.9** (TF Cloud backend) — VPS provisioning (Hetzner); DNS managed by CLI via Cloudflare API
 - **Docker Compose** — app deployment on each VPS
-- **Traefik v3** — reverse proxy, automatic SSL via Let's Encrypt DNS challenge
+- **Caddy** — native reverse proxy (xcaddy + Cloudflare DNS plugin), automatic SSL via ACME DNS-01
 - **Tailscale** — secure internal mesh network (all VPSes connected)
 - **Grafana Alloy** — push-based observability agent on every VPS
 
-**Repository:** `NextnodeSolutions/infrastructure`
+**Repository:** `NextNodeSolutions/infrastructure`
 
 ## nextnode.toml — The Single Config File
 
@@ -48,8 +48,8 @@ canary_on_label = true         # Publish canary on PR label "canary"
 # === App-only: Server (4 tiers) ===
 # No [server] = shared dev + shared prod VPS (Tier 1)
 [server]                       # Tier 2: dedicated VPS (same for dev + prod)
-type = "cpx21"                 # Hetzner server type
-location = "nbg1"              # Hetzner datacenter
+type = "cpx21"                 # Hetzner server type (default: cpx22)
+location = "nbg1"              # Hetzner datacenter (default: nbg1)
 internal = true                # true = grey cloud (Tailscale), false = orange cloud (public)
 
 # Tier 3: per-env server overrides
@@ -73,6 +73,15 @@ strategy = "docker-compose"
 file = "docker-compose.yml"
 dockerfile = "./Dockerfile"
 context = "./"
+port = 4321                    # App port (auto-injected as APP_PORT in .env)
+
+[health]                       # Optional — health check config
+type = "http"                  # "http" | "tcp" | "command"
+endpoint = "/health"           # For http type
+port = 8080                    # For tcp type
+interval = "30s"
+timeout = "10s"
+retries = 3
 
 [environment.dev]
 auto_deploy = true
@@ -87,6 +96,24 @@ enabled = true
 keep_versions = 5
 ```
 
+### .env Injection
+
+At deploy time, the CLI builds the `.env` file for each app:
+
+1. **All GitHub org secrets** are injected automatically as-is (`SECRET_NAME=value`), **except** infrastructure secrets (`HETZNER_API_TOKEN`, `CLOUDFLARE_API_TOKEN`, `TF_CLOUD_TOKEN`, `TAILSCALE_OAUTH_*`, `SSH_PRIVATE_KEY`, `SLACK_BOT_TOKEN`, `GRAFANA_API_KEY`, `NPM_TOKEN`, `GITHUB_TOKEN`)
+2. **Auto-injected variables** (if not already present from secrets):
+
+| Variable | Source |
+|----------|--------|
+| `IMAGE` | GHCR image tag for the deployment |
+| `HOST_PORT` | Deterministic hash-based port (10000-29999) |
+| `NODE_ENV` | `production` for prod, `development` for others |
+| `DOMAIN` | `[project].domain`, or VPS IP if no domain set |
+| `PUBLIC_SITE_URL` | `https://<domain>`, or `http://<vps-ip>` if no domain set |
+| `APP_PORT` | `[deploy].port` (default `4321`) |
+
+3. **Auto-detected compose env vars**: CLI reads the compose file and forwards any env vars referenced from `process.env`
+
 ### Server Tier Resolution
 
 | Config Present | Dev VPS | Prod VPS |
@@ -96,43 +123,143 @@ keep_versions = 5
 | `[server]` + `[environment.X.server]` | Dedicated (overridden) | Dedicated (overridden) |
 | `[environment.X.server]` only | Dedicated dev | Dedicated prod |
 
+## CLI Commands
+
+The `infra` CLI (`packages/cli/`) is built with **citty** and provides all CI/CD operations. All commands accept `--config <path>` and `--env <env>` base args.
+
+| Command | Purpose | Key Args |
+|---------|---------|----------|
+| `infra plan` | Show resolved config and planned pipeline actions (dry run) | — |
+| `infra lint` | Run `pnpm <lint-script>` | — |
+| `infra test` | Run `pnpm <test-script>` | — |
+| `infra build` | Build Docker image, push to ghcr.io | `--sha` |
+| `infra provision` | Provision VPS via Terraform (skips if VPS healthy) | `--force`, `--plan-only` |
+| `infra deploy` | Deploy app to VPS via SSH + Docker Compose | `--sha` |
+| `infra dns upsert` | Create/update DNS A record | `--ip` |
+| `infra dns delete` | Delete DNS records for app | — |
+| `infra dns list` | List DNS records for domain | — |
+| `infra destroy` | Destroy VPS + cleanup (smart shared VPS handling) | `--app`, `--yes`, `--cleanup-workspace` |
+| `infra rollback` | Rollback to a previous git ref | `--ref`, `--skip-build`, `--yes` |
+| `infra status` | Check VPS, containers, DNS, Caddy health | `--json` |
+| `infra pipeline` | Run full CI/CD pipeline (provision + DNS + deploy) | `--sha`, `--force`, `--skip-quality` |
+| `infra publish` | Publish npm package (release or canary) | — |
+
+### CLI Libraries (`packages/cli/src/lib/`)
+
+| Library | Key Functions |
+|---------|---------------|
+| **config** | `loadConfig()`, `computeHostPort()`, `computeEnvDomain()`, `computeWorkspaceName()`, `computeImageTag()`, `detectDockerConfig()` |
+| **cloudflare** | `lookupZoneId()`, `upsertDnsRecord()`, `deleteDnsRecord()`, `listDnsRecords()` — with retry for rate limiting |
+| **dns** | `resolveProxied()`, `resolveDnsTarget()`, `upsertWildcardRecords()` |
+| **ssh** | `sshExec()`, `scp()`, `writeKeyFile()` — SSH via Tailscale hostnames |
+| **terraform** | `terraformInit()`, `terraformPlan()`, `terraformApply()`, `terraformOutput()`, `terraformDestroy()` |
+| **tfcloud** | `ensureWorkspace()`, `deleteWorkspace()`, `hasResources()` |
+| **tailscale** | `deleteDevice()`, `generateAuthKey()`, `getDeviceIp()` — OAuth token caching |
+| **caddy** | `generateCaddyFileContent()`, `deployCaddyConfig()`, `removeCaddyAppConfig()`, `reloadCaddy()`, `waitForCaddy()` |
+| **docker** | `dockerBuild()`, `dockerPush()`, `dockerLogin()` |
+| **github** | `verifyCiPassed()`, `getCheckRuns()` — prod gate CI verification |
+| **hetzner** | `fetchHetznerSshKeyIds()` |
+| **exec** | `exec()`, `execCapture()`, `requireBinary()` — process execution with logging |
+| **logger** | `logger` (consola), `withTiming()` |
+| **secrets** | `validateSecrets()`, `requireEnv()` |
+
 ## Pipeline Behavior
 
-### Pipeline Workflow Files
+### Per-repo CI files (3 workflow files per app repo)
 
-The pipeline is split into three reusable workflows in `infrastructure/.github/workflows/`:
+**CRITICAL:** The caller workflow MUST declare `permissions` for the reusable workflow to function. Without it, `GITHUB_TOKEN` defaults to read-only and operations will fail.
 
-| File | Purpose |
-|------|---------|
-| `pipeline.yml` | Main entry — Plan, Lint, Test, Build, then dispatches to package or app workflow |
-| `pipeline-package.yml` | Package-specific: Publish (semantic-release) + Canary Publish |
-| `pipeline-app.yml` | App-specific: Deploy Dev → Deploy Prod |
+> **Why permissions in the caller?** With reusable workflows, `permissions` in the called workflow can only **restrict** the caller's permissions, not expand them. The caller must grant the ceiling.
 
-### Per-repo CI file (identical in every repo)
-
-**CRITICAL:** The caller workflow MUST declare `permissions` for semantic-release (package repos) or deployment (app repos) to work. Without it, `GITHUB_TOKEN` defaults to read-only and publish/deploy will fail with `EGITNOPERMISSION`.
+#### 1. `.github/workflows/ci.yml` — Main CI pipeline
 
 ```yaml
-# .github/workflows/ci.yml
 name: CI
+
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
-  contents: write       # semantic-release: push tags + changelog commits
-  issues: write         # @semantic-release/github: create issues on failure
-  pull-requests: write  # @semantic-release/github: comment on PRs
+  checks: read
+  contents: read
+  packages: write
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   pipeline:
     uses: NextNodeSolutions/infrastructure/.github/workflows/pipeline.yml@main
+    with:
+      action: ${{ inputs.action || 'ci' }}
+      environment: ${{ inputs.environment || 'dev' }}
     secrets: inherit
 ```
 
-> **Why permissions in the caller?** With reusable workflows, `permissions` in the called workflow can only **restrict** the caller's permissions, not expand them. The caller must grant the ceiling.
+#### 2. `.github/workflows/deploy-prod.yml` — Manual production deploy
+
+```yaml
+name: Deploy to Production
+
+on:
+  workflow_dispatch:
+
+permissions:
+  checks: read
+  contents: read
+  packages: write
+
+jobs:
+  deploy:
+    uses: NextNodeSolutions/infrastructure/.github/workflows/pipeline.yml@main
+    with:
+      action: deploy-prod
+      environment: prod
+    secrets: inherit
+```
+
+#### 3. `.github/workflows/destroy.yml` — Manual environment destroy
+
+```yaml
+name: Destroy Environment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to destroy"
+        required: true
+        type: choice
+        options:
+          - dev
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  destroy:
+    uses: NextNodeSolutions/infrastructure/.github/workflows/pipeline.yml@main
+    with:
+      action: destroy
+      environment: ${{ inputs.environment }}
+    secrets: inherit
+```
+
+### How the 3 workflows map to pipeline actions
+
+The reusable workflow (`pipeline.yml`) accepts `action` and `environment` inputs:
+
+| Workflow | `action` | `environment` | Trigger |
+|----------|----------|---------------|---------|
+| `ci.yml` | `ci` (default) | `dev` (default) | push/PR/manual |
+| `deploy-prod.yml` | `deploy-prod` | `prod` | manual only |
+| `destroy.yml` | `destroy` | user picks (dev) | manual only |
 
 ### What happens on PR
 
@@ -147,7 +274,41 @@ jobs:
 | Project Type | Actions |
 |-------------|---------|
 | **Package** | Lint -> Test -> Build -> semantic-release (npm publish + GitHub Release) |
-| **App** | Lint -> Test -> Build -> Deploy dev -> [Manual approval] -> Deploy prod |
+| **App** | Lint -> Test -> Build -> Provision -> DNS -> Deploy dev -> [Prod gate] -> Deploy prod |
+
+### Workflow architecture
+
+```
+ci.yml (per-repo template)
+  └─> pipeline.yml (reusable workflow_call, in infrastructure repo)
+        ├─> Plan job (inline TOML parse)
+        ├─> Lint job (pnpm lint)
+        ├─> Test job (pnpm test)
+        ├─> Build job (infra build --sha)
+        ├─> [Internal] pipeline-package.yml (if package)
+        │     └─> publish (infra publish)
+        └─> [For apps] After quality gates:
+              ├─> Provision (infra provision)
+              ├─> DNS (infra dns upsert --ip)
+              ├─> Deploy (infra deploy --sha)
+              └─> Prod gate: verify CI passed via GitHub Checks API
+
+Standalone action workflows (infrastructure repo, workflow_dispatch):
+  action-rollback.yml        — inputs: app, env → infra rollback
+  action-setup-email.yml     — inputs: domain, dkim_names, dkim_values, dmarc_email
+  action-destroy-vps.yml     — inputs: app, env, domain → infra destroy + dns delete
+  pipeline-monitoring.yml    — inputs: action → infra provision/deploy for monitoring stack
+```
+
+### How workflows invoke the CLI
+
+Workflows check out the infra repo to `.infra/` with sparse-checkout (`packages/cli`, `nextnode.default.toml`, `terraform`), then invoke:
+
+```bash
+cd .infra && node packages/cli/dist/index.js <command> \
+  --env "$ENV" --sha "${{ github.sha }}" \
+  --config "../${{ inputs.config_file }}"
+```
 
 ### Commit Convention
 
@@ -156,111 +317,103 @@ Uses **Conventional Commits** — semantic-release reads these to determine vers
 - `fix:` — patch version bump
 - `feat!:` or `BREAKING CHANGE:` — major version bump
 
-## Dagger Modules
-
-Seven TypeScript modules in `infrastructure/dagger-modules/`:
-
-| Module | Key Functions | Purpose |
-|--------|--------------|---------|
-| **pipeline** | `plan()`, `lint()`, `test()`, `build()` | Reads nextnode.toml, outputs job matrix |
-| **npm** | `publish()`, `canaryPublish()` | semantic-release with zero config in repos |
-| **docker** | `build()`, `buildAndPush()` | Docker image build and GHCR push |
-| **vps** | `provision()`, `deploy()`, `status()`, `rollback()` | Terraform provisioning + SSH deployment |
-| **dns** | `verifyPropagation()`, `lookup()` | DNS verification (Terraform creates, Dagger verifies) |
-| **secrets** | `inject()`, `verify()`, `rotate()` | SSH-based secret injection to VPS |
-| **monitoring** | `deploy()`, `status()`, `annotate()`, `notifyDeploy()` | Monitoring stack + Grafana annotations |
-
-### Dagger Module File Structure
-
-Each module follows this exact layout (generated by `dagger develop`):
-
-```
-dagger-modules/<module>/
-├── dagger.json              # Module manifest (name, sdk, source, engineVersion)
-└── src/                     # Source root (matches dagger.json "source": "src")
-    ├── .gitattributes       # Marks SDK as linguist-generated
-    ├── .gitignore           # Excludes /sdk and node_modules
-    ├── package.json         # ⚠️ Dependencies go HERE (not module root)
-    ├── tsconfig.json        # TypeScript config for SDK
-    ├── yarn.lock            # Lock file (generated by SDK)
-    ├── sdk/                 # Auto-generated SDK (gitignored)
-    └── src/
-        └── index.ts         # ⚠️ ACTUAL MODULE CODE goes here
-```
-
-**Key gotchas:**
-- Entry point is `src/src/index.ts` (source root + SDK convention), NOT `src/index.ts`
-- Dependencies must be in `src/package.json`, not the module root `package.json`
-- Run `dagger develop` after creating a new module to generate SDK artifacts
-- The `dagger.json` SDK field uses object format: `"sdk": { "source": "typescript" }`
-
-### GitHub Actions: dagger-for-github@v6
-
-The `dagger-for-github@v6` action defaults to `verb: call` which runs bare `dagger call` — this fails in repos without `dagger.json`. **Always use `verb: version`** for install-only mode when running `dagger call` manually in a run step:
-
-```yaml
-- uses: dagger/dagger-for-github@v6
-  with:
-    version: "0.19.11"
-    verb: version          # ← install-only, does NOT run dagger call
-- name: Run Pipeline
-  run: dagger call -m github.com/NextNodeSolutions/infrastructure/dagger-modules/pipeline plan ...
-```
-
-## Terraform Modules
+## Terraform Structure
 
 Located in `infrastructure/terraform/`:
 
-| Module | Provider | Resources |
-|--------|----------|-----------|
-| `modules/vps` | Hetzner | `hcloud_server`, `hcloud_firewall` |
-| `modules/dns` | Cloudflare | `cloudflare_zone`, `cloudflare_dns_record`, `cloudflare_zone_dnssec` |
-| `modules/ssl` | Cloudflare | `cloudflare_zone_setting` (Full Strict, TLS 1.2+, HTTPS rewrites) |
-| `modules/volume` | Hetzner | `hcloud_volume` (ext4, automount) |
+```
+terraform/
+├── apps/          # Variable-driven app infrastructure (vps + volume composition)
+├── modules/
+│   ├── vps/       # Hetzner VPS: hcloud_server, hcloud_firewall
+│   └── volume/    # Hetzner volume: hcloud_volume (ext4, automount)
+└── global/        # Cloudflare zone-level settings (zones, DNSSEC, SSL mode)
+```
 
-**Environments:** `terraform/environments/prod/` and `terraform/environments/monitoring/`
+- **No DNS/SSL Terraform modules** — DNS records are managed by CLI via Cloudflare API
+- **No environments/ dirs** — replaced by TF Cloud workspaces (variable-driven approach)
+- **One `apps/` module** used by ALL apps — TF Cloud workspaces isolate state per app
 
 ## VPS Setup (cloud-init)
 
-Every VPS is provisioned with Ubuntu 24.04 and auto-configured via `templates/cloud-init.yml`:
+Every VPS is provisioned with **Debian 12** and auto-configured via `templates/cloud-init.yml`:
 
 - **Docker** + docker-compose-plugin
+- **Caddy** (built natively via xcaddy with Cloudflare DNS plugin)
 - **Tailscale** (ephemeral auth key, auto-joins tailnet)
 - **Grafana Alloy** agent (auto-discovers all Docker containers)
-- **UFW** firewall (22, 80, 443, 8443 + tailscale0)
+- **fail2ban** for SSH protection
 - **deploy** user (docker + sudo groups)
-- **Unattended upgrades**
+- **Automatic security updates**
+
+## docker-compose.yml Standard (App)
+
+Every app repo MUST have a `docker-compose.yml` at root. Caddy runs **natively on the VPS** (not in Docker) and reverse-proxies to `localhost:HOST_PORT` — so apps do NOT need a `proxy-public` external network.
+
+```yaml
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${HOST_PORT}:${APP_PORT}"
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=${NODE_ENV}
+```
+
+**Key rules:**
+- **No `proxy-public` network** — Caddy is native, not containerized. It reaches the app via host port mapping.
+- **No `env_file`** — use `environment` block with individual variables. CLI injects all env vars into `.env` at deploy time; compose references only the ones it needs.
+- **No `container_name`** — let Docker Compose auto-name containers.
+- **No inline `healthcheck`** — put health checks in the `Dockerfile` instead (via `HEALTHCHECK` instruction).
+- **`restart: unless-stopped`** — standard restart policy for all production services.
+- **Port mapping** — `${HOST_PORT}:${APP_PORT}` where `HOST_PORT` is the CLI-assigned hash-based port (10000-29999) and `APP_PORT` is the port the app listens on inside the container (from `nextnode.toml [deploy].port`).
 
 ## Deployment Flow (App)
 
 ```
-GitHub Actions triggers Dagger VPS module (provision-and-deploy)
-  -> Parse nextnode.toml [server] config
+GitHub Actions triggers CLI pipeline (infra pipeline --sha <sha>)
+  -> Load and validate nextnode.toml (smol-toml + defu merge with defaults)
   -> Resolve server tier (shared vs dedicated)
-  -> Determine TF Cloud workspace (nextnode-shared or nextnode-<app>)
-  -> Auto-create workspace if needed (TF Cloud API)
-  -> terraform plan (with app vars)
-  -> terraform apply only if changes detected (skip if no diff)
-  -> Read TF state outputs (VPS IP)
-  -> Inject secrets via SSH (.env on VPS)
-  -> Deploy: docker compose up -d (via SSH, namespaced in /opt/apps/<app>/)
-  -> Annotate Grafana deployment dashboard
-  -> Notify Slack #deployments
+  -> QUALITY GATE: lint, test, build (parallel, unless --skip-quality)
+  -> PROD GATE (prod only): verify Lint/Test/Build passed via GitHub Checks API
+  -> PROVISION:
+     -> Ensure TF Cloud workspace exists
+     -> Fetch Hetzner SSH key IDs
+     -> Generate ephemeral Tailscale auth key
+     -> terraform plan → apply (skip if VPS exists and healthy)
+     -> Wait for SSH via Tailscale hostname
+     -> Get Tailscale IP
+  -> DNS:
+     -> If no domain: skip
+     -> Upsert A record (+ wildcard records)
+     -> Prod: proxied (orange cloud), Non-prod: unproxied (grey cloud)
+     -> CNAME conflict detection and cleanup
+  -> DEPLOY:
+     -> Create /opt/apps/<app> on VPS
+     -> Transform compose: replace build/image with GHCR tag, ensure caddy-net
+     -> Generate .env (IMAGE, HOST_PORT, NODE_ENV, secrets, auto-vars)
+     -> docker compose pull → up -d --remove-orphans
+     -> Configure Caddy (reverse proxy + optional basic_auth)
+     -> Health checks (container + HTTP)
 ```
 
 ### TF Cloud Workspaces
 
 | Workspace | Contents |
 |-----------|----------|
-| `nextnode-shared` | Shared dev + prod VPSes, Traefik, base DNS |
+| `nextnode-shared-dev` | Shared dev VPS, Caddy (DNS managed by CLI) |
+| `nextnode-shared-prod` | Shared prod VPS, Caddy (DNS managed by CLI) |
 | `nextnode-monitoring` | Monitoring VPS + volume |
-| `nextnode-<app>` | Per-app dedicated VPS + volume + DNS (on-demand) |
+| `nextnode-<app>` | Per-app dedicated VPS + volume (DNS managed by CLI) |
 
-Workspaces are auto-created by Dagger. No manual bootstrap needed.
+Workspaces are auto-created by CLI (`ensureWorkspace()`). No manual bootstrap needed.
 
 ## Monitoring Stack
 
-**Centralized monitoring VPS** (cpx21, nbg1) running:
+**Centralized monitoring VPS** (cx23, nbg1) running:
 
 | Component | Port | Purpose |
 |-----------|------|---------|
@@ -289,11 +442,35 @@ Workspaces are auto-created by Dagger. No manual bootstrap needed.
 ## DNS & SSL Strategy
 
 - **Cloudflare Universal SSL** — edge certs (free, auto-managed)
-- **Traefik ACME** — origin certs via Let's Encrypt DNS challenge (wildcard `*.nextnode.fr`)
+- **Caddy ACME** — origin certs via Let's Encrypt DNS-01 challenge (Cloudflare DNS plugin)
 - **Full (Strict) SSL mode** — origin cert validation required
 - **Public apps** — orange cloud (Cloudflare proxied, CDN + DDoS protection)
 - **Internal apps** — grey cloud (DNS points to Tailscale IP)
-- Terraform OWNS all DNS records (`prevent_destroy = true`)
+- **DNS ownership**: CLI manages app DNS records via Cloudflare API. Terraform only manages zone-level settings (DNSSEC, SSL mode).
+- **Cleanup**: `infra dns delete` removes A/CNAME records for an app domain
+- **Caddy sites**: Per-app Caddy config with wildcard domain, handle blocks per app
+- **CNAME conflict detection**: auto-detects and deletes conflicting CNAME records before creating A records (prevents migration issues from Railway/Vercel)
+- **Wildcard records**: `infra dns upsert` creates both `*.{domain}` and `{domain}` A records
+
+## Dev Environment Auth
+
+Non-prod deployments can be protected with Caddy basic auth via org-level GitHub secrets:
+
+| Secret | User | Purpose |
+|--------|------|---------|
+| `DEV_PREVIEW_PASSWORD` | `preview` | Share with clients for preview access |
+| `DEV_PASSWORD` | `dev` | Internal team access |
+
+- CLI's `deployCaddyConfig()` generates bcrypt hashes on VPS using `caddy hash-password`
+- Injects `basic_auth` block into Caddyfile for non-prod environments when domain is set and passwords are provided
+- Graceful fallback: if passwords not set, deploys without auth
+
+## Smart Shared VPS Handling
+
+The `infra destroy` command intelligently handles shared VPS:
+- Checks if other apps are running on the shared VPS
+- If other apps exist: removes only this app's containers, DNS, and Caddy config — keeps VPS alive
+- If last app: full VPS destruction via Terraform destroy + Tailscale cleanup
 
 ## GitHub Org Secrets
 
@@ -303,252 +480,14 @@ Workspaces are auto-created by Dagger. No manual bootstrap needed.
 | `HETZNER_API_TOKEN` | VPS provisioning |
 | `CLOUDFLARE_API_TOKEN` | DNS/SSL management |
 | `TF_CLOUD_TOKEN` | Terraform Cloud API (workspace mgmt + state) |
-| `TS_OAUTH_CLIENT_ID` | Tailscale ephemeral auth (CI runner) |
-| `TS_OAUTH_SECRET` | Tailscale ephemeral auth (CI runner) |
-| `TS_AUTH_KEY` | Tailscale auth key for new VPSes (cloud-init) |
-| `VPS_SSH_KEY` | SSH private key for deploy user |
+| `TAILSCALE_OAUTH_CLIENT_ID` | Tailscale OAuth — generates ephemeral auth keys for new VPSes |
+| `TAILSCALE_OAUTH_CLIENT_SECRET` | Tailscale OAuth — paired with client ID |
+| `SSH_PRIVATE_KEY` | SSH private key for deploy user |
 | `SLACK_BOT_TOKEN` | Slack notifications + alerts |
 | `GRAFANA_API_KEY` | Grafana annotations API |
+| `DEV_PREVIEW_PASSWORD` | Optional — basic auth for `preview` user on non-prod environments |
+| `DEV_PASSWORD` | Optional — basic auth for `dev` user on non-prod environments |
 
-## Key Conventions
+### Production Approval Gate
 
-- **VPS naming:** `<app>-<tier>` (e.g., `plane-worker`, `monitoring`)
-- **Domain pattern:** `<app>.nextnode.fr` (public) or `<app>.nextnode.fr` grey cloud (internal)
-- **Branch strategy:** single `main` branch, PRs for development
-- **No barrel exports** — direct imports only
-- **Conventional Commits** required for semantic-release
-- **Biome** for linting + formatting, **Vitest** for testing
-- **pnpm** as package manager
-
-## Cost Structure
-
-| Component | Monthly |
-|-----------|---------|
-| Prod VPS (cpx22) | ~8EUR |
-| Dev VPS (cx22) | ~4EUR |
-| Monitoring VPS (cpx21) | ~6EUR |
-| Hetzner Volumes (20GB) | ~1.60EUR |
-| GitHub Actions | Free (public repos) |
-| **Total** | **~20EUR** |
-
-## Quick Reference: Adding a New App
-
-1. Create repo in `NextnodeSolutions` org
-2. Add `nextnode.toml` with `[project]`, `[routing]`, `[vps]`, `[deploy]` sections
-3. Add `.github/workflows/ci.yml` (10-line reusable workflow caller)
-4. Add `docker-compose.yml` and `Dockerfile`
-5. Push to main — infrastructure auto-provisions VPS, DNS, deploys
-6. Approve prod deployment in GitHub Actions when ready
-
-## Quick Reference: Adding a New Package
-
-1. Create repo in `NextnodeSolutions` org
-2. Add `nextnode.toml` with `type = "package"`, `[package]` section
-3. Add `.github/workflows/ci.yml` (10-line reusable workflow caller)
-4. Use Conventional Commits — semantic-release handles versioning + publishing
-5. Add `canary` label to PRs for pre-release testing
-
----
-
-# NextNode Brand Guidelines
-
-## Per-Project Branding Question (MANDATORY — ask ONCE per project)
-
-When this skill auto-loads on a NextNode/SaaS project, **check if a `.nextnode-branding.json` file exists at the project root**. If it does NOT exist, you MUST ask the user the following question BEFORE doing any UI/frontend work:
-
-> **Do you want to apply NextNode branding to this project?**
-
-Use `AskUserQuestion` with these options:
-
-| Option | Description |
-|--------|-------------|
-| **Full branding** | Typography + colors + logo — full NextNode identity |
-| **Typography only** | Fonts (Plus Jakarta Sans, DM Sans, JetBrains Mono) + type scale — project picks its own colors |
-| **Colors + typography** | NextNode palette + fonts — but no logo/icon integration |
-| **No branding** | Project has its own identity — skip all NextNode brand rules |
-
-After the user answers, create `.nextnode-branding.json` at the project root:
-
-```json
-{
-  "level": "full" | "typography" | "colors-typography" | "none",
-  "decidedAt": "2024-12-08"
-}
-```
-
-On subsequent sessions, read the file and apply the chosen level silently. Never re-ask.
-
-## Brand Identity
-
-- **Name:** NextNode Solutions (EURL)
-- **Tagline meaning:** Next = innovation, future / Node = connection, technical robustness
-- **Values:** Technical excellence, transparency, human guidance, pragmatic innovation
-
-## Color Palette
-
-### Primary Colors
-
-| Token | Hex | Usage |
-|-------|-----|-------|
-| `teal-500` | `#0D9488` | Primary — CTAs, links, active states |
-| `orange-500` | `#F97316` | Accent — highlights, secondary CTAs |
-| `dark-navy` | `#141A30` | Dark mode backgrounds |
-
-### Teal Scale
-
-| Token | Hex |
-|-------|-----|
-| `teal-50` | Light teal (use Tailwind `teal-50`) |
-| `teal-100` – `teal-400` | Intermediate steps (Tailwind defaults) |
-| `teal-500` | `#0D9488` (primary) |
-| `teal-600` | Hover states |
-| `teal-700` | Dark teal |
-
-### Background Tokens
-
-| Context | Hex |
-|---------|-----|
-| Light page bg | `#F8FAFC` (slate-50) |
-| Dark page bg | `#141A30` (dark navy) |
-| Card dark bg | `#141A30` |
-| Card light bg | `#F8FAFC` |
-
-### Tailwind Config Mapping
-
-When using Tailwind, extend the theme with:
-
-```ts
-colors: {
-  brand: {
-    teal: {
-      DEFAULT: '#0D9488',
-      50: '#F0FDFA',   // teal-50
-      100: '#CCFBF1',
-      200: '#99F6E4',
-      300: '#5EEAD4',
-      400: '#2DD4BF',
-      500: '#0D9488',  // primary
-      600: '#0F766E',
-      700: '#115E59',
-    },
-    orange: {
-      DEFAULT: '#F97316',
-    },
-    navy: '#141A30',
-  },
-}
-```
-
-## Typography
-
-### Three Font Families
-
-| Role | Font | Weights | Usage |
-|------|------|---------|-------|
-| **Display** | Plus Jakarta Sans | 600, 700, 800 | Hero titles, impact elements |
-| **Body** | DM Sans | 400, 500, 600, 700 | All text content, navigation, buttons |
-| **Code** | JetBrains Mono | 400, 500 | Code blocks, technical data |
-
-### Type Scale
-
-| Token | Size | Font |
-|-------|------|------|
-| Display | 48px | Plus Jakarta Sans 800 |
-| H1 | 36px | Plus Jakarta Sans 700 |
-| H2 | 28px | Plus Jakarta Sans 600 |
-| Body | 16px | DM Sans 400 |
-| Small | 14px | DM Sans 400 |
-
-### Font Loading (Google Fonts)
-
-```html
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-```
-
-### Tailwind Font Config
-
-```ts
-fontFamily: {
-  display: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
-  sans: ['"DM Sans"', 'system-ui', 'sans-serif'],
-  mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
-},
-```
-
-## Logo System
-
-### SVG Assets Location
-
-All original SVGs are at: `/Users/walid/Documents/NextNode/Branding/`
-
-### Available Variants
-
-| Folder | Files | Usage |
-|--------|-------|-------|
-| `icons/` | `icon-teal.svg`, `icon-white.svg`, `icon-black.svg` | Favicons, app icons, watermarks |
-| `icons-text/` | `icon-text-{teal,white,black}.svg` | App icon with "NextNode" text below |
-| `logos-square/` | `logo-square-{teal,white,black}.svg` | Social profiles, email signatures (400x400) |
-| `logos-landscape/` | `logo-landscape-{teal,white,black}.svg` | Website headers, documents (500x100) |
-| `logos-landscape/` | `logo-landscape-{teal,white,black}-short.svg` | Short version — "NextNode" only |
-| `social/` | `avatar-dark.svg` (`#141A30` bg), `avatar-light.svg` (`#F8FAFC` bg) | Social media avatars |
-| `favicon/` | `favicon.svg` | Browser favicon (32x32) |
-
-### Gradient Specs
-
-The NN symbol uses a **unified single-path SVG** with `gradientUnits="userSpaceOnUse"`.
-
-| Variant | Gradient Stops |
-|---------|---------------|
-| **Teal** (primary) | `#5EEAD4` → `#14B8A6` → `#0D9488` |
-| **White** (dark bg) | `#FFFFFF` → `#E2E8F0` → `#CBD5E1` |
-| **Black** (print) | `#475569` → `#334155` → `#1E293B` |
-
-### Context → File Quick Reference
-
-| Context | File |
-|---------|------|
-| Website header | `logos-landscape/logo-landscape-teal.svg` |
-| Favicon | `favicon/favicon.svg` |
-| LinkedIn / Twitter | `social/avatar-dark.svg` |
-| Email signature | `logos-landscape/logo-landscape-teal-short.svg` |
-| App icon | `icons-text/icon-text-teal.svg` |
-| Dark backgrounds | `-white` variants |
-| Print / B&W | `-black` variants |
-
-### Logo Rules
-
-**DO:**
-- Use original SVG files (copy from branding folder into project `public/` or `src/assets/`)
-- Respect 25% clear space around the logo
-- Choose the variant matching the background
-- Maintain aspect ratio
-- Use Black variant for B&W print
-
-**DON'T:**
-- Modify gradient colors
-- Distort or stretch the logo
-- Add effects (shadows, outlines)
-- Place on low-contrast backgrounds
-- Use below minimum sizes
-
-### Minimum Sizes
-
-| Context | Min Size |
-|---------|----------|
-| Favicon | 32x32px |
-| Social | 48x48px |
-| Header | 40px height |
-| Print | 15x15mm |
-
-## Branding Level Application Rules
-
-Based on the `.nextnode-branding.json` `level` value:
-
-| Level | Typography | Colors | Logo |
-|-------|-----------|--------|------|
-| `full` | Apply all 3 font families + type scale | Apply full teal/orange/navy palette | Copy appropriate SVGs into project |
-| `colors-typography` | Apply all 3 font families + type scale | Apply full palette | Skip logo integration |
-| `typography` | Apply all 3 font families + type scale | Project's own colors | Skip logo + palette |
-| `none` | Skip entirely | Skip entirely | Skip entirely |
+The `infra pipeline` command (for `deploy-prod` action) verifies that Lint, Test, and Build checks all passed on the commit SHA via GitHub Checks API before allowing production deployment.

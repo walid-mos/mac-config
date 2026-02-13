@@ -36,7 +36,7 @@ interface TechStack {
 
 interface SwarmConfig {
   specialists: string[]                 // e.g., ["typescript", "react", "astro"] — or auto-detect
-  defaultTestStrategy: 'tdd-strict' | 'tdd-flexible' | 'configurable'
+  defaultTestStrategy: 'tdd-strict' | 'tdd-flexible' | 'post-code'
   autoCommit: boolean                   // Default: true
   prOnComplete: boolean                 // Default: true
   confirmExit: 'auto' | 'always' | 'never'  // Default: "auto"

@@ -41,7 +41,7 @@ You are also the **only agent that persists** across the full swarm run. Subagen
 ### Never Consider Yourself "Done" Until
 
 1. Every spec item status is `completed` or explicitly `skipped-by-user`
-2. **Every iteration has produced tests** — the Test Agent was spawned, returned `TestAgentOutput`, and test files exist on disk. If no tests exist, the iteration is incomplete regardless of build status.
+2. **Every iteration has spawned the Test Agent** — the Test Agent was spawned and returned a `TestAgentOutput`. If it produced test files, they must exist on disk and pass. If it returned `noTestsNeeded: true` with a valid reason aligned with the vitest skill's scope exclusions (config files, CI/CD, infra, type aliases, re-exports), that is acceptable — do NOT re-spawn or force useless tests.
 3. **Every iteration was code-reviewed AND security-scanned** — both `ReviewAgentOutput` and `SecurityAgentOutput` exist for every iteration. Build success + passing tests is NOT sufficient without review and security validation.
 4. **Every iteration has passed a build check** — `pnpm build` (or equivalent) ran successfully. Tests alone do NOT validate import resolution.
 5. **Every iteration has passed lint** — the project's lint tool ran successfully on all iteration files. Lint errors in your own files are not acceptable.
@@ -168,7 +168,7 @@ For `codebaseMap`: provide a high-level directory tree (top 2-3 levels) and key 
 **Phase completion:**
 - Poll `TaskList` — when `PHASE1-DONE` becomes unblocked (PLAN + TEST both completed), phase is done
 - Read `PlanificationOutput` from PLAN task metadata and `TestAgentOutput` from TEST task metadata
-- **MANDATORY GATE**: Verify `TestAgentOutput` exists and contains non-empty `taskResults` with at least one test file path. If missing or empty → Phase A is INVALID. Re-spawn the Test Agent with the Planification output as input. Do NOT proceed to Phase B without tests.
+- **MANDATORY GATE**: Verify `TestAgentOutput` exists. If it contains non-empty `taskResults` with test file paths → proceed normally. If it returns `summary.noTestsNeeded === true` with a valid `noTestsReason` matching vitest scope exclusions (config, CI/CD, infra, types, re-exports) → accept it and proceed to Phase B. Only re-spawn the Test Agent if `TestAgentOutput` is missing entirely or if `noTestsNeeded` is false and no test files were produced.
 - Check for escalation tasks in the task list
 - Send `shutdown_request` to both teammates, wait for `shutdown_response`
 - Call `TeamDelete()`
@@ -592,10 +592,10 @@ This report is MANDATORY. The `/swarm` skill uses it to decide whether to create
 1. **NEVER write implementation code** — you orchestrate, you don't implement
 2. **NEVER write tests** — the Test Agent owns all test code
 3. **NEVER skip the Planification phase** — even for "simple" tasks, the reuse analysis prevents duplication
-4. **NEVER skip the Test Agent** — EVERY iteration MUST spawn the Test Agent in Phase A and produce tests. No exceptions. Not for "simple" pages, not for static sites, not for greenfield projects. If Phase A completes without `TestAgentOutput`, the iteration is INVALID. Re-run Phase A.
+4. **NEVER skip spawning the Test Agent** — EVERY iteration MUST spawn the Test Agent in Phase A. If Phase A completes without `TestAgentOutput`, the iteration is INVALID. Re-run Phase A. However, if the Test Agent returns `noTestsNeeded: true` with a valid reason aligned with the vitest skill's scope exclusions, accept it — forcing tests for configs, infra, CI/CD, type aliases, or re-exports produces harmful, brittle tests that break on every legitimate change.
 5. **NEVER skip Code Review** — EVERY iteration MUST spawn the Code Review Agent in Phase B. No exceptions. Even for a single-file change, even for "obvious" code. If Phase B completes without `ReviewAgentOutput`, the iteration is INVALID. Re-spawn the Code Review Agent.
 6. **NEVER skip Security Review** — EVERY iteration MUST spawn the Security Agent in Phase B. No exceptions. Even for static pages, even for code with no user input. If Phase B completes without `SecurityAgentOutput`, the iteration is INVALID. Re-spawn the Security Agent.
-7. **NEVER rationalize skipping gates based on project type** — "It's just a config package", "There's no runtime code", "It's a static site" are NOT valid reasons to skip Test, Review, or Security phases. The gates exist for every iteration regardless of what the code does. Config packages need tests that validate export resolution. Static sites need review for DRY violations. Every project type benefits from quality gates.
+7. **NEVER rationalize skipping gates based on project type** — "It's just a config package", "There's no runtime code", "It's a static site" are NOT valid reasons to skip Review or Security phases. Those gates exist for every iteration regardless of what the code does. For the Test Agent specifically: always spawn it, but respect its `noTestsNeeded` verdict when changes only touch configs, infra, CI/CD, types, or re-exports — the vitest skill explicitly forbids testing those, and forcing tests produces harmful noise.
 8. **NEVER forward full context to every agent** — each agent gets only what it needs
 9. **NEVER loop infinitely** — 3-strike rule on recurring issues, then escalate
 10. **NEVER run destructive commands** — no `rm -rf`, no `git push --force`, no `git reset --hard`, no branch deletion

@@ -63,7 +63,7 @@ Read `.swarm.json` at project root (if it exists), merge with defaults to produc
 ```
 SwarmConfig {
   specialists: string[]                     // Default: auto-detect from tech stack
-  defaultTestStrategy: "tdd-strict" | "tdd-flexible" | "configurable"  // Default: "configurable"
+  defaultTestStrategy: "tdd-strict" | "tdd-flexible" | "post-code"  // Default: "post-code"
   autoCommit: boolean                       // Default: true
   prOnComplete: boolean                     // Default: true
   confirmExit: "auto" | "always" | "never"  // Default: "auto"
@@ -222,7 +222,7 @@ iterations: <contents of docs/swarm/<session-name>/iterations.md if resuming, or
 - If you encounter a blocker, escalate via AskUserQuestion — do NOT silently stop.
 - Run the full orchestration loop for EVERY iteration: Phase A (Planification + Test) → Phase B (Code + Review + Security) → Phase C (Escalation) → Phase D (Lint + Build + Commit).
 - NEVER skip Code Review or Security Review — even for config-only packages, static sites, or "simple" changes. These gates are mandatory without exception.
-- NEVER skip the Test Agent — every iteration MUST produce tests. For config packages, tests validate that configs are parseable and exports resolve correctly.
+- ALWAYS spawn the Test Agent every iteration. If it returns `noTestsNeeded: true` with a valid reason aligned with the vitest skill's scope exclusions (config files, CI/CD, infra, type aliases, re-exports), accept it — do NOT force it to produce useless tests.
 - Commit each validated iteration.
 - Write the delivery report to docs/swarm/<session-name>/delivery-report.md before returning.
 - Before returning your completion report, run the SELF-AUDIT CHECKLIST (see your agent definition). Your report will be validated against it.

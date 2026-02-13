@@ -29,7 +29,7 @@ autoload-dirs:
 | `@nextnode-solutions/standards/typescript/library` | tsconfig for libraries/packages | `tsconfig.json` |
 | `@nextnode-solutions/standards/typescript/nextjs` | tsconfig for Next.js apps | `tsconfig.json` |
 | `@nextnode-solutions/standards/typescript/astro` | tsconfig for Astro apps | `tsconfig.json` |
-| `@nextnode-solutions/standards/tailwind` | Tailwind CSS preset | `tailwind.config.ts` |
+| `@nextnode-solutions/standards/tailwind` | Tailwind CSS v4 theme (CSS) | CSS `@import` |
 | `@nextnode-solutions/standards/vitest/frontend` | Vitest config (jsdom, coverage) | `vitest.config.ts` |
 | `@nextnode-solutions/standards/vitest/backend` | Vitest config (node, coverage) | `vitest.config.ts` |
 | `@nextnode-solutions/standards/commitlint` | Commitlint conventional config | `commitlint.config.js` |
@@ -131,22 +131,19 @@ Extend the appropriate base depending on project type:
 - ESNext module with bundler resolution
 - `noEmit: true` (type-checking only)
 
-### 4.4 Tailwind — `tailwind.config.ts`
+### 4.4 Tailwind v4 — CSS `@import`
 
-```ts
-import type { Config } from 'tailwindcss'
+In the project's main CSS file (e.g., `app.css`, `global.css`):
 
-import standards from '@nextnode-solutions/standards/tailwind'
-
-export default {
-  presets: [standards],
-  content: ['./src/**/*.{astro,html,js,jsx,md,mdx,svelte,ts,tsx,vue}'],
-} satisfies Config
+```css
+@import "tailwindcss";
+@import "@nextnode-solutions/standards/tailwind";
 ```
 
+No `tailwind.config.ts` needed — Tailwind v4 uses CSS-first configuration.
+
 **What it provides:**
-- Centered container with responsive padding
-- `xs: 475px` breakpoint
+- `--breakpoint-xs: 30rem` (extra-small breakpoint for mobile-first layouts)
 
 ### 4.5 Vitest — `vitest.config.ts`
 

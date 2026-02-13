@@ -47,7 +47,7 @@ Read the following files from the project root (in parallel for speed). If a fil
 | `.husky/pre-commit` | contains `lint-staged` |
 | `.husky/commit-msg` | contains `commitlint` |
 | `vitest.config.ts` | extends from standards (only if vitest in deps) |
-| `tailwind.config.ts` | uses standards preset (only if tailwindcss in deps) |
+| main CSS file (e.g., `app.css`) | `@import "@nextnode-solutions/standards/tailwind"` (only if tailwindcss in deps) |
 
 ---
 

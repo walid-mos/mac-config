@@ -158,6 +158,19 @@ describe('<Feature> — <behavior group>', () => {
 })
 ```
 
+## Pre-Push Gate (Husky)
+
+All NextNode/SaaS projects use **Husky** with a `pre-push` hook that runs `pnpm test` before every push. This means:
+
+- **Every test MUST pass locally before code reaches the remote** — broken tests block the entire push
+- **NEVER write tests that are flaky, environment-dependent, or timing-sensitive** — they will block pushes randomly
+- **NEVER leave failing tests behind** — if you modify code, run `pnpm test` mentally and ensure all existing + new tests pass
+- **If you add/change functionality, verify test impact** — check that no existing test breaks as a side effect
+- **If you delete or rename exports/functions**, grep for test files that reference them and update accordingly
+- **Quick feedback loop**: tests must run fast — avoid heavy setup, large fixtures, or unnecessary async delays
+
+> Bottom line: treat `pnpm test` as a hard gate. If Claude writes code that breaks tests, the user cannot push. Every code change must be test-aware.
+
 ## Anti-Patterns — NEVER Do These
 
 1. NEVER test implementation details — no internal state, private methods, CSS classes, DOM structure

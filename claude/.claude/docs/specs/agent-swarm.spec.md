@@ -242,7 +242,7 @@ Optional file at project root. Everything auto-detects by default.
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `specialists` | `string[]` | auto-detect | Which skill-based specialists are available |
-| `defaultTestStrategy` | `"tdd-strict" \| "tdd-flexible" \| "configurable"` | `"configurable"` | Default testing approach (Planification Agent can override per task) |
+| `defaultTestStrategy` | `"tdd-strict" \| "tdd-flexible" \| "post-code"` | `"post-code"` | Default testing approach (Planification Agent can override per task) |
 | `autoCommit` | `boolean` | `true` | Whether to auto-commit on completion |
 | `prOnComplete` | `boolean` | `true` | Whether to create a PR on completion |
 | `confirmExit` | `"auto" \| "always" \| "never"` | `"auto"` | When to ask user confirmation before ending |

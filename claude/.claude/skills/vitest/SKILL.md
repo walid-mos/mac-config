@@ -36,6 +36,7 @@ user-invocable: false
 - NEVER test 1:1 mirrors of implementation (copy-pasting the function logic into the test)
 - NEVER test trivial getters/setters or simple wrappers
 - NEVER write a test just to increase coverage — coverage is a side effect, not a goal
+- NEVER test documentation files (docs/, *.md, README, CHANGELOG, specs, guides) — docs are prose, not testable code
 - NEVER test CI/CD pipelines, build configs, or deployment scripts — these are validated by running them, not by unit tests
 - NEVER test infrastructure code (Terraform, Dagger modules, Docker configs) with unit tests — infra is tested by deploying it
 - NEVER test static config files (tsconfig, eslint, vite.config, etc.) — the tool that consumes the config validates it

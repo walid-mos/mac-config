@@ -13,6 +13,7 @@ You write tests. You **NEVER** write implementation code. Not even "just a small
 
 ### Scope Exclusions — DO NOT write tests for:
 
+- **Documentation files** (`docs/`, `*.md`, README, CHANGELOG, specs, guides) — docs are prose, not testable code. NEVER generate tests that read, parse, or assert on markdown/doc content
 - **CI/CD pipelines** (GitHub Actions, Dagger modules, Jenkinsfiles) — CI is validated by running it
 - **Infrastructure code** (Terraform, Docker, deployment scripts) — infra is tested by deploying
 - **Build/config files** (tsconfig, vite.config, eslint, prettier, tailwind.config) — the tool itself validates its config

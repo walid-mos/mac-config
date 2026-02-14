@@ -50,28 +50,43 @@ The `infra` CLI (`packages/cli/`) is built with **citty**. All commands accept `
 
 | Library | Key Functions |
 |---------|---------------|
-| **config** | `loadConfig()`, `computeHostPort()`, `computeEnvDomain()`, `computeWorkspaceName()`, `computeImageTag()`, `detectDockerConfig()` |
+| **config** | `loadConfig()`, `parseConfig()`, `mergeConfig()`, `validateConfig()`, `resolveConfigInput()`, `computeHostPort()`, `computeEnvDomain()`, `computeWildcardDomain()`, `buildComputedFields()` |
 | **cloudflare** | `lookupZoneId()`, `upsertDnsRecord()`, `deleteDnsRecord()`, `listDnsRecords()` — with retry for rate limiting |
-| **dns** | `resolveDnsTarget()`, `upsertWildcardRecords()`, `upsertRedirectDnsRecords()`, `deleteRedirectDnsRecords()` |
-| **ssh** | `sshExec()`, `scp()`, `writeKeyFile()` — SSH via Tailscale hostnames |
+| **dns** | `resolveDnsTarget()`, `resolveProxied()`, `resolveTtl()`, `upsertWildcardRecords()`, `upsertRedirectDnsRecords()`, `deleteRedirectDnsRecords()` |
+| **ssh** | `sshExec()`, `scp()`, `writeKeyFile()`, `cleanupKeyFile()` — SSH via Tailscale hostnames |
 | **terraform** | `terraformInit()`, `terraformPlan()`, `terraformApply()`, `terraformOutput()`, `terraformDestroy()` |
-| **tfcloud** | `ensureWorkspace()`, `deleteWorkspace()`, `hasResources()` |
-| **tailscale** | `deleteDevice()`, `generateAuthKey()`, `getDeviceIp()` — OAuth token caching |
-| **caddy** | `generateHandleBlock()`, `generateBasicAuthBlock()`, `deployCaddyConfig()`, `removeCaddyAppConfig()`, `switchToReverseProxy()`, `switchToMaintenance()`, `sanitizeAppIdentifier()` |
+| **tfcloud** | `getWorkspace()`, `ensureWorkspace()`, `deleteWorkspace()`, `hasResources()` |
+| **tailscale** | `getAccessToken()`, `tsFetch()`, `deleteDevice()`, `generateAuthKey()`, `getDeviceIp()` — OAuth token caching |
+| **caddy** | `generateHandleBlock()`, `generateBasicAuthBlock()`, `generateMaintenanceBlock()`, `deployCaddyConfig()`, `removeCaddyAppConfig()`, `switchToReverseProxy()`, `switchToMaintenance()`, `sanitizeAppIdentifier()` |
 | **compose-validation** | `validateCompose()` — check docker-compose.yml for common issues |
-| **port-validation** | `validatePortConsistency()` — check compose port matches config |
+| **port-validation** | `validatePortConsistency()`, `validateDockerfile()`, `validateComposePort()`, `validateFrameworkConfig()` |
 | **docker** | `dockerBuild()`, `dockerPush()`, `dockerLogin()` |
-| **github** | `verifyCiPassed()`, `getCheckRuns()` — prod gate CI verification |
+| **dockerfile** | `parseDockerfileEnv()` — extract ARG/ENV declarations from Dockerfile (source of truth for env vars) |
+| **github** | `verifyCiPassed()`, `getCheckRuns()`, `getCommitStatus()`, `getWorkflowRun()` — prod gate CI verification |
 | **hetzner** | `fetchHetznerSshKeyIds()` |
-| **exec** | `exec()`, `execCapture()`, `requireBinary()` — process execution with logging |
+| **exec** | `exec()`, `execCapture()`, `checkBinary()`, `requireBinary()` — process execution with logging |
 | **logger** | `logger` (consola), `withTiming()` |
 | **secrets** | `validateSecrets()`, `requireEnv()` |
+| **maintenance-page** | `MAINTENANCE_PAGE_HTML` — static HTML for maintenance mode (503) |
+| **base-args** | `baseArgs` — shared `--config` and `--env` args for all commands |
 
 ### Key Config Types (`packages/cli/src/types/`)
 
 ```typescript
 type ProjectType = "app" | "package" | "monitoring"
+type HealthType = "http" | "tcp"
 type PipelineAction = "ci" | "deploy-prod" | "destroy" | "force-redeploy" | "pr-preview"
+
+interface ResourcesConfig {
+  cpu_limit?: string       // e.g. "1.0"
+  memory_limit?: string    // e.g. "1G", "256M"
+  cpu_reservation?: string
+  memory_reservation?: string
+}
+
+interface EnvironmentEntry extends ResourcesConfig {
+  enabled: boolean
+}
 
 interface ProjectConfig {
   project: { name: string; type: ProjectType; domain?: string; description?: string; redirect_domains?: string[] }
@@ -79,8 +94,8 @@ interface ProjectConfig {
   server?: { type: string; location: string; internal: boolean }
   volume: { enabled: boolean; size: number }
   deploy: { port: number; file?: string; hasCompose: boolean; zero_downtime: boolean }
-  health: { type: "http" | "tcp"; path?: string; interval: string; timeout: string; retries: number }
-  environment: { dev: { enabled: boolean }; prod: { enabled: boolean } }
+  health: { type: HealthType; path?: string; interval: string; timeout: string; retries: number }
+  environment: { dev: EnvironmentEntry; prod: EnvironmentEntry }
   sablier?: { enabled: boolean; session_duration: string; display_name: string }
   computed: {
     isSharedVps: boolean
@@ -95,6 +110,50 @@ interface ProjectConfig {
     redirectDomains(env: string): string[]
   }
 }
+```
+
+### Deploy Types (`packages/cli/src/types/deploy.ts`)
+
+```typescript
+type DeploySlot = "blue" | "green"
+
+interface DeployResult {
+  imageTag: string; vpsHost: string; domain: string
+  hostPort: number; healthStatus: "healthy" | "unhealthy"; duration: number
+}
+
+interface DeployState { activeSlot: DeploySlot; imageTag: string; deployedAt: string }
+
+interface CaddySiteConfig {
+  appIdentifier: string; envDomain: string; wildcardDomain: string; baseDomain: string
+  hostPort: number; env: string; devPreviewPassword?: string; devPassword?: string
+  mode?: "proxy" | "maintenance"
+  sablier?: { containerName: string; sessionDuration: string; displayName: string }
+  redirectDomains?: string[]; canonicalDomain?: string
+}
+```
+
+### Pipeline Types (`packages/cli/src/types/pipeline.ts`)
+
+```typescript
+interface PipelinePlan {
+  projectName: string; projectType: ProjectType; environment: string
+  hasLint: boolean; hasTest: boolean; hasBuild: boolean; hasCompose: boolean
+  needsProvision: boolean; imageTag: string; domain: string
+}
+
+interface PipelineStepResult { step: string; status: "success"|"skipped"|"failed"; duration: number; error?: string }
+interface QualityResult { lint: PipelineStepResult; test: PipelineStepResult; build: PipelineStepResult; allPassed: boolean }
+interface PipelineResult { plan: PipelinePlan; quality?: QualityResult; steps: PipelineStepResult[]; success: boolean; totalDuration: number }
+```
+
+### Status Types (`packages/cli/src/types/status.ts`)
+
+```typescript
+interface VpsStatus { hostname: string; publicIp: string; tailscaleIp: string; serverType: string; location: string; uptime: string; exists: boolean }
+interface ContainerStatus { name: string; status: string; health: string; ports: string }
+interface DnsStatus { name: string; type: string; content: string; proxied: boolean }
+interface AppStatus { vps: VpsStatus; containers: ContainerStatus[]; dns: DnsStatus | null; caddy: CaddyStatus | null; image: ImageStatus | null; domain: DomainStatus | null }
 ```
 
 ## Pipeline Behavior

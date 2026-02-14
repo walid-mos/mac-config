@@ -15,7 +15,8 @@ NextNode uses a **config-as-code driven, zero-manual-UI** infrastructure:
 - **`infra` CLI** (TypeScript, citty) — CI/CD engine in `packages/cli/` — provision, deploy, destroy, rollback, build, lint, test, publish
 - **Terraform 1.9** (TF Cloud backend) — VPS provisioning (Hetzner); DNS managed by CLI via Cloudflare API
 - **Docker Compose** — app deployment on each VPS
-- **Caddy** — native reverse proxy (xcaddy + Cloudflare DNS plugin), automatic SSL via ACME DNS-01
+- **Caddy** — native reverse proxy (xcaddy + Cloudflare DNS plugin), automatic SSL via ACME DNS-01 (HTTP-01 fallback)
+- **Sablier** — idle container auto-stop for non-prod environments (custom NextNode waiting page)
 - **Tailscale** — secure internal mesh network (all VPSes connected)
 - **Grafana Alloy** — push-based observability agent on every VPS
 
@@ -27,12 +28,13 @@ Every NextNode/SaaS repo has a `nextnode.toml` at its root. This file drives ALL
 
 ```toml
 [project]
-name = "my-app"                # Required — used for naming everywhere
-type = "package" | "app"       # Required — determines pipeline flow
-domain = "app.nextnode.fr"     # App-only — subdomain for the app
-description = "Description"    # Optional
+name = "my-app"                    # REQUIRED — no default. Used for naming everywhere.
+type = "app"                       # REQUIRED — "app" | "package" | "monitoring"
+domain = "app.nextnode.fr"         # App-only — subdomain for the app
+description = "Description"        # Optional
+redirect_domains = ["www.app.fr"]  # Optional — domains that 301→canonical (prod only, auto-adds www)
 
-[scripts]                      # Optional — defaults to pnpm lint/test/build
+[scripts]                          # Optional — defaults to pnpm lint/test/build
 lint = "lint"
 test = "test"
 build = "build"
@@ -40,21 +42,21 @@ build = "build"
 # === Package-only ===
 [package]
 scope = "@nextnode-solutions"
-access = "public" | "restricted"
-canary_on_label = true         # Publish canary on PR label "canary"
+access = "public"                  # "public" | "restricted"
+canary_on_label = true             # Publish canary on PR label "canary"
 
 # === App-only: Server (4 tiers) ===
 # No [server] = shared dev + shared prod VPS (Tier 1)
-[server]                       # Tier 2: dedicated VPS (same for dev + prod)
-type = "cpx21"                 # Hetzner server type (default: cpx22)
-location = "nbg1"              # Hetzner datacenter (default: nbg1)
-internal = true                # true = grey cloud (Tailscale), false = orange cloud (public)
+[server]                           # Tier 2: dedicated VPS (same for dev + prod)
+type = "cpx22"                     # Hetzner server type (default: cpx22)
+location = "nbg1"                  # Hetzner datacenter (default: nbg1)
+internal = false                   # true = grey cloud (Tailscale), false = orange cloud (public)
 
 # Tier 3: per-env server overrides
 [environment.dev.server]
-type = "cx22"                  # Smaller dev server
+type = "cx22"                      # Smaller dev server
 [environment.prod.server]
-type = "cpx22"                 # Bigger prod server
+type = "cpx22"                     # Bigger prod server
 
 # Tier 4: fully custom per-env (no top-level [server])
 # [environment.dev.server]
@@ -62,36 +64,32 @@ type = "cpx22"                 # Bigger prod server
 # type = "cx22"
 # location = "nbg1"
 
-[volume]                       # Optional — auto-provisions Hetzner block storage
-enabled = true
-size = 20                      # GB
+[volume]                           # Optional — default: disabled
+enabled = false
+size = 20                          # GB
 
 [deploy]
-strategy = "docker-compose"
-file = "docker-compose.yml"
-dockerfile = "./Dockerfile"
-context = "./"
-port = 4321                    # App port (auto-injected as APP_PORT in .env)
+port = 4321                        # Container port (auto-injected as APP_PORT in .env)
+file = "docker-compose.yml"        # Explicit compose path (auto-detected if omitted)
+zero_downtime = false              # Blue-green zero-downtime deployment
 
-[health]                       # Optional — health check config
-type = "http"                  # "http" | "tcp" | "command"
-endpoint = "/health"           # For http type
-port = 8080                    # For tcp type
+[health]                           # Optional — health check config
+type = "http"                      # "http" | "tcp"
+path = "/health"                   # HTTP health check path
 interval = "30s"
 timeout = "10s"
 retries = 3
 
+[sablier]                          # Idle container auto-stop (non-prod only)
+enabled = true                     # Default: true
+session_duration = "15m"           # Idle timeout before stopping containers
+display_name = "My App"            # Display name on waiting page (default: project.name)
+
 [environment.dev]
-auto_deploy = true
-pr_deploys = true
+enabled = true                     # Default: true — set false to skip dev deployment
 
 [environment.prod]
-auto_deploy = false
-approvers = ["walid"]
-
-[rollback]
-enabled = true
-keep_versions = 5
+enabled = true                     # Default: true — set false to skip prod deployment
 ```
 
 ### .env Injection
@@ -141,6 +139,7 @@ The `infra` CLI (`packages/cli/`) is built with **citty** and provides all CI/CD
 | `infra status` | Check VPS, containers, DNS, Caddy health | `--json` |
 | `infra pipeline` | Run full CI/CD pipeline (provision + DNS + deploy) | `--sha`, `--force`, `--skip-quality` |
 | `infra publish` | Publish npm package (release or canary) | — |
+| `infra validate` | Validate nextnode.toml configuration | — |
 
 ### CLI Libraries (`packages/cli/src/lib/`)
 
@@ -148,12 +147,14 @@ The `infra` CLI (`packages/cli/`) is built with **citty** and provides all CI/CD
 |---------|---------------|
 | **config** | `loadConfig()`, `computeHostPort()`, `computeEnvDomain()`, `computeWorkspaceName()`, `computeImageTag()`, `detectDockerConfig()` |
 | **cloudflare** | `lookupZoneId()`, `upsertDnsRecord()`, `deleteDnsRecord()`, `listDnsRecords()` — with retry for rate limiting |
-| **dns** | `resolveProxied()`, `resolveDnsTarget()`, `upsertWildcardRecords()` |
+| **dns** | `resolveDnsTarget()`, `upsertWildcardRecords()`, `upsertRedirectDnsRecords()`, `deleteRedirectDnsRecords()` |
 | **ssh** | `sshExec()`, `scp()`, `writeKeyFile()` — SSH via Tailscale hostnames |
 | **terraform** | `terraformInit()`, `terraformPlan()`, `terraformApply()`, `terraformOutput()`, `terraformDestroy()` |
 | **tfcloud** | `ensureWorkspace()`, `deleteWorkspace()`, `hasResources()` |
 | **tailscale** | `deleteDevice()`, `generateAuthKey()`, `getDeviceIp()` — OAuth token caching |
-| **caddy** | `generateCaddyFileContent()`, `deployCaddyConfig()`, `removeCaddyAppConfig()`, `reloadCaddy()`, `waitForCaddy()` |
+| **caddy** | `generateHandleBlock()`, `generateBasicAuthBlock()`, `deployCaddyConfig()`, `removeCaddyAppConfig()`, `switchToReverseProxy()`, `switchToMaintenance()`, `sanitizeAppIdentifier()` |
+| **compose-validation** | `validateCompose()` — check docker-compose.yml for common issues |
+| **port-validation** | `validatePortConsistency()` — check compose port matches config |
 | **docker** | `dockerBuild()`, `dockerPush()`, `dockerLogin()` |
 | **github** | `verifyCiPassed()`, `getCheckRuns()` — prod gate CI verification |
 | **hetzner** | `fetchHetznerSshKeyIds()` |
@@ -168,20 +169,25 @@ type ProjectType = "app" | "package" | "monitoring"
 type PipelineAction = "ci" | "deploy-prod" | "destroy" | "force-redeploy" | "pr-preview"
 
 interface ProjectConfig {
-  project: { name: string; type: ProjectType; domain?: string }
+  project: { name: string; type: ProjectType; domain?: string; description?: string; redirect_domains?: string[] }
   scripts: { lint?: string; test?: string; build?: string }
   server?: { type: string; location: string; internal: boolean }
   volume: { enabled: boolean; size: number }
-  deploy: { port: number; file?: string; hasCompose: boolean }
+  deploy: { port: number; file?: string; hasCompose: boolean; zero_downtime: boolean }
   health: { type: "http" | "tcp"; path?: string; interval: string; timeout: string; retries: number }
-  environment: { dev: { auto_deploy: boolean }; prod: { auto_deploy: boolean } }
+  environment: { dev: { enabled: boolean }; prod: { enabled: boolean } }
+  sablier?: { enabled: boolean; session_duration: string; display_name: string }
   computed: {
     isSharedVps: boolean
     wildcardDomain: string
     hostPort: number                         // Hash-based (10000-29999)
+    bluePort: number                         // Same as hostPort (10000-29999)
+    greenPort: number                        // Range 30000-49999
+    devEnabled: boolean                      // Shorthand for environment.dev.enabled
     envDomain(env: string): string           // prod={domain}, non-prod={env}.{domain}
     workspaceName(env: string): string       // nextnode-{name} or nextnode-shared-{env}
     imageTag(env: string, sha: string): string
+    redirectDomains(env: string): string[]   // User-specified + auto-www, deduped. Empty for non-prod.
   }
 }
 ```
@@ -364,6 +370,7 @@ Every VPS is provisioned with **Debian 12** and auto-configured via `templates/c
 - **Docker** + docker-compose-plugin
 - **Caddy** (built natively via xcaddy with Cloudflare DNS plugin)
 - **Tailscale** (ephemeral auth key, auto-joins tailnet)
+- **Sablier** (idle container auto-stop, custom NextNode waiting page)
 - **Grafana Alloy** agent (auto-discovers all Docker containers)
 - **fail2ban** for SSH protection
 - **deploy** user (docker + sudo groups)
@@ -400,7 +407,7 @@ services:
 GitHub Actions triggers CLI pipeline (infra pipeline --sha <sha>)
   -> Load and validate nextnode.toml (smol-toml + defu merge with defaults)
   -> Resolve server tier (shared vs dedicated)
-  -> QUALITY GATE: lint, test, build (parallel, unless --skip-quality)
+  -> QUALITY GATE: lint, test, build, compose-validate, port-validate (parallel, unless --skip-quality)
   -> PROD GATE (prod only): verify Lint/Test/Build passed via GitHub Checks API
   -> PROVISION:
      -> Ensure TF Cloud workspace exists
@@ -412,14 +419,17 @@ GitHub Actions triggers CLI pipeline (infra pipeline --sha <sha>)
   -> DNS:
      -> If no domain: skip
      -> Upsert A record (+ wildcard records)
+     -> Upsert redirect domain DNS records (prod only, auto-www)
      -> Prod: proxied (orange cloud), Non-prod: unproxied (grey cloud)
      -> CNAME conflict detection and cleanup
   -> DEPLOY:
      -> Create /opt/apps/<app> on VPS
      -> Transform compose: replace build/image with GHCR tag, ensure caddy-net
      -> Generate .env (IMAGE, HOST_PORT, NODE_ENV, secrets, auto-vars)
-     -> docker compose pull → up -d --remove-orphans
-     -> Configure Caddy (reverse proxy + optional basic_auth)
+     -> If zero_downtime: blue-green deploy (two slots, health check inactive slot before switch)
+     -> Else: docker compose pull → up -d --remove-orphans
+     -> Persist deploy state (.deploy-state JSON on VPS: activeSlot, imageTag, deployedAt)
+     -> Configure Caddy (reverse proxy + optional basic_auth + optional Sablier)
      -> Health checks (container + HTTP)
 ```
 
@@ -472,7 +482,7 @@ Workspaces are auto-created by CLI (`ensureWorkspace()`). No manual bootstrap ne
 ## DNS & SSL Strategy
 
 - **Cloudflare Universal SSL** — edge certs (free, auto-managed)
-- **Caddy ACME** — origin certs via Let's Encrypt DNS-01 challenge (Cloudflare DNS plugin)
+- **Caddy ACME** — origin certs via Let's Encrypt DNS-01 challenge (Cloudflare DNS plugin), HTTP-01 fallback when DNS-01 fails
 - **Full (Strict) SSL mode** — origin cert validation required
 - **Public apps** — orange cloud (Cloudflare proxied, CDN + DDoS protection)
 - **Internal apps** — grey cloud (DNS points to Tailscale IP)
@@ -481,6 +491,7 @@ Workspaces are auto-created by CLI (`ensureWorkspace()`). No manual bootstrap ne
 - **Caddy sites**: Per-app Caddy config with wildcard domain, handle blocks per app
 - **CNAME conflict detection**: auto-detects and deletes conflicting CNAME records before creating A records
 - **Wildcard records**: `infra dns upsert` creates both `*.{domain}` and `{domain}` A records
+- **Redirect domains**: `redirect_domains` config auto-creates DNS + Caddy redirect blocks (prod only, auto-adds www subdomain)
 
 ## Dev Environment Auth
 

@@ -73,10 +73,47 @@ interface Logger {
   error(message: string, object?: LogObject): void
 }
 
+// Core Transport (types.ts) — used by Logger interface
+interface Transport {
+  log(entry: LogEntry): void | Promise<void>
+}
+
+// Extended Transport (transports/transport.ts) — used by transport implementations
 interface Transport {
   log(entry: LogEntry): void | Promise<void>
   dispose?(): void | Promise<void>
 }
+
+interface TransportConfig {
+  enabled?: boolean  // Base config extended by ConsoleTransportConfig, HttpTransportConfig
+}
+
+interface ConsoleTransportConfig extends TransportConfig {
+  environment?: Environment
+  format?: 'auto' | 'node' | 'browser' | 'json'  // Default: 'auto'
+}
+
+interface HttpTransportConfig extends TransportConfig {
+  endpoint: string                                    // Required, http/https only
+  headers?: Record<string, string>                    // Restricted: host, content-length, transfer-encoding
+  batchSize?: number                                  // Default: 10
+  flushInterval?: number                              // Default: 5000ms
+  timeout?: number                                    // Default: 10000ms
+  maxRetries?: number                                 // Default: 3 (exponential backoff: 100ms, 200ms, 400ms)
+  onError?: (error: Error, entries: LogEntry[]) => void
+  onSuccess?: (count: number) => void
+}
+
+interface SpyLogger extends Logger {
+  readonly calls: LogEntry[]
+  getCallsByLevel(level: LogLevel): LogEntry[]
+  getLastCall(): LogEntry | undefined
+  wasCalledWith(message: string): boolean
+  wasCalledWithLevel(level: LogLevel, message: string): boolean
+  clear(): void
+}
+
+// LOG_LEVEL_PRIORITY: Record<LogLevel, number> — debug=0, info=1, warn=2, error=3
 ```
 
 ## Usage Patterns
@@ -101,11 +138,24 @@ import { HttpTransport } from '@nextnode-solutions/logger/transports/http'
 const log = createLogger({
   transports: [
     new ConsoleTransport({ format: 'json' }),
-    new HttpTransport({ endpoint: 'https://logs.example.com', batchSize: 20 }),
+    new HttpTransport({
+      endpoint: 'https://logs.example.com',
+      batchSize: 20,
+      maxRetries: 5,
+      onError: (err, entries) => console.error(`Failed to send ${entries.length} logs`, err),
+    }),
   ],
 })
 // Call dispose() on shutdown to flush buffered HTTP logs
 await log.dispose()
+```
+
+### Factory functions (alternative to `new`)
+```typescript
+import { createConsoleTransport } from '@nextnode-solutions/logger'
+import { createHttpTransport } from '@nextnode-solutions/logger/transports/http'
+const transport = createConsoleTransport({ format: 'node' })
+const http = createHttpTransport({ endpoint: 'https://logs.example.com' })
 ```
 
 ### Testing — spy logger
@@ -121,11 +171,21 @@ spy.clear()
 ### Testing — noop and mock
 ```typescript
 import { createNoopLogger, createMockLogger } from '@nextnode-solutions/logger/testing'
+import type { MockLogger } from '@nextnode-solutions/logger/testing'
 // Noop: discards all output, satisfies Logger interface
 const service = new MyService(createNoopLogger())
-// Mock: tracks raw calls (mock.info.mock.calls)
+// Mock: tracks raw calls (mock.info.mock.calls), typed as MockLogger
 const mock = createMockLogger()
+expect(mock.info.mock.calls[0][0]).toBe('Expected message')
+mock.info.mockClear() // Reset a single method
 ```
+
+## Re-exported Utilities (from main entry)
+
+- **Formatters**: `formatForNode`, `formatForBrowser`, `createBrowserLogArgs`, `formatAsJson`, `formatAsJsonPretty`
+- **Utilities**: `generateRequestId`, `detectRuntime`, `hasCryptoSupport`, `detectEnvironment`, `parseLocation`, `safeStringify`, `getCurrentTimestamp`
+- **Constants**: `LOG_LEVEL_PRIORITY`
+- **Types**: `BrowserLogOutput`, `JsonLogOutput`, `ConsoleTransportConfig`, `DevelopmentLocationInfo`, `ProductionLocationInfo`, `LocationInfo`, `SpyLogger` (+ all core types)
 
 ## Conventions
 
@@ -137,6 +197,8 @@ const mock = createMockLogger()
 - `exactOptionalPropertyTypes` is enabled — use `| undefined` explicitly in optional properties
 - All imports use `.js` extensions (ESM)
 - No barrel exports — direct imports only
+- Tests live in `src/__tests__/` organized by concern (`core/`, `transports/`, `utils/`, `config/`)
+- `__testing__` exports on formatters are for internal test access only — not part of public API
 
 ## Build
 
@@ -144,4 +206,6 @@ const mock = createMockLogger()
 - **Format**: ESM-only, minified, tree-shaken, code-split
 - **Entries**: `logger`, `testing`, `transports/http`
 - **Output**: `dist/` (JS + .d.ts)
+- **Linting**: oxlint (`pnpm lint`)
+- **Formatting**: oxfmt (`pnpm format`)
 - **Commands**: `pnpm build`, `pnpm test`, `pnpm lint`, `pnpm type-check`, `pnpm size`

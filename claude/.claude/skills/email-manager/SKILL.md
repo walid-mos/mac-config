@@ -17,6 +17,8 @@ version: 0.0.0-development
 Template-first email sending library. Provider-agnostic architecture — every email uses a React Email component, rendered to HTML internally. Resend is the first (and currently only) provider.
 
 **Peer deps**: `react`, `@react-email/render`, `@nextnode-solutions/logger`
+**Optional peer dep**: `resend` (only needed when using the Resend provider)
+**Engine**: Node.js `>=24.0.0`
 
 ## Architecture
 
@@ -40,10 +42,10 @@ src/
 
 ## Key API
 
-### `createEmailManager(config)` — Main entry point
+### `createEmailManager(config)` — Main entry point (async)
 
 ```typescript
-const manager = createEmailManager({
+const manager = await createEmailManager({
   provider: "resend",
   providerConfig: { apiKey: "re_..." },
   defaultFrom: "noreply@app.com",
@@ -51,18 +53,26 @@ const manager = createEmailManager({
 });
 ```
 
-Returns `EmailManager` with:
+Returns `Promise<EmailManager>` with:
 - `send<TProps>(message: TemplatedEmailMessage<TProps>)` → `Promise<SendResult>`
 - `validateConfig()` → `Promise<boolean>`
 - `provider` (readonly) — underlying `EmailProvider`
 
 ### `renderTemplate(template, props, options?)` — Standalone renderer
 
-Returns `Result<RenderedTemplate, EmailError>` — never throws.
+Returns `Promise<Result<RenderedTemplate, EmailError>>` — never throws.
 
-### `createProvider(name, config)` — Provider factory
+Default options: `{ plainText: true, pretty: false }`.
 
-Throws on invalid config (fail-fast at setup). Currently supports `"resend"` only.
+### `createProvider(name, config)` — Provider factory (async)
+
+Returns `Promise<EmailProvider>`. Provider SDKs are dynamically imported — the library won't crash if an unused provider's package is missing. Throws on invalid config or missing SDK (fail-fast at setup). Currently supports `"resend"` only.
+
+### Key exported types
+
+- `EmailTemplateComponent<TProps>` — `(props: TProps) => React.ReactElement`, used for template parameter typing
+- `SendSuccess` — `{ id: string; provider: string; sentAt: Date }`, returned in successful `SendResult.data`
+- `EmailManagerConfig<P>` — generic over provider name, defaults to `"resend"`
 
 ## Core Patterns
 
@@ -74,7 +84,7 @@ type SendResult = Result<SendSuccess, EmailError>;
 ```
 
 - Public API returns `Result` — check `result.success` before accessing data
-- Only `createProvider()` and `createEmailManager()` throw (fail-fast at setup)
+- Only `createProvider()` and `createEmailManager()` reject/throw (fail-fast at setup)
 - Use factory helpers: `fail()`, `emailError()`, `emailFail()`
 
 ### EmailError codes
@@ -109,7 +119,10 @@ await manager.send({
 
 ### Composition over inheritance
 
-`createProviderUtils(name)` returns shared utilities (normalization, validation) used by providers via composition — no base class.
+`createProviderUtils(name)` returns `ProviderUtils` with shared utilities — no base class:
+- `normalizeRecipient(recipient)` → `string`
+- `normalizeRecipients(recipients)` → `string[]`
+- `validateMessage(message)` → `Result<void, EmailError>`
 
 ### Recipient normalization
 
@@ -140,6 +153,15 @@ pnpm test            # vitest run
 pnpm test:coverage   # vitest + coverage
 pnpm test:watch      # vitest watch
 ```
+
+## Testing
+
+Tests live in `__tests__/` at project root (not inside `src/`):
+- `scaffolding.test.ts` — package identity, build config, scripts, hooks
+- `types.test.ts` — type-level tests for all exported types + result factories
+- `renderer.test.ts` — template rendering with mocked `@react-email/render`
+- `resend-provider.test.ts` — provider send, error mapping, validation, config
+- `email-manager.test.ts` — facade integration with mocked provider + renderer
 
 ## Adding a New Provider
 

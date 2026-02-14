@@ -33,6 +33,8 @@ autoload-dirs:
 | `@nextnode-solutions/standards/vitest/frontend` | Vitest config (jsdom, coverage) | `vitest.config.ts` |
 | `@nextnode-solutions/standards/vitest/backend` | Vitest config (node, coverage) | `vitest.config.ts` |
 | `@nextnode-solutions/standards/commitlint` | Commitlint conventional config | `commitlint.config.js` |
+| `@nextnode-solutions/standards/editorconfig` | EditorConfig base config | `.editorconfig` (symlink/copy) |
+| `@nextnode-solutions/standards/npmrc` | pnpm .npmrc config | `.npmrc` (symlink/copy) |
 | `@nextnode-solutions/standards/lint-staged` | lint-staged config (oxlint + oxfmt + sort-package-json) | `lint-staged.config.js` |
 
 ---
@@ -190,7 +192,33 @@ export { default } from '@nextnode-solutions/standards/commitlint'
 - Lowercase type and scope, no period in subject, max 100 char header
 - Body/footer: leading blank line, max 100 char lines
 
-### 4.7 lint-staged — `lint-staged.config.js`
+### 4.7 EditorConfig — `.editorconfig`
+
+Copy or symlink the base config to the project root:
+
+```bash
+cp node_modules/@nextnode-solutions/standards/src/editorconfig/base.editorconfig .editorconfig
+```
+
+**What it enforces:**
+- Tabs (indent size 4), LF line endings, UTF-8 charset
+- Trim trailing whitespace, insert final newline
+- Markdown files: preserve trailing whitespace
+
+### 4.8 npmrc — `.npmrc`
+
+Copy or symlink the base config to the project root:
+
+```bash
+cp node_modules/@nextnode-solutions/standards/src/npmrc/base.npmrc .npmrc
+```
+
+**What it enforces:**
+- `strict-peer-dependencies=false` (don't fail on optional peer dep mismatches)
+- `auto-install-peers=true` (auto-install peer deps)
+- `shamefully-hoist=false` (strict node_modules isolation)
+
+### 4.9 lint-staged — `lint-staged.config.js`
 
 ```js
 export { default } from '@nextnode-solutions/standards/lint-staged'
@@ -198,7 +226,7 @@ export { default } from '@nextnode-solutions/standards/lint-staged'
 
 **What it runs on staged files:**
 - `package.json` -> `better-sort-package-json`
-- All files (`*`) -> `oxlint` then `oxfmt --write`
+- All files (`*`) -> `oxlint` then `oxfmt --no-error-on-unmatched-pattern --write`
 
 ---
 
@@ -273,10 +301,11 @@ When generating or editing code in any NextNode project, **always follow the oxf
 When scaffolding a new project, **always set up @nextnode-solutions/standards from the start**:
 
 1. Install the package and required peer deps
-2. Create all config files per section 4 (pick the right TypeScript variant)
-3. Add package.json scripts per section 5
-4. Set up husky + lint-staged + commitlint per section 6
-5. Verify with `pnpm lint` and `pnpm format:check`
+2. Create all config files per section 3 (pick the right TypeScript variant)
+3. Copy `.editorconfig` and `.npmrc` from the package (section 3.7 and 3.8)
+4. Add package.json scripts per section 4
+5. Set up husky + lint-staged + commitlint per section 5
+6. Verify with `pnpm lint` and `pnpm format:check`
 
 **Never create a NextNode project without `@nextnode-solutions/standards`.** This is non-negotiable.
 

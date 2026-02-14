@@ -21,11 +21,11 @@ Read the project identity from the current working directory:
 3. If neither exists, abort with a clear message: "No package.json or nextnode.toml found in the current directory."
 
 Derive a **skill identifier** (kebab-case) from the package name:
-- `@nextnode/dagger-pipeline` → `dagger-pipeline`
-- `@nextnode/standards` → `standards`
+- `@nextnode-solutions/dagger-pipeline` → `dagger-pipeline`
+- `@nextnode-solutions/standards` → `standards`
 - `my-tool` → `my-tool`
 
-Strip the scope (`@nextnode/`, `@scope/`) to get the base name.
+Strip the scope (`@nextnode-solutions/`, `@scope/`) to get the base name.
 
 ---
 
@@ -96,7 +96,7 @@ If updating an existing skill:
 
 Present a concise summary to the user:
 ```
-Package: @nextnode/standards (v2.1.0)
+Package: @nextnode-solutions/standards (v2.1.0)
 Skill: ~/.claude/skills/standards/SKILL.md
 
 Changes detected:

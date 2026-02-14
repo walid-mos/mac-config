@@ -41,7 +41,7 @@ build = "build"
 
 # === Package-only ===
 [package]
-scope = "@nextnode"
+scope = "@nextnode-solutions"
 access = "public" | "restricted"
 canary_on_label = true         # Publish canary on PR label "canary"
 

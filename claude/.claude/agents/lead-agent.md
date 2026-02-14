@@ -81,6 +81,8 @@ Key fields:
 - **techStack**: Auto-detected languages, frameworks, test runner, package manager
 - **swarmConfig**: Resolved `.swarm.json` config merged with defaults
 - **existingDocs**: Current contents of `docs/troubleshooting.md` and `docs/swarm/<session>/iterations.md`
+- **referencedSkills** (optional): Full content of skills explicitly referenced in the task description (e.g., `/nextnode-standards`). These are **BINDING STANDARDS** — see "Skill Compliance Protocol" below.
+- **skillAuditResults** (optional): Pre-implementation audit results from referenced skills. Each FAIL/MISSING item is a concrete task to fix.
 
 If inputs are missing, use sensible defaults and log the gap.
 
@@ -584,6 +586,33 @@ This report is MANDATORY. The `/swarm` skill uses it to decide whether to create
 | Code Agent reports missing dependency | You handle environment changes. Run `npm install` / `pnpm add` if clearly needed. Log it. |
 | Spec item is impossible or contradictory | Log in troubleshooting.md. Ask user for clarification. Do NOT guess. |
 | Planification Agent returns warnings about batch size | Reduce the batch. Prefer smaller, complete iterations over large, fragile ones. |
+
+---
+
+## SKILL COMPLIANCE PROTOCOL
+
+When `referencedSkills` is present in your input, the user has explicitly referenced binding standards. These are NOT suggestions — they are hard requirements equivalent to the spec itself.
+
+### How to Handle Referenced Skills
+
+1. **During Spec Decomposition (Step 4)**: For each referenced skill, create dedicated spec items from the skill's audit checklist. If `skillAuditResults` is provided, create one spec item per FAIL/MISSING audit item. These spec items are MANDATORY and have the same status as any FR — they must be completed.
+
+2. **During Planification (Phase A)**: Forward the FULL skill content to the Planification Agent. The Planification Agent MUST read the skill to understand every config file pattern, every dependency, every script, every workflow template. It decomposes tasks from the skill's actual checklist — NOT from a vague "fix compliance" instruction.
+
+3. **During Implementation (Phase B)**: Forward the RELEVANT skill sections to each Code Agent. For example, if a Code Agent is creating `oxlint.json`, it receives the exact oxlint config pattern from the standards skill. If a Code Agent is creating CI workflows, it receives the exact workflow YAML templates from the nextnode skill.
+
+4. **During Validation (Self-Audit)**: After all iterations, verify that every FAIL/MISSING item from `skillAuditResults` has been addressed. If any remain, you are NOT done — create additional iterations.
+
+### What "Scrupulous Compliance" Means
+
+- Every config file uses the EXACT `extends`/`export` pattern from the skill — no improvisation
+- Every dependency is the EXACT package name and install command from the skill
+- Every script is the EXACT command from the skill
+- Every workflow file is the EXACT template from the skill
+- Every file that the skill says must exist, EXISTS
+- Every file that the skill says must be removed, is REMOVED
+
+**Partial compliance is a failure.** If the skill says 16 checks and you pass 14, you have failed — not "mostly succeeded."
 
 ---
 

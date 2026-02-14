@@ -79,7 +79,24 @@ Run `git branch --show-current` and store the result as `baseBranch`. This is th
 
 Also store `pwd` as `projectDir`. This is needed to return to the original directory after worktree cleanup in Step 5c.
 
-> **Note**: Spec qualification (interview, deepening) happens in Step 2d — after the worktree is created. Step 1 only detects and reads specs; it never creates or modifies files.
+### 1e. Skill Resolution (CRITICAL)
+
+Scan the task description for explicit skill references — any `/skillname` pattern (e.g., `/nextnode-standards`, `/typescript`, `/clean-code`). These are **binding standards** that the swarm MUST follow scrupulously.
+
+For each detected skill reference:
+
+1. **Load the skill** via the `Skill` tool to get it injected into the current context
+2. **Read the skill file** to capture its full content as text: glob `~/.claude/skills/<skillname>/SKILL.md` (or check the skill's base directory as indicated by the Skill tool output)
+3. **Resolve dependent skills**: if the skill content references other skills (e.g., `/nextnode-standards` references `standards` and `nextnode`), load and read those too — recursively, max depth 2
+4. Store the results as `resolvedSkills`: a map of `{ skillName: fullContent }`
+
+**Example**: `/swarm fix security + /nextnode-standards` → detect `/nextnode-standards` → load it → read its SKILL.md → it references `standards` and `nextnode` skills → load and read those too → `resolvedSkills` has 3 entries.
+
+**If a referenced skill contains an audit procedure** (like `/nextnode-standards` does): run the audit NOW, in Step 1e, against the current project state. Store the audit results as `skillAuditResults`: a map of `{ skillName: auditOutput }`. This gives the Lead Agent the exact list of FAIL/MISSING items to fix — not a vague "fix compliance gaps" instruction.
+
+**Why this matters**: Sub-agents (Lead Agent, Planification Agent, Code Agents) do NOT have access to the Skill tool. They cannot load skills themselves. The ONLY way skill content reaches them is if the launcher embeds it in their prompts. Without this step, a spec item like "Run /nextnode-standards and fix all gaps" is unactionable — the agents have no idea what the standard requires.
+
+> **Note**: Spec qualification (interview, deepening) happens in Step 2d — after the worktree is created. Step 1 only detects and reads specs; it never creates or modifies files. Step 1e is an exception — it reads skill files (which are outside the project) but does not modify anything.
 
 ## Step 2 — Create Worktree
 
@@ -221,10 +238,31 @@ confirmExit: <resolved value>
 troubleshooting: <contents of docs/troubleshooting.md, or "null">
 iterations: <contents of docs/swarm/<session-name>/iterations.md if resuming, or "null">
 
+### referencedSkills (from Step 1e — include ONLY if resolvedSkills is non-empty)
+
+The following skills were explicitly referenced in the task description. These are BINDING STANDARDS — every check, every config file, every pattern described in these skills MUST be implemented exactly as specified. Partial compliance is a FAILURE.
+
+#### <skillName>
+<full SKILL.md content>
+
+#### <dependentSkillName>
+<full SKILL.md content>
+
+(Repeat for each entry in resolvedSkills)
+
+### skillAuditResults (from Step 1e — include ONLY if audit was run)
+
+The following audit was run against the current project state BEFORE any implementation. This is the exact list of items to fix. Every FAIL and MISSING item MUST become PASS.
+
+#### <skillName> audit
+<full audit output>
+
 ## CRITICAL INSTRUCTIONS
 
 - You MUST complete ALL spec items before returning. Do NOT stop early.
 - If you encounter a blocker, escalate via AskUserQuestion — do NOT silently stop.
+- When `referencedSkills` is provided: these are BINDING STANDARDS. You MUST forward the FULL skill content to the Planification Agent and to EVERY Code Agent. The Planification Agent MUST decompose tasks covering EVERY check in the skill. The Code Agents MUST implement EXACTLY what the skill specifies — every config file, every dependency, every script, every workflow. Partial compliance is a FAILURE that will be caught in output validation.
+- When `skillAuditResults` is provided: this is the exact list of FAIL/MISSING items. Every single one MUST become PASS. Do NOT invent your own interpretation of what the skill requires — follow the audit results literally.
 - Run the full orchestration loop for EVERY iteration: Phase A (Planification + Test) → Phase B (Code + Review + Security) → Phase C (Escalation) → Phase D (Lint + Build + Commit).
 - NEVER skip Code Review or Security Review — even for config-only packages, static sites, or "simple" changes. These gates are mandatory without exception.
 - ALWAYS spawn the Test Agent every iteration. If it returns `noTestsNeeded: true` with a valid reason aligned with the vitest skill's scope exclusions (config files, CI/CD, infra, type aliases, re-exports), accept it — do NOT force it to produce useless tests.
@@ -254,7 +292,13 @@ Before accepting the Lead Agent's result, validate the delivery report:
    - Every iteration MUST show test counts in the "Tests" column
 3. Check `docs/swarm/<session-name>/iterations.md`:
    - Every iteration entry MUST have `**Review**:` and `**Lint**:` and `**Build**:` lines
-4. If ANY iteration is missing review/security/test evidence:
+4. **Skill compliance validation** (if `resolvedSkills` was non-empty): Re-run the skill audit from Step 1e against the CURRENT project state (post-implementation). Compare the new audit results against the original `skillAuditResults`. Every item that was FAIL or MISSING in the original audit MUST now be PASS. If ANY skill audit item is still FAIL or MISSING:
+   - Do NOT proceed to Step 5
+   - Re-spawn the Lead Agent with:
+     - The remaining FAIL/MISSING items as the ONLY spec items
+     - The full skill content (from `resolvedSkills`)
+     - A directive: "SKILL COMPLIANCE FAILURE: The following audit items are still failing: [list]. You MUST fix these before returning. Here is the full skill definition: [content]."
+5. If ANY iteration is missing review/security/test evidence:
    - Do NOT proceed to Step 5
    - Re-spawn the Lead Agent with:
      - The current state of the codebase

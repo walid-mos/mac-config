@@ -21,6 +21,7 @@ This skill auto-loads on all NextNode/SaaS projects. It defines what a compliant
 | `nextnode-infra` | Infrastructure operations — CLI commands, Terraform, VPS, deployment, monitoring, DNS | No (manual `/nextnode-infra`) |
 | `nextnode-standards` | Compliance audit — checks all standards and produces a report | Yes (same dirs) |
 | `nextnode-brand` | Brand guidelines — colors, typography, logo system | No (manual `/nextnode-brand`) |
+| `structure-astro` | Astro project `src/` structure — domain-driven components, shared/page separation, lib layer, islands | Yes (same dirs + clients) |
 
 > **Keeping skills up to date:** Run `/learn` on any `@nextnode-solutions/*` package to update its skill. `/learn` cascades to dependent skills automatically.
 

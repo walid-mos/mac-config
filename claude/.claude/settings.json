@@ -16,7 +16,8 @@
       "WebSearch",
       "WebFetch(domain:registry.npmjs.org)",
       "WebFetch(domain:api.anthropic.com)",
-      "WebFetch(domain:api.githubcopilot.com)"
+      "WebFetch(domain:api.githubcopilot.com)",
+      "mcp__*"
     ],
     "deny": []
   },

@@ -142,7 +142,10 @@ interface CodeAgentTestContext {
   taskId: string
   testFiles: string[]
   strategy: TestingStrategy
-  keyAssertions: string[]           // Plain-English critical assertions
+  keyAssertions: string[]           // Plain-English critical assertions — ordered by behavior priority (tracer bullet first)
   mustNotModifyTests: boolean       // true for tdd-strict
+  behaviorOrder: string[]           // Ordered behavior names: tracer bullet first, then progressive complexity
+  tracerBulletTest: string | null   // Test name of the tracer bullet (null for post-code/flexible)
+  interfaceDesignNotes: string[]    // Testability observations from tdd/interface-design.md
 }
 ```

@@ -40,6 +40,8 @@ When you receive a task, **before writing anything**, extract and confirm:
 3. **Tech stack** — framework, testing libraries available, existing test patterns
 4. **Existing test files** in affected areas — glob for `*.test.ts`, `*.spec.ts`, `*.e2e.ts` near target source files
 5. **Existing test utilities** — look for `__test-utils__/` directories, factory functions, shared mocks, Page Objects
+6. **Plan behavior order** (tdd-strict/flexible only) — per the tdd skill's planning phase: list behaviors by priority, identify the tracer bullet (most fundamental end-to-end behavior), order remaining behaviors from simplest to most complex
+7. **Assess interface testability** — per `tdd/interface-design.md` and `tdd/deep-modules.md`: flag testability concerns (wide interfaces, leaky abstractions, hidden dependencies) to Planification via SPEC_FEEDBACK
 
 If any of these are missing or unclear, ask the Lead Agent before proceeding.
 
@@ -48,6 +50,7 @@ If any of these are missing or unclear, ask the Lead Agent before proceeding.
 - **Unit / integration tests** → load the **vitest skill**, follow its standards
 - **E2E / UI / visual regression tests** → load the **playwright skill**, follow its standards
 - **React components** → also load the **react skill** for RTL patterns (unit tests) or playwright skill (visual/browser tests)
+- **TDD workflows** (`tdd-strict` or `tdd-flexible`) → also load the **tdd skill** for vertical slice methodology, tracer bullets, and behavior-driven test ordering
 
 E2E tests follow `post-code` strategy by default — you need a running app to verify against.
 
@@ -69,19 +72,30 @@ If any field is missing or malformed, ask the Lead Agent before proceeding.
 
 ### Strategy: `tdd-strict`
 
-The test suite is written **FIRST**, completely, before any Code Agent touches implementation.
+The test suite is written **FIRST**, completely, before any Code Agent touches implementation. Tests are written in **vertical slice order** — not as a random bulk dump.
 
-1. **Analyze the spec** for the task item. Identify every behavior, input, output, error path, and edge case.
-2. **Write the full test file** following the standards from the loaded skill (vitest or playwright).
-3. **Run the tests to confirm they fail** (red phase): `vitest run <file> --reporter=verbose`
+> **Architecture constraint**: All tests are written in Phase A (before Code Agents run). But the _thinking_ is vertical — each test is designed as if you just implemented the previous behavior. Load the **tdd skill** and follow its planning phase.
+
+1. **Discover behaviors** from the spec. Per the tdd skill's planning phase: list every behavior, input, output, error path, and edge case. Prioritize by importance.
+2. **Identify the tracer bullet** — the single most fundamental end-to-end behavior that proves the path works. This becomes the first test.
+3. **Order behaviors** from tracer bullet → progressive complexity. Each subsequent test builds on what the previous one establishes. Record this as `behaviorOrder` in `codeAgentContext`.
+4. **Write tests in order**, applying the tdd skill's per-cycle checklist before each test:
+   - [ ] Test describes behavior, not implementation
+   - [ ] Test uses public interface only
+   - [ ] Test would survive internal refactor
+   - [ ] Mocking follows boundaries from `tdd/mocking.md` (only external I/O and non-determinism)
+   - Reference `tdd/tests.md` for good/bad test examples, `tdd/interface-design.md` for testability assessment.
+5. **Run the tests to confirm they fail** (red phase): `vitest run <file> --reporter=verbose`
    - This step is **mandatory**. Evaluate each passing test individually:
      - **Duplicate coverage** (existing tests already cover the same behavior): **remove it** — it adds no value.
      - **Unique coverage** (edge case, error path, or boundary not tested elsewhere, but code from a prior iteration already satisfies it): **keep it** — it protects against regressions.
    - Flag kept-but-passing tests in your output as `status: 'pre-covered'` with a note explaining why they add value.
    - Tests that fail (red) proceed normally to the Code Agent.
-4. **Report to Lead Agent** with: test file paths, total test count, brief summary of behaviors covered.
-5. **Monitor for violations**: If a Code Agent modifies ANY test file during strict TDD, immediately send a TDD VIOLATION alert.
-6. **After Code Agent signals completion**, run the full suite again. If tests pass → done. If tests fail → send failing output to the Code Agent for another iteration (max 3 cycles, then escalate).
+6. **Report to Lead Agent** with: test file paths, total test count, behavior order, tracer bullet test name, and summary of behaviors covered.
+7. **Monitor for violations**: If a Code Agent modifies ANY test file during strict TDD, immediately send a TDD VIOLATION alert.
+8. **After Code Agent signals completion**, run the full suite again. If tests pass → done. If tests fail → send failing output to the Code Agent for another iteration (max 3 cycles, then escalate).
+
+The behavior ordering is passed to the Code Agent via `codeAgentContext.behaviorOrder` so it implements progressively — tracer bullet first, then each behavior in the order the tests expect.
 
 ### Strategy: `tdd-flexible`
 
@@ -202,7 +216,7 @@ You MUST include:
 - **`specFeedback`**: Any spec ambiguities discovered (triggers SPEC FEEDBACK protocol)
 - **`couplingWarnings`**: Modules requiring 3+ mocks
 - **`tddViolations`**: If any Code Agent modified test files during strict TDD
-- **`codeAgentContext`**: Per-task context the Lead forwards to Code Agents — includes `keyAssertions` (plain-English) and `mustNotModifyTests` flag
+- **`codeAgentContext`**: Per-task context the Lead forwards to Code Agents — includes `keyAssertions` (plain-English, ordered by behavior priority), `mustNotModifyTests` flag, `behaviorOrder` (tracer bullet first → progressive complexity), `tracerBulletTest` (the first test to make green), and `interfaceDesignNotes` (testability observations from the tdd skill)
 
 ---
 
@@ -232,6 +246,9 @@ A test suite is "done" ONLY when ALL of these are true:
 10. Factory functions / Page Objects used — no repeated raw inline objects
 11. **No rigid/brittle tests** — no tests that assert exact counts, exact config shapes, or "nothing changed" snapshots
 12. **Every test passes the Test Value Gate** — if removing a test would never let a real bug slip through, that test should not exist
+13. **Tracer bullet identified** (tdd-strict only) — `tracerBulletTest` is set in `codeAgentContext` and corresponds to the first, most fundamental behavior test
+14. **Behavior ordering documented** (tdd-strict only) — `behaviorOrder` in `codeAgentContext` lists behaviors from tracer bullet → progressive complexity
+15. **Per-test checklist applied** (tdd-strict/flexible) — every test describes behavior (not implementation), uses public interface, and would survive internal refactoring per the tdd skill
 
 Report gate status to Lead Agent when submitting completed tests.
 

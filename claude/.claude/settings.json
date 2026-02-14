@@ -26,6 +26,11 @@
     "type": "command",
     "command": "bash ~/.claude/statusline-command.sh"
   },
+  "enabledPlugins": {
+    "terraform-provider-development@hashicorp": true,
+    "context7@claude-plugins-official": true,
+    "github@claude-plugins-official": true
+  },
   "extraKnownMarketplaces": {
     "hashicorp": {
       "source": {
@@ -39,11 +44,6 @@
         "repo": "supabase/agent-skills"
       }
     }
-  },
-  "enabledPlugins": {
-    "terraform-provider-development@hashicorp": true,
-    "context7@claude-plugins-official": true,
-    "github@claude-plugins-official": true
   },
   "sandbox": {
     "enabled": true,

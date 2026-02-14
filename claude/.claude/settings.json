@@ -29,7 +29,8 @@
   "enabledPlugins": {
     "terraform-provider-development@hashicorp": true,
     "context7@claude-plugins-official": true,
-    "github@claude-plugins-official": true
+    "github@claude-plugins-official": true,
+    "postgres-best-practices@supabase-agent-skills": true
   },
   "extraKnownMarketplaces": {
     "hashicorp": {

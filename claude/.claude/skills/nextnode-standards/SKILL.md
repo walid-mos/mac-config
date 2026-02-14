@@ -128,6 +128,7 @@ Skip these checks if `type = "package"` in `nextnode.toml`.
 **`Dockerfile`:**
 - **PASS**: file exists with multi-stage build (`FROM ... AS builder` + `FROM ... AS runtime`)
 - **WARN**: file exists but no multi-stage build
+- **WARN**: build-only variables (`HUSKY`, `CI`) declared as `ENV` — the infra CLI's `parseDockerfileEnv()` treats all `ENV` declarations as required runtime secrets. Inline them in `RUN` commands instead (e.g., `RUN HUSKY=0 CI=true pnpm install ...`)
 - **MISSING**: file does not exist — **FAIL** if `docker-compose.yml` also missing (no deploy strategy)
 
 **`docker-compose.yml`:**
@@ -201,7 +202,7 @@ If there are FAIL or MISSING items, **ask the user** if they want Claude to fix 
 3. **Fix existing config files** — add missing `extends` or re-export (use paths from `standards` skill)
 4. **Add missing scripts** — patch `package.json` (use commands from `standards` skill)
 5. **Set up husky** — init + create hook files
-6. **Create Docker files** — generate `Dockerfile` from template if missing (apps only). Do NOT create `docker-compose.yml` when only a `Dockerfile` exists — the infrastructure auto-generates compose at deploy time
+6. **Create Docker files** — generate `Dockerfile` from template if missing (apps only). Do NOT create `docker-compose.yml` when only a `Dockerfile` exists — the infrastructure auto-generates compose at deploy time. **Important:** never declare build-only variables (`HUSKY`, `CI`) as `ENV` — inline them in `RUN` commands (e.g., `RUN HUSKY=0 CI=true pnpm install ...`) so the infra CLI doesn't treat them as required runtime secrets
 7. **Create CI workflow** — copy reusable pipeline template (from `nextnode` skill)
 8. **Create nextnode.toml** — prompt for project name/type/domain, generate using the canonical template from the `nextnode` skill
 

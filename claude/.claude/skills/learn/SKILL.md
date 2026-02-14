@@ -159,13 +159,63 @@ Adjust sections based on what the package actually provides — not every packag
 
 ---
 
-## Step 6 — Confirm & Report
+## Step 6 — Cascade to Dependent Skills
 
-After applying changes:
+After updating the target skill, check if other skills reference it. This ensures that `/learn` on one package propagates changes everywhere.
+
+### 6a. Identify dependent skills
+
+Grep `~/.claude/skills/*/SKILL.md` for references to the updated package name (e.g., `@nextnode-solutions/standards`, `standards` skill). Known dependency graph:
+
+| Updated Skill | Dependents |
+|---------------|------------|
+| `standards` | `nextnode-standards` (audit checks reference standards for config patterns, required deps, scripts) |
+| `logger` | `nextnode-standards` (optional package recommendation) |
+| `email-manager` | `nextnode-standards` (optional package recommendation) |
+| `nextnode` | `nextnode-standards` (references nextnode for toml config, CI templates) |
+| `nextnode-infra` | `nextnode` (cross-references infra for CLI/deployment details) |
+
+### 6b. Check for stale references
+
+For each dependent skill:
+
+1. Read the dependent skill's `SKILL.md`
+2. Check if it contains any **hardcoded information** that should come from the updated skill instead
+3. Specifically look for:
+   - Package version numbers that have changed
+   - API references, function names, or type definitions that have changed
+   - Config patterns or extends paths that have changed
+   - Dependency lists that have changed
+
+### 6c. Update dependent skills
+
+If stale references are found:
+
+1. Use **Edit** to fix them — replace hardcoded details with references to the source skill, or update the hardcoded values
+2. Report what was cascaded:
+
+```
+Cascade updates:
+  → nextnode-standards: updated required peer deps list (oxlint → oxlint + oxfmt)
+  → nextnode: no stale references found (already references standards skill)
+```
+
+If no cascade updates are needed, report:
+
+```
+Cascade check: no dependent skills need updating.
+```
+
+---
+
+## Step 7 — Confirm & Report
+
+After applying changes (including cascade):
 
 1. Show the user what was updated with a brief summary
-2. If a new skill was created, remind them it will be auto-loaded based on the `autoload-dirs` or matched by name
-3. Suggest running `/learn` again after the next significant package update
+2. List any cascade updates that were applied
+3. If a new skill was created, remind them it will be auto-loaded based on the `autoload-dirs` or matched by name
+4. Suggest running `/learn` again after the next significant package update
 
 ---
 
@@ -176,3 +226,4 @@ After applying changes:
 - **Preserve manual edits**: If the existing skill has hand-written notes or rules not derivable from source code, keep them. Only remove what is provably outdated.
 - **Code examples**: Include short, representative examples — prefer real patterns from the package's own tests over invented examples.
 - **Version awareness**: If `package.json` has a version, note it in the skill so future runs can detect version bumps.
+- **DRY across skills**: Never duplicate package details in multiple skills. The package skill is the single source of truth. Other skills (like `nextnode-standards`) should reference it, not copy it.

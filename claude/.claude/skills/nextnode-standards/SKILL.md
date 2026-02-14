@@ -40,7 +40,8 @@ Read the following files from the project root (in parallel for speed). If a fil
 | `nextnode.toml` | `[project]` section (name, type, domain) |
 | `Dockerfile` | multi-stage build, non-root user (apps only) |
 | `docker-compose.yml` | service structure (apps only, optional if Dockerfile exists) |
-| `.github/workflows/ci.yml` | reusable pipeline reference |
+| `.github/workflows/deploy-dev.yml` | reusable pipeline reference (deploy dev) |
+| `.github/workflows/deploy-prod.yml` | reusable pipeline reference (deploy prod) |
 | `oxlint.json` | extends from standards (refer to `standards` skill, section "oxlint") |
 | `oxfmt.json` | extends from standards (refer to `standards` skill, section "oxfmt") |
 | `tsconfig.json` | extends from standards (refer to `standards` skill, section "TypeScript") |
@@ -115,11 +116,19 @@ If the file does not exist: **MISSING**.
 - `.husky/pre-commit` must exist and contain `lint-staged`
 - `.husky/commit-msg` must exist and contain `commitlint`
 
-### 7. CI Pipeline (`.github/workflows/ci.yml`)
+### 7. CI Pipelines (`.github/workflows/`)
 
+Check both workflow files:
+
+**`deploy-dev.yml`**:
 - **PASS**: file exists and contains `NextNodeSolutions/infrastructure/.github/workflows/pipeline.yml@main`
-- **FAIL**: file exists but uses custom CI logic instead of the reusable pipeline
-- **MISSING**: no CI workflow
+- **FAIL**: file exists but uses custom logic instead of the reusable pipeline
+- **MISSING**: file does not exist
+
+**`deploy-prod.yml`**:
+- **PASS**: file exists and contains `NextNodeSolutions/infrastructure/.github/workflows/pipeline.yml@main` with `action: deploy-prod`
+- **FAIL**: file exists but uses custom logic instead of the reusable pipeline
+- **MISSING**: file does not exist
 
 ### 8. Docker (Apps Only)
 
@@ -166,10 +175,11 @@ Type: <app|package> | Domain: <domain or n/a>
 | 9 | Husky hooks | PASS | pre-commit + commit-msg |
 | 10 | package.json scripts | FAIL | Missing: format:check |
 | 11 | pnpm enforced | PASS | No package-lock.json or yarn.lock |
-| 12 | CI pipeline | PASS | Uses reusable workflow |
-| 13 | Dockerfile | WARN | No multi-stage build |
-| 14 | docker-compose.yml | SKIP | Not needed — Dockerfile present, infra auto-generates compose |
-| 15 | Barrel exports | PASS | None found |
+| 12 | CI pipeline (deploy-dev.yml) | PASS | Uses reusable workflow |
+| 13 | CI pipeline (deploy-prod.yml) | PASS | Uses reusable workflow |
+| 14 | Dockerfile | WARN | No multi-stage build |
+| 15 | docker-compose.yml | SKIP | Not needed — Dockerfile present, infra auto-generates compose |
+| 16 | Barrel exports | PASS | None found |
 
 ### Issues to Fix
 

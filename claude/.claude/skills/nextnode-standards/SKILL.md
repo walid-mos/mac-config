@@ -11,6 +11,8 @@ autoload-dirs:
 
 Full compliance checker for NextNode projects. Reads project files and produces a structured report showing what's compliant, what's missing, and what needs fixing.
 
+> **Source of truth:** This audit references the `standards`, `logger`, `email-manager`, and `nextnode` skills for expected values. When those skills are updated via `/learn`, this audit automatically uses the latest information. **Do NOT hardcode package-specific details here — always defer to the package skills.**
+
 ## When This Skill Runs
 
 - **Auto-load**: runs automatically when working in a NextNode/SaaS project directory
@@ -18,7 +20,7 @@ Full compliance checker for NextNode projects. Reads project files and produces 
 
 ### Auto-load behavior
 
-On auto-load, run the audit **silently** — only speak up if there are FAIL or MISSING items. If everything passes, do NOT print anything. This keeps the experience clean.
+On auto-load, run the audit **silently** — only speak up if there are FAIL or MISSING items. If everything passes, do NOT print anything.
 
 ### Manual invocation behavior
 
@@ -39,15 +41,15 @@ Read the following files from the project root (in parallel for speed). If a fil
 | `Dockerfile` | multi-stage build, non-root user (apps only) |
 | `docker-compose.yml` | service structure (apps only, optional if Dockerfile exists) |
 | `.github/workflows/ci.yml` | reusable pipeline reference |
-| `oxlint.json` | extends from `@nextnode-solutions/standards/oxlint` |
-| `oxfmt.json` | extends from `@nextnode-solutions/standards/oxfmt` |
-| `tsconfig.json` | extends from `@nextnode-solutions/standards/typescript/*` |
-| `commitlint.config.js` | re-exports from `@nextnode-solutions/standards/commitlint` |
-| `lint-staged.config.js` | re-exports from `@nextnode-solutions/standards/lint-staged` |
+| `oxlint.json` | extends from standards (refer to `standards` skill, section "oxlint") |
+| `oxfmt.json` | extends from standards (refer to `standards` skill, section "oxfmt") |
+| `tsconfig.json` | extends from standards (refer to `standards` skill, section "TypeScript") |
+| `commitlint.config.js` | re-exports from standards (refer to `standards` skill, section "Commitlint") |
+| `lint-staged.config.js` | re-exports from standards (refer to `standards` skill, section "lint-staged") |
 | `.husky/pre-commit` | contains `lint-staged` |
 | `.husky/commit-msg` | contains `commitlint` |
-| `vitest.config.ts` | extends from standards (only if vitest in deps) |
-| main CSS file (e.g., `app.css`) | `@import "@nextnode-solutions/standards/tailwind"` (only if tailwindcss in deps) |
+| `vitest.config.ts` | extends from standards (only if vitest in deps — refer to `standards` skill, section "Vitest") |
+| main CSS file (e.g., `app.css`) | imports standards Tailwind theme (only if tailwindcss in deps — refer to `standards` skill, section "Tailwind") |
 
 ---
 
@@ -55,66 +57,7 @@ Read the following files from the project root (in parallel for speed). If a fil
 
 ### 1. `nextnode.toml`
 
-**Canonical template** (reference for what a complete nextnode.toml looks like):
-
-```toml
-[project]
-name = "my-app"                    # REQUIRED — no default
-type = "app"                       # REQUIRED — "app" | "package" | "monitoring"
-description = "Description"        # Optional
-domain = "app.nextnode.fr"         # App-only — required when type = "app"
-redirect_domains = ["www.app.fr"]  # Optional — domains that 301→canonical (prod only, auto-adds www)
-
-[scripts]                          # Optional — defaults shown
-lint = "lint"
-test = "test"
-build = "build"
-
-# === Package-only ===
-[package]
-scope = "@nextnode"
-access = "public"                  # "public" | "restricted"
-canary_on_label = true
-
-# === App-only: Server ===
-[server]                           # No [server] = shared VPS (Tier 1)
-type = "cpx22"                     # Hetzner server type (default: cpx22)
-location = "nbg1"                  # Hetzner datacenter (default: nbg1)
-internal = false                   # true = grey cloud / Tailscale-only
-
-[volume]
-enabled = false                    # Default: false
-size = 20                          # GB
-
-[deploy]
-port = 4321                        # Container port (auto-injected as APP_PORT)
-file = "docker-compose.yml"        # Explicit compose path (auto-detected if omitted)
-zero_downtime = false              # Blue-green zero-downtime deployment
-
-[health]
-type = "http"                      # "http" | "tcp"
-path = "/health"                   # HTTP health check path
-interval = "30s"
-timeout = "10s"
-retries = 3
-
-[sablier]                          # Idle container auto-stop (non-prod only)
-enabled = true                     # Default: true
-session_duration = "15m"           # Idle timeout before stopping containers
-display_name = "My App"            # Display name on waiting page (default: project.name)
-
-[environment.dev]
-enabled = true                     # Default: true — set false to skip dev deployment
-
-[environment.prod]
-enabled = true                     # Default: true — set false to skip prod deployment
-
-# Per-env server overrides (Tier 3/4)
-# [environment.dev.server]
-# type = "cx22"
-# [environment.prod.server]
-# type = "cpx22"
-```
+Refer to the `nextnode` skill for the canonical template and valid keys.
 
 **Checks:**
 
@@ -129,45 +72,25 @@ enabled = true                     # Default: true — set false to skip prod de
 
 ### 2. `package.json` — Core Dependencies
 
-Check `devDependencies` for:
+Check `devDependencies` for mandatory packages. Refer to the `standards` skill (section "Installation") for the required list:
 
-| Dependency | Status |
-|------------|--------|
-| `@nextnode-solutions/standards` | **MANDATORY** |
-| `oxlint` | **MANDATORY** |
-| `oxfmt` | **MANDATORY** |
-| `husky` | **MANDATORY** |
-| `lint-staged` | **MANDATORY** |
-| `@commitlint/cli` | **MANDATORY** |
-| `@commitlint/config-conventional` | **MANDATORY** |
-| `better-sort-package-json` | **MANDATORY** |
+- `@nextnode-solutions/standards` — **MANDATORY**
+- Required peer deps from the `standards` skill — **MANDATORY**
+- `husky`, `lint-staged`, `@commitlint/cli`, `@commitlint/config-conventional`, `better-sort-package-json` — **MANDATORY**
 
 Check `dependencies` or `devDependencies` for optional packages — report as INFO (not FAIL):
 
-| Dependency | Note |
-|------------|------|
-| `@nextnode-solutions/logger` | Recommended for apps |
-| `@nextnode-solutions/email-manager` | Only if app sends emails |
-| `vitest` | Recommended |
-| `tailwindcss` | Only if project uses Tailwind |
+- Packages documented in the `logger` skill — recommended for apps
+- Packages documented in the `email-manager` skill — only if app sends emails
+- `vitest` — recommended
+- `tailwindcss` — only if project uses Tailwind
 
 ### 3. `package.json` — Scripts
 
-Required scripts:
-
-| Script | Expected command |
-|--------|-----------------|
-| `lint` | must contain `oxlint` |
-| `format` | must contain `oxfmt --write` |
-| `format:check` | must contain `oxfmt --check` |
-| `prepare` | must contain `husky` |
-| `build` | must exist (any value) |
+Required scripts are defined in the `standards` skill (section "Required `package.json` Scripts"). Check that they exist and contain the expected commands.
 
 Conditional scripts (only required if vitest in deps):
-
-| Script | Expected command |
-|--------|-----------------|
-| `test` | must contain `vitest` |
+- `test` must contain `vitest`
 
 ### 4. `package.json` — Package Manager
 
@@ -176,15 +99,13 @@ Conditional scripts (only required if vitest in deps):
 
 ### 5. Config Files — Extends Standards
 
-For each config file, verify it extends from `@nextnode-solutions/standards`:
+For each config file, verify it extends from `@nextnode-solutions/standards`. The exact extends paths are documented in the `standards` skill (section "Configuration Setup Per Tool"):
 
-| File | Must contain |
-|------|-------------|
-| `oxlint.json` | `"extends"` includes `"@nextnode-solutions/standards/oxlint"` |
-| `oxfmt.json` | `"extends"` includes `"@nextnode-solutions/standards/oxfmt"` |
-| `tsconfig.json` | `"extends"` contains `"@nextnode-solutions/standards/typescript/"` |
-| `commitlint.config.js` | references `@nextnode-solutions/standards/commitlint` |
-| `lint-staged.config.js` | references `@nextnode-solutions/standards/lint-staged` |
+- `oxlint.json` must extend from the oxlint base config
+- `oxfmt.json` must extend from the oxfmt base config
+- `tsconfig.json` must extend from the appropriate TypeScript variant (library/nextjs/astro)
+- `commitlint.config.js` must re-export from the commitlint config
+- `lint-staged.config.js` must re-export from the lint-staged config
 
 If the file exists but does NOT extend from standards: **FAIL**.
 If the file does not exist: **MISSING**.
@@ -251,15 +172,15 @@ Type: <app|package> | Domain: <domain or n/a>
 
 ### Issues to Fix
 
-1. **FAIL** — `package.json` scripts: add `"format:check": "oxfmt --check ."` to scripts
+1. **FAIL** — `package.json` scripts: add the missing script (refer to `standards` skill for expected command)
 2. **WARN** — `Dockerfile`: consider using multi-stage build for smaller image
 
 ### Optional Packages
 
-- `@nextnode-solutions/logger` — not installed (recommended for apps)
+- `@nextnode-solutions/logger` — not installed (recommended for apps, see `logger` skill)
 ```
 
-### Status legend
+### Status Legend
 
 | Status | Meaning |
 |--------|---------|
@@ -275,31 +196,13 @@ Type: <app|package> | Domain: <domain or n/a>
 
 If there are FAIL or MISSING items, **ask the user** if they want Claude to fix them automatically. Group fixes by type:
 
-1. **Install missing dependencies** — single `pnpm add -D` command
-2. **Create missing config files** — generate from templates (see `/nextnode` skill, Full App Compliance Kit)
-3. **Fix existing config files** — add missing `extends` or re-export
-4. **Add missing scripts** — patch `package.json`
+1. **Install missing dependencies** — single `pnpm add -D` command (use versions from the `standards` skill)
+2. **Create missing config files** — generate from the patterns documented in the `standards` skill
+3. **Fix existing config files** — add missing `extends` or re-export (use paths from `standards` skill)
+4. **Add missing scripts** — patch `package.json` (use commands from `standards` skill)
 5. **Set up husky** — init + create hook files
 6. **Create Docker files** — generate `Dockerfile` from template if missing (apps only). Do NOT create `docker-compose.yml` when only a `Dockerfile` exists — the infrastructure auto-generates compose at deploy time
-7. **Create CI workflow** — copy reusable pipeline template
-8. **Create nextnode.toml** — prompt for project name/type/domain, generate using the canonical template from check #1. Minimal app example:
-
-```toml
-[project]
-name = "my-app"
-type = "app"
-domain = "app.nextnode.fr"
-
-[deploy]
-port = 4321
-```
-
-Minimal package example:
-
-```toml
-[project]
-name = "my-package"
-type = "package"
-```
+7. **Create CI workflow** — copy reusable pipeline template (from `nextnode` skill)
+8. **Create nextnode.toml** — prompt for project name/type/domain, generate using the canonical template from the `nextnode` skill
 
 Never auto-fix without asking first.

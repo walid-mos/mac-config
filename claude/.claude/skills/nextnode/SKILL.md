@@ -110,14 +110,14 @@ enabled = true                     # Default: true — set false to skip prod de
 
 ---
 
-## Per-Repo CI Files (3 Workflow Files)
+## Per-Repo CI Files (2 Workflow Files)
 
 **CRITICAL:** The caller workflow MUST declare `permissions` for the reusable workflow to function.
 
-### 1. `.github/workflows/ci.yml` — Main CI pipeline
+### 1. `.github/workflows/deploy-dev.yml` — Dev deploy pipeline
 
 ```yaml
-name: CI
+name: Deploy Dev
 
 on:
   push:
@@ -132,15 +132,14 @@ permissions:
   packages: write
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: deploy-dev-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   pipeline:
     uses: NextNodeSolutions/infrastructure/.github/workflows/pipeline.yml@main
     with:
-      action: ${{ inputs.action || 'ci' }}
-      environment: ${{ inputs.environment || 'dev' }}
+      environment: dev
     secrets: inherit
 ```
 
@@ -166,41 +165,12 @@ jobs:
     secrets: inherit
 ```
 
-### 3. `.github/workflows/destroy.yml` — Manual environment destroy
-
-```yaml
-name: Destroy Environment
-
-on:
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: "Environment to destroy"
-        required: true
-        type: choice
-        options:
-          - dev
-
-permissions:
-  contents: read
-  packages: write
-
-jobs:
-  destroy:
-    uses: NextNodeSolutions/infrastructure/.github/workflows/pipeline.yml@main
-    with:
-      action: destroy
-      environment: ${{ inputs.environment }}
-    secrets: inherit
-```
-
 ### How Workflows Map to Pipeline Actions
 
 | Workflow | `action` | `environment` | Trigger |
 |----------|----------|---------------|---------|
-| `ci.yml` | `ci` (default) | `dev` (default) | push/PR/manual |
+| `deploy-dev.yml` | `ci` (default) | `dev` (default) | push/PR/manual |
 | `deploy-prod.yml` | `deploy-prod` | `prod` | manual only |
-| `destroy.yml` | `destroy` | user picks (dev) | manual only |
 
 ---
 

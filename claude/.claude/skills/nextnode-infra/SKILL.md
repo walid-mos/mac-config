@@ -9,6 +9,10 @@ autoload-dirs: []
 
 > **`nextnode.toml` configuration** is documented in the `nextnode` skill (auto-loaded on all NextNode repos). This skill focuses on infrastructure operations.
 
+## SSH Access
+
+> **MANDATORY:** All SSH connections to NextNode infrastructure MUST use the key `~/.ssh/nextnode-ci`. Never use the default SSH key or any other identity file.
+
 ## Architecture Overview
 
 NextNode uses a **config-as-code driven, zero-manual-UI** infrastructure:

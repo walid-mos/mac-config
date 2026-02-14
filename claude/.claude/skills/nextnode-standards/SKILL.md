@@ -36,8 +36,8 @@ Read the following files from the project root (in parallel for speed). If a fil
 |------|-------|
 | `package.json` | dependencies, devDependencies, scripts, packageManager |
 | `nextnode.toml` | `[project]` section (name, type, domain) |
-| `docker-compose.yml` | service structure (apps only) |
 | `Dockerfile` | multi-stage build, non-root user (apps only) |
+| `docker-compose.yml` | service structure (apps only, optional if Dockerfile exists) |
 | `.github/workflows/ci.yml` | reusable pipeline reference |
 | `oxlint.json` | extends from `@nextnode-solutions/standards/oxlint` |
 | `oxfmt.json` | extends from `@nextnode-solutions/standards/oxfmt` |
@@ -55,9 +55,76 @@ Read the following files from the project root (in parallel for speed). If a fil
 
 ### 1. `nextnode.toml`
 
+**Canonical template** (reference for what a complete nextnode.toml looks like):
+
+```toml
+[project]
+name = "my-app"                    # REQUIRED — no default
+type = "app"                       # REQUIRED — "app" | "package" | "monitoring"
+description = "Description"        # Optional
+domain = "app.nextnode.fr"         # App-only — required when type = "app"
+redirect_domains = ["www.app.fr"]  # Optional — domains that 301→canonical (prod only, auto-adds www)
+
+[scripts]                          # Optional — defaults shown
+lint = "lint"
+test = "test"
+build = "build"
+
+# === Package-only ===
+[package]
+scope = "@nextnode"
+access = "public"                  # "public" | "restricted"
+canary_on_label = true
+
+# === App-only: Server ===
+[server]                           # No [server] = shared VPS (Tier 1)
+type = "cpx22"                     # Hetzner server type (default: cpx22)
+location = "nbg1"                  # Hetzner datacenter (default: nbg1)
+internal = false                   # true = grey cloud / Tailscale-only
+
+[volume]
+enabled = false                    # Default: false
+size = 20                          # GB
+
+[deploy]
+port = 4321                        # Container port (auto-injected as APP_PORT)
+file = "docker-compose.yml"        # Explicit compose path (auto-detected if omitted)
+zero_downtime = false              # Blue-green zero-downtime deployment
+
+[health]
+type = "http"                      # "http" | "tcp"
+path = "/health"                   # HTTP health check path
+interval = "30s"
+timeout = "10s"
+retries = 3
+
+[sablier]                          # Idle container auto-stop (non-prod only)
+enabled = true                     # Default: true
+session_duration = "15m"           # Idle timeout before stopping containers
+display_name = "My App"            # Display name on waiting page (default: project.name)
+
+[environment.dev]
+enabled = true                     # Default: true — set false to skip dev deployment
+
+[environment.prod]
+enabled = true                     # Default: true — set false to skip prod deployment
+
+# Per-env server overrides (Tier 3/4)
+# [environment.dev.server]
+# type = "cx22"
+# [environment.prod.server]
+# type = "cpx22"
+```
+
+**Checks:**
+
 - **PASS**: file exists with `[project]` containing `name` and `type`
-- **PASS**: if `type = "app"`, `domain` is set (or project is internal-only)
+- **PASS**: if `type = "app"`, `domain` is set (or project is internal-only via `[server].internal = true`)
+- **PASS**: all present sections use valid keys (no unknown keys)
 - **FAIL**: file exists but missing `name` or `type`
+- **FAIL**: `[health].endpoint` used instead of `[health].path` (renamed)
+- **WARN**: `[deploy].zero_downtime = true` without health check configured
+- **WARN**: `[sablier].enabled = true` (default) but app is internal — Sablier only works with public Caddy
 - **MISSING**: file does not exist
 
 ### 2. `package.json` — Core Dependencies
@@ -137,14 +204,15 @@ If the file does not exist: **MISSING**.
 
 Skip these checks if `type = "package"` in `nextnode.toml`.
 
-**`docker-compose.yml`:**
-- **PASS**: file exists with a `services` block
-- **MISSING**: file does not exist
-
 **`Dockerfile`:**
 - **PASS**: file exists with multi-stage build (`FROM ... AS builder` + `FROM ... AS runtime`)
 - **WARN**: file exists but no multi-stage build
-- **MISSING**: file does not exist
+- **MISSING**: file does not exist — **FAIL** if `docker-compose.yml` also missing (no deploy strategy)
+
+**`docker-compose.yml`:**
+- **PASS**: file exists with a `services` block
+- **SKIP**: file does not exist but `Dockerfile` exists — infrastructure auto-generates compose at deploy time
+- **FAIL**: neither `docker-compose.yml` nor `Dockerfile` exist (no deploy strategy at all)
 
 ### 9. No Barrel Exports
 
@@ -177,8 +245,8 @@ Type: <app|package> | Domain: <domain or n/a>
 | 10 | package.json scripts | FAIL | Missing: format:check |
 | 11 | pnpm enforced | PASS | No package-lock.json or yarn.lock |
 | 12 | CI pipeline | PASS | Uses reusable workflow |
-| 13 | docker-compose.yml | PASS | Standard service structure |
-| 14 | Dockerfile | WARN | No multi-stage build |
+| 13 | Dockerfile | WARN | No multi-stage build |
+| 14 | docker-compose.yml | SKIP | Not needed — Dockerfile present, infra auto-generates compose |
 | 15 | Barrel exports | PASS | None found |
 
 ### Issues to Fix
@@ -212,8 +280,26 @@ If there are FAIL or MISSING items, **ask the user** if they want Claude to fix 
 3. **Fix existing config files** — add missing `extends` or re-export
 4. **Add missing scripts** — patch `package.json`
 5. **Set up husky** — init + create hook files
-6. **Create Docker files** — generate from templates (apps only)
+6. **Create Docker files** — generate `Dockerfile` from template if missing (apps only). Do NOT create `docker-compose.yml` when only a `Dockerfile` exists — the infrastructure auto-generates compose at deploy time
 7. **Create CI workflow** — copy reusable pipeline template
-8. **Create nextnode.toml** — prompt for project name/domain, generate minimal config
+8. **Create nextnode.toml** — prompt for project name/type/domain, generate using the canonical template from check #1. Minimal app example:
+
+```toml
+[project]
+name = "my-app"
+type = "app"
+domain = "app.nextnode.fr"
+
+[deploy]
+port = 4321
+```
+
+Minimal package example:
+
+```toml
+[project]
+name = "my-package"
+type = "package"
+```
 
 Never auto-fix without asking first.

@@ -29,12 +29,13 @@ Every NextNode/SaaS repo has a `nextnode.toml` at its root. This file drives ALL
 
 ```toml
 [project]
-name = "my-app"                # Required — used for naming everywhere
-type = "package" | "app"       # Required — determines pipeline flow
-domain = "app.nextnode.fr"     # App-only — subdomain for the app
-description = "Description"    # Optional
+name = "my-app"                    # REQUIRED — no default. Used for naming everywhere.
+type = "app"                       # REQUIRED — "app" | "package" | "monitoring"
+domain = "app.nextnode.fr"         # App-only — subdomain for the app
+description = "Description"        # Optional
+redirect_domains = ["www.app.fr"]  # Optional — domains that 301→canonical (prod only, auto-adds www)
 
-[scripts]                      # Optional — defaults to pnpm lint/test/build
+[scripts]                          # Optional — defaults to pnpm lint/test/build
 lint = "lint"
 test = "test"
 build = "build"
@@ -42,21 +43,21 @@ build = "build"
 # === Package-only ===
 [package]
 scope = "@nextnode-solutions"
-access = "public" | "restricted"
-canary_on_label = true         # Publish canary on PR label "canary"
+access = "public"                  # "public" | "restricted"
+canary_on_label = true             # Publish canary on PR label "canary"
 
 # === App-only: Server (4 tiers) ===
 # No [server] = shared dev + shared prod VPS (Tier 1)
-[server]                       # Tier 2: dedicated VPS (same for dev + prod)
-type = "cpx21"                 # Hetzner server type (default: cpx22)
-location = "nbg1"              # Hetzner datacenter (default: nbg1)
-internal = true                # true = grey cloud (Tailscale), false = orange cloud (public)
+[server]                           # Tier 2: dedicated VPS (same for dev + prod)
+type = "cpx22"                     # Hetzner server type (default: cpx22)
+location = "nbg1"                  # Hetzner datacenter (default: nbg1)
+internal = false                   # true = grey cloud (Tailscale), false = orange cloud (public)
 
 # Tier 3: per-env server overrides
 [environment.dev.server]
-type = "cx22"                  # Smaller dev server
+type = "cx22"                      # Smaller dev server
 [environment.prod.server]
-type = "cpx22"                 # Bigger prod server
+type = "cpx22"                     # Bigger prod server
 
 # Tier 4: fully custom per-env (no top-level [server])
 # [environment.dev.server]
@@ -64,36 +65,32 @@ type = "cpx22"                 # Bigger prod server
 # type = "cx22"
 # location = "nbg1"
 
-[volume]                       # Optional — auto-provisions Hetzner block storage
-enabled = true
-size = 20                      # GB
+[volume]                           # Optional — default: disabled
+enabled = false
+size = 20                          # GB
 
 [deploy]
-strategy = "docker-compose"
-file = "docker-compose.yml"
-dockerfile = "./Dockerfile"
-context = "./"
-port = 4321                    # App port (auto-injected as APP_PORT in .env)
+port = 4321                        # Container port (auto-injected as APP_PORT in .env)
+file = "docker-compose.yml"        # Explicit compose path (auto-detected if omitted)
+zero_downtime = false              # Blue-green zero-downtime deployment
 
-[health]                       # Optional — health check config
-type = "http"                  # "http" | "tcp" | "command"
-endpoint = "/health"           # For http type
-port = 8080                    # For tcp type
+[health]                           # Optional — health check config
+type = "http"                      # "http" | "tcp"
+path = "/health"                   # HTTP health check path
 interval = "30s"
 timeout = "10s"
 retries = 3
 
+[sablier]                          # Idle container auto-stop (non-prod only)
+enabled = true                     # Default: true
+session_duration = "15m"           # Idle timeout before stopping containers
+display_name = "My App"            # Display name on waiting page (default: project.name)
+
 [environment.dev]
-auto_deploy = true
-pr_deploys = true
+enabled = true                     # Default: true — set false to skip dev deployment
 
 [environment.prod]
-auto_deploy = false
-approvers = ["walid"]
-
-[rollback]
-enabled = true
-keep_versions = 5
+enabled = true                     # Default: true — set false to skip prod deployment
 ```
 
 ### .env Injection

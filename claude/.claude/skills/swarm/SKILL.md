@@ -25,13 +25,14 @@ Examples:
 
 ## Step 1 — Gather Context & Ensure Specs
 
-Perform 1a through 1d in parallel, then run 1e (spec qualification) sequentially.
+Perform 1a through 1d in parallel. **Step 1 is READ-ONLY** — no files are created or modified. All file mutations happen after the worktree is created (Step 2).
 
 ### 1a. Spec Detection
 
 1. Glob `docs/specs/*.spec.md`
 2. Read any matching specs that relate to the task description
 3. Preliminary classification: `found` or `not-found`
+4. If `found`, store the spec content in memory for later qualification (Step 2d)
 
 ### 1b. Tech Stack Detection
 
@@ -78,51 +79,7 @@ Run `git branch --show-current` and store the result as `baseBranch`. This is th
 
 Also store `pwd` as `projectDir`. This is needed to return to the original directory after worktree cleanup in Step 5c.
 
-### 1e. Spec Qualification (sequential — depends on 1a)
-
-This step determines the `NormalizedSpec` that will be passed to the Lead Agent. **The Lead Agent must receive a complete, actionable spec.** The `/interview` skill is the mechanism to ensure this.
-
-#### Case 1: No spec found (`not-found` from 1a)
-
-**`/interview` is MANDATORY.** Invoke it immediately:
-
-```
-Skill: interview
-Args: <task description>
-```
-
-Wait for the interview to complete. It will produce `docs/specs/<feature-name>.spec.md`. Read the produced file.
-
-Result: `NormalizedSpec = { type: "full-spec", content: <file contents>, path: <file path> }`
-
-#### Case 2: Spec found (`found` from 1a)
-
-Read the spec and assess its completeness against these criteria:
-
-1. **Has Functional Requirements** — at least one `FR-*` or equivalent numbered requirement
-2. **Has Data Model** — entities, fields, types described (if applicable to the task)
-3. **Has Acceptance Criteria** — clear, testable conditions for "done"
-4. **No Open Questions** — the `## Open Questions` section is empty or absent
-5. **Covers the task scope** — the spec FRs actually address the task description (not a different feature)
-
-**If ALL criteria pass**: the spec is complete.
-
-Result: `NormalizedSpec = { type: "full-spec", content: <file contents>, path: <file path> }`
-
-**If ANY criteria fail**: gaps exist. Invoke `/interview` in **deepen** mode to fill them:
-
-```
-Skill: interview
-Args: <task description> — deepening existing spec at <spec path>
-```
-
-The interview will enrich the existing spec via Edit. Read the updated file afterward.
-
-Result: `NormalizedSpec = { type: "full-spec", content: <updated contents>, path: <file path> }`
-
-After obtaining the `NormalizedSpec` (in both Case 1 and Case 2), store the spec path as `specPath` for later use. Do NOT copy or modify files yet — that happens after the worktree is created (Step 2d).
-
-> **Note**: After Step 1e, the `NormalizedSpec` should ALWAYS be `full-spec`. The `partial-spec` and `no-spec` types exist in the schema for edge cases (user explicitly skips interview), but the default flow always produces a full spec.
+> **Note**: Spec qualification (interview, deepening) happens in Step 2d — after the worktree is created. Step 1 only detects and reads specs; it never creates or modifies files.
 
 ## Step 2 — Create Worktree
 
@@ -153,18 +110,66 @@ If the worktree already exists (resuming a session), `-y` auto-navigates to it.
 
 Store the worktree path (`pwd` after `wt new`) as `worktreePath` for cleanup in Step 5.
 
-### 2d. Prepare spec files and initial commit
+### 2d. Spec Qualification (in the worktree — depends on 1a)
 
-Now that we're on the feature branch, prepare the spec files and commit them:
+**All file creation and modification happens here, inside the worktree.** This ensures no files are left untracked on the base branch.
+
+This step determines the `NormalizedSpec` that will be passed to the Lead Agent. **The Lead Agent must receive a complete, actionable spec.** The `/interview` skill is the mechanism to ensure this.
+
+#### Case 1: No spec found (`not-found` from 1a)
+
+**`/interview` is MANDATORY.** Invoke it now (inside the worktree):
+
+```
+Skill: interview
+Args: <task description>
+```
+
+Wait for the interview to complete. It will produce `docs/specs/<feature-name>.spec.md`. Read the produced file.
+
+Result: `NormalizedSpec = { type: "full-spec", content: <file contents>, path: <file path> }`
+
+#### Case 2: Spec found (`found` from 1a)
+
+The spec file already exists in the worktree (inherited from the base branch). Assess its completeness against these criteria:
+
+1. **Has Functional Requirements** — at least one `FR-*` or equivalent numbered requirement
+2. **Has Data Model** — entities, fields, types described (if applicable to the task)
+3. **Has Acceptance Criteria** — clear, testable conditions for "done"
+4. **No Open Questions** — the `## Open Questions` section is empty or absent
+5. **Covers the task scope** — the spec FRs actually address the task description (not a different feature)
+
+**If ALL criteria pass**: the spec is complete.
+
+Result: `NormalizedSpec = { type: "full-spec", content: <file contents>, path: <file path> }`
+
+**If ANY criteria fail**: gaps exist. Invoke `/interview` in **deepen** mode to fill them:
+
+```
+Skill: interview
+Args: <task description> — deepening existing spec at <spec path>
+```
+
+The interview will enrich the existing spec via Edit. Read the updated file afterward.
+
+Result: `NormalizedSpec = { type: "full-spec", content: <updated contents>, path: <file path> }`
+
+After obtaining the `NormalizedSpec`, store the spec path as `specPath`.
+
+> **Note**: After Step 2d, the `NormalizedSpec` should ALWAYS be `full-spec`. The `partial-spec` and `no-spec` types exist in the schema for edge cases (user explicitly skips interview), but the default flow always produces a full spec.
+
+### 2e. Prepare spec files and initial commit
+
+Now that the spec is qualified and we're on the feature branch, prepare the spec files and commit them:
 
 1. Create `docs/swarm/<session-name>/` directory (via `mkdir -p`)
 2. Copy the spec file to `docs/swarm/<session-name>/spec.md`
-3. Prepend a processing banner to the **original** spec file using Edit:
+3. Prepend a processing banner to the spec file using Edit:
    ```
    <!-- PROCESSED BY SWARM: <session-name> — <ISO-8601 timestamp> -->
    ```
 4. Stage and commit the spec files:
-   - Stage the original spec file (`specPath`) and the session copy (`docs/swarm/<session-name>/spec.md`)
+   - Stage the spec file (`specPath`) and the session copy (`docs/swarm/<session-name>/spec.md`)
    - Commit with format:
    ```
    docs(<session-name>): add spec

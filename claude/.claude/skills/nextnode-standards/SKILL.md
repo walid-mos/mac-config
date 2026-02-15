@@ -40,8 +40,8 @@ Read the following files from the project root (in parallel for speed). If a fil
 | `nextnode.toml` | `[project]` section (name, type, domain) |
 | `Dockerfile` | multi-stage build, non-root user (apps only) |
 | `docker-compose.yml` | service structure (apps only, optional if Dockerfile exists) |
-| `.github/workflows/deploy-dev.yml` | reusable pipeline reference (deploy dev) |
-| `.github/workflows/deploy-prod.yml` | reusable pipeline reference (deploy prod) |
+| `.github/workflows/deploy-dev.yml` | reusable pipeline reference (deploy dev) — **conditional on `nextnode.toml`** |
+| `.github/workflows/deploy-prod.yml` | reusable pipeline reference (deploy prod) — **conditional on `nextnode.toml`** |
 | `oxlint.json` | extends from standards (refer to `standards` skill, section "oxlint") |
 | `oxfmt.json` | extends from standards (refer to `standards` skill, section "oxfmt") |
 | `tsconfig.json` | extends from standards (refer to `standards` skill, section "TypeScript") |
@@ -118,14 +118,18 @@ If the file does not exist: **MISSING**.
 
 ### 7. CI Pipelines (`.github/workflows/`)
 
-Check both workflow files:
+**First, read `nextnode.toml`** to determine if the dev environment is enabled. The `[environment.dev]` section controls whether `deploy-dev.yml` is required:
+
+- `[environment.dev].enabled = true` (default if section absent) → `deploy-dev.yml` is **required**
+- `[environment.dev].enabled = false` → `deploy-dev.yml` is **not required** → **SKIP**
 
 **`deploy-dev.yml`**:
 - **PASS**: file exists and contains `NextNodeSolutions/infrastructure/.github/workflows/pipeline.yml@main`
 - **FAIL**: file exists but uses custom logic instead of the reusable pipeline
 - **MISSING**: file does not exist
+- **SKIP**: `[environment.dev].enabled = false` in `nextnode.toml` — no dev deployment configured
 
-**`deploy-prod.yml`**:
+**`deploy-prod.yml`** (always required):
 - **PASS**: file exists and contains `NextNodeSolutions/infrastructure/.github/workflows/pipeline.yml@main` with `action: deploy-prod`
 - **FAIL**: file exists but uses custom logic instead of the reusable pipeline
 - **MISSING**: file does not exist
@@ -175,7 +179,7 @@ Type: <app|package> | Domain: <domain or n/a>
 | 9 | Husky hooks | PASS | pre-commit + commit-msg |
 | 10 | package.json scripts | FAIL | Missing: format:check |
 | 11 | pnpm enforced | PASS | No package-lock.json or yarn.lock |
-| 12 | CI pipeline (deploy-dev.yml) | PASS | Uses reusable workflow |
+| 12 | CI pipeline (deploy-dev.yml) | SKIP | environment.dev.enabled = false |
 | 13 | CI pipeline (deploy-prod.yml) | PASS | Uses reusable workflow |
 | 14 | Dockerfile | WARN | No multi-stage build |
 | 15 | docker-compose.yml | SKIP | Not needed — Dockerfile present, infra auto-generates compose |
@@ -213,7 +217,7 @@ If there are FAIL or MISSING items, **ask the user** if they want Claude to fix 
 4. **Add missing scripts** — patch `package.json` (use commands from `standards` skill)
 5. **Set up husky** — init + create hook files
 6. **Create Docker files** — generate `Dockerfile` from template if missing (apps only). Do NOT create `docker-compose.yml` when only a `Dockerfile` exists — the infrastructure auto-generates compose at deploy time. **Important:** never declare build-only variables (`HUSKY`, `CI`) as `ENV` — inline them in `RUN` commands (e.g., `RUN HUSKY=0 CI=true pnpm install ...`) so the infra CLI doesn't treat them as required runtime secrets
-7. **Create CI workflow** — copy reusable pipeline template (from `nextnode` skill)
+7. **Create CI workflow** — copy reusable pipeline template (from `nextnode` skill). Skip `deploy-dev.yml` if `[environment.dev].enabled = false` in `nextnode.toml`
 8. **Create nextnode.toml** — prompt for project name/type/domain, generate using the canonical template from the `nextnode` skill
 
 Never auto-fix without asking first.

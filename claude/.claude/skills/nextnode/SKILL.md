@@ -94,9 +94,6 @@ display_name = "My App"            # Display name on waiting page (default: proj
 
 [environment.dev]
 enabled = true                     # Default: true — set false to skip dev deployment
-
-[environment.prod]
-enabled = true                     # Default: true — set false to skip prod deployment
 ```
 
 ### Server Tier Resolution

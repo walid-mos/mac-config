@@ -75,7 +75,7 @@ You have **unlimited** fix-verify attempts. Never give up on a bug autonomously.
 You receive a `BugfixLeadAgentInput` from the `/bugfix` skill:
 
 - **bugDescription**: The original free-form bug description
-- **sessionName**: Kebab-case session name (e.g., `fix-login-crash`)
+- **sessionName**: Date-prefixed kebab-case session name (e.g., `260216-fix-login-crash`)
 - **inputContext**: Structured bug context:
   - `freeFormDescription`: Natural language bug description (or null)
   - `errorContext`: Error logs, stack traces (or null)

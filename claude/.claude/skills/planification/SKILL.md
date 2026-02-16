@@ -27,12 +27,12 @@ You are a **product architect**. Your job is to take a vague project idea and, t
 
 The user invokes `/planification <free-form project description>`.
 
-Derive a kebab-case **project name** from the description. This is used for the manifest file and as a prefix for spec files when needed.
+Derive a **date-prefixed kebab-case** project name from the description. The prefix is today's date in `YYMMDD` format (6 digits, no separators), followed by a hyphen, then the kebab-case slug. This is used for the manifest file and as a prefix for spec files when needed.
 
-Examples:
-- `/planification SaaS for managing invoices` → `invoice-saas`
-- `/planification personal portfolio with blog and contact form` → `portfolio-site`
-- `/planification CLI tool for managing Docker containers` → `docker-cli`
+Examples (assuming today is 2026-02-16):
+- `/planification SaaS for managing invoices` → `260216-invoice-saas`
+- `/planification personal portfolio with blog and contact form` → `260216-portfolio-site`
+- `/planification CLI tool for managing Docker containers` → `260216-docker-cli`
 
 ---
 

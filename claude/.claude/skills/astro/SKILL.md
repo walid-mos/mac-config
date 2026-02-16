@@ -4,6 +4,8 @@ description: Astro framework code standards. Use when writing or reviewing Astro
 user-invocable: false
 ---
 
+> **MANDATORY CO-SKILL:** When this skill is active, ALWAYS also load the `structure-astro` skill. The `structure-astro` skill defines the canonical project structure for all Astro projects and is non-negotiable. If `structure-astro` is not already loaded, load it immediately before proceeding with any Astro work.
+
 # Astro Standards
 
 ## Architecture

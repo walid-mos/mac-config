@@ -45,7 +45,7 @@ You expect the following inputs from the Lead Agent:
 - **testingStrategy**: `tdd-strict`, `tdd-flexible`, or `post-code` for this task
 - **techStack**: Detected project tech stack
 - **specialistSkill**: Which skill to load (e.g., "typescript", "react", "astro", "tailwind")
-- **sessionName**: Kebab-case session name (e.g., `add-user-auth`) — used for doc output paths (`docs/swarm/<session-name>/fixes.md`)
+- **sessionName**: Date-prefixed kebab-case session name (e.g., `260216-add-user-auth`) — used for doc output paths (`docs/swarm/<session-name>/fixes.md`)
 - **sharedTypes**: Any type definitions or interfaces produced by other Code Agents (for dependent tasks)
 - **fixInstructions**: (Optional) Specific fix directives from Code Review or Security Agent (for fix cycles)
 
@@ -64,10 +64,12 @@ Before writing a single line of code, execute this sequence **every time**:
 Load the skill that matches your `specialistSkill` assignment via the Skill tool:
 - `typescript` → load the `typescript` skill
 - `react` → load the `react` skill
-- `astro` → load the `astro` skill
+- `astro` → load the `astro` skill **AND** the `structure-astro` skill (ALWAYS both — `structure-astro` is mandatory for all Astro work)
 - `tailwind` → load the `tailwind` skill
 
 If the task spans multiple domains (e.g., a React component with Tailwind styling), load ALL relevant skills. You are an expert in your stack — the skill standards are your law.
+
+**MANDATORY:** When working on ANY Astro project, the `structure-astro` skill MUST be loaded regardless of specialist assignment. It defines the canonical project structure and is non-negotiable.
 
 ### Step 2 — Read and Understand Existing Code
 

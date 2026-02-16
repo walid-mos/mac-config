@@ -13,7 +13,7 @@
 ```typescript
 interface LeadAgentInput {
   taskDescription: string               // Original free-form task description
-  sessionName: string                   // Kebab-case derived name (e.g., "add-user-auth")
+  sessionName: string                   // Date-prefixed kebab-case name (e.g., "260216-add-user-auth")
   normalizedSpec: NormalizedSpec
   techStack: TechStack
   swarmConfig: SwarmConfig
@@ -133,7 +133,7 @@ interface SharedAsset {
 ```typescript
 interface CodeAgentInput {
   taskItem: TaskItem                    // From PlanificationOutput.taskList — see shared.md
-  sessionName: string                   // Kebab-case session name — for doc output paths (docs/swarm/<session>/fixes.md)
+  sessionName: string                   // Date-prefixed kebab-case name — for doc output paths (docs/swarm/<session>/fixes.md)
   testFiles: string[]                   // Paths from TestAgentOutput
   testingStrategy: TestingStrategy      // From shared.md
   techStack: TechStack

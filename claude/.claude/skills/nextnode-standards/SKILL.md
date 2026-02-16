@@ -141,7 +141,7 @@ Skip these checks if `type = "package"` in `nextnode.toml`.
 **`Dockerfile`:**
 - **PASS**: file exists with multi-stage build (`FROM ... AS builder` + `FROM ... AS runtime`)
 - **WARN**: file exists but no multi-stage build
-- **WARN**: build-only variables (`HUSKY`, `CI`) declared as `ENV` — the infra CLI's `parseDockerfileEnv()` treats all `ENV` declarations as required runtime secrets. Inline them in `RUN` commands instead (e.g., `RUN HUSKY=0 CI=true pnpm install ...`)
+- **WARN**: build-only variables (`HUSKY`, `CI`) declared as `ENV` or inlined in `RUN` (e.g., `RUN HUSKY=0 pnpm install`) — use `--ignore-scripts` on the relevant `pnpm install` instead
 - **MISSING**: file does not exist — **FAIL** if `docker-compose.yml` also missing (no deploy strategy)
 
 **`docker-compose.yml`:**
@@ -216,7 +216,7 @@ If there are FAIL or MISSING items, **ask the user** if they want Claude to fix 
 3. **Fix existing config files** — add missing `extends` or re-export (use paths from `standards` skill)
 4. **Add missing scripts** — patch `package.json` (use commands from `standards` skill)
 5. **Set up husky** — init + create hook files
-6. **Create Docker files** — generate `Dockerfile` from template if missing (apps only). Do NOT create `docker-compose.yml` when only a `Dockerfile` exists — the infrastructure auto-generates compose at deploy time. **Important:** never declare build-only variables (`HUSKY`, `CI`) as `ENV` — inline them in `RUN` commands (e.g., `RUN HUSKY=0 CI=true pnpm install ...`) so the infra CLI doesn't treat them as required runtime secrets
+6. **Create Docker files** — generate `Dockerfile` from template if missing (apps only). Do NOT create `docker-compose.yml` when only a `Dockerfile` exists — the infrastructure auto-generates compose at deploy time. **Important:** never declare build-only variables (`HUSKY`, `CI`) as `ENV` — and do NOT use inline hacks like `HUSKY=0` either. Use `pnpm install --ignore-scripts` to skip all lifecycle scripts (prepare, postinstall, etc.) in Docker builds — this is the correct way to prevent `husky: not found` errors in production installs
 7. **Create CI workflow** — copy reusable pipeline template (from `nextnode` skill). Skip `deploy-dev.yml` if `[environment.dev].enabled = false` in `nextnode.toml`
 8. **Create nextnode.toml** — prompt for project name/type/domain, generate using the canonical template from the `nextnode` skill
 

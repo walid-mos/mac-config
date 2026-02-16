@@ -13,11 +13,11 @@ Interview the user in depth about their feature or task, then produce a detailed
 
 The user invokes `/interview <free-form prompt>`. There is no `specs` or `plan` prefix — the skill determines the output type (spec vs plan) organically during the interview, or asks the user if ambiguous.
 
-Derive a kebab-case feature name from the prompt for the output filename.
+Derive a **date-prefixed kebab-case** feature name from the prompt for the output filename. The prefix is today's date in `YYMMDD` format (6 digits, no separators), followed by a hyphen, then the kebab-case slug.
 
-Examples:
-- `/interview I want a skill that loops with multiple agents` → `multi-agent-loop`
-- `/interview authentication system with OAuth and magic links` → `auth-system`
+Examples (assuming today is 2026-02-16):
+- `/interview I want a skill that loops with multiple agents` → `260216-multi-agent-loop`
+- `/interview authentication system with OAuth and magic links` → `260216-auth-system`
 
 ## Update Mode Detection
 

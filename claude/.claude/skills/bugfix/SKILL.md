@@ -38,12 +38,12 @@ Produces:
 - `errorContext`: TypeError stack trace
 - `githubIssue`: { url, title, body, labels, comments } (fetched via gh CLI)
 
-Derive a kebab-case session name from the bug description:
+Derive a **date-prefixed kebab-case** session name from the bug description. The prefix is today's date in `YYMMDD` format (6 digits, no separators), followed by a hyphen, then the kebab-case slug.
 
-Examples:
-- `/bugfix login page crashes on submit` → `fix-login-crash`
-- `/bugfix https://github.com/acme/app/issues/123` → `fix-issue-123`
-- `/bugfix TypeError in UserProfile component` → `fix-userprofile-typeerror`
+Examples (assuming today is 2026-02-16):
+- `/bugfix login page crashes on submit` → `260216-fix-login-crash`
+- `/bugfix https://github.com/acme/app/issues/123` → `260216-fix-issue-123`
+- `/bugfix TypeError in UserProfile component` → `260216-fix-userprofile-typeerror`
 
 ## Step 1 — Gather Context
 

@@ -2,6 +2,7 @@
 
 # Claude user config (stays in ~/, not in Stow)
 .claude.json
+.claude
 
 # Unignore claude/.claude/ stow package (overrides global .claude/ ignore)
 !claude/.claude/

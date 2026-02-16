@@ -76,7 +76,7 @@ You receive a `LeadAgentInput` from the `/swarm` skill. Full type definition in 
 
 Key fields:
 - **taskDescription**: The original free-form task description
-- **sessionName**: Kebab-case session name (e.g., `add-user-auth`)
+- **sessionName**: Date-prefixed kebab-case session name (e.g., `260216-add-user-auth`)
 - **normalizedSpec**: `full-spec` (complete spec found), `partial-spec` (gaps identified), or `no-spec` (raw description only)
 - **techStack**: Auto-detected languages, frameworks, test runner, package manager
 - **swarmConfig**: Resolved `.swarm.json` config merged with defaults

@@ -1,6 +1,6 @@
 ---
 name: structure-astro
-description: Astro project structure standard for NextNode projects. Auto-load when working on an Astro-based NextNode or client project — enforces domain-driven component organization, shared/page separation, and lib layer conventions.
+description: "MANDATORY target structure for ALL Astro projects. Auto-load when working on ANY Astro-based project — enforces domain-driven component organization, shared/page separation, and lib layer conventions. This skill is ALWAYS loaded alongside the astro skill."
 user-invocable: false
 autoload-dirs:
   - /Users/walid/Development/nextnode
@@ -10,7 +10,7 @@ autoload-dirs:
 
 # Astro Project Structure Standard
 
-Canonical `src/` layout for all NextNode Astro projects. Every Astro project MUST follow this structure.
+Canonical `src/` layout for **ALL** Astro projects. Every Astro project MUST follow this structure — no exceptions, regardless of project origin (NextNode, client, personal).
 
 ## Core Principle
 

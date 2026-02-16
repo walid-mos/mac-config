@@ -16,12 +16,12 @@ This skill is a thin launcher. It prepares the context, spawns the **Lead Agent*
 
 The user invokes `/swarm <free-form task description>`.
 
-Derive a kebab-case session name from the description for doc headers, git branch naming, and commit messages.
+Derive a **date-prefixed kebab-case** session name from the description for doc headers, git branch naming, and commit messages. The prefix is today's date in `YYMMDD` format (6 digits, no separators), followed by a hyphen, then the kebab-case slug.
 
-Examples:
-- `/swarm add user authentication with OAuth` → `add-user-auth`
-- `/swarm refactor the payment module` → `refactor-payment-module`
-- `/swarm fix broken dark mode toggle` → `fix-dark-mode-toggle`
+Examples (assuming today is 2026-02-16):
+- `/swarm add user authentication with OAuth` → `260216-add-user-auth`
+- `/swarm refactor the payment module` → `260216-refactor-payment-module`
+- `/swarm fix broken dark mode toggle` → `260216-fix-dark-mode-toggle`
 
 ## Step 1 — Gather Context & Ensure Specs
 

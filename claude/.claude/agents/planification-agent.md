@@ -28,7 +28,7 @@ The Lead Agent has **global vision** across all iterations. You have **deep visi
 
 You expect the following inputs from the Lead Agent:
 - **taskDescription**: The original user task description
-- **sessionName**: Kebab-case session name (for logging)
+- **sessionName**: Date-prefixed kebab-case session name (for logging)
 - **specItems**: The specific spec items / FRs assigned to this iteration
 - **existingSpecs**: Full content of any matching spec files (or null)
 - **specGaps**: Identified gaps in spec coverage

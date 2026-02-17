@@ -12,6 +12,10 @@ This skill is a thin launcher. It prepares the context, spawns the **Lead Agent*
 
 **You do NOT orchestrate the work yourself.** You prepare inputs, spawn the Lead Agent, and handle post-completion actions.
 
+## CRITICAL — NEVER STOP MID-FLOW
+
+`/swarm` is an end-to-end pipeline: interview → spec → worktree → Lead Agent → PR. **You MUST execute Steps 1 through 5 in a single invocation.** If `/interview` runs in Step 2d, that is NOT the end — it is the beginning. The moment the interview produces a spec file, you MUST continue to Step 2e (commit spec), Step 3 (spawn Lead Agent), Step 4 (handle result), and Step 5 (create PR). Stopping after the interview to "let the user review" or "summarize what was gathered" is a critical failure.
+
 ## Argument Parsing
 
 The user invokes `/swarm <free-form task description>`.
@@ -146,6 +150,8 @@ Wait for the interview to complete. It will produce `docs/specs/<feature-name>.s
 
 Result: `NormalizedSpec = { type: "full-spec", content: <file contents>, path: <file path> }`
 
+**CRITICAL: The interview completing does NOT mean /swarm is done. You MUST immediately continue to Step 2e, then Step 3, then Steps 4-5. No pausing, no summarizing, no asking the user if they want to proceed.**
+
 #### Case 2: Spec found (`found` from 1a)
 
 The spec file already exists in the worktree (inherited from the base branch). Assess its completeness against these criteria:
@@ -174,6 +180,8 @@ Result: `NormalizedSpec = { type: "full-spec", content: <updated contents>, path
 After obtaining the `NormalizedSpec`, store the spec path as `specPath`.
 
 > **Note**: After Step 2d, the `NormalizedSpec` should ALWAYS be `full-spec`. The `partial-spec` and `no-spec` types exist in the schema for edge cases (user explicitly skips interview), but the default flow always produces a full spec.
+
+**NOW CONTINUE IMMEDIATELY TO STEP 2e.** Do not stop. Do not summarize the spec to the user. Do not ask for confirmation. The spec was produced by the interview — it is ready. Proceed.
 
 ### 2e. Prepare spec files and initial commit
 
@@ -381,7 +389,7 @@ This removes the worktree directory but keeps the branch (which is now on the re
 
 ## Constraints
 
-- **`/swarm` ALWAYS executes the full flow** — Steps 1 through 5 must run every time. NEVER stop after gathering context to display a summary, dashboard, or status overview. The purpose of `/swarm` is to deliver working code, not to report on the project state. If spec detection finds nothing, proceed to `/interview`. If `/interview` completes, proceed to the Lead Agent. There is no valid reason to stop before Step 3.
+- **`/swarm` ALWAYS executes the full flow** — Steps 1 through 5 must run every time. NEVER stop after gathering context, after the interview, or to display a summary/dashboard/status overview. The purpose of `/swarm` is to deliver working code and a PR, not to report on the project state or produce a spec. If spec detection finds nothing, proceed to `/interview`. **The moment `/interview` completes and produces a spec file, you MUST immediately continue to Step 2e → Step 3 → Step 4 → Step 5.** Stopping after the interview is the single most common failure mode — do NOT do it. There is no valid reason to stop before Step 3.
 - Never run destructive commands: no `rm -rf`, no `git push --force`, no `git reset --hard`, no branch deletion
 - Git operations are limited to: branch creation, commit, push, and PR creation
 - The skill is a launcher — all implementation work happens in the Lead Agent and its sub-agents

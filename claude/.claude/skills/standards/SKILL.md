@@ -230,7 +230,23 @@ export { default } from '@nextnode-solutions/standards/lint-staged'
 
 ---
 
-## 4. Required `package.json` Scripts
+## 4. Required `package.json` Fields
+
+### 4.1 `packageManager` (mandatory)
+
+Every project **MUST** declare a `packageManager` field in `package.json` specifying the exact pnpm version. Without this, the CI pipeline will fail.
+
+```json
+{
+  "packageManager": "pnpm@10.4.1"
+}
+```
+
+- Use `corepack use pnpm@latest` to set it automatically
+- The version must be pinned (exact version, no range)
+- This enables Corepack to enforce the correct pnpm version across all environments
+
+### 4.2 Scripts (mandatory)
 
 Every project MUST have these scripts:
 
@@ -301,11 +317,12 @@ When generating or editing code in any NextNode project, **always follow the oxf
 When scaffolding a new project, **always set up @nextnode-solutions/standards from the start**:
 
 1. Install the package and required peer deps
-2. Create all config files per section 3 (pick the right TypeScript variant)
-3. Copy `.editorconfig` and `.npmrc` from the package (section 3.7 and 3.8)
-4. Add package.json scripts per section 4
-5. Set up husky + lint-staged + commitlint per section 5
-6. Verify with `pnpm lint` and `pnpm format:check`
+2. Set `packageManager` field with `corepack use pnpm@latest` (section 4.1)
+3. Create all config files per section 3 (pick the right TypeScript variant)
+4. Copy `.editorconfig` and `.npmrc` from the package (section 3.7 and 3.8)
+5. Add package.json scripts per section 4.2
+6. Set up husky + lint-staged + commitlint per section 5
+7. Verify with `pnpm lint` and `pnpm format:check`
 
 **Never create a NextNode project without `@nextnode-solutions/standards`.** This is non-negotiable.
 

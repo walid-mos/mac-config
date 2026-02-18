@@ -18,10 +18,11 @@ This skill auto-loads on all NextNode/SaaS projects. It defines what a compliant
 | `standards` | `@nextnode-solutions/standards` — linting, formatting, TypeScript, Tailwind, testing, commit conventions | Yes (same dirs) |
 | `logger` | `@nextnode-solutions/logger` — logging library API and patterns | Yes (when in deps) |
 | `email-manager` | `@nextnode-solutions/email-manager` — email sending library API | Yes (same dirs, conditional) |
-| `nextnode-infra` | Infrastructure operations — CLI commands, Terraform, VPS, deployment, monitoring, DNS | No (manual `/nextnode-infra`) |
+| `nextnode-infra` | Infrastructure operations — CLI commands, Terraform, VPS, deployment, monitoring, DNS | Yes (same dirs) |
 | `nextnode-standards` | Compliance audit — checks all standards and produces a report | Yes (same dirs) |
 | `nextnode-brand` | Brand guidelines — colors, typography, logo system | No (manual `/nextnode-brand`) |
 | `structure-astro` | Astro project `src/` structure — domain-driven components, shared/page separation, lib layer, islands | Yes (same dirs + clients) |
+| `docker` | Docker standards — multi-stage builds, pnpm optimization, security hardening, nextnode.toml integration | Yes (when editing Docker files) |
 
 > **Keeping skills up to date:** Run `/learn` on any `@nextnode-solutions/*` package to update its skill. `/learn` cascades to dependent skills automatically.
 
@@ -46,9 +47,11 @@ lint = "lint"                      # Set to false to skip lint step
 test = "test"                      # Set to false to skip test step
 build = "build"                    # Set to false to skip build step
 
-# === App-only: Server (2 tiers) ===
+# === App-only: Server (3 tiers) ===
 # No [server] = shared dev + shared prod VPS (default)
 [server]                           # Dedicated VPS (same for dev + prod)
+name = "my-vps"                    # Named VPS — groups multiple apps onto the same custom VPS (optional)
+project = "my-hetzner-project"     # Hetzner project — resolves to HETZNER_TOKEN_{PROJECT} secret (optional)
 type = "cpx22"                     # Hetzner server type (default: cpx22)
 location = "nbg1"                  # Hetzner datacenter (default: nbg1)
 internal = false                   # true = grey cloud (Tailscale), false = orange cloud (public)
@@ -104,8 +107,9 @@ memory_reservation = "256M"        # Guaranteed minimum memory (default: 256M)
 
 | Config Present | Dev VPS | Prod VPS |
 |---------------|---------|----------|
-| No `[server]` | Shared dev VPS (`nextnode-shared-dev`) | Shared prod VPS (`nextnode-shared-prod`) |
-| `[server]` present | Dedicated VPS (`nextnode-{name}`) | Same dedicated VPS |
+| No `[server]` | Shared dev VPS (`shared-dev`) | Shared prod VPS (`shared-prod`) |
+| `[server]` (no name) | Dedicated VPS (`{project-name}`) | Same dedicated VPS |
+| `[server]` + `name` | Named shared VPS (`nextnode-{name}`) — multi-tenant | Same named VPS |
 
 ---
 

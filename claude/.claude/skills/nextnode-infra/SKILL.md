@@ -2,7 +2,9 @@
 name: nextnode-infra
 description: NextNode infrastructure operations — CLI commands, Terraform, VPS provisioning, deployment, monitoring, and DNS/SSL. For repo compliance and nextnode.toml config, see the `nextnode` skill.
 user-invocable: true
-autoload-dirs: []
+autoload-dirs:
+  - /Users/walid/Development/nextnode
+  - /Users/walid/Development/saas
 ---
 
 # NextNode Infrastructure Reference
@@ -11,7 +13,15 @@ autoload-dirs: []
 
 ## SSH Access
 
-> **MANDATORY:** All SSH connections to NextNode infrastructure MUST use the key `~/.ssh/nextnode-ci`. Never use the default SSH key or any other identity file.
+> **MANDATORY — both rules are non-negotiable:**
+> 1. **User:** always `deploy`. Never `root` or any other user.
+> 2. **Key:** always `~/.ssh/nextnode-ci` (`-i ~/.ssh/nextnode-ci`). Never the default SSH key or any other identity file.
+>
+> Example: `ssh -i ~/.ssh/nextnode-ci deploy@<host>`
+
+## Tailscale
+
+> **MANDATORY:** All `tailscale` CLI commands (e.g. `tailscale status`, `tailscale ssh`) MUST run outside the sandbox (`dangerouslyDisableSandbox: true`) because Tailscale communicates via a Unix socket that the sandbox blocks.
 
 ## Architecture Overview
 
@@ -71,7 +81,7 @@ The `infra` CLI (`packages/cli/`) is built with **citty**. All commands accept `
 | **dockerfile** | `parseDockerfileEnv()` — extract ARG/ENV declarations from Dockerfile. `INFRA_MANAGED_VARS` constant excludes `NODE_ENV`, `PORT`, `APP_PORT`, `HOST_PORT`, `IMAGE`, `COMPOSE_PROJECT_NAME` |
 | **github** | `verifyCiPassed()`, `getCheckRuns()`, `getCommitStatus()`, `getWorkflowRun()` — prod gate CI verification |
 | **hetzner** | `fetchHetznerSshKeyIds()` |
-| **services** | `computeServiceEnvVars()` — derives env vars from `[services]` config: Supabase (URL + auto-generated JWT keys stored as GH env secrets), Redis (URL), R2 (endpoint + public URL) |
+| **services** | `computeServiceEnvVars()` — derives env vars from `[services]` config: Supabase (URLs + auto-generated JWT keys stored as GH env secrets), Redis (URL), R2 (account ID, endpoint, public URL, bucket name + forwards credentials from process.env) |
 | **r2** | `ensureR2Setup()`, `ensureR2Bucket()`, `ensureR2Credentials()` — self-healing R2 setup for Caddy cert storage. Auto-creates bucket + credentials, injects into `process.env`, best-effort stores as GitHub org secrets |
 | **http** | `fetchWithRetry()` — generic fetch with exponential backoff on 429 |
 | **polling** | `pollUntilReady()` — generic retry/polling (SSH wait, Tailscale wait, Caddy wait) |
@@ -102,8 +112,8 @@ interface EnvironmentEntry extends ResourcesConfig {
 
 interface ProjectConfig {
   project: { name: string; type: ProjectType; domain?: string; description?: string; redirect_domains?: string[] }
-  scripts: { lint?: string; test?: string; build?: string }
-  server?: { type: string; location: string; internal: boolean }
+  scripts: { lint?: string | false; test?: string | false; build?: string | false }
+  server?: { name?: string; project?: string; type: string; location: string; internal: boolean }
   volume: { enabled: boolean; size: number }
   deploy: { port: number; file?: string; hasCompose: boolean; zero_downtime: boolean }
   health: { type: HealthType; path?: string; interval: string; timeout: string; retries: number }
@@ -367,7 +377,7 @@ The `infra destroy` command intelligently handles shared VPS:
 ## DNS & SSL Strategy
 
 - **Cloudflare Universal SSL** — edge certs (free, auto-managed)
-- **Caddy ACME** — origin certs via Let's Encrypt DNS-01 challenge (Cloudflare DNS plugin), HTTP-01 fallback, certs stored in Cloudflare R2 (`nextnode-caddy-certs` bucket via certmagic-s3)
+- **Caddy ACME** — origin certs via Let's Encrypt DNS-01 challenge (Cloudflare DNS plugin), HTTP-01 fallback, certs stored in Cloudflare R2 (`INTERNAL-caddy-certs` bucket via certmagic-s3)
 - **Full (Strict) SSL mode** — origin cert validation required
 - **Public apps** — orange cloud (Cloudflare proxied, CDN + DDoS protection)
 - **Internal apps** — grey cloud (DNS points to Tailscale IP)
@@ -421,6 +431,6 @@ The `[services]` config section auto-generates environment variables at deploy t
 
 | Service | Generated Vars | Notes |
 |---------|---------------|-------|
-| **Supabase** | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET` | JWT keys auto-generated + stored as GH environment secrets |
+| **Supabase** | `SITE_URL`, `API_EXTERNAL_URL`, `SUPABASE_URL`, `JWT_SECRET`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | URLs derived from domain; JWT keys auto-generated + stored as GH environment secrets |
 | **Redis** | `REDIS_URL` | `redis://redis:{port}` (default port 6379) |
-| **R2** | `R2_ENDPOINT`, `R2_PUBLIC_URL` | Derived from Cloudflare account ID + bucket config |
+| **R2** | `R2_BUCKET_NAME`, `R2_ACCOUNT_ID`, `R2_ENDPOINT_URL`, `R2_PUBLIC_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | Bucket from config; account ID + endpoint derived from CF API; public URL only if `public = true`; credentials forwarded from process.env (org secrets) |

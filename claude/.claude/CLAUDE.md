@@ -52,3 +52,7 @@
 
 - Prefer single quotes unless interpolation is needed
 - Section headers: `# ===...===` (shell) or `-- ===...===` (Lua)
+
+# Mandatory Code Rules
+
+- **Guard clauses ALWAYS** — before writing `if (x) { ...long block... } return`, flip to `if (!x) return` + flat logic. Evaluate both forms, pick the one that exits early. Nested ifs → sequential guards. Happy path at lowest indentation. All languages, no exceptions.

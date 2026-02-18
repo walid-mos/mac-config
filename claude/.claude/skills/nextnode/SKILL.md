@@ -41,35 +41,17 @@ description = "Description"        # Optional
 domain = "app.nextnode.fr"         # App-only — subdomain for the app
 redirect_domains = ["www.app.fr"]  # Optional — domains that 301→canonical (prod only, auto-adds www)
 
-[scripts]                          # Optional — defaults to pnpm lint/test/build
-lint = "lint"
-test = "test"
-build = "build"
+[scripts]                          # Defaults to pnpm lint/test/build
+lint = "lint"                      # Set to false to skip lint step
+test = "test"                      # Set to false to skip test step
+build = "build"                    # Set to false to skip build step
 
-# === Package-only ===
-[package]
-scope = "@nextnode-solutions"
-access = "public"                  # "public" | "restricted"
-canary_on_label = true             # Publish canary on PR label "canary"
-
-# === App-only: Server (4 tiers) ===
-# No [server] = shared dev + shared prod VPS (Tier 1)
-[server]                           # Tier 2: dedicated VPS (same for dev + prod)
+# === App-only: Server (2 tiers) ===
+# No [server] = shared dev + shared prod VPS (default)
+[server]                           # Dedicated VPS (same for dev + prod)
 type = "cpx22"                     # Hetzner server type (default: cpx22)
 location = "nbg1"                  # Hetzner datacenter (default: nbg1)
 internal = false                   # true = grey cloud (Tailscale), false = orange cloud (public)
-
-# Tier 3: per-env server overrides
-[environment.dev.server]
-type = "cx22"                      # Smaller dev server
-[environment.prod.server]
-type = "cpx22"                     # Bigger prod server
-
-# Tier 4: fully custom per-env (no top-level [server])
-# [environment.dev.server]
-# name = "client-dev"
-# type = "cx22"
-# location = "nbg1"
 
 [volume]                           # Optional — default: disabled
 enabled = false
@@ -92,22 +74,42 @@ enabled = true                     # Default: true
 session_duration = "15m"           # Idle timeout before stopping containers
 display_name = "My App"            # Display name on waiting page (default: project.name)
 
+# === Services (all optional, app-only) ===
+[services.supabase]                # Supabase self-hosted sidecar
+studio_port = 54323                # Studio port on 127.0.0.1 (informational)
+migrations = "supabase/migrations" # Path to SQL migrations (relative, reserved)
+
+[services.r2]                      # Cloudflare R2 object storage
+bucket = "my-bucket"               # REQUIRED when [services.r2] is declared
+public = false                     # Whether bucket has public access
+
+[services.redis]                   # Redis sidecar
+port = 6379                        # Redis port (default: 6379)
+
+# === Per-Environment Config ===
 [environment.dev]
 enabled = true                     # Default: true — set false to skip dev deployment
+cpu_limit = "0.25"                 # Docker CPU limit (default: 0.25)
+memory_limit = "256M"              # Docker memory limit (default: 256M)
+
+[environment.prod]
+enabled = true                     # Default: true
+cpu_limit = "1.0"                  # Default: 1.0
+memory_limit = "1G"                # Default: 1G
+cpu_reservation = "0.25"           # Guaranteed minimum CPU (default: 0.25)
+memory_reservation = "256M"        # Guaranteed minimum memory (default: 256M)
 ```
 
 ### Server Tier Resolution
 
 | Config Present | Dev VPS | Prod VPS |
 |---------------|---------|----------|
-| No `[server]` | Shared dev VPS | Shared prod VPS |
-| `[server]` only | Dedicated (shared dev+prod) | Same dedicated VPS |
-| `[server]` + `[environment.X.server]` | Dedicated (overridden) | Dedicated (overridden) |
-| `[environment.X.server]` only | Dedicated dev | Dedicated prod |
+| No `[server]` | Shared dev VPS (`nextnode-shared-dev`) | Shared prod VPS (`nextnode-shared-prod`) |
+| `[server]` present | Dedicated VPS (`nextnode-{name}`) | Same dedicated VPS |
 
 ---
 
-## Per-Repo CI Files (2 Workflow Files)
+## Per-Repo CI Files
 
 **CRITICAL:** The caller workflow MUST declare `permissions` for the reusable workflow to function.
 
@@ -118,8 +120,6 @@ name: Deploy Dev
 
 on:
   push:
-    branches: [main]
-  pull_request:
     branches: [main]
   workflow_dispatch:
 
@@ -162,12 +162,55 @@ jobs:
     secrets: inherit
 ```
 
+### 3. `.github/workflows/pr-preview.yml` — PR preview deploy + cleanup
+
+```yaml
+name: PR Preview
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, closed]
+
+permissions:
+  checks: read
+  contents: read
+  deployments: write
+  packages: write
+  pull-requests: write
+
+concurrency:
+  group: pr-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    if: github.event.action != 'closed'
+    uses: NextNodeSolutions/infrastructure/.github/workflows/pipeline.yml@main
+    with:
+      action: pr-preview
+      environment: dev
+      pr_number: ${{ github.event.pull_request.number }}
+    secrets: inherit
+
+  cleanup:
+    if: github.event.action == 'closed'
+    uses: NextNodeSolutions/infrastructure/.github/workflows/pipeline.yml@main
+    with:
+      action: pr-cleanup
+      environment: dev
+      pr_number: ${{ github.event.pull_request.number }}
+    secrets: inherit
+```
+
 ### How Workflows Map to Pipeline Actions
 
 | Workflow | `action` | `environment` | Trigger |
 |----------|----------|---------------|---------|
-| `deploy-dev.yml` | `ci` (default) | `dev` (default) | push/PR/manual |
+| `deploy-dev.yml` | `ci` (default) | `dev` (default) | push to main / manual |
 | `deploy-prod.yml` | `deploy-prod` | `prod` | manual only |
+| `pr-preview.yml` | `pr-preview` | `dev` | PR opened/synced |
+| `pr-preview.yml` | `pr-cleanup` | `dev` | PR closed |
 
 ---
 

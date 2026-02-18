@@ -51,6 +51,7 @@ Read the following files from the project root (in parallel for speed). If a fil
 | `.husky/commit-msg` | contains `commitlint` |
 | `vitest.config.ts` | extends from standards (only if vitest in deps — refer to `standards` skill, section "Vitest") |
 | main CSS file (e.g., `app.css`) | imports standards Tailwind theme (only if tailwindcss in deps — refer to `standards` skill, section "Tailwind") |
+| `astro.config.mjs` | env-derived server config, logger, adapter (only if astro in deps) |
 
 ---
 
@@ -153,6 +154,58 @@ Skip these checks if `type = "package"` in `nextnode.toml`.
 
 Quick scan: check if any `src/**/index.ts` files exist that only re-export (barrel pattern). Report as **WARN** if found.
 
+### 10. `astro.config.mjs` (Astro Apps Only)
+
+Skip if `astro` is not in `dependencies`.
+
+**Canonical template:**
+
+```javascript
+import node from "@astrojs/node";
+import { logger } from "@nextnode-solutions/logger";
+import tailwindcss from "@tailwindcss/vite";
+import { defineConfig } from "astro/config";
+
+const host = process.env.HOST || "localhost";
+const port = Number(process.env.PORT) || 4321;
+const site = process.env.URL || `http://${host}:${port}`;
+
+// Log configuration for debugging
+logger.info("Configuration loaded", {
+  details: {
+    host,
+    port,
+    site,
+    environment: process.env.NODE_ENV || "development",
+  },
+});
+
+export default defineConfig({
+  site,
+  output: "server",
+  server: {
+    port,
+    host,
+  },
+  vite: {
+    plugins: [tailwindcss()],
+  },
+  adapter: node({
+    mode: "standalone",
+  }),
+  // ... integrations, i18n, etc.
+});
+```
+
+**Checks:**
+
+- **PASS**: file exists, uses `@nextnode-solutions/logger` to log config, and derives `host`/`port`/`site` from env vars with defaults
+- **WARN**: file exists but missing logger import — config loads silently with no debug output
+- **WARN**: file exists but `host`/`port`/`site` are hardcoded instead of env-derived
+- **WARN**: file exists but does not use `@astrojs/node` adapter in `standalone` mode (apps only — packages may not need an adapter)
+- **FAIL**: file does not exist but `astro` is in dependencies
+- **SKIP**: `astro` is not in dependencies
+
 ---
 
 ## Report Format
@@ -184,6 +237,7 @@ Type: <app|package> | Domain: <domain or n/a>
 | 14 | Dockerfile | WARN | No multi-stage build |
 | 15 | docker-compose.yml | SKIP | Not needed — Dockerfile present, infra auto-generates compose |
 | 16 | Barrel exports | PASS | None found |
+| 17 | astro.config.mjs | PASS | Logger + env-derived config |
 
 ### Issues to Fix
 
@@ -219,5 +273,6 @@ If there are FAIL or MISSING items, **ask the user** if they want Claude to fix 
 6. **Create Docker files** — generate `Dockerfile` from template if missing (apps only). Do NOT create `docker-compose.yml` when only a `Dockerfile` exists — the infrastructure auto-generates compose at deploy time. **Important:** never declare build-only variables (`HUSKY`, `CI`) as `ENV` — and do NOT use inline hacks like `HUSKY=0` either. Use `pnpm install --ignore-scripts` to skip all lifecycle scripts (prepare, postinstall, etc.) in Docker builds — this is the correct way to prevent `husky: not found` errors in production installs
 7. **Create CI workflow** — copy reusable pipeline template (from `nextnode` skill). Skip `deploy-dev.yml` if `[environment.dev].enabled = false` in `nextnode.toml`
 8. **Create nextnode.toml** — prompt for project name/type/domain, generate using the canonical template from the `nextnode` skill
+9. **Fix astro.config.mjs** — add `@nextnode-solutions/logger` import and config logging block, replace hardcoded `host`/`port`/`site` with env-derived values (Astro apps only). Use the canonical template from check 10 above
 
 Never auto-fix without asking first.

@@ -32,6 +32,10 @@ alias gc="git commit"
 alias gr="git rebase"
 alias gp="git push"
 
+# GH Shortcuts
+alias ghwdev="gh workflow run deploy-dev.yml -R"
+alias ghwprod="gh workflow run deploy-prod.yml -R"
+
 # Tools
 alias upclaude="rm -rf ~/.local/state/claude/locks && curl -fsSL https://claude.ai/install.sh | sh -s"
 alias ghclean="gh run list --limit 500 --json databaseId -q '.[].databaseId' | xargs -I {} gh run delete {}"

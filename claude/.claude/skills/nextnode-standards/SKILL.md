@@ -137,12 +137,18 @@ If the file does not exist: **MISSING**.
 
 ### 8. Docker (Apps Only)
 
-Skip these checks if `type = "package"` in `nextnode.toml`.
+Skip these checks if `type = "package"` in `nextnode.toml`. Refer to the `docker` skill for all Docker rules and canonical templates.
 
 **`Dockerfile`:**
 - **PASS**: file exists with multi-stage build (`FROM ... AS builder` + `FROM ... AS runtime`)
 - **WARN**: file exists but no multi-stage build
-- **WARN**: build-only variables (`HUSKY`, `CI`) declared as `ENV` or inlined in `RUN` (e.g., `RUN HUSKY=0 pnpm install`) — use `--ignore-scripts` on the relevant `pnpm install` instead
+- **WARN**: build-only variables (`HUSKY`, `CI`) declared as `ENV` or inlined in `RUN` — use `--ignore-scripts` instead (see `docker` skill, anti-pattern #2)
+- **WARN**: `corepack prepare pnpm@X.Y.Z` with hardcoded version — use `corepack prepare --activate` (see `docker` skill, anti-pattern #1)
+- **WARN**: missing `# syntax=docker/dockerfile:1` on line 1
+- **WARN**: missing BuildKit cache mounts on `pnpm install`
+- **WARN**: missing `.dockerignore` file
+- **WARN**: missing HEALTHCHECK instruction
+- **WARN**: missing tini/dumb-init signal handler
 - **MISSING**: file does not exist — **FAIL** if `docker-compose.yml` also missing (no deploy strategy)
 
 **`docker-compose.yml`:**
@@ -270,7 +276,7 @@ If there are FAIL or MISSING items, **ask the user** if they want Claude to fix 
 3. **Fix existing config files** — add missing `extends` or re-export (use paths from `standards` skill)
 4. **Add missing scripts** — patch `package.json` (use commands from `standards` skill)
 5. **Set up husky** — init + create hook files
-6. **Create Docker files** — generate `Dockerfile` from template if missing (apps only). Do NOT create `docker-compose.yml` when only a `Dockerfile` exists — the infrastructure auto-generates compose at deploy time. **Important:** never declare build-only variables (`HUSKY`, `CI`) as `ENV` — and do NOT use inline hacks like `HUSKY=0` either. Use `pnpm install --ignore-scripts` to skip all lifecycle scripts (prepare, postinstall, etc.) in Docker builds — this is the correct way to prevent `husky: not found` errors in production installs
+6. **Create Docker files** — generate `Dockerfile` and `.dockerignore` using the canonical templates from the `docker` skill (sections 7 and 9). Do NOT create `docker-compose.yml` when only a `Dockerfile` exists — the infrastructure auto-generates compose at deploy time. The `docker` skill is the single source of truth for all Dockerfile patterns — never inline Docker rules here
 7. **Create CI workflow** — copy reusable pipeline template (from `nextnode` skill). Skip `deploy-dev.yml` if `[environment.dev].enabled = false` in `nextnode.toml`
 8. **Create nextnode.toml** — prompt for project name/type/domain, generate using the canonical template from the `nextnode` skill
 9. **Fix astro.config.mjs** — add `@nextnode-solutions/logger` import and config logging block, replace hardcoded `host`/`port`/`site` with env-derived values (Astro apps only). Use the canonical template from check 10 above

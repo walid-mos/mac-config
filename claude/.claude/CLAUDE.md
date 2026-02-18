@@ -1,3 +1,27 @@
+# ============================================================
+# ZERO FAILING TESTS — ABSOLUTE, NON-NEGOTIABLE RULE
+# ============================================================
+#
+# ALL tests MUST pass. No exceptions. Ever.
+#
+# - "Pre-existing failure" is NOT an excuse. Fix it.
+# - "Unrelated to my changes" is NOT an excuse. Fix it.
+# - You do NOT get to dismiss, skip, or ignore ANY failing test.
+# - If a test fails, you have exactly TWO options:
+#     1. Fix the CODE so the test passes.
+#     2. If you believe the TEST is wrong (not the code), ASK
+#        the user: "This test expects X but the code does Y —
+#        should I fix the code or update the test?" Then do
+#        whatever the user says.
+# - You NEVER ship, commit, or report "done" with failing tests.
+# - This rule applies to ALL agents (Code, Lead, Test, Bugfix,
+#   every single one). No agent may waive it.
+# - Saying "N failing tests are pre-existing" without fixing
+#   them is a VIOLATION of this rule.
+#
+# In short: SEE RED? MAKE IT GREEN. THEN TALK.
+# ============================================================
+
 # Core Principles
 
 1. English ONLY — responses, code, comments, commits

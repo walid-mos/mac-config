@@ -36,9 +36,9 @@ keymap("v", "<A-Up>", ":m '<-2<CR>gv=gv", { desc = 'Move selection up' })
 keymap('n', 'go', 'o<Esc>k', { desc = 'Add one line after' })
 keymap('n', 'gO', 'O<Esc>j', { desc = 'Add one line before' })
 
--- Paste from yank register (so replaced text doesn't overwrite clipboard)
-keymap("x", "p", '"0p', { desc = 'Paste from yank register' })
-keymap("x", "P", '"0P', { desc = 'Paste from yank register (before)' })
+-- In visual mode, P replaces selection without overwriting the unnamed register (Neovim 0.8+)
+-- Remap p to P so both keys behave consistently
+keymap("x", "p", "P", { desc = 'Paste without overwriting clipboard' })
 
 -- Clear search highlight
 keymap("n", "<leader>ch", ":noh<CR>", { desc = 'Clear highlight' })

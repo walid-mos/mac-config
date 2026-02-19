@@ -26,7 +26,7 @@ Auto-loads when writing or reviewing any Docker-related file. Every rule is mand
 3. **`node:XX-slim`** (Debian) as base — NOT full `node:XX`, NOT `alpine` (musl breaks native modules silently). Exception: pure JS apps with zero native deps MAY use `alpine` if explicitly justified.
 4. **Never hardcode pnpm version** — use `corepack prepare --activate` (reads `packageManager` from `package.json`). NEVER `corepack prepare pnpm@X.Y.Z --activate`.
 5. **`--frozen-lockfile`** on every `pnpm install` — no exceptions.
-6. **`--ignore-scripts`** on every `pnpm install` in Docker — prevents `husky: not found` errors and lifecycle script side effects. NEVER use `HUSKY=0`, `CI=true`, or any inline env hack.
+6. **`pnpm.onlyBuiltDependencies`** MUST be set in `package.json` — this is the allowlist of packages permitted to run install scripts (e.g. `better-sqlite3`, `esbuild`, `sharp`). Everything else is blocked by default in pnpm v10+. NEVER use `--ignore-scripts` (breaks native module builds), `HUSKY=0`, `CI=true`, or any inline env hack. `husky` is excluded from the allowlist, so its `prepare` script never runs in Docker — no hack needed.
 7. **Exec form ALWAYS** for `CMD` and `ENTRYPOINT` — `CMD ["node", "dist/server.js"]`, never `CMD node server.js`.
 8. **Non-root user** in the runtime stage — switch with `USER` before `CMD`.
 9. **Signal handler (tini or dumb-init)** as PID 1 — Node.js must not run as PID 1.
@@ -140,7 +140,7 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
 # Now install from pre-populated store — no network
 COPY package.json ./
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile --ignore-scripts --offline
+    pnpm install --frozen-lockfile --offline
 ```
 
 Why: `pnpm fetch` only reads `pnpm-lock.yaml`. Adding a script to `package.json` (without changing deps) does NOT bust this cache layer.
@@ -153,12 +153,12 @@ BuildKit runs independent stages concurrently:
 FROM fetch AS prod-deps
 COPY package.json ./
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile --prod --ignore-scripts --offline
+    pnpm install --frozen-lockfile --prod --offline
 
 FROM fetch AS build
 COPY package.json ./
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile --ignore-scripts --offline
+    pnpm install --frozen-lockfile --offline
 COPY . .
 RUN pnpm build
 ```
@@ -299,7 +299,7 @@ RUN echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > .npmrc
 
 # CORRECT — ephemeral, never in any layer
 RUN --mount=type=secret,id=npmrc,target=/root/.npmrc \
-    pnpm install --frozen-lockfile --ignore-scripts
+    pnpm install --frozen-lockfile
 ```
 
 Rules:
@@ -402,13 +402,13 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
 FROM fetch AS prod-deps
 COPY package.json ./
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile --prod --ignore-scripts --offline
+    pnpm install --frozen-lockfile --prod --offline
 
 # ── Build ────────────────────────────────────────────────
 FROM fetch AS build
 COPY package.json ./
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile --ignore-scripts --offline
+    pnpm install --frozen-lockfile --offline
 COPY tsconfig*.json ./
 COPY src/ ./src/
 RUN pnpm build
@@ -465,7 +465,7 @@ When `PUBLIC_*` vars must be inlined at build time:
 FROM fetch AS build
 COPY package.json ./
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile --ignore-scripts --offline
+    pnpm install --frozen-lockfile --offline
 
 # PUBLIC_ vars inlined by Vite at build time
 ARG PUBLIC_SUPABASE_URL
@@ -483,9 +483,23 @@ RUN pnpm build
 
 These are NOT secrets — they are public client-side values embedded in the JS bundle.
 
-### Apps with system build dependencies (native modules)
+### Apps with native modules (better-sqlite3, sharp, etc.)
 
-When native addons need compilation tools:
+**Prerequisite:** `package.json` MUST declare `pnpm.onlyBuiltDependencies` — this is the allowlist of packages permitted to run install/build scripts. Without it, pnpm v10+ blocks all lifecycle scripts by default.
+
+```json
+{
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild",
+      "sharp"
+    ]
+  }
+}
+```
+
+When native addons need compilation tools, install them in the **builder stage only**:
 
 ```dockerfile
 FROM base AS build
@@ -495,6 +509,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ... rest of build stage
 # These packages are NOT in the runtime stage
 ```
+
+`--ignore-scripts` is NEVER needed — `onlyBuiltDependencies` handles script control declaratively. Using `--ignore-scripts` would override the allowlist and break native module compilation.
 
 ---
 
@@ -527,7 +543,7 @@ COPY apps/web/package.json ./apps/web/
 COPY packages/shared/package.json ./packages/shared/
 
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile --ignore-scripts --offline
+    pnpm install --frozen-lockfile --offline
 
 COPY . .
 RUN pnpm turbo build
@@ -539,7 +555,7 @@ COPY apps/api/package.json ./apps/api/
 COPY packages/shared/package.json ./packages/shared/
 
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile --prod --ignore-scripts --offline
+    pnpm install --frozen-lockfile --prod --offline
 
 # ── Runtime ──────────────────────────────────────────────
 FROM node:${NODE_VERSION}-slim AS runtime
@@ -655,7 +671,7 @@ docker-compose*.yaml
 | # | Anti-Pattern | Correct Approach |
 |---|-------------|------------------|
 | 1 | `corepack prepare pnpm@X.Y.Z --activate` | `corepack prepare --activate` — reads `packageManager` from `package.json` |
-| 2 | `HUSKY=0 pnpm install` or `ENV CI=true` | `pnpm install --ignore-scripts` |
+| 2 | `--ignore-scripts` / `HUSKY=0` / `ENV CI=true` | `pnpm.onlyBuiltDependencies` allowlist in `package.json` — blocks all scripts except listed packages |
 | 3 | `COPY . .` before `pnpm install` | Copy `pnpm-lock.yaml` first, then `package.json`, then install, then source |
 | 4 | `CMD npm start` or `CMD pnpm start` | `CMD ["node", "dist/server.js"]` — exec form, direct node invocation |
 | 5 | Running as root in production | Create dedicated user, `USER appuser` before CMD |
@@ -705,7 +721,7 @@ When reviewing any Dockerfile, verify ALL of the following:
 - [ ] `COPY` over `ADD`
 - [ ] tini or dumb-init as ENTRYPOINT
 - [ ] SUID/SGID bits stripped (optional but recommended)
-- [ ] `--ignore-scripts` on all pnpm installs
+- [ ] `pnpm.onlyBuiltDependencies` set in `package.json` (NO `--ignore-scripts`)
 
 **Runtime:**
 - [ ] Exec form CMD/ENTRYPOINT

@@ -18,7 +18,7 @@ This skill auto-loads on all NextNode/SaaS projects. It defines what a compliant
 | `standards` | `@nextnode-solutions/standards` — linting, formatting, TypeScript, Tailwind, testing, commit conventions | Yes (same dirs) |
 | `logger` | `@nextnode-solutions/logger` — logging library API and patterns | Yes (when in deps) |
 | `email-manager` | `@nextnode-solutions/email-manager` — email sending library API | Yes (same dirs, conditional) |
-| `nextnode-infra` | Infrastructure operations — CLI commands, Terraform, VPS, deployment, monitoring, DNS | Yes (same dirs) |
+| `nextnode-infra` | Infrastructure operations — CLI commands, Terraform, VPS, deployment, DNS | Yes (same dirs) |
 | `nextnode-standards` | Compliance audit — checks all standards and produces a report | Yes (same dirs) |
 | `nextnode-brand` | Brand guidelines — colors, typography, logo system | No (manual `/nextnode-brand`) |
 | `structure-astro` | Astro project `src/` structure — domain-driven components, shared/page separation, lib layer, islands | Yes (same dirs + clients) |
@@ -37,7 +37,7 @@ Every NextNode/SaaS repo has a `nextnode.toml` at its root. This file drives ALL
 ```toml
 [project]
 name = "my-app"                    # REQUIRED — no default. Used for naming everywhere.
-type = "app"                       # REQUIRED — "app" | "package" | "monitoring"
+type = "app"                       # REQUIRED — "app" | "package"
 description = "Description"        # Optional
 domain = "app.nextnode.fr"         # App-only — subdomain for the app
 redirect_domains = ["www.app.fr"]  # Optional — domains that 301→canonical (prod only, auto-adds www)
@@ -80,7 +80,14 @@ display_name = "My App"            # Display name on waiting page (default: proj
 # === Services (all optional, app-only) ===
 [services.supabase]                # Supabase self-hosted sidecar
 studio_port = 54323                # Studio port on 127.0.0.1 (informational)
-migrations = "supabase/migrations" # Path to SQL migrations (relative, reserved)
+migrations = "supabase/migrations" # Path to SQL migrations (relative)
+features = ["storage", "realtime"] # Optional features to enable
+[services.supabase.oauth]          # OAuth provider config for GoTrue
+providers = ["github", "google"]   # Provider names to enable
+[services.supabase.oauth.github]   # Per-provider overrides (optional)
+scopes = ["user:email"]
+[services.supabase.versions]       # Pin specific service versions (optional)
+postgres = "15.8.1.085"            # Override any service image tag
 
 [services.r2]                      # Cloudflare R2 object storage
 bucket = "my-bucket"               # REQUIRED when [services.r2] is declared
@@ -89,13 +96,21 @@ public = false                     # Whether bucket has public access
 [services.redis]                   # Redis sidecar
 port = 6379                        # Redis port (default: 6379)
 
+# === Subdomain Routes (app-only, optional) ===
+[[routes]]                         # Map subdomains to compose services
+subdomain = "admin"                # e.g., admin.domain.fr (prod), admin.dev.domain.fr (dev)
+service = "strapi"                 # docker-compose service name
+port = 1337                        # container port
+health_path = "/_health"           # optional health check path override
+
 # === Per-Environment Config ===
-[environment.dev]
+[environment.development]
 enabled = true                     # Default: true — set false to skip dev deployment
+pr_previews = true                 # Default: true — PR preview deployments. Forced false when enabled=false.
 cpu_limit = "0.25"                 # Docker CPU limit (default: 0.25)
 memory_limit = "256M"              # Docker memory limit (default: 256M)
 
-[environment.prod]
+[environment.production]
 enabled = true                     # Default: true
 cpu_limit = "1.0"                  # Default: 1.0
 memory_limit = "1G"                # Default: 1G

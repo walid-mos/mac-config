@@ -1,6 +1,6 @@
 ---
 name: nextnode-infra
-description: NextNode infrastructure operations — CLI commands, Terraform, VPS provisioning, deployment, monitoring, and DNS/SSL. For repo compliance and nextnode.toml config, see the `nextnode` skill.
+description: NextNode infrastructure operations — CLI commands, Terraform, VPS provisioning, deployment, and DNS/SSL. For repo compliance and nextnode.toml config, see the `nextnode` skill.
 user-invocable: true
 autoload-dirs:
   - /Users/walid/Development/nextnode
@@ -34,7 +34,6 @@ NextNode uses a **config-as-code driven, zero-manual-UI** infrastructure:
 - **Caddy** — native reverse proxy (xcaddy + Cloudflare DNS, Sablier, certmagic-s3 plugins), SSL via ACME DNS-01 (HTTP-01 fallback), R2-backed cert storage
 - **Sablier** — idle container auto-stop for non-prod environments (custom NextNode waiting page)
 - **Tailscale** — secure internal mesh network (all VPSes connected)
-- **Grafana Alloy** — push-based observability agent on every VPS
 
 **Repository:** `NextNodeSolutions/infrastructure`
 
@@ -44,7 +43,7 @@ The `infra` CLI (`packages/cli/`) is built with **citty**. All commands accept `
 
 | Command | Purpose | Key Args |
 |---------|---------|----------|
-| `infra plan` | Show resolved config and planned pipeline actions (dry run) | — |
+| `infra plan` | Show resolved config and planned pipeline actions (dry run) | `--ci`, `--pr-number` |
 | `infra lint` | Run `pnpm <lint-script>` | — |
 | `infra test` | Run `pnpm <test-script>` | — |
 | `infra build` | Build Docker image, push to ghcr.io | `--sha` |
@@ -66,28 +65,30 @@ The `infra` CLI (`packages/cli/`) is built with **citty**. All commands accept `
 
 | Library | Key Functions |
 |---------|---------------|
-| **config** | `loadConfig()`, `parseConfig()`, `mergeConfig()`, `validateConfig()`, `resolveConfigInput()`, `computeHostPort()`, `computeGreenPort()`, `computeEnvDomain()`, `computeWildcardDomain()`, `computeRedirectDomains()`, `computePreviewDomain()`, `isPrPreview()`, `detectDockerConfig()`, `findDefaultTomlPath()` |
+| **config** | `loadConfig()`, `parseConfig()`, `mergeConfig()`, `validateConfig()`, `resolveConfigInput()`, `computeHostPort()`, `computeGreenPort()`, `computeEnvDomain()`, `computeRouteEnvDomain()`, `computeWildcardDomain()`, `computeRedirectDomains()`, `computePreviewDomain()`, `computeWorkspaceName()`, `computeImageTag()`, `infraEnvId()`, `isPrPreview()`, `detectDockerConfig()`, `findDefaultTomlPath()` |
+| **compose** | `parseComposeEnv()`, `extractComposeEnvValues()`, `parseComposeContainerNames()` — env var extraction from compose files |
 | **cloudflare** | `lookupZoneId()`, `upsertDnsRecord()`, `deleteDnsRecord()`, `listDnsRecords()`, `resolveCloudflareAccountId()` — with retry for rate limiting |
 | **dns** | `resolveDnsTarget()`, `resolveProxied()`, `resolveTtl()`, `upsertWildcardRecords()`, `upsertDevWildcardRecord()`, `upsertRedirectDnsRecords()`, `deleteRedirectDnsRecords()` |
 | **ssh** | `sshExec()`, `scp()`, `withSshKey()`, `writeKeyFile()`, `cleanupKeyFile()` — SSH via Tailscale hostnames |
-| **terraform** | `terraformInit()`, `terraformPlan()`, `terraformApply()`, `terraformOutput()`, `terraformDestroy()`, `terraformDestroyTargeted()` |
+| **terraform** | `terraformInit()`, `terraformPlan()`, `terraformApply()`, `terraformOutput()`, `terraformDestroy()`, `terraformStateList()`, `terraformDestroyTargeted()`, `resetTerraformCheck()` |
 | **tfcloud** | `getWorkspace()`, `ensureWorkspace()`, `deleteWorkspace()`, `hasResources()` |
-| **tailscale** | `deleteDevice()`, `generateAuthKey()`, `getDeviceIp()` — OAuth token caching |
-| **caddy** | `generateHandleBlock()`, `generateBasicAuthBlock()`, `generateMaintenanceBlock()`, `generateCaddyFileContent()`, `generateRedirectBlock()`, `updateCaddyFile()`, `deployCaddyConfig()`, `removeCaddyBlock()`, `removeCaddyAppConfig()`, `switchToReverseProxy()`, `switchToMaintenance()`, `writeCaddyConfigAtomic()`, `restoreCaddyBackup()`, `reloadCaddy()`, `waitForCaddy()`, `sanitizeAppIdentifier()` |
+| **tailscale** | `deleteDevice()`, `generateAuthKey()`, `getDeviceIp()`, `resetTokenCache()` — OAuth token caching |
+| **caddy** | `generateHandleBlock()`, `generateBasicAuthBlock()`, `generateMaintenanceBlock()`, `generateCaddyFileContent()`, `generateRedirectBlock()`, `updateCaddyFile()`, `updateRedirectBlockInFile()`, `removeRedirectBlock()`, `deployCaddyConfig()`, `removeCaddyBlock()`, `removeCaddyAppConfig()`, `switchToReverseProxy()`, `switchToMaintenance()`, `writeCaddyConfigAtomic()`, `restoreCaddyBackup()`, `reloadCaddy()`, `waitForCaddy()`, `sanitizeAppIdentifier()`, `TAILSCALE_CGNAT_RANGE`, `SablierCaddyConfig` |
 | **caddy-lifecycle** | `createCaddyLifecycle()` — strategy pattern: `RealCaddyLifecycle` (domain) / `NoOpCaddyLifecycle` (no domain). Interface: `showMaintenance()`, `restoreProxy()`, `switchTraffic()` |
 | **compose-validation** | `validateCompose()` — check docker-compose.yml for common issues |
 | **port-validation** | `validatePortConsistency()`, `validateDockerfile()`, `validateComposePort()`, `validateFrameworkConfig()` |
 | **docker** | `dockerBuild()`, `dockerPush()`, `dockerLogin()` |
 | **dockerfile** | `parseDockerfileEnv()` — extract ARG/ENV declarations from Dockerfile. `INFRA_MANAGED_VARS` constant excludes `NODE_ENV`, `PORT`, `APP_PORT`, `HOST_PORT`, `IMAGE`, `COMPOSE_PROJECT_NAME` |
-| **github** | `verifyCiPassed()`, `getCheckRuns()`, `getCommitStatus()`, `getWorkflowRun()` — prod gate CI verification |
+| **github** | `ghFetch()`, `verifyCiPassed()`, `getCheckRuns()`, `getCommitStatus()`, `getWorkflowRun()`, `ensureGitHubEnvironments()`, `findOpenPrForCurrentBranch()` — prod gate CI verification + env sync |
 | **hetzner** | `fetchHetznerSshKeyIds()` |
-| **services** | `computeServiceEnvVars()` — derives env vars from `[services]` config: Supabase (URLs + auto-generated JWT keys stored as GH env secrets), Redis (URL), R2 (account ID, endpoint, public URL, bucket name + forwards credentials from process.env) |
+| **services** | `computeServiceEnvVars()`, `generateSupabaseKeys()`, `resolveCloudflareAccountId()`, `storeSupabaseKeysViaGh()` — derives env vars from `[services]` config: Supabase (URLs, JWT keys, POSTGRES_PASSWORD, OAuth vars), Redis (URL), R2 (account ID, endpoint, public URL, bucket name + forwards credentials from process.env) |
+| **supabase** | `generateSupabaseCompose()`, `mergeSupabaseCompose()`, `hasExistingSupabaseServices()`, `generateKongConfig()`, `generateInitScripts()`, `computeOAuthEnvVars()`, `resolvePostgresPassword()`, `SUPABASE_DEFAULT_VERSIONS` — centralized Supabase compose scaffolding + Kong API gateway config + init scripts + OAuth env vars |
 | **r2** | `ensureR2Setup()`, `ensureR2Bucket()`, `ensureR2Credentials()` — self-healing R2 setup for Caddy cert storage. Auto-creates bucket + credentials, injects into `process.env`, best-effort stores as GitHub org secrets |
 | **http** | `fetchWithRetry()` — generic fetch with exponential backoff on 429 |
 | **polling** | `pollUntilReady()` — generic retry/polling (SSH wait, Tailscale wait, Caddy wait) |
 | **exec** | `exec()`, `execCapture()`, `checkBinary()`, `requireBinary()` — process execution with secret redaction |
 | **logger** | `logger` (consola), `withTiming()` |
-| **secrets** | `validateSecrets()`, `requireEnv()` |
+| **secrets** | `validateSecrets()`, `requireEnv()`, `resolveHetznerToken(project?)` — per-project Hetzner token support |
 | **constants** | `TF_CLOUD_ORG`, `TAILNET`, `TERRAFORM_DIR`, `GITHUB_ORG`, `R2_BUCKET_NAME`, `CLOUDFLARE_API`, secret group constants |
 | **maintenance-page** | `MAINTENANCE_PAGE_HTML` — static HTML for maintenance mode (503, auto-refresh) |
 | **base-args** | `baseArgs` — shared `--config` and `--env` args for all commands |
@@ -95,9 +96,10 @@ The `infra` CLI (`packages/cli/`) is built with **citty**. All commands accept `
 ### Key Config Types (`packages/cli/src/types/`)
 
 ```typescript
-type ProjectType = "app" | "package" | "monitoring"
+type ProjectType = "app" | "package"
 type HealthType = "http" | "tcp"
 type PipelineAction = "ci" | "deploy-prod" | "destroy" | "force-redeploy" | "pr-preview" | "pr-cleanup"
+type SupabaseFeature = "storage" | "realtime"
 
 interface ResourcesConfig {
   cpu_limit?: string       // e.g. "1.0"
@@ -108,6 +110,23 @@ interface ResourcesConfig {
 
 interface EnvironmentEntry extends ResourcesConfig {
   enabled: boolean
+  pr_previews: boolean     // PR preview deployments. Forced false when enabled=false.
+}
+
+interface SupabaseOAuthProviderConfig { scopes?: string[] }
+interface SupabaseOAuthConfig { providers: string[]; [provider: string]: string[] | SupabaseOAuthProviderConfig | undefined }
+interface SupabaseVersionOverrides { postgres?; gotrue?; postgrest?; kong?; meta?; studio?; storage?; realtime? }
+interface SupabaseServiceConfig { studio_port?: number; migrations?: string; features?: SupabaseFeature[]; oauth?: SupabaseOAuthConfig; versions?: SupabaseVersionOverrides }
+interface R2ServiceConfig { bucket: string; public?: boolean }
+interface RedisServiceConfig { port?: number }
+interface ServicesSection { supabase?: SupabaseServiceConfig; r2?: R2ServiceConfig; redis?: RedisServiceConfig }
+
+/** Subdomain route mapping to a docker-compose service. */
+interface RouteConfig {
+  subdomain: string      // DNS label (e.g., "admin" → admin.domain.fr)
+  service: string        // docker-compose service name
+  port: number           // container port (1-65535)
+  health_path?: string   // override health check path (default: main app's health.path)
 }
 
 interface ProjectConfig {
@@ -117,25 +136,30 @@ interface ProjectConfig {
   volume: { enabled: boolean; size: number }
   deploy: { port: number; file?: string; hasCompose: boolean; zero_downtime: boolean }
   health: { type: HealthType; path?: string; interval: string; timeout: string; retries: number }
-  environment: { dev: EnvironmentEntry; prod: EnvironmentEntry }
+  environment: { development: EnvironmentEntry; production: EnvironmentEntry }
   sablier?: { enabled: boolean; session_duration: string; display_name: string }
-  services?: { supabase?: { studio_port?; migrations? }; r2?: { bucket; public? }; redis?: { port? } }
+  services?: ServicesSection
+  routes?: RouteConfig[]  // [[routes]] — subdomain-to-service mappings (apps only)
   computed: {
     isSharedVps: boolean
     wildcardDomain: string
     hostPort: number
     bluePort: number
     greenPort: number
-    devEnabled: boolean
+    developmentEnabled: boolean   // shorthand for environment.development.enabled
+    prPreviewsEnabled: boolean    // shorthand for environment.development.pr_previews && enabled
     envDomain(env: string): string
     workspaceName(env: string): string
     imageTag(env: string, sha: string): string
     redirectDomains(env: string): string[]
+    routeHostPort(subdomain: string): number       // deterministic port per route (10000-29999)
+    routeGreenPort(subdomain: string): number      // green slot port per route (30000-49999)
+    routeEnvDomain(subdomain: string, env: string): string  // env-aware route domain
   }
 }
 ```
 
-### Deploy Types (`packages/cli/src/types/deploy.ts`)
+### Deploy Types (`packages/cli/src/types/deploy.ts` + `commands/deploy.ts`)
 
 ```typescript
 type DeploySlot = "blue" | "green"
@@ -157,8 +181,9 @@ interface CaddySiteConfig {
   appIdentifier: string; envDomain: string; wildcardDomain: string; baseDomain: string
   hostPort: number; env: string; devPreviewPassword?: string; devPassword?: string
   mode?: "proxy" | "maintenance"
-  sablier?: { containerName: string; sessionDuration: string; displayName: string }
+  sablier?: { group: string; sessionDuration: string; displayName: string }
   redirectDomains?: string[]; canonicalDomain?: string
+  internal?: boolean  // Tailscale-only (Caddy remote_ip guard)
 }
 ```
 
@@ -242,7 +267,7 @@ cd .infra && node packages/cli/dist/index.js <command> \
 
 At deploy time, the CLI builds the `.env` file for each app:
 
-1. **All GitHub org secrets** are injected automatically, **except** infrastructure secrets (`HETZNER_API_TOKEN`, `CLOUDFLARE_API_TOKEN`, `TF_CLOUD_TOKEN`, `TAILSCALE_OAUTH_*`, `SSH_PRIVATE_KEY`, `SLACK_BOT_TOKEN`, `GRAFANA_API_KEY`, `NPM_TOKEN`, `GITHUB_TOKEN`)
+1. **All GitHub org secrets** are injected automatically, **except** infrastructure secrets (`HETZNER_API_TOKEN`, `CLOUDFLARE_API_TOKEN`, `TF_CLOUD_TOKEN`, `TAILSCALE_OAUTH_*`, `SSH_PRIVATE_KEY`, `NPM_TOKEN`, `GITHUB_TOKEN`)
 2. **Auto-injected variables** (if not already present from secrets):
 
 | Variable | Source |
@@ -253,6 +278,8 @@ At deploy time, the CLI builds the `.env` file for each app:
 | `DOMAIN` | `[project].domain`, or VPS IP if no domain set |
 | `PUBLIC_SITE_URL` | `https://<domain>`, or `http://<vps-ip>` if no domain set |
 | `APP_PORT` | `[deploy].port` (default `4321`) |
+| `HOST_PORT_{SERVICE}` | Per-route host port (only when `[[routes]]` defined). SERVICE = uppercased service name, hyphens → underscores |
+| `APP_PORT_{SERVICE}` | Per-route container port (only when `[[routes]]` defined) |
 
 3. **Auto-detected compose env vars**: CLI reads the compose file and forwards any env vars referenced from `process.env`
 
@@ -279,7 +306,6 @@ terraform/
 |-----------|----------|
 | `nextnode-shared-dev` | Shared dev VPS, Caddy (DNS managed by CLI) |
 | `nextnode-shared-prod` | Shared prod VPS, Caddy (DNS managed by CLI) |
-| `nextnode-monitoring` | Monitoring VPS + volume |
 | `nextnode-<app>` | Per-app dedicated VPS + volume (DNS managed by CLI) |
 
 Workspaces are auto-created by CLI (`ensureWorkspace()`). No manual bootstrap needed.
@@ -292,7 +318,6 @@ Every VPS is provisioned with **Debian 12** and auto-configured via `templates/c
 - **Caddy** (xcaddy with `cloudflare`, `sablier-caddy-plugin`, `certmagic-s3` plugins) — R2-backed cert storage, DNS-01 ACME
 - **Tailscale** (ephemeral auth key, auto-joins tailnet)
 - **Sablier** v1.9.0 (idle container auto-stop, custom NextNode waiting page, connected to `caddy-net`)
-- **Grafana Alloy** agent (auto-discovers Docker containers, pushes to monitoring VPS)
 - **fail2ban** for SSH protection (5 retries, 1h ban)
 - **deploy** user (docker + sudo groups, passwordless sudo)
 - **UFW** firewall (allow 80/443/Tailscale UDP, SSH only via `tailscale0`)
@@ -326,14 +351,15 @@ GitHub Actions triggers CLI pipeline (infra pipeline --sha <sha>)
      -> Check VPS resources (disk/memory warnings, abort if critical)
      -> Show maintenance page (default strategy) or prepare blue-green slot
      -> Create /opt/apps/<app> on VPS
-     -> Transform compose: replace build/image with GHCR tag, ensure caddy-net
-     -> Generate .env (IMAGE, HOST_PORT, NODE_ENV, secrets, service vars, auto-vars)
+     -> Transform compose: replace build/image with GHCR tag, ensure caddy-net, inject route ports
+     -> Generate .env (IMAGE, HOST_PORT, NODE_ENV, secrets, service vars, route vars, auto-vars)
      -> Checkpoint-based deploy: init → pull → compose-up → caddy-config → caddy-reload → health-check → cleanup → done
      -> If zero_downtime: blue-green (two slots, health check inactive, atomic Caddy switch, 30s drain)
      -> Else: maintenance page → docker compose pull → up → switch to reverse proxy
      -> Atomic Caddy writes (backup + restore on failure)
      -> Persist deploy state (.deploy-state JSON on VPS: activeSlot, imageTag, deployedAt)
-     -> Health checks (container + HTTP)
+     -> Health checks (container + HTTP, includes per-route health checks)
+     -> Deploy route Caddy configs (one handle block per route, inherits main app auth/sablier/internal)
      -> Clean up old Docker images
      -> Release deploy lock
      -> Resume support: --resume flag replays from last checkpoint on failure
@@ -343,36 +369,8 @@ GitHub Actions triggers CLI pipeline (infra pipeline --sha <sha>)
 
 The `infra destroy` command intelligently handles shared VPS:
 - Checks if other apps are running on the shared VPS
-- If other apps exist: removes only this app's containers, DNS, and Caddy config — keeps VPS alive
+- If other apps exist: removes only this app's containers, DNS, Caddy config (main + all routes) — keeps VPS alive
 - If last app: full VPS destruction via Terraform destroy + Tailscale cleanup
-
-## Monitoring Stack
-
-**Centralized monitoring VPS** (cx23, nbg1) running:
-
-| Component | Port | Purpose |
-|-----------|------|---------|
-| **Grafana 11.5** | 3000 | Dashboards at `grafana.nextnode.fr` (Tailscale only, no login) |
-| **Loki 3.4** | 3100 | Log aggregation (30-day retention) |
-| **Prometheus v3.2** | 9090 | Metrics via remote-write receiver (30-day retention) |
-| **Alertmanager v0.28** | 9093 | Alert routing to Slack |
-
-**Push-only architecture:** Alloy agents on each VPS push logs + metrics to the monitoring VPS via Tailscale.
-
-### Grafana Dashboards
-
-1. **Infrastructure Overview** — CPU, memory, disk, network per VPS
-2. **Container Dashboard** — Per-container resource usage (cAdvisor)
-3. **App Logs Explorer** — Search/filter logs by app, level, container
-4. **Deployment Tracker** — Deployment timeline with annotations
-
-### Slack Channels
-
-| Channel | Alerts |
-|---------|--------|
-| `#alerts-critical` | Container down, disk >90%, OOM, service down |
-| `#alerts-general` | High CPU, high memory, restart loops, cert expiry |
-| `#deployments` | Deploy start/approve/complete/fail/rollback with details |
 
 ## DNS & SSL Strategy
 
@@ -412,8 +410,6 @@ Non-prod deployments can be protected with Caddy basic auth via org-level GitHub
 | `TAILSCALE_OAUTH_CLIENT_ID` | Tailscale OAuth — generates ephemeral auth keys for new VPSes |
 | `TAILSCALE_OAUTH_CLIENT_SECRET` | Tailscale OAuth — paired with client ID |
 | `SSH_PRIVATE_KEY` | SSH private key for deploy user |
-| `SLACK_BOT_TOKEN` | Slack notifications + alerts |
-| `GRAFANA_API_KEY` | Grafana annotations API |
 | `R2_ACCESS_KEY_ID` | Cloudflare R2 access key (Caddy cert storage) — auto-created by `setup-r2` |
 | `R2_SECRET_ACCESS_KEY` | Cloudflare R2 secret key — auto-created by `setup-r2` |
 | `NEXTNODE_APP_ID` | GitHub App ID — used for generating tokens with elevated permissions |
@@ -431,6 +427,74 @@ The `[services]` config section auto-generates environment variables at deploy t
 
 | Service | Generated Vars | Notes |
 |---------|---------------|-------|
-| **Supabase** | `SITE_URL`, `API_EXTERNAL_URL`, `SUPABASE_URL`, `JWT_SECRET`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | URLs derived from domain; JWT keys auto-generated + stored as GH environment secrets |
+| **Supabase** | `SITE_URL`, `API_EXTERNAL_URL`, `SUPABASE_URL`, `JWT_SECRET`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_USER`, `APP_NAME` | URLs derived from domain; JWT keys auto-generated + stored as GH env secrets; POSTGRES_PASSWORD auto-generated + stored as GH env secret; OAuth vars via `computeOAuthEnvVars()` |
+| **Supabase OAuth** | `GOTRUE_EXTERNAL_{PROVIDER}_ENABLED`, `_CLIENT_ID`, `_SECRET`, `_REDIRECT_URI`, `_SCOPE` | Per-provider env vars from `[services.supabase.oauth]` config. Requires `{PROVIDER}_CLIENT_ID` + `{PROVIDER}_CLIENT_SECRET` as GH secrets. |
 | **Redis** | `REDIS_URL` | `redis://redis:{port}` (default port 6379) |
 | **R2** | `R2_BUCKET_NAME`, `R2_ACCOUNT_ID`, `R2_ENDPOINT_URL`, `R2_PUBLIC_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | Bucket from config; account ID + endpoint derived from CF API; public URL only if `public = true`; credentials forwarded from process.env (org secrets) |
+
+## Supabase Compose Scaffolding
+
+The `supabase.ts` library auto-generates a full Supabase stack as Docker Compose services:
+
+**Baseline services** (always included): `supabase-db` (Postgres 15.8), `supabase-auth` (GoTrue), `supabase-rest` (PostgREST), `supabase-kong` (API gateway), `supabase-meta` (PG Meta), `supabase-studio`
+
+**Feature-gated services**: `supabase-storage` (when `features = ["storage"]`), `supabase-realtime` (when `features = ["realtime"]`)
+
+**Generated artifacts**: Kong declarative YAML, roles.sql, init-db.sh (migration runner), kong-entrypoint.sh (env var interpolation)
+
+**Merge behavior**: `mergeSupabaseCompose()` injects Supabase services into existing app compose, adds `depends_on: supabase-kong` to the app service. Data volumes mount to `/mnt/data/{appName}-supabase-*`.
+
+## Subdomain Routing (`[[routes]]`)
+
+Maps subdomains to docker-compose services. Each route exposes a specific compose service on its own subdomain with automated Caddy config, port allocation, and health checks.
+
+### Config
+
+```toml
+[[routes]]
+subdomain = "admin"
+service = "strapi"
+port = 1337
+health_path = "/_health"  # optional, defaults to main app's health.path
+```
+
+### Domain Patterns
+
+| Environment | Pattern | Example |
+|-------------|---------|---------|
+| Prod | `{sub}.{domain}` | `admin.fleursdaujourdhui.fr` |
+| Dev | `{sub}.dev.{domain}` | `admin.dev.fleursdaujourdhui.fr` |
+| PR preview | `{sub}-pr-{N}.dev.{domain}` | `admin-pr-5.dev.fleursdaujourdhui.fr` |
+
+- DNS: covered by existing `*.{domain}` (prod) and `*.dev.{domain}` (dev/PR) wildcards — no new DNS records needed
+- TLS: prod routes use `*.{domain}` cert, dev/PR routes use `*.dev.{domain}` cert
+
+### Compose Transformation
+
+- Route services get `ports: "${HOST_PORT_SERVICE}:${APP_PORT_SERVICE}"` injected (service name uppercased, hyphens → underscores)
+- Route services get `caddy-net` network injected
+- Route services keep their original `image:` (no ghcr.io replacement — only the main app service gets the built image)
+
+### Caddy
+
+- One handle block per route, placed in the correct site file:
+  - Prod: `{domain}.caddy` (same as main app)
+  - Dev/PR: `dev.{domain}.caddy` (same as PR previews)
+- Routes inherit main app's `basic_auth`, Sablier, and `internal` guard
+- App identifier: `{sanitizedAppName}-{subdomain}` (e.g., `fleurs-daujourdhui-admin`)
+
+### Deploy Functions
+
+- `extractComposeServiceNames(content)` — parse service names from compose
+- `validateRouteServices(routes, composeServiceNames)` — deploy-time validation
+- `sanitizeServiceEnvName(serviceName)` — convert to env var suffix
+- `injectRouteCaddyNet(content, routeServiceNames)` — inject caddy-net into route services
+- `deployRouteCaddyConfigs(ctx, routes)` — deploy Caddy configs for all routes
+
+### Blue-Green
+
+When `zero_downtime` is enabled, routes participate: each route gets blue/green ports, all handle blocks swap atomically in one Caddy reload.
+
+### Destroy
+
+`infra destroy` removes all route Caddy blocks from both `{domain}.caddy` and `dev.{domain}.caddy`.

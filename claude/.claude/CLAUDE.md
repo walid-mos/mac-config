@@ -80,3 +80,7 @@
 # Mandatory Code Rules
 
 - **Guard clauses ALWAYS** — before writing `if (x) { ...long block... } return`, flip to `if (!x) return` + flat logic. Evaluate both forms, pick the one that exits early. Nested ifs → sequential guards. Happy path at lowest indentation. All languages, no exceptions.
+
+- **NEVER `sleep` to poll workflows** — no `sleep N && gh run view`, no `while/sleep` loops. Use GitHub MCP tools (`pull_request_read`, `get_commit`) or `gh run watch --exit-status` for real-time status. All agents, no exceptions.
+
+- **NEVER swallow errors** — no empty `catch {}`, no `catch (_) { /* ignore */ }`, no `catch` that does nothing with the error. Every error MUST be handled: log it (minimum `console.warn`), re-throw it, propagate it, or return it. Decide what the caller needs — most of the time the error should crash, propagate, or be logged at warning+. Silent swallowing is ALWAYS a bug. All languages, all agents, no exceptions.

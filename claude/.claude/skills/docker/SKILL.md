@@ -45,7 +45,7 @@ These are injected by the NextNode CLI at deploy time — the Dockerfile uses `A
 | Variable | Source | Usage in Dockerfile |
 |----------|--------|---------------------|
 | `APP_PORT` | `[deploy].port` in `nextnode.toml` | `ARG APP_PORT=<default>` + `EXPOSE $APP_PORT` |
-| `HOST_PORT` | CLI-assigned (10000-29999) | docker-compose only: `${HOST_PORT}:${APP_PORT}` |
+| `HOST_PORT_APP` | CLI-assigned (10000-29999) | docker-compose only: `${HOST_PORT_APP}:${APP_PORT_APP}` |
 | `NODE_ENV` | CLI-injected | `ENV NODE_ENV=production` in runtime stage |
 | `HOST` | Always `0.0.0.0` for containers | `ENV HOST=0.0.0.0` |
 
@@ -68,11 +68,13 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "${HOST_PORT}:${APP_PORT}"
+      - "${HOST_PORT_APP}:${APP_PORT_APP}"
     restart: unless-stopped
     environment:
       - NODE_ENV=${NODE_ENV}
 ```
+
+> Multi-build: every service with `build:` gets `${HOST_PORT_<SERVICE>}:${APP_PORT_<SERVICE>}`. SERVICE = uppercased name, hyphens → underscores.
 
 - **No `env_file`** — CLI injects `.env` at deploy time
 - **No `container_name`** — let Compose auto-name

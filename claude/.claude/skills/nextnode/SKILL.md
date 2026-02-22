@@ -90,8 +90,11 @@ scopes = ["user:email"]
 postgres = "15.8.1.085"            # Override any service image tag
 
 [services.r2]                      # Cloudflare R2 object storage
-bucket = "my-bucket"               # REQUIRED when [services.r2] is declared
-public = false                     # Whether bucket has public access
+bucket = "my-bucket"               # REQUIRED. Resolved to {bucket}-{envShortId} per env (e.g., my-bucket-dev, my-bucket-prod)
+public = false                     # Whether bucket has public access (enables r2.dev URL)
+domain_cdn = true                  # Auto-derive CDN domain from project.domain (e.g., cdn.domain.fr)
+domain_cdn_prefix = "cdn"          # Subdomain label for auto CDN domain (default: "cdn")
+cdn = ["cdn.example.com"]          # Additional CDN bare hostnames (no protocol). Dev auto-prefixed (cdn.dev.example.com)
 
 [services.redis]                   # Redis sidecar
 port = 6379                        # Redis port (default: 6379)
@@ -244,7 +247,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "${HOST_PORT}:${APP_PORT}"
+      - "${HOST_PORT_APP}:${APP_PORT_APP}"
     restart: unless-stopped
     environment:
       - NODE_ENV=${NODE_ENV}
@@ -256,7 +259,7 @@ services:
 - **No `container_name`** — let Docker Compose auto-name
 - **No inline `healthcheck`** — put health checks in `Dockerfile` (`HEALTHCHECK` instruction)
 - **`restart: unless-stopped`** — standard restart policy
-- **Port mapping** — `${HOST_PORT}:${APP_PORT}` where `HOST_PORT` is CLI-assigned (10000-29999) and `APP_PORT` is from `nextnode.toml [deploy].port`
+- **Port mapping** — `${HOST_PORT_APP}:${APP_PORT_APP}` where `HOST_PORT_APP` is CLI-assigned (10000-29999) and `APP_PORT_APP` is from `nextnode.toml [deploy].port`. Every buildable service uses `${HOST_PORT_<SERVICE>}:${APP_PORT_<SERVICE>}` (SERVICE = uppercased name, hyphens → underscores)
 
 ---
 

@@ -84,3 +84,5 @@
 - **NEVER `sleep` to poll workflows** — no `sleep N && gh run view`, no `while/sleep` loops. Use GitHub MCP tools (`pull_request_read`, `get_commit`) or `gh run watch --exit-status` for real-time status. All agents, no exceptions.
 
 - **NEVER swallow errors** — no empty `catch {}`, no `catch (_) { /* ignore */ }`, no `catch` that does nothing with the error. Every error MUST be handled: log it (minimum `console.warn`), re-throw it, propagate it, or return it. Decide what the caller needs — most of the time the error should crash, propagate, or be logged at warning+. Silent swallowing is ALWAYS a bug. All languages, all agents, no exceptions.
+
+- **Respect the project's package manager** — if `pnpm-lock.yaml` exists, use ONLY `pnpm`, `pnpm dlx`, `pnpm exec`. NEVER run `npm`, `npx`, `npm install`, `npm run`, or any `npm`/`npx` command in a pnpm project. Same principle applies to other lockfiles (`yarn.lock` → yarn, `bun.lockb` → bun).

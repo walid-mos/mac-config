@@ -2,7 +2,7 @@
 name: interview
 description: Interview user in-depth to create detailed specs or implementation plans
 argument-hint: [feature or task description]
-allowed-tools: AskUserQuestion, Write, Read, Glob, Grep, Edit
+allowed-tools: AskUserQuestion, Write, Read, Glob, Grep, Edit, Task, Skill
 ---
 
 # Interview Skill
@@ -43,6 +43,21 @@ Conduct a thorough, adaptive interview:
 - Cover organically as relevant: technical implementation, UI/UX, business logic, edge cases, security, performance, tradeoffs, dependencies, error handling, data model, API design...
 - End the interview when there is enough material to write a complete, precise document
 - Use AskUserQuestion for each round of questions — batch related questions together when it makes sense, but prefer depth over breadth
+
+## Council Refinement (MANDATORY GATE)
+
+After the interview is complete and BEFORE presenting the final document to the user:
+
+1. **Write the draft**: write the document to its target file path using the appropriate template (spec or plan) from the Output section below
+2. **Invoke `/council`**: use the Skill tool to invoke `/council` with the file path as argument (e.g., `/council docs/specs/260223-auth-system.spec.md`)
+3. **Wait for council completion**: the council runs 3-5 deliberation rounds with 5 expert sages, refining the document in-place
+4. **The council output IS the final deliverable** — do not modify the file after the council finishes (unless the user requests changes)
+
+This step is **NON-NEGOTIABLE**. Every `/interview` output passes through the council before being presented to the user. Skipping the council is a critical violation — the same severity as skipping tests in `/swarm`.
+
+> **Why**: The council catches architectural gaps, security oversights, DRY violations, missing edge cases, and convention drift that a single-pass interview cannot. It is the quality gate between "gathered requirements" and "production-ready spec/plan".
+
+---
 
 ## Output
 

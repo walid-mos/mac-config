@@ -3,7 +3,7 @@ name: planification
 description: Deep strategic interview to produce swarm-ready specs — decomposes a project into parallelizable, self-contained spec files that each map to one /swarm run
 user-invocable: true
 argument-hint: [project or feature description]
-allowed-tools: AskUserQuestion, Write, Read, Glob, Grep, Edit, WebSearch, WebFetch
+allowed-tools: AskUserQuestion, Write, Read, Glob, Grep, Edit, WebSearch, WebFetch, Task, Skill
 ---
 
 # Planification Skill — Strategic Spec Architect
@@ -258,9 +258,27 @@ All human actions needed across specs, deduplicated:
 
 ---
 
+## Step 3c — Council Refinement (MANDATORY GATE)
+
+After writing all spec files (3a) and the manifest (3b), run `/council` on **each spec file** to refine it:
+
+1. For each spec file written in Step 3a, invoke `/council` via the Skill tool with the file path as argument:
+   - `/council docs/specs/<module-name>.spec.md`
+   - The council runs 3-5 deliberation rounds with 5 expert sages
+   - The council refines the spec **in-place** (overwrites the file)
+2. Run specs through the council **sequentially** (one at a time) — each council run is already heavily parallel internally (5 sages per round)
+3. Do **NOT** run `/council` on the manifest — it is a coordination document, not a deliverable spec
+4. After all specs have been council-refined, proceed to Step 4
+
+This step is **NON-NEGOTIABLE**. Every spec passes through the council before being presented to the user. Skipping the council is a critical violation — the same severity as skipping tests in `/swarm`.
+
+> **Why**: The council catches architectural gaps, security oversights, missing edge cases, DRY violations, and convention drift across 5 expert lenses. A single-author spec always has blind spots — the council eliminates them.
+
+---
+
 ## Step 4 — Presentation & Validation
 
-After generating all specs:
+After all specs have been council-refined:
 
 1. Present a summary to the user: how many specs, total FRs, parallel groups, recommended execution order
 2. Ask if they want to:

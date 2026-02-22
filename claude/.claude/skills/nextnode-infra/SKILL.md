@@ -46,7 +46,7 @@ The `infra` CLI (`packages/cli/`) is built with **citty**. All commands accept `
 | `infra plan` | Show resolved config and planned pipeline actions (dry run) | `--ci`, `--pr-number` |
 | `infra lint` | Run `pnpm <lint-script>` | — |
 | `infra test` | Run `pnpm <test-script>` | — |
-| `infra build` | Build Docker image, push to ghcr.io | `--sha` |
+| `infra build` | Build Docker image(s), push to ghcr.io | `--sha`, `--list`, `--service` |
 | `infra provision` | Provision VPS via Terraform (skips if VPS healthy) | `--force`, `--plan-only` |
 | `infra deploy` | Deploy app to VPS via SSH + Docker Compose (maintenance-page default, blue-green optional) | `--sha`, `--resume` |
 | `infra dns upsert` | Create/update DNS A record (+ wildcards) | `--ip` |
@@ -67,8 +67,11 @@ The `infra` CLI (`packages/cli/`) is built with **citty**. All commands accept `
 |---------|---------------|
 | **config** | `loadConfig()`, `parseConfig()`, `mergeConfig()`, `validateConfig()`, `resolveConfigInput()`, `computeHostPort()`, `computeGreenPort()`, `computeEnvDomain()`, `computeRouteEnvDomain()`, `computeWildcardDomain()`, `computeRedirectDomains()`, `computePreviewDomain()`, `computeWorkspaceName()`, `computeImageTag()`, `infraEnvId()`, `isPrPreview()`, `detectDockerConfig()`, `findDefaultTomlPath()` |
 | **compose** | `parseComposeEnv()`, `extractComposeEnvValues()`, `parseComposeContainerNames()` — env var extraction from compose files |
-| **cloudflare** | `lookupZoneId()`, `upsertDnsRecord()`, `deleteDnsRecord()`, `listDnsRecords()`, `resolveCloudflareAccountId()` — with retry for rate limiting |
-| **dns** | `resolveDnsTarget()`, `resolveProxied()`, `resolveTtl()`, `upsertWildcardRecords()`, `upsertDevWildcardRecord()`, `upsertRedirectDnsRecords()`, `deleteRedirectDnsRecords()` |
+| **compose-parse** | `parseComposeServices(content): ComposeService[]`, `discoverBuildableServices(content, appDir): BuildableService[]` — YAML AST parser (`yaml` package) for service discovery, Dockerfile validation. Types: `ComposeService`, `BuildableService` |
+| **compose-transform** | `transformCompose(content, options?: TransformOptions): string`, `stripSharedServices(content): StripResult`, `sanitizeServiceEnvName(name): string` — AST-based compose transformation: replaces `build:` with `image: ${IMAGE_<SERVICE>}`, strips NODE_ENV/deploy blocks. Types: `TransformOptions`, `StripResult` |
+| **docker-build** | `buildImages(services, options): Promise<BuildResult[]>`, `pushImages(results): Promise<void>`, `listBuildableServices(content, appDir): BuildableService[]`, `imageTagForService(prefix, env, sha, service): string` — multi-service parallel build/push orchestration via `Promise.allSettled()`. Types: `BuildOptions`, `BuildResult` |
+| **cloudflare** | `lookupZoneId()`, `upsertDnsRecord()`, `deleteDnsRecord()`, `listDnsRecords()`, `resolveCloudflareAccountId()`, `enableR2PublicAccess()`, `getR2BucketPublicUrl()`, `ensureR2PublicAccess()` — with retry for rate limiting; R2 public access automation via Cloudflare API |
+| **dns** | `resolveDnsTarget()`, `resolveProxied()`, `resolveTtl()`, `upsertWildcardRecords()`, `upsertDevWildcardRecord()`, `upsertRedirectDnsRecords()`, `deleteRedirectDnsRecords()`, `upsertStudioDnsRecord()`, `deleteStudioDnsRecord()`, `upsertCdnDnsRecords()`, `deleteCdnDnsRecords()`, `extractRootDomain()` — CDN CNAME records for R2 custom domains (prod=proxied, dev=unproxied) |
 | **ssh** | `sshExec()`, `scp()`, `withSshKey()`, `writeKeyFile()`, `cleanupKeyFile()` — SSH via Tailscale hostnames |
 | **terraform** | `terraformInit()`, `terraformPlan()`, `terraformApply()`, `terraformOutput()`, `terraformDestroy()`, `terraformStateList()`, `terraformDestroyTargeted()`, `resetTerraformCheck()` |
 | **tfcloud** | `getWorkspace()`, `ensureWorkspace()`, `deleteWorkspace()`, `hasResources()` |
@@ -78,10 +81,10 @@ The `infra` CLI (`packages/cli/`) is built with **citty**. All commands accept `
 | **compose-validation** | `validateCompose()` — check docker-compose.yml for common issues |
 | **port-validation** | `validatePortConsistency()`, `validateDockerfile()`, `validateComposePort()`, `validateFrameworkConfig()` |
 | **docker** | `dockerBuild()`, `dockerPush()`, `dockerLogin()` |
-| **dockerfile** | `parseDockerfileEnv()` — extract ARG/ENV declarations from Dockerfile. `INFRA_MANAGED_VARS` constant excludes `NODE_ENV`, `PORT`, `APP_PORT`, `HOST_PORT`, `IMAGE`, `COMPOSE_PROJECT_NAME` |
+| **dockerfile** | `parseDockerfileEnv()` — extract ARG/ENV declarations from Dockerfile. `INFRA_MANAGED_VARS` constant excludes infra-managed env vars (NODE_ENV, PORT, APP_PORT_*, HOST_PORT_*, IMAGE_*, COMPOSE_PROJECT_NAME) |
 | **github** | `ghFetch()`, `verifyCiPassed()`, `getCheckRuns()`, `getCommitStatus()`, `getWorkflowRun()`, `ensureGitHubEnvironments()`, `findOpenPrForCurrentBranch()` — prod gate CI verification + env sync |
 | **hetzner** | `fetchHetznerSshKeyIds()` |
-| **services** | `computeServiceEnvVars()`, `generateSupabaseKeys()`, `resolveCloudflareAccountId()`, `storeSupabaseKeysViaGh()` — derives env vars from `[services]` config: Supabase (URLs, JWT keys, POSTGRES_PASSWORD, OAuth vars), Redis (URL), R2 (account ID, endpoint, public URL, bucket name + forwards credentials from process.env) |
+| **services** | `computeServiceEnvVars()`, `generateSupabaseKeys()`, `resolveCloudflareAccountId()`, `storeSupabaseKeysViaGh()`, `computeCdnEntryForEnv()`, `computeAllCdnDomains()` — derives env vars from `[services]` config: Supabase (URLs, JWT keys, POSTGRES_PASSWORD, DATABASE_HOST/PORT, OAuth vars), Redis (URL), R2 (per-env bucket name, account ID, endpoint, CDN URL with priority chain: domain_cdn > cdn[0] > R2 public URL, forwards credentials from process.env) |
 | **supabase** | `generateSupabaseCompose()`, `mergeSupabaseCompose()`, `hasExistingSupabaseServices()`, `generateKongConfig()`, `generateInitScripts()`, `computeOAuthEnvVars()`, `resolvePostgresPassword()`, `SUPABASE_DEFAULT_VERSIONS` — centralized Supabase compose scaffolding + Kong API gateway config + init scripts + OAuth env vars |
 | **r2** | `ensureR2Setup()`, `ensureR2Bucket()`, `ensureR2Credentials()` — self-healing R2 setup for Caddy cert storage. Auto-creates bucket + credentials, injects into `process.env`, best-effort stores as GitHub org secrets |
 | **http** | `fetchWithRetry()` — generic fetch with exponential backoff on 429 |
@@ -117,7 +120,7 @@ interface SupabaseOAuthProviderConfig { scopes?: string[] }
 interface SupabaseOAuthConfig { providers: string[]; [provider: string]: string[] | SupabaseOAuthProviderConfig | undefined }
 interface SupabaseVersionOverrides { postgres?; gotrue?; postgrest?; kong?; meta?; studio?; storage?; realtime? }
 interface SupabaseServiceConfig { studio_port?: number; migrations?: string; features?: SupabaseFeature[]; oauth?: SupabaseOAuthConfig; versions?: SupabaseVersionOverrides }
-interface R2ServiceConfig { bucket: string; public?: boolean }
+interface R2ServiceConfig { bucket: string; public?: boolean; domain_cdn?: boolean; domain_cdn_prefix?: string; cdn?: string[] }
 interface RedisServiceConfig { port?: number }
 interface ServicesSection { supabase?: SupabaseServiceConfig; r2?: R2ServiceConfig; redis?: RedisServiceConfig }
 
@@ -152,6 +155,8 @@ interface ProjectConfig {
     workspaceName(env: string): string
     imageTag(env: string, sha: string): string
     redirectDomains(env: string): string[]
+    dbHostPort(env: string): number                 // deterministic Supabase Postgres host port (env-scoped)
+    studioHostPort(env: string): number             // deterministic Supabase Studio host port (env-scoped, overridable)
     routeHostPort(subdomain: string): number       // deterministic port per route (10000-29999)
     routeGreenPort(subdomain: string): number      // green slot port per route (30000-49999)
     routeEnvDomain(subdomain: string, env: string): string  // env-aware route domain
@@ -237,7 +242,7 @@ ci.yml (per-repo template — see `nextnode` skill)
         ├─> Plan job (inline TOML parse, outputs project_type/has_lint/test/build)
         ├─> Lint job (pnpm lint)
         ├─> Test job (pnpm test)
-        ├─> Build job (infra build --sha, GHCR push)
+        ├─> Build job (dynamic matrix: `infra build --list` discovers services, one matrix slot per service via `--service`)
         ├─> [For packages] pipeline-package.yml
         │     └─> publish (pnpm dlx semantic-release)
         └─> [For apps] After quality gates:
@@ -272,14 +277,16 @@ At deploy time, the CLI builds the `.env` file for each app:
 
 | Variable | Source |
 |----------|--------|
-| `IMAGE` | GHCR image tag for the deployment |
-| `HOST_PORT` | Deterministic hash-based port (10000-29999) |
+| `IMAGE_APP` | GHCR image tag for the main app service (or `IMAGE_{SERVICE}` per buildable service) |
+| `HOST_PORT_APP` | Deterministic hash-based port (10000-29999) for the main app (or `HOST_PORT_{SERVICE}` per buildable service) |
+| `APP_PORT_APP` | `[deploy].port` (default `4321`) for the main app (or `APP_PORT_{SERVICE}` per buildable service) |
 | `NODE_ENV` | `production` for prod, `development` for others |
 | `DOMAIN` | `[project].domain`, or VPS IP if no domain set |
 | `PUBLIC_SITE_URL` | `https://<domain>`, or `http://<vps-ip>` if no domain set |
-| `APP_PORT` | `[deploy].port` (default `4321`) |
 | `HOST_PORT_{SERVICE}` | Per-route host port (only when `[[routes]]` defined). SERVICE = uppercased service name, hyphens → underscores |
 | `APP_PORT_{SERVICE}` | Per-route container port (only when `[[routes]]` defined) |
+
+> **Breaking change (PR #71):** `IMAGE`, `HOST_PORT`, `APP_PORT` are now suffixed: `IMAGE_APP`, `HOST_PORT_APP`, `APP_PORT_APP`. Apps with custom `docker-compose.yml` must update their env var references. The `.env` is regenerated on every deploy — only the compose file in the app repo needs updating.
 
 3. **Auto-detected compose env vars**: CLI reads the compose file and forwards any env vars referenced from `process.env`
 
@@ -344,6 +351,7 @@ GitHub Actions triggers CLI pipeline (infra pipeline --sha <sha>)
      -> If no domain: skip (CaddyLifecycle uses NoOp)
      -> Upsert A record (+ wildcard records)
      -> Upsert redirect domain DNS records (prod only, auto-www)
+     -> Upsert CDN CNAME records for R2 custom domains (if `[services.r2]` with `domain_cdn` or `cdn` entries)
      -> Prod: proxied (orange cloud), Non-prod: unproxied (grey cloud)
      -> CNAME conflict detection and cleanup
   -> DEPLOY:
@@ -351,8 +359,8 @@ GitHub Actions triggers CLI pipeline (infra pipeline --sha <sha>)
      -> Check VPS resources (disk/memory warnings, abort if critical)
      -> Show maintenance page (default strategy) or prepare blue-green slot
      -> Create /opt/apps/<app> on VPS
-     -> Transform compose: replace build/image with GHCR tag, ensure caddy-net, inject route ports
-     -> Generate .env (IMAGE, HOST_PORT, NODE_ENV, secrets, service vars, route vars, auto-vars)
+     -> Transform compose (AST-based via `yaml` package): replace all build: blocks with image: ${IMAGE_<SERVICE>}, inject per-service ports, ensure caddy-net
+     -> Generate .env (IMAGE_APP, HOST_PORT_APP, APP_PORT_APP per buildable service, NODE_ENV, secrets, service vars, route vars, auto-vars)
      -> Checkpoint-based deploy: init → pull → compose-up → caddy-config → caddy-reload → health-check → cleanup → done
      -> If zero_downtime: blue-green (two slots, health check inactive, atomic Caddy switch, 30s drain)
      -> Else: maintenance page → docker compose pull → up → switch to reverse proxy
@@ -380,9 +388,10 @@ The `infra destroy` command intelligently handles shared VPS:
 - **Public apps** — orange cloud (Cloudflare proxied, CDN + DDoS protection)
 - **Internal apps** — grey cloud (DNS points to Tailscale IP)
 - **DNS ownership**: CLI manages app DNS records via Cloudflare API. Terraform only manages zone-level settings (DNSSEC, SSL mode)
-- **Cleanup**: `infra dns delete` removes A/CNAME records for an app domain
+- **Cleanup**: `infra dns delete` removes A/CNAME records for an app domain (including CDN CNAME records)
 - **Wildcard records**: `infra dns upsert` creates both `*.{domain}` and `{domain}` A records
 - **Redirect domains**: `redirect_domains` config auto-creates DNS + Caddy redirect blocks (prod only, auto-adds www)
+- **CDN CNAME records**: R2 CDN domains (`domain_cdn` + `cdn` array) get CNAME records pointing to R2 public bucket URL during pipeline DNS step. Prod = proxied (orange cloud), dev = unproxied. Idempotent — skips if record already exists with correct target. Cleaned up on destroy.
 - **CNAME conflict detection**: auto-detects and deletes conflicting CNAME records before creating A records
 
 ## Dev Environment Auth
@@ -427,10 +436,10 @@ The `[services]` config section auto-generates environment variables at deploy t
 
 | Service | Generated Vars | Notes |
 |---------|---------------|-------|
-| **Supabase** | `SITE_URL`, `API_EXTERNAL_URL`, `SUPABASE_URL`, `JWT_SECRET`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_USER`, `APP_NAME` | URLs derived from domain; JWT keys auto-generated + stored as GH env secrets; POSTGRES_PASSWORD auto-generated + stored as GH env secret; OAuth vars via `computeOAuthEnvVars()` |
+| **Supabase** | `SITE_URL`, `API_EXTERNAL_URL`, `SUPABASE_URL`, `JWT_SECRET`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_USER`, `DATABASE_HOST`, `DATABASE_PORT`, `APP_NAME` | URLs derived from domain (omitted when no domain); JWT keys auto-generated + stored as GH env secrets; POSTGRES_PASSWORD auto-generated + stored as GH env secret; DATABASE_HOST always `supabase-db`; DATABASE_PORT via `dbHostPort()` (env-scoped deterministic); OAuth vars via `computeOAuthEnvVars()` |
 | **Supabase OAuth** | `GOTRUE_EXTERNAL_{PROVIDER}_ENABLED`, `_CLIENT_ID`, `_SECRET`, `_REDIRECT_URI`, `_SCOPE` | Per-provider env vars from `[services.supabase.oauth]` config. Requires `{PROVIDER}_CLIENT_ID` + `{PROVIDER}_CLIENT_SECRET` as GH secrets. |
 | **Redis** | `REDIS_URL` | `redis://redis:{port}` (default port 6379) |
-| **R2** | `R2_BUCKET_NAME`, `R2_ACCOUNT_ID`, `R2_ENDPOINT_URL`, `R2_PUBLIC_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | Bucket from config; account ID + endpoint derived from CF API; public URL only if `public = true`; credentials forwarded from process.env (org secrets) |
+| **R2** | `R2_BUCKET_NAME`, `R2_ACCOUNT_ID`, `R2_ENDPOINT_URL`, `R2_CDN_URL`, `R2_CDN_URLS`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | Bucket is per-env: `{bucket}-{envShortId}` (e.g., `assets-dev`, `assets-prod`); account ID + endpoint from CF API; `R2_CDN_URL` via priority chain: domain_cdn > cdn[0] > R2 public URL; `R2_CDN_URLS` only if 2+ CDN domains; credentials forwarded from process.env (org secrets) |
 
 ## Supabase Compose Scaffolding
 
@@ -471,9 +480,11 @@ health_path = "/_health"  # optional, defaults to main app's health.path
 
 ### Compose Transformation
 
-- Route services get `ports: "${HOST_PORT_SERVICE}:${APP_PORT_SERVICE}"` injected (service name uppercased, hyphens → underscores)
+- All services with `build:` get `image: ${IMAGE_<SERVICE>}` injected (replacing the build block) and `ports: "${HOST_PORT_<SERVICE>}:${APP_PORT_<SERVICE>}"`
+- Route services (non-buildable) get `ports: "${HOST_PORT_SERVICE}:${APP_PORT_SERVICE}"` injected
 - Route services get `caddy-net` network injected
-- Route services keep their original `image:` (no ghcr.io replacement — only the main app service gets the built image)
+- Services without `build:` and not in routes are left untouched
+- Image tag convention: `ghcr.io/{org}/{project}:{env}-{sha}-{service}` (per-service suffix)
 
 ### Caddy
 
@@ -498,3 +509,120 @@ When `zero_downtime` is enabled, routes participate: each route gets blue/green 
 ### Destroy
 
 `infra destroy` removes all route Caddy blocks from both `{domain}.caddy` and `dev.{domain}.caddy`.
+
+## Auto-Generated Environment Variables (Do NOT Add Manually)
+
+The infrastructure auto-generates and injects these variables at deploy time. **Projects must NEVER define these in GitHub secrets, `.env` files, or `docker-compose.yml` environment blocks.** They are overwritten on every deploy.
+
+### Core Deploy Variables
+
+Always injected by `generateDotEnv()` in `deploy.ts`:
+
+| Variable | Value | Source |
+|----------|-------|--------|
+| `IMAGE_APP` | `ghcr.io/{org}/{repo}:{env}-{sha}-app` | Computed from config |
+| `COMPOSE_PROJECT_NAME` | `{appName}-{env}[-{slot}]` | Computed from config |
+| `HOST_PORT_APP` | Deterministic port (10000-29999) | Hash of app name |
+| `APP_PORT_APP` | `[deploy].port` (default `4321`) | `nextnode.toml` |
+| `NODE_ENV` | `production` or `development` | Derived from env |
+
+### Multi-Service / Route Variables
+
+Injected per buildable service and per `[[routes]]` entry:
+
+| Variable | Pattern | Example |
+|----------|---------|---------|
+| `IMAGE_{SERVICE}` | Per buildable service | `IMAGE_STRAPI` |
+| `HOST_PORT_{SERVICE}` | Per service/route host port | `HOST_PORT_ADMIN` |
+| `APP_PORT_{SERVICE}` | Per service/route container port | `APP_PORT_API` |
+
+SERVICE = uppercased service name, hyphens replaced with underscores.
+
+### Supabase Service Variables
+
+Injected when `[services.supabase]` is configured (`computeServiceEnvVars()` in `services.ts`):
+
+| Variable | Value |
+|----------|-------|
+| `SITE_URL` | `https://{envDomain}` |
+| `API_EXTERNAL_URL` | Same as `SITE_URL` |
+| `SUPABASE_URL` | `http://supabase-kong:8000` |
+| `JWT_SECRET` | 64-char hex (auto-generated, stored as GH env secret) |
+| `SUPABASE_ANON_KEY` | JWT (auto-generated, stored as GH env secret) |
+| `SUPABASE_SERVICE_ROLE_KEY` | JWT (auto-generated, stored as GH env secret) |
+| `POSTGRES_PASSWORD` | 64-char hex (auto-generated, stored as GH env secret) |
+| `POSTGRES_DB` | `postgres` |
+| `POSTGRES_USER` | `supabase_admin` |
+| `DATABASE_HOST` | `supabase-db` (always, Docker service name) |
+| `DATABASE_PORT` | Deterministic env-scoped port via `dbHostPort(env)` |
+| `APP_NAME` | `[project].name` from `nextnode.toml` |
+
+### Supabase OAuth Variables
+
+Injected per provider when `[services.supabase.oauth]` is configured (`computeOAuthEnvVars()` in `supabase.ts`):
+
+| Variable | Example |
+|----------|---------|
+| `GOTRUE_EXTERNAL_{PROVIDER}_ENABLED` | `GOTRUE_EXTERNAL_GOOGLE_ENABLED=true` |
+| `GOTRUE_EXTERNAL_{PROVIDER}_CLIENT_ID` | From `{PROVIDER}_CLIENT_ID` GH secret |
+| `GOTRUE_EXTERNAL_{PROVIDER}_SECRET` | From `{PROVIDER}_CLIENT_SECRET` GH secret |
+| `GOTRUE_EXTERNAL_{PROVIDER}_REDIRECT_URI` | `https://{domain}/auth/v1/callback` |
+| `GOTRUE_EXTERNAL_{PROVIDER}_SCOPE` | From `[services.supabase.oauth.{provider}].scopes` |
+
+Note: GitHub OAuth uses `GH_CLIENT_ID` / `GH_CLIENT_SECRET` (not `GITHUB_*`) to avoid GitHub's reserved namespace.
+
+### Redis Service Variables
+
+Injected when `[services.redis]` is configured:
+
+| Variable | Value |
+|----------|-------|
+| `REDIS_URL` | `redis://redis:{port}` (default port 6379) |
+
+### R2 Service Variables
+
+Injected when `[services.r2]` is configured:
+
+| Variable | Value |
+|----------|-------|
+| `R2_BUCKET_NAME` | Per-env: `{bucket}-{envShortId}` (e.g., `assets-dev`, `assets-prod`) |
+| `R2_ACCOUNT_ID` | Resolved via Cloudflare API |
+| `R2_ENDPOINT_URL` | `https://{accountId}.r2.cloudflarestorage.com` |
+| `R2_CDN_URL` | Best available CDN URL (priority: `domain_cdn` auto-domain > `cdn[0]` > R2 public URL). Always `https://`. Not set if no CDN source available. |
+| `R2_CDN_URLS` | Comma-separated `https://` URLs (only if 2+ CDN domains from `domain_cdn` + `cdn` combined) |
+| `R2_ACCESS_KEY_ID` | Forwarded from org secret |
+| `R2_SECRET_ACCESS_KEY` | Forwarded from org secret |
+
+**R2 CDN URL resolution chain** (`computeAllCdnDomains()` + `computeServiceEnvVars()`):
+1. `domain_cdn = true` → auto-derives `{prefix}.{domain}` (prod) or `{prefix}.{envId}.{domain}` (dev). Prefix defaults to `"cdn"`, overridable via `domain_cdn_prefix`.
+2. `cdn` array entries → each bare hostname is env-prefixed for non-prod via `computeCdnEntryForEnv()` (e.g., `cdn.example.com` → `cdn.dev.example.com`).
+3. Fallback: R2 public bucket URL from Cloudflare API (only if `public = true`).
+4. `R2_CDN_URL` = `https://{first domain from above}`. `R2_CDN_URLS` = all domains joined (only if 2+).
+
+### Infra-Managed Vars (`INFRA_MANAGED_VARS`)
+
+These base names are recognized by the CLI as infra-managed and **excluded from Dockerfile/Compose env validation** (the CLI never asks for them as secrets):
+
+```
+NODE_ENV, PORT, APP_PORT, HOST_PORT, HOST, HOSTNAME, IMAGE, COMPOSE_PROJECT_NAME
+```
+
+Defined in `packages/cli/src/lib/dockerfile.ts`. Any `ENV` or compose variable matching these names is silently skipped during secret validation.
+
+### Quick Reference: What to Add vs What NOT to Add
+
+**DO add as GitHub secrets** (user-provided):
+- App-specific API keys (`STRIPE_SECRET_KEY`, `SENTRY_AUTH_TOKEN`, etc.)
+- OAuth client credentials (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, etc.)
+- Any custom app env var your code needs
+
+**Do NOT add** (infra auto-generates these):
+- `IMAGE_*`, `HOST_PORT_*`, `APP_PORT_*` — port and image mappings
+- `NODE_ENV`, `COMPOSE_PROJECT_NAME` — deploy context
+- `SITE_URL`, `API_EXTERNAL_URL`, `SUPABASE_URL` — Supabase URLs
+- `JWT_SECRET`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` — Supabase keys
+- `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_USER`, `DATABASE_HOST`, `DATABASE_PORT` — Postgres credentials/connection
+- `GOTRUE_EXTERNAL_*` — OAuth wiring
+- `REDIS_URL` — Redis connection
+- `R2_*` (including `R2_CDN_URL`, `R2_CDN_URLS`) — R2 storage config
+- `APP_NAME` — derived from project name

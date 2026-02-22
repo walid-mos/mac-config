@@ -240,6 +240,27 @@ If `specFeedback` is empty, proceed directly.
 - Dependent tasks: **serialize** — pass output of task A as `sharedTypes` to task B
 - Review + Security agents: spawned at team creation but **idle until their tasks become unblocked** (all IMPL tasks completed)
 
+**⚠️ CRITICAL — HOW to spawn Code Agents in parallel**:
+
+You MUST make ALL independent Code Agent `Task` calls in a **single message turn**. This means your response contains multiple `Task` tool calls at once — NOT one per turn.
+
+**Correct** (3 independent tasks → 3 Task calls in ONE response):
+```
+Turn N: [Task call: code-agent-PLAN-001] + [Task call: code-agent-PLAN-002] + [Task call: code-agent-PLAN-003]
+Turn N+1: (all 3 results arrive together)
+```
+
+**Wrong** (sequential — 1 Task call per turn):
+```
+Turn N: [Task call: code-agent-PLAN-001]
+Turn N+1: (result from PLAN-001) → [Task call: code-agent-PLAN-002]
+Turn N+2: (result from PLAN-002) → [Task call: code-agent-PLAN-003]
+```
+
+For **dependent** tasks (PLAN-002 depends on PLAN-001): spawn PLAN-001 first, wait for its result, THEN spawn PLAN-002 with `sharedTypes` from PLAN-001's output. Only dependent pairs are serialized — all other independent tasks run in parallel.
+
+Review + Security agents can be spawned in the same parallel batch as Code Agents — they will self-manage via task dependencies (idle until IMPL tasks complete).
+
 **How the team collaborates:**
 - When a Code Agent finishes, it sends `IMPL_COMPLETE` to `code-review` and `security` with file change details
 - Review and Security agents wait (idle) until their tasks become unblocked, then begin work
@@ -486,10 +507,10 @@ When iteration N produces assets needed by iteration N+1:
 - Phase C: no team — Lead Agent processes escalations directly
 - Phase D: no team — Lead Agent commits directly
 
-**Parallel spawning rules within teams**:
-- Code Agents for independent tasks: **always parallel** (concurrent `Task` calls in one message)
-- Dependent Code Agent tasks: **serialize** via `blockedBy` in task list
-- Review + Security: spawned at team creation, **idle until IMPL tasks complete** (task dependency manages this)
+**Parallel spawning rules within teams** (see anti-pattern #19):
+- Code Agents for independent tasks: **always parallel** — you MUST make ALL independent Code Agent `Task` calls in a SINGLE message turn. Never one-per-turn.
+- Dependent Code Agent tasks: **serialize** via `blockedBy` in task list — only these may be spawned in sequence
+- Review + Security: spawned in the same parallel batch as Code Agents, **idle until IMPL tasks complete** (task dependency manages this)
 - Phase D (commit): **always sequential** — runs only after all phases complete
 
 ---
@@ -636,6 +657,7 @@ When `referencedSkills` is present in your input, the user has explicitly refere
 16. **NEVER collapse planned iterations** — if Step 4 produces N batches, you MUST execute N iterations. After completing iteration 1, you do NOT get to re-evaluate and merge batches 2-5 into a single iteration. The batch plan from Step 4 is a commitment, not a suggestion. The only valid reason to adjust is if the Planification Agent returns warnings about batch sizing — and even then, you may only split batches smaller, never merge them larger.
 17. **NEVER commit without a passing build** — every iteration MUST pass `pnpm build` (or the project's build command) before committing. Tests passing is necessary but NOT sufficient. The build command validates import resolution, type checking, and bundling — things that mocked test environments skip.
 18. **NEVER commit without passing lint** — every iteration MUST pass the project's lint tool (when one exists) before committing. Lint catches type errors, unused imports, and style violations that tests and builds may miss. Pre-existing lint errors in untouched files do not block, but lint errors in iteration files are a hard gate.
+19. **NEVER spawn independent Code Agents sequentially** — if the execution plan has N independent tasks (no `blockedBy` between them), you MUST spawn all N Code Agents in a SINGLE message turn (N concurrent `Task` calls in one response). Spawning them one-by-one (wait for result → spawn next) defeats the entire purpose of the swarm and makes execution N times slower. The only valid serialization is when task B explicitly depends on task A's output (shared types). Review and Security agents can also be spawned in the same parallel batch.
 
 ---
 

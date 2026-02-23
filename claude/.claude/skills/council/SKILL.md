@@ -1,6 +1,6 @@
 ---
 name: council
-description: Spawn 5 expert review agents (sages) that collaboratively refine a plan or spec through multiple deliberation rounds until convergence. Plan in → refined plan out. Spec in → refined spec out.
+description: Spawn 5+ expert review agents (sages) that collaboratively refine a plan or spec through multiple deliberation rounds until convergence. Conditional sages (e.g., TypeScript Master) activate based on project tech stack. Plan in → refined plan out. Spec in → refined spec out.
 user-invocable: true
 argument-hint: <path-to-plan-or-spec>
 allowed-tools: Task, Read, Glob, Grep, Write, Edit, AskUserQuestion, Bash
@@ -8,7 +8,7 @@ allowed-tools: Task, Read, Glob, Grep, Write, Edit, AskUserQuestion, Bash
 
 # Council Skill — Multi-Expert Deliberation Loop
 
-You orchestrate a **council of 5 expert sages** that collaboratively review and refine a plan or spec through multiple deliberation rounds. Each sage brings a distinct expertise lens. Together, through iterative refinement, they produce a battle-hardened document.
+You orchestrate a **council of 5 core sages + conditional sages** that collaboratively review and refine a plan or spec through multiple deliberation rounds. Each sage brings a distinct expertise lens. Conditional sages activate based on the project's tech stack (e.g., TypeScript Master only spawns if the project uses TypeScript). Together, through iterative refinement, they produce a battle-hardened document.
 
 **You do NOT review the document yourself.** You orchestrate the sages, synthesize their feedback, and manage the convergence loop.
 
@@ -46,15 +46,31 @@ Read the file and classify it:
 
 Store the classification. The output MUST match the input format — a spec stays a spec, a plan stays a plan.
 
-### Gather project context
+### Gather project context (pre-fetch)
 
 Run in parallel:
 
-1. **Tech stack detection**: read `package.json`, glob for framework configs (`astro.config.*`, `next.config.*`, `vite.config.*`, `tsconfig.json`, `tailwind.config.*`), detect languages/frameworks
-2. **Relevant skills**: based on tech stack, identify which project skills apply (typescript, react, astro, tailwind, clean-code, docker, etc.)
-3. **Known patterns**: read `docs/troubleshooting.md` if it exists, check memory files for project anti-patterns
+1. **Tech stack detection + content**: read the CONTENTS of these files (if they exist):
+   - `package.json` (full content)
+   - `tsconfig.json` (full content)
+   - Framework configs: glob `*.config.{ts,js,mjs}` at project root, read each
+   - `docs/troubleshooting.md` (if exists)
+   - Memory files for project anti-patterns
+2. **Directory structure**: run `ls -R src/` (or equivalent source dir) limited to depth 3 to capture file tree
+3. **Referenced files**: scan the document under review for file paths (e.g., `src/components/Foo.tsx`) and read each referenced file
+4. **Relevant skills**: based on tech stack, identify which project skills apply (typescript, react, astro, tailwind, clean-code, docker, etc.)
 
-Compile this into a `projectContext` block passed to every sage.
+Compile ALL of this into a `projectContext` block. This block is passed verbatim to every sage prompt — sages should use it as their PRIMARY source and only use tools for targeted lookups NOT covered by the pre-fetched content.
+
+### Determine active conditional sages
+
+Based on the tech stack detection above, activate conditional sages:
+
+| Condition | Conditional Sage |
+|-----------|-----------------|
+| `tsconfig.json` exists OR `.ts`/`.tsx` files detected | **Sage 6: TypeScript Master** |
+
+Store the list of active conditional sages. The total sage count for this session = 5 core + active conditional sages.
 
 ---
 
@@ -114,6 +130,30 @@ Each sage is a **Plan** subagent (`subagent_type: "Plan"`) — read-only, deep a
 
 ---
 
+## Conditional Sages
+
+These sages are **only spawned when their activation condition is met** (determined in Step 0). They join the core 5 sages and participate in every round just like any other sage.
+
+### Sage 6: TypeScript Master *(conditional — TypeScript projects only)*
+
+**Activation**: `tsconfig.json` exists OR `.ts`/`.tsx` files detected in tech stack detection
+
+**Lens**: Type safety, type inference, zero `as` assertions, zero `any`, strict mode, discriminated unions, generics, branded types
+
+- **ZERO `as` assertions** — every `as` cast is a bug waiting to happen. Use type guards (`is`), discriminated unions, `satisfies`, or runtime schema validation (`.parse()` from whatever validation library the project uses) instead. The ONLY acceptable `as` is `as const`.
+- **ZERO `any`** — every `any` is a type system escape hatch that defeats the purpose of TypeScript. Use `unknown` + narrowing, generics, or proper types.
+- **ZERO `@ts-ignore` / `@ts-expect-error`** — fix the type error, don't silence it.
+- **Non-null assertions (`!`) are allowed when provably safe** — if the value was already validated elsewhere or is structurally guaranteed to be defined, `!` is fine. But flag blind `!` on unvalidated data as a critical issue.
+- Are generic types used correctly (not too broad, not unnecessarily complex)?
+- Are discriminated unions used for state modeling instead of optional fields?
+- Are return types inferred where obvious and explicit where they clarify intent?
+- Is `strict: true` enforced in tsconfig (no `skipLibCheck` escape hatches)?
+- Are types co-located with the code that uses them (not in a global `types.ts` dumping ground)?
+- Is a runtime validation library (Zod, ArkType, Valibot, or whatever the project uses) applied at system boundaries (API responses, env vars, user input) instead of blind `as` casts?
+- Does the plan avoid type-only patterns that add noise without safety (e.g., unnecessary interface over type alias, redundant generic constraints)?
+
+---
+
 ## Deliberation Loop
 
 ### Constants
@@ -127,7 +167,7 @@ MAX_NEW_SUGGESTIONS = 3     # Suggestions below this count = converged
 
 ### Step 1 — Sage Review (Parallel)
 
-Spawn ALL 5 sages **in a single message with 5 parallel Task calls**. Never spawn them sequentially.
+Spawn ALL active sages (5 core + any active conditional sages) **in a single message with parallel Task calls**. Never spawn them sequentially. When spawning sages, pass `model: "<model>"` from the Sage Prompt Assembly Reference table to the Task tool.
 
 **Sage prompt template** (customize `[SAGE_NAME]`, `[SAGE_NUMBER]`, `[LENS_DESCRIPTION]`, and `[FOCUS_QUESTIONS]` per sage):
 
@@ -146,14 +186,34 @@ You are the **[SAGE_NAME]** (Sage [SAGE_NUMBER]/5) on a council of experts revie
 ---
 
 ## Previous Round Context
-{previousRoundFeedback OR "This is the first round. No prior feedback exists."}
+{IF round == 1: "This is the first round. No prior feedback exists."}
+{IF round >= 2: paste ONLY the round changelog from the previous synthesis — NOT the raw sage feedback. Format:
+
+### Round {N-1} Changelog
+**Changes applied:**
+- [change] (driven by [sage])
+- ...
+
+**Unresolved items:**
+- [item] (rationale: [reason])
+
+**Domains touched:** [list]
+}
 
 ## Project Context
 - Tech stack: {techStack}
 - Relevant skills: {relevantSkills}
 - Known anti-patterns: {knownAntiPatterns}
 
+### Pre-fetched Files
+{preFetchedFileContents}
+
+### Directory Structure
+{directoryTree}
+
 ## Instructions
+
+**IMPORTANT: Use the pre-fetched files above as your PRIMARY context source. Only use Read/Glob/Grep tools for targeted lookups of files NOT included above.** This avoids redundant codebase exploration across sages.
 
 Review the document STRICTLY through your expertise lens. Do not comment on areas outside your domain — the other 4 sages cover those.
 
@@ -202,7 +262,7 @@ Only include sections you want changed. If your feedback is captured in Critical
 
 ### Step 2 — Synthesis
 
-After all 5 sages return, YOU (the orchestrator) synthesize:
+After ALL active sages return, YOU (the orchestrator) synthesize:
 
 1. **Collect scores**: record per-sage scores for the round table
 2. **Merge critical issues**: deduplicate overlapping issues, keep all unique ones
@@ -215,7 +275,10 @@ After all 5 sages return, YOU (the orchestrator) synthesize:
 
 Produce:
 - The **revised document** (full text, ready for the next round or final output)
-- A **round changelog** (bulleted list: what changed, which sage drove it)
+- A **round changelog** — concise, structured, used as input for round N+1 sages:
+  - **Changes applied**: bulleted list of what changed and which sage drove it
+  - **Unresolved items**: any suggestions deliberately deferred, with rationale
+  - **Domains touched**: list which sage domains were affected by changes (architecture, security, clean-code, reliability, standards, typescript)
 
 Write the revised document to the original file path using Edit/Write.
 
@@ -258,7 +321,10 @@ If STOP: go to Step 4.
 | Clean Code | X | X | X | ... | X |
 | Reliability | X | X | X | ... | X |
 | Standards | X | X | X | ... | X |
+| TypeScript Master* | X | X | X | ... | X |
 | **Average** | **X** | **X** | **X** | ... | **X** |
+
+*Include conditional sage rows only if they were active for this session. Omit inactive ones entirely.*
 
 ### Key Improvements
 - [Most impactful changes across all rounds, grouped by theme]
@@ -279,20 +345,26 @@ If STOP: go to Step 4.
 
 When constructing sage prompts, use this mapping:
 
-| Sage | Name | Lens Description | Focus Questions |
-|------|------|-----------------|-----------------|
-| 1 | Architect | System design, modularity, dependency management, API design, scalability | Are modules decomposed with clean boundaries? Are dependencies explicit and acyclic? Does architecture support requirements without over-engineering? |
-| 2 | Security | OWASP Top 10, input validation, auth/authz, data protection, secrets handling | Are inputs validated at boundaries? Are auth flows complete? Any injection vectors? Are secrets handled properly? |
-| 3 | Clean Code | DRY, SOLID, guard clauses, naming conventions, complexity reduction | Is there duplication to extract? Are names clear and conventional? Are guard clauses used? Is complexity minimal? |
-| 4 | Reliability | Error handling, edge cases, testing strategy, failure modes, observability | Are error paths handled? Are edge cases covered? Is testing strategy complete? Are failure modes identified? |
-| 5 | Standards | Project conventions, skill compliance, naming rules, structure patterns | Does it follow naming conventions? Are project skills respected? Does structure follow project patterns? Are known anti-patterns avoided? |
+| Sage | Name | Model | Lens Description | Focus Questions |
+|------|------|-------|-----------------|-----------------|
+| 1 | Architect | opus | System design, modularity, dependency management, API design, scalability | Are modules decomposed with clean boundaries? Are dependencies explicit and acyclic? Does architecture support requirements without over-engineering? |
+| 2 | Security | opus | OWASP Top 10, input validation, auth/authz, data protection, secrets handling | Are inputs validated at boundaries? Are auth flows complete? Any injection vectors? Are secrets handled properly? |
+| 3 | Clean Code | sonnet | DRY, SOLID, guard clauses, naming conventions, complexity reduction | Is there duplication to extract? Are names clear and conventional? Are guard clauses used? Is complexity minimal? |
+| 4 | Reliability | opus | Error handling, edge cases, testing strategy, failure modes, observability | Are error paths handled? Are edge cases covered? Is testing strategy complete? Are failure modes identified? |
+| 5 | Standards | sonnet | Project conventions, skill compliance, naming rules, structure patterns | Does it follow naming conventions? Are project skills respected? Does structure follow project patterns? Are known anti-patterns avoided? |
+
+**Conditional sages** (include only when active):
+
+| Sage | Name | Condition | Model | Lens Description | Focus Questions |
+|------|------|-----------|-------|-----------------|-----------------|
+| 6 | TypeScript Master | `tsconfig.json` or `.ts`/`.tsx` files | sonnet | Type safety, zero `as`/`any`/`@ts-ignore`, strict mode, discriminated unions, generics, branded types | Zero `as` assertions (only `as const`)? Zero `any` (use `unknown` + narrowing)? `!` only when provably safe? Zero `@ts-ignore`/`@ts-expect-error`? Discriminated unions for state? Types co-located? Runtime validation at boundaries? |
 
 ---
 
 ## Anti-Patterns
 
-1. **Never skip sages** — all 5 run every round, even if their area scored 10/10 (changes from other sages may introduce regressions in their area)
-2. **Never spawn sages sequentially** — always 5 parallel Task calls in a single message
+1. **Never skip sages** — all active sages (core + conditional) run every round, even if their area scored 10/10 (changes from other sages may introduce regressions in their area)
+2. **Never spawn sages sequentially** — always N parallel Task calls in a single message (where N = number of active sages)
 3. **Never modify the document format** — spec stays spec, plan stays plan, same sections
 4. **Never add fluff** — sages produce actionable feedback with concrete fixes, not vague praise or generic advice
 5. **Never stop before MIN_ROUNDS** — even if round 1 looks perfect, rounds 2-3 catch subtle interactions between sage changes
@@ -300,6 +372,8 @@ When constructing sage prompts, use this mapping:
 7. **Never let synthesis introduce new opinions** — synthesis ONLY applies sage feedback, it does not inject the orchestrator's own review
 8. **Never ignore project context** — the Standards Sage exists specifically to enforce project conventions; skipping project context detection undermines the entire council
 9. **Never repeat fixed issues** — round 2+ sages must focus on new issues and verification of fixes, not re-flagging resolved items
+10. **Never spawn a conditional sage when its condition is not met** — TypeScript Master only activates for TypeScript projects. Spawning it for a pure JS/Python/etc. project wastes a round trip and adds noise
+11. **Never skip a conditional sage when its condition IS met** — if `tsconfig.json` exists, TypeScript Master MUST be spawned. Its enforcement of type safety is non-negotiable for TS projects
 
 ---
 

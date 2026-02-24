@@ -86,3 +86,11 @@
 - **NEVER swallow errors** — no empty `catch {}`, no `catch (_) { /* ignore */ }`, no `catch` that does nothing with the error. Every error MUST be handled: log it (minimum `console.warn`), re-throw it, propagate it, or return it. Decide what the caller needs — most of the time the error should crash, propagate, or be logged at warning+. Silent swallowing is ALWAYS a bug. All languages, all agents, no exceptions.
 
 - **Respect the project's package manager** — if `pnpm-lock.yaml` exists, use ONLY `pnpm`, `pnpm dlx`, `pnpm exec`. NEVER run `npm`, `npx`, `npm install`, `npm run`, or any `npm`/`npx` command in a pnpm project. Same principle applies to other lockfiles (`yarn.lock` → yarn, `bun.lockb` → bun).
+
+- **NEVER think migration / legacy / deprecated** — when writing new code, changing code, or designing solutions, NEVER waste time on: backward compatibility shims, migration paths, deprecation warnings, legacy support, fallback for "old" consumers, re-exports of renamed symbols, or any form of "what about existing usage?" thinking. Write the correct code NOW. Delete the old code. Move on. The ONLY exception is when the user EXPLICITLY asks you to handle existing/legacy concerns (e.g., "make sure the old API still works", "add a migration step"). If the user didn't say it, it doesn't exist. All agents, no exceptions.
+
+# MCP Context Optimization
+
+- **GitHub MCP**: Always set `minimal_output: true` unless full details are explicitly needed. Use `per_page: 5` max. Prefer `search_*` tools over `list_*` for targeted queries. For read-only browsing (list PRs, check status, view issues), prefer `gh` CLI via Bash (~200 tokens) over MCP tools (10k+ tokens JSON).
+- **MCP responses land in context unfiltered** — the full JSON payload hits the context window. Only mitigation: request less data at the source (smaller pages, minimal output, targeted searches).
+- **Avoid loading heavy MCP tools unnecessarily** — Plane (~80 tools), Linear (~30), HubSpot (~7). Don't call ToolSearch for these unless the task actually requires them.

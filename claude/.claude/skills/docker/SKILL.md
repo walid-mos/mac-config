@@ -24,7 +24,7 @@ Auto-loads when writing or reviewing any Docker-related file. Every rule is mand
 1. **Multi-stage builds ALWAYS** — minimum 2 stages: `builder` + `runtime`. No single-stage production Dockerfiles.
 2. **`# syntax=docker/dockerfile:1`** on line 1 of every Dockerfile — unlocks BuildKit features (cache mounts, secret mounts, heredocs).
 3. **`node:XX-slim`** (Debian) as base — NOT full `node:XX`, NOT `alpine` (musl breaks native modules silently). Exception: pure JS apps with zero native deps MAY use `alpine` if explicitly justified.
-4. **Never hardcode pnpm version** — use `corepack prepare --activate` (reads `packageManager` from `package.json`). NEVER `corepack prepare pnpm@X.Y.Z --activate`.
+4. **Never hardcode pnpm version** — use `corepack prepare --activate` (reads `packageManager` from `package.json`). NEVER `corepack prepare pnpm@X.Y.Z --activate`. **IMPORTANT:** `corepack prepare --activate` requires `package.json` (with `packageManager` field) to exist in the current directory — always `COPY package.json ./` BEFORE running it in any stage.
 5. **`--frozen-lockfile`** on every `pnpm install` — no exceptions.
 6. **`pnpm.onlyBuiltDependencies`** MUST be set in `package.json` — this is the allowlist of packages permitted to run install scripts (e.g. `better-sqlite3`, `esbuild`, `sharp`). Everything else is blocked by default in pnpm v10+. NEVER use `--ignore-scripts` (breaks native module builds), `HUSKY=0`, `CI=true`, or any inline env hack. `husky` is excluded from the allowlist, so its `prepare` script never runs in Docker — no hack needed.
 7. **Exec form ALWAYS** for `CMD` and `ENTRYPOINT` — `CMD ["node", "dist/server.js"]`, never `CMD node server.js`.
@@ -34,24 +34,15 @@ Auto-loads when writing or reviewing any Docker-related file. Every rule is mand
 
 ---
 
-## 2. nextnode.toml Integration
+## 2. NextNode Ecosystem Integration
 
-When a project uses `nextnode.toml` (NextNode ecosystem), Docker config MUST derive values from it — never hardcode what the infrastructure manages.
+> **Source of truth:** The `nextnode-infra` skill owns all deploy-time behavior — auto-generated env vars, compose transformation, port allocation, route handling, service scaffolding, and the "What to Add vs What NOT to Add" guide. **Always consult `nextnode-infra` when working on NextNode Docker/Compose files.** This section covers only the Dockerfile/Compose **authoring** rules.
 
-### Managed Variables
-
-These are injected by the NextNode CLI at deploy time — the Dockerfile uses `ARG`/`ENV` for them:
-
-| Variable | Source | Usage in Dockerfile |
-|----------|--------|---------------------|
-| `APP_PORT` | `[deploy].port` in `nextnode.toml` | `ARG APP_PORT=<default>` + `EXPOSE $APP_PORT` |
-| `HOST_PORT_APP` | CLI-assigned (10000-29999) | docker-compose only: `${HOST_PORT_APP}:${APP_PORT_APP}` |
-| `NODE_ENV` | CLI-injected | `ENV NODE_ENV=production` in runtime stage |
-| `HOST` | Always `0.0.0.0` for containers | `ENV HOST=0.0.0.0` |
+When a project uses `nextnode.toml`, Docker config MUST derive values from it — never hardcode what the infrastructure manages.
 
 ### Port Consistency Rule
 
-The `EXPOSE` port, the `ENV PORT`, and the app's listening port MUST all match `[deploy].port` from `nextnode.toml`. Use an `ARG` with the toml value as default:
+`EXPOSE`, `ENV PORT`, and the app's listening port MUST all match `[deploy].port` from `nextnode.toml`:
 
 ```dockerfile
 ARG APP_PORT=4321
@@ -59,7 +50,7 @@ ENV PORT=$APP_PORT
 EXPOSE $APP_PORT
 ```
 
-### docker-compose.yml Rules (nextnode ecosystem)
+### docker-compose.yml Rules
 
 ```yaml
 services:
@@ -74,30 +65,13 @@ services:
       - NODE_ENV=${NODE_ENV}
 ```
 
-> Multi-build: every service with `build:` gets `${HOST_PORT_<SERVICE>}:${APP_PORT_<SERVICE>}`. SERVICE = uppercased name, hyphens → underscores.
-
 - **No `env_file`** — CLI injects `.env` at deploy time
 - **No `container_name`** — let Compose auto-name
 - **No `proxy-public` network** — Caddy runs natively on VPS
 - **No inline `healthcheck`** — belongs in Dockerfile
 - **`restart: unless-stopped`** always
 
-### Resource Limits
-
-When `[environment.*]` defines `cpu_limit`/`memory_limit`, apply in compose:
-
-```yaml
-services:
-  app:
-    deploy:
-      resources:
-        limits:
-          cpus: "${CPU_LIMIT:-0.25}"
-          memory: "${MEMORY_LIMIT:-256M}"
-        reservations:
-          cpus: "${CPU_RESERVATION:-0.1}"
-          memory: "${MEMORY_RESERVATION:-128M}"
-```
+> For multi-service builds, `[[routes]]`, resource limits, compose transformation at deploy time, and the full list of infra-managed env vars — see `nextnode-infra` skill.
 
 ---
 
@@ -108,19 +82,18 @@ Order instructions from what changes LEAST to what changes MOST. A changed layer
 ```
 1. FROM base image            (changes: on security patches)
 2. System packages            (changes: rarely)
-3. corepack enable            (changes: never)
-4. WORKDIR                    (changes: never)
-5. Non-root user creation     (changes: never)
-6. pnpm-lock.yaml COPY       (changes: when deps change)
-7. pnpm fetch                 (changes: when lockfile changes)
-8. package.json COPY          (changes: slightly more often)
-9. pnpm install               (changes: when deps change)
-10. Source files COPY         (changes: every build)
-11. Build command             (changes: every build)
-12. Runtime COPY --from=build (changes: every build)
-13. ENV / LABEL / HEALTHCHECK (changes: rarely)
-14. USER                      (changes: never)
-15. ENTRYPOINT / CMD          (changes: rarely)
+3. WORKDIR                    (changes: never)
+4. package.json COPY          (changes: slightly more often)
+5. corepack enable + prepare  (changes: when packageManager changes)
+6. Non-root user creation     (changes: never)
+7. pnpm-lock.yaml COPY       (changes: when deps change)
+8. pnpm install               (changes: when deps change)
+9. Source files COPY          (changes: every build)
+10. Build command             (changes: every build)
+11. Runtime COPY --from=build (changes: every build)
+12. ENV / LABEL / HEALTHCHECK (changes: rarely)
+13. USER                      (changes: never)
+14. ENTRYPOINT / CMD          (changes: rarely)
 ```
 
 **Critical mistakes:**
@@ -131,37 +104,34 @@ Order instructions from what changes LEAST to what changes MOST. A changed layer
 
 ## 4. Build Time Optimization
 
-### 4.1 pnpm fetch + offline install (cache-optimal pattern)
+### 4.1 pnpm install with cache mounts
 
 ```dockerfile
-# Lockfile alone — pnpm fetch only needs this file
-COPY pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml ./
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm fetch --frozen-lockfile
-
-# Now install from pre-populated store — no network
-COPY package.json ./
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile --offline
+    pnpm install --frozen-lockfile
 ```
 
-Why: `pnpm fetch` only reads `pnpm-lock.yaml`. Adding a script to `package.json` (without changing deps) does NOT bust this cache layer.
+The BuildKit cache mount persists the pnpm store across builds — repeat installs with unchanged lockfile resolve from cache instantly.
+
+> **WARNING — `pnpm fetch` + `--offline` is broken.** The cache mount target `/pnpm/store` does NOT match pnpm's actual default store path (`~/.local/share/pnpm/store`). `pnpm fetch` writes to the default store, the cache mount persists an empty `/pnpm/store`, and `pnpm install --offline` silently installs nothing from the empty mount. NEVER use `pnpm fetch`/`--offline` with cache mounts — use direct `pnpm install --frozen-lockfile` instead.
 
 ### 4.2 Parallel stages for prod/build deps
 
 BuildKit runs independent stages concurrently:
 
 ```dockerfile
-FROM fetch AS prod-deps
-COPY package.json ./
+FROM base AS prod-deps
+COPY pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile --prod --offline
+    pnpm install --frozen-lockfile --prod
 
-FROM fetch AS build
-COPY package.json ./
+FROM base AS build
+COPY pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile --offline
-COPY . .
+    pnpm install --frozen-lockfile
+COPY tsconfig*.json ./
+COPY src/ ./src/
 RUN pnpm build
 ```
 
@@ -174,7 +144,7 @@ Always use `--mount=type=cache` for package managers:
 ```dockerfile
 # pnpm store
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm fetch --frozen-lockfile
+    pnpm install --frozen-lockfile
 
 # apt (needs sharing=locked)
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -389,28 +359,23 @@ ARG APP_PORT=4321
 
 # ── Base ─────────────────────────────────────────────────
 FROM node:${NODE_VERSION}-slim AS base
+WORKDIR /app
+COPY package.json ./
 RUN corepack enable && corepack prepare --activate
 ENV PNPM_HOME="/pnpm" \
     PATH="/pnpm:$PATH"
-WORKDIR /app
-
-# ── Fetch ────────────────────────────────────────────────
-FROM base AS fetch
-COPY pnpm-lock.yaml ./
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm fetch --frozen-lockfile
 
 # ── Prod deps ────────────────────────────────────────────
-FROM fetch AS prod-deps
-COPY package.json ./
+FROM base AS prod-deps
+COPY pnpm-lock.yaml ./
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile --prod --offline
+    pnpm install --frozen-lockfile --prod
 
 # ── Build ────────────────────────────────────────────────
-FROM fetch AS build
-COPY package.json ./
+FROM base AS build
+COPY pnpm-lock.yaml ./
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile --offline
+    pnpm install --frozen-lockfile
 COPY tsconfig*.json ./
 COPY src/ ./src/
 RUN pnpm build
@@ -464,10 +429,10 @@ CMD ["node", "dist/server/entry.mjs"]
 When `PUBLIC_*` vars must be inlined at build time:
 
 ```dockerfile
-FROM fetch AS build
-COPY package.json ./
+FROM base AS build
+COPY pnpm-lock.yaml ./
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile --offline
+    pnpm install --frozen-lockfile
 
 # PUBLIC_ vars inlined by Vite at build time
 ARG PUBLIC_SUPABASE_URL
@@ -526,38 +491,33 @@ ARG APP_PORT=3000
 
 # ── Base ─────────────────────────────────────────────────
 FROM node:${NODE_VERSION}-slim AS base
+WORKDIR /app
+COPY package.json ./
 RUN corepack enable && corepack prepare --activate
 ENV PNPM_HOME="/pnpm" \
     PATH="/pnpm:$PATH"
-WORKDIR /app
-
-# ── Fetch ────────────────────────────────────────────────
-FROM base AS fetch
-COPY pnpm-lock.yaml ./
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm fetch --frozen-lockfile
 
 # ── Install + Build ─────────────────────────────────────
-FROM fetch AS build
-COPY package.json pnpm-workspace.yaml turbo.json ./
+FROM base AS build
+COPY pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
 COPY apps/api/package.json ./apps/api/
 COPY apps/web/package.json ./apps/web/
 COPY packages/shared/package.json ./packages/shared/
 
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile --offline
+    pnpm install --frozen-lockfile
 
 COPY . .
 RUN pnpm turbo build
 
 # ── Prod deps ────────────────────────────────────────────
-FROM fetch AS prod-deps
-COPY package.json pnpm-workspace.yaml ./
+FROM base AS prod-deps
+COPY pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json ./apps/api/
 COPY packages/shared/package.json ./packages/shared/
 
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --frozen-lockfile --prod --offline
+    pnpm install --frozen-lockfile --prod
 
 # ── Runtime ──────────────────────────────────────────────
 FROM node:${NODE_VERSION}-slim AS runtime
@@ -675,7 +635,7 @@ docker-compose*.yaml
 | 1 | `corepack prepare pnpm@X.Y.Z --activate` | `corepack prepare --activate` — reads `packageManager` from `package.json` |
 | 2 | `--ignore-scripts` / `HUSKY=0` / `ENV CI=true` | `pnpm.onlyBuiltDependencies` allowlist in `package.json` — blocks all scripts except listed packages |
 | 3 | `COPY . .` before `pnpm install` | Copy `pnpm-lock.yaml` first, then `package.json`, then install, then source |
-| 4 | `CMD npm start` or `CMD pnpm start` | `CMD ["node", "dist/server.js"]` — exec form, direct node invocation |
+| 4 | `CMD npm start` or `CMD pnpm start` | `CMD ["node", "dist/server.js"]` — exec form, direct node invocation. Exception: frameworks that need their CLI for bootstrapping (e.g. Strapi needs `pnpm start` for migration running, TypeScript detection). When using pnpm in CMD, corepack + `PNPM_HOME` must also be configured in the runtime stage |
 | 5 | Running as root in production | Create dedicated user, `USER appuser` before CMD |
 | 6 | Node.js as PID 1 | `ENTRYPOINT ["/usr/bin/tini", "-g", "--"]` |
 | 7 | Installing curl just for HEALTHCHECK | Use `node -e "require('http')..."` |
@@ -686,7 +646,7 @@ docker-compose*.yaml
 | 12 | `EXPOSE 4321` with hardcoded value | `ARG APP_PORT=4321` + `EXPOSE ${APP_PORT}` |
 | 13 | `RUN chown -R user:group /app` as separate layer | `COPY --chown=user:group` at copy time |
 | 14 | Full `node:22` as runtime base | `node:22-slim` — 1 GB vs 220 MB |
-| 15 | `pnpm install` without `--offline` after `pnpm fetch` | Always `--offline` after fetch — guarantees no network, faster |
+| 15 | `pnpm fetch` + `pnpm install --offline` with cache mounts | Cache mount at `/pnpm/store` doesn't match pnpm's default store path — `--offline` finds an empty store and silently installs nothing. Use `pnpm install --frozen-lockfile` with cache mounts directly |
 | 16 | Copying devDependencies to runtime | Use `--prod` on install or separate prod-deps stage |
 | 17 | Missing `# syntax=docker/dockerfile:1` | Always first line — enables cache mounts, secret mounts |
 | 18 | `pnpm install` without `--frozen-lockfile` | Always `--frozen-lockfile` — deterministic builds |
@@ -701,11 +661,10 @@ When reviewing any Dockerfile, verify ALL of the following:
 - [ ] `# syntax=docker/dockerfile:1` on line 1
 - [ ] Multi-stage build (minimum: build + runtime)
 - [ ] `node:XX-slim` base (or justified alpine)
-- [ ] `corepack prepare --activate` (no version pinning)
+- [ ] `corepack prepare --activate` (no version pinning) — `package.json` with `packageManager` must be COPYed BEFORE this command
 
 **Build optimization:**
-- [ ] pnpm fetch + offline pattern (lockfile-only cache)
-- [ ] BuildKit cache mounts on pnpm install (`--mount=type=cache`)
+- [ ] `pnpm install --frozen-lockfile` with BuildKit cache mounts (`--mount=type=cache`) — NO `pnpm fetch`/`--offline`
 - [ ] Selective COPY (not `COPY . .` before install)
 - [ ] Layer ordering: stable → volatile
 - [ ] Parallel stages where possible (prod-deps || build)
@@ -734,3 +693,56 @@ When reviewing any Dockerfile, verify ALL of the following:
 
 **Files:**
 - [ ] `.dockerignore` exists and excludes `.git`, `node_modules`, `.env`, `.npmrc`
+
+---
+
+## 12. Buildx Builder
+
+Buildx with `docker-container` driver is REQUIRED — enables `--mount=type=cache`, `--mount=type=secret`, and multi-platform builds.
+
+### 12.1 Create
+
+```bash
+docker buildx create \
+  --name nextnode-builder \
+  --driver docker-container \
+  --platform linux/amd64,linux/arm64 \
+  --bootstrap \
+  --use
+```
+
+- `--driver docker-container` — BuildKit in a dedicated container, full feature set
+- `--platform linux/amd64,linux/arm64` — cross-compile (deploy = amd64, dev may be arm64)
+- `--bootstrap --use` — pull image, start, set as default
+
+Do NOT pass `--buildkitd-flags '--oci-worker-no-process-sandbox'` unless rootless Docker — causes boot loop otherwise.
+
+### 12.2 Build commands
+
+```bash
+# Single-platform → local daemon
+docker buildx build --load -t myapp:latest .
+
+# Multi-platform → registry (--load only works single-arch)
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  -t ghcr.io/org/app:latest \
+  --push .
+
+# With registry cache
+docker buildx build \
+  --cache-from type=registry,ref=ghcr.io/org/app:buildcache \
+  --cache-to   type=registry,ref=ghcr.io/org/app:buildcache,mode=max \
+  --platform linux/amd64,linux/arm64 \
+  -t ghcr.io/org/app:latest \
+  --push .
+```
+
+### 12.3 Maintenance
+
+```bash
+docker buildx prune                                             # clear cache
+docker buildx stop nextnode-builder                             # stop
+docker buildx inspect --bootstrap nextnode-builder              # restart
+docker buildx rm nextnode-builder                               # remove
+```

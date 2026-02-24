@@ -1,7 +1,7 @@
 # Lead Agent Schemas
 
-> Input/output contracts and internal state for the Lead Agent.
-> This file is loaded by: Lead Agent only.
+> Input/output contracts and internal state for the Lead Agent and Iteration Runner.
+> This file is loaded by: Lead Agent, Iteration Runner.
 > For shared types (TaskItem, TestingBrief, TestingStrategy), see `shared.md`.
 > For Planification output types (PlanificationOutput, ExecutionPlan, ReuseMap, HumanPrerequisite), see `planification.md`.
 > For Test Agent types (TestAgentInput, TestAgentOutput), see `test-agent.md`.
@@ -66,6 +66,10 @@ interface GlobalState {
   sharedAssets: SharedAsset[]           // Types/interfaces produced by previous iterations
   plannedBatches: PlannedBatch[]       // LOCKED batch plan from Step 4 — never merge, only split
   humanPrerequisites: HumanPrerequisite[] // From PlanificationOutput — before-deploy items for delivery report
+  retryCounters: Record<number, {     // Keyed by iteration number
+    buildRetries: number
+    testRetries: number
+  }>
 }
 
 interface PlannedBatch {
@@ -123,6 +127,98 @@ interface SharedAsset {
   type: 'type' | 'interface' | 'service' | 'hook' | 'component' | 'utility'
   exports: string[]                     // Named exports available
   producedInIteration: number
+}
+```
+
+---
+
+## IterationRunnerInput (Lead Agent → Iteration Runner)
+
+```typescript
+interface IterationRunnerInput {
+  sessionName: string
+  iterationNumber: number
+  specItemBatch: SpecItem[]           // Current batch from plannedBatches
+  techStack: TechStack
+  swarmConfig: SwarmConfig
+  sharedAssets: SharedAsset[]         // From prior iterations
+  troubleshootingContext: string | null // Accumulated troubleshooting + any retry context
+  iterationHistory: string            // Compressed 1-line summaries of prior iterations
+  referencedSkills: Record<string, string> | null  // Skill name → full content
+  recurringIssues: RecurringIssue[]   // For 3-strike detection within the iteration
+  humanPrerequisites: HumanPrerequisite[] // Accumulated from prior planification outputs
+  isRetry: boolean                    // Whether this is a retry of a failed iteration
+  retryContext: RetryContext | null    // Context from the failed attempt
+}
+
+interface RetryContext {
+  reason: IterationFailedReason
+  previousAttemptDetails: string      // What was tried and failed
+  buildError: string | null           // Parsed build error output (for build-failure retries)
+  filesOnDisk: string[]               // Files created before failure (may need cleanup or reuse)
+}
+```
+
+---
+
+## IterationRunnerOutput (Iteration Runner → Lead Agent)
+
+```typescript
+type IterationRunnerOutput = IterationSuccess | IterationFailed
+
+interface IterationSuccess {
+  status: 'completed'
+  iterationNumber: number
+  specItemIds: string[]
+  completedItems: string[]            // Spec items completed
+  blockedItems: BlockedItem[]         // Spec items blocked (if any)
+  filesChanged: string[]
+  filesCreated: string[]
+  testResults: { total: number; passed: number; failed: number }
+  reviewSummary: { totalIssues: number; quickFixes: number; significant: number; critical: number }
+  securitySummary: { totalIssues: number; quickFixes: number; significant: number; critical: number }
+  lintPassed: boolean
+  buildPassed: boolean
+  commitSha: string
+  sharedAssets: SharedAsset[]
+  escalations: string[]               // Significant/critical issue descriptions for Lead to track
+  humanPrerequisites: HumanPrerequisite[] // New prerequisites discovered in this iteration
+  innerRetries: InnerRetryLog[]
+  oneLineSummary: string              // e.g., "3 tasks done (auth, login, types), 15 tests pass, 0 issues"
+}
+
+type IterationFailedReason =
+  | 'build-failure'
+  | 'test-failure-after-3-cycles'
+  | 'critical-escalation'
+  | 'lint-failure-after-2-attempts'
+  | 'phase-a-failed'
+  | 'human-prerequisite-blocking'
+
+interface IterationFailed {
+  status: 'failed'
+  iterationNumber: number
+  specItemIds: string[]
+  reason: IterationFailedReason
+  details: string                     // Parsed error details
+  troubleshootingContext: string       // What was tried, what failed
+  partialOutputs: {
+    planOutput: string | null         // Compressed PlanificationOutput
+    testOutput: string | null         // Compressed TestAgentOutput
+    codeOutputs: string | null        // Compressed CodeAgentOutputs
+    reviewOutput: string | null       // Compressed ReviewAgentOutput
+    securityOutput: string | null     // Compressed SecurityAgentOutput
+  }
+  filesOnDisk: string[]               // Files created/modified before failure
+  humanPrerequisites: HumanPrerequisite[] // before-impl items that block progress
+  innerRetries: InnerRetryLog[]
+}
+
+interface InnerRetryLog {
+  phase: 'D0-lint' | 'D1.5-gate' | 'C-fix' | 'B-test'
+  attempt: number
+  action: string
+  result: 'resolved' | 'escalated'
 }
 ```
 

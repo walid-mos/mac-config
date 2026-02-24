@@ -37,6 +37,44 @@ NextNode uses a **config-as-code driven, zero-manual-UI** infrastructure:
 
 **Repository:** `NextNodeSolutions/infrastructure`
 
+## `nn` DX CLI (`packages/nn/`)
+
+Published as `@nextnode-solutions/nn` — local development workflow tool. Built with citty, uses `@nextnode/cli` as a workspace dependency for shared types and config.
+
+| Command | Purpose | Key Args |
+|---------|---------|----------|
+| `nn up` | Start local dev environment (Docker services + app dev server) | `--containerized`, `--reset-ports` |
+| `nn down` | Stop local dev environment (kills dev server + Docker services) | `--clean` (removes volumes) |
+| `nn env show` | Display resolved environment variables | — |
+| `nn env check` | Validate env vars against Dockerfile/compose requirements | — |
+| `nn env init` | Initialize `.env.local` with computed service vars | — |
+| `nn env push` | Push env vars to GitHub environment secrets | — |
+
+### `nn up` Flow
+
+1. Detect services from `nextnode.toml` (`detectServices()`)
+2. Resolve port assignments (persisted to `.nn/ports.json`, reusable across restarts)
+3. Generate `docker-compose.local.yml` in `.nn/` with local service configs
+4. Start Docker services (Supabase, Redis, etc.)
+5. Build `.env.local` with computed service env vars + OAuth vars
+6. Detect and start app dev server (`detectDevCommand()`)
+7. Stream logs with prefixed output (Docker + app interleaved)
+
+### Key Libraries (`packages/nn/src/lib/`)
+
+| Library | Purpose |
+|---------|---------|
+| **config** | `requireConfig()` — loads `nextnode.toml` via `@nextnode/cli` |
+| **services** | `detectServices(config)` — identifies which services to start locally |
+| **ports** | `resolvePortMap(services, appPort, nnDir, opts)` — deterministic local port assignment |
+| **compose** | `generateLocalCompose()`, `writeLocalComposeFiles()` — local Docker Compose generation |
+| **docker** | `checkDockerAvailable()`, `startDockerServices()`, `stopDockerServices()`, `areServicesRunning()`, `getServiceStatuses()` |
+| **env** | `buildLocalEnvVars()`, `writeEnvLocal()` — `.env.local` generation |
+| **oauth** | `computeLocalOAuthEnvVars()` — local OAuth redirect config |
+| **dev-server** | `detectDevCommand()` — auto-detects `pnpm dev` / framework dev command |
+| **logs** | `pipeWithPrefix()`, `streamDockerLogs()` — prefixed log streaming |
+| **process** | `gracefulKill()`, `waitForHealthy()`, `writePidFile()`, `readPidFile()`, `isProcessRunning()`, `killProcess()`, `removePidFile()` |
+
 ## CLI Commands
 
 The `infra` CLI (`packages/cli/`) is built with **citty**. All commands accept `--config <path>` and `--env <env>` base args.
@@ -58,6 +96,7 @@ The `infra` CLI (`packages/cli/`) is built with **citty**. All commands accept `
 | `infra pipeline` | Run full CI/CD pipeline (provision + DNS + deploy) | `--sha`, `--force`, `--skip-quality`, `--force-shared-vps`, `--pr-number` |
 | `infra publish` | Publish npm package (release or canary) | — |
 | `infra validate` | Validate nextnode.toml port consistency | — |
+| `infra services` | Service setup subcommands (R2, Supabase, Redis) | — |
 | `infra setup-r2` | Bootstrap R2 credentials for Caddy cert storage | `--force` |
 | `infra preview-cleanup` | Clean up orphaned PR preview deployments | `--pr`, `--repo`, `--dry-run` |
 
@@ -65,10 +104,13 @@ The `infra` CLI (`packages/cli/`) is built with **citty**. All commands accept `
 
 | Library | Key Functions |
 |---------|---------------|
-| **config** | `loadConfig()`, `parseConfig()`, `mergeConfig()`, `validateConfig()`, `resolveConfigInput()`, `computeHostPort()`, `computeGreenPort()`, `computeEnvDomain()`, `computeRouteEnvDomain()`, `computeWildcardDomain()`, `computeRedirectDomains()`, `computePreviewDomain()`, `computeWorkspaceName()`, `computeImageTag()`, `infraEnvId()`, `isPrPreview()`, `detectDockerConfig()`, `findDefaultTomlPath()` |
+| **env-resolve** | `validateEnv(input): CanonicalEnv` (Phase 1: pure table lookup), `resolveEnv(canonical, config, prNumber?): ResolvedEnv` (Phase 2: full resolution). Returns `ResolvedEnv` with `identity` (canonical, short, isProduction, isPrPreview, effectiveId), `behavior` (proxied, supportsBlueGreen, basicAuthEligible, sablierEnabled, portRangeBase, domainPrefix), `compute` (domain, hostPort, greenPort, dbHostPort, studioHostPort, routeHostPort, routeGreenPort, workspace, imageTag, routeDomain, redirectDomains). **SINGLE SOURCE OF TRUTH for all env logic.** |
+| **config** | `loadConfig()`, `parseConfig()`, `mergeConfig()`, `validateConfig()`, `resolveConfigInput()`, `findDefaultTomlPath()`, `detectDockerConfig()`, `computeWildcardDomain()` — env-specific compute functions moved to `ResolvedEnv.compute.*` |
 | **compose** | `parseComposeEnv()`, `extractComposeEnvValues()`, `parseComposeContainerNames()` — env var extraction from compose files |
 | **compose-parse** | `parseComposeServices(content): ComposeService[]`, `discoverBuildableServices(content, appDir): BuildableService[]` — YAML AST parser (`yaml` package) for service discovery, Dockerfile validation. Types: `ComposeService`, `BuildableService` |
 | **compose-transform** | `transformCompose(content, options?: TransformOptions): string`, `stripSharedServices(content): StripResult`, `sanitizeServiceEnvName(name): string` — AST-based compose transformation: replaces `build:` with `image: ${IMAGE_<SERVICE>}`, strips NODE_ENV/deploy blocks. Types: `TransformOptions`, `StripResult` |
+| **yaml-utils** | `injectService(doc, name, config)`, `removeService(doc, name)`, `injectNetwork(doc, serviceName, networkName, networkConfig?, aliases?)`, `injectLabels(doc, serviceName, labels)`, `injectDependsOn(doc, serviceName, dependency)`, `removeDependsOnEntry(doc, serviceName, dependency)`, `getServiceNames(doc): string[]`, `hasService(doc, name): boolean` — low-level YAML AST utilities for compose document manipulation (uses `yaml` package `Document` type). Exports `ServiceConfig` interface for compose service definitions. |
+| **caddy-builder** | `CaddyfileBuilder` class — fluent builder for Caddy site blocks. Types: `CaddyCredential`, `CaddyTlsOptions`, `CaddySablierConfig` |
 | **docker-build** | `buildImages(services, options): Promise<BuildResult[]>`, `pushImages(results): Promise<void>`, `listBuildableServices(content, appDir): BuildableService[]`, `imageTagForService(prefix, env, sha, service): string` — multi-service parallel build/push orchestration via `Promise.allSettled()`. Types: `BuildOptions`, `BuildResult` |
 | **cloudflare** | `lookupZoneId()`, `upsertDnsRecord()`, `deleteDnsRecord()`, `listDnsRecords()`, `resolveCloudflareAccountId()`, `enableR2PublicAccess()`, `getR2BucketPublicUrl()`, `ensureR2PublicAccess()` — with retry for rate limiting; R2 public access automation via Cloudflare API |
 | **dns** | `resolveDnsTarget()`, `resolveProxied()`, `resolveTtl()`, `upsertWildcardRecords()`, `upsertDevWildcardRecord()`, `upsertRedirectDnsRecords()`, `deleteRedirectDnsRecords()`, `upsertStudioDnsRecord()`, `deleteStudioDnsRecord()`, `upsertCdnDnsRecords()`, `deleteCdnDnsRecords()`, `extractRootDomain()` — CDN CNAME records for R2 custom domains (prod=proxied, dev=unproxied) |
@@ -93,6 +135,8 @@ The `infra` CLI (`packages/cli/`) is built with **citty**. All commands accept `
 | **logger** | `logger` (consola), `withTiming()` |
 | **secrets** | `validateSecrets()`, `requireEnv()`, `resolveHetznerToken(project?)` — per-project Hetzner token support |
 | **constants** | `TF_CLOUD_ORG`, `TAILNET`, `TERRAFORM_DIR`, `GITHUB_ORG`, `R2_BUCKET_NAME`, `CLOUDFLARE_API`, secret group constants |
+| **service-env** | `computeServiceBuildEnv(config, envShort, isProduction, dockerfileArgs, resolvedEnv?)` — demand-driven build arg computation. Provider pattern: only computes vars that Dockerfile ARGs actually reference. Per-service providers: `computeR2Vars()` / `R2_COMPUTABLE_VARS`, `computeRedisVars()` / `REDIS_COMPUTABLE_VARS`, `computeSupabaseVars()` / `SUPABASE_COMPUTABLE_VARS` |
+| **supabase-deploy** | `ensureDevSupabase(params: EnsureDevSupabaseParams)`, `generateSupabaseDotEnv(composeName, supabaseVars)` — standalone idempotent Supabase deployer (internal module, not a CLI command). Used by dev deploys and PR previews to ensure the dev Supabase stack is running before the app deploy. |
 | **maintenance-page** | `MAINTENANCE_PAGE_HTML` — static HTML for maintenance mode (503, auto-refresh) |
 | **base-args** | `baseArgs` — shared `--config` and `--env` args for all commands |
 
@@ -151,16 +195,52 @@ interface ProjectConfig {
     greenPort: number
     developmentEnabled: boolean   // shorthand for environment.development.enabled
     prPreviewsEnabled: boolean    // shorthand for environment.development.pr_previews && enabled
-    envDomain(env: string): string
-    workspaceName(env: string): string
-    imageTag(env: string, sha: string): string
-    redirectDomains(env: string): string[]
-    dbHostPort(env: string): number                 // deterministic Supabase Postgres host port (env-scoped)
-    studioHostPort(env: string): number             // deterministic Supabase Studio host port (env-scoped, overridable)
-    routeHostPort(subdomain: string): number       // deterministic port per route (10000-29999)
-    routeGreenPort(subdomain: string): number      // green slot port per route (30000-49999)
-    routeEnvDomain(subdomain: string, env: string): string  // env-aware route domain
   }
+}
+```
+
+### Environment Resolution Types (`packages/cli/src/types/env.ts`)
+
+```typescript
+type CanonicalEnv = "development" | "production"
+
+interface EnvIdentity {
+  canonical: CanonicalEnv
+  short: string          // "dev" | "prod"
+  github: string         // "development" | "production"
+  effectiveId: string    // canonical or "pr-{N}" for PR previews
+  isProduction: boolean
+  isPrPreview: boolean
+  prNumber: number | null
+}
+
+interface EnvBehavior {
+  proxied: boolean           // true for prod (Cloudflare orange cloud)
+  supportsBlueGreen: boolean // true for prod when zero_downtime enabled
+  basicAuthEligible: boolean // true for non-prod
+  sablierEnabled: boolean    // true for dev/PR when sablier configured
+  portRangeBase: number      // 10000 (prod), 30000 (dev), 40000 (PR)
+  domainPrefix: string | null // null (prod), "dev" (dev), "pr-{N}" (PR)
+}
+
+interface EnvCompute {
+  domain(baseDomain: string): string           // prod: baseDomain, dev: dev.baseDomain, PR: pr-N.dev.baseDomain
+  hostPort(appName: string): number            // portRangeBase + deterministicHash(appName)
+  greenPort(appName: string): number           // 20000 + deterministicHash(appName-green)
+  dbHostPort(appName: string): number          // Supabase Postgres host port
+  studioHostPort(appName: string, override?): number // Supabase Studio host port
+  routeHostPort(appName: string, subdomain: string): number  // per-route port
+  routeGreenPort(appName: string, subdomain: string): number // per-route green port
+  workspace(projectName: string, isShared: boolean, serverName?: string): string
+  imageTag(projectName: string, sha: string, org?: string): string
+  routeDomain(subdomain: string, baseDomain: string): string
+  redirectDomains(baseDomain: string, rawRedirectDomains?: string[]): string[] // prod-only, auto-www
+}
+
+interface ResolvedEnv {
+  identity: EnvIdentity
+  behavior: EnvBehavior
+  compute: EnvCompute
 }
 ```
 
@@ -436,7 +516,7 @@ The `[services]` config section auto-generates environment variables at deploy t
 
 | Service | Generated Vars | Notes |
 |---------|---------------|-------|
-| **Supabase** | `SITE_URL`, `API_EXTERNAL_URL`, `SUPABASE_URL`, `JWT_SECRET`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_USER`, `DATABASE_HOST`, `DATABASE_PORT`, `APP_NAME` | URLs derived from domain (omitted when no domain); JWT keys auto-generated + stored as GH env secrets; POSTGRES_PASSWORD auto-generated + stored as GH env secret; DATABASE_HOST always `supabase-db`; DATABASE_PORT via `dbHostPort()` (env-scoped deterministic); OAuth vars via `computeOAuthEnvVars()` |
+| **Supabase** | `SITE_URL`, `API_EXTERNAL_URL`, `SUPABASE_URL`, `JWT_SECRET`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_USER`, `DATABASE_HOST`, `DATABASE_PORT`, `APP_NAME` | URLs derived from domain (omitted when no domain); JWT keys auto-generated + stored as GH env secrets; POSTGRES_PASSWORD auto-generated + stored as GH env secret; DATABASE_HOST always `supabase-db`; DATABASE_PORT always `5432` (internal container port); OAuth vars via `computeOAuthEnvVars()` |
 | **Supabase OAuth** | `GOTRUE_EXTERNAL_{PROVIDER}_ENABLED`, `_CLIENT_ID`, `_SECRET`, `_REDIRECT_URI`, `_SCOPE` | Per-provider env vars from `[services.supabase.oauth]` config. Requires `{PROVIDER}_CLIENT_ID` + `{PROVIDER}_CLIENT_SECRET` as GH secrets. |
 | **Redis** | `REDIS_URL` | `redis://redis:{port}` (default port 6379) |
 | **R2** | `R2_BUCKET_NAME`, `R2_ACCOUNT_ID`, `R2_ENDPOINT_URL`, `R2_CDN_URL`, `R2_CDN_URLS`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | Bucket is per-env: `{bucket}-{envShortId}` (e.g., `assets-dev`, `assets-prod`); account ID + endpoint from CF API; `R2_CDN_URL` via priority chain: domain_cdn > cdn[0] > R2 public URL; `R2_CDN_URLS` only if 2+ CDN domains; credentials forwarded from process.env (org secrets) |
@@ -554,7 +634,7 @@ Injected when `[services.supabase]` is configured (`computeServiceEnvVars()` in 
 | `POSTGRES_DB` | `postgres` |
 | `POSTGRES_USER` | `supabase_admin` |
 | `DATABASE_HOST` | `supabase-db` (always, Docker service name) |
-| `DATABASE_PORT` | Deterministic env-scoped port via `dbHostPort(env)` |
+| `DATABASE_PORT` | `5432` (internal Postgres container port for container-to-container access). Note: `dbHostPort()` in env-resolve is for Docker host port mapping only. |
 | `APP_NAME` | `[project].name` from `nextnode.toml` |
 
 ### Supabase OAuth Variables

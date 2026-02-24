@@ -39,6 +39,39 @@
     ],
     "deny": []
   },
+  "hooks": {
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/track-agent.sh"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/clear-agent.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/guard-orchestrator-writes.sh"
+          }
+        ]
+      }
+    ]
+  },
   "allowManagedPermissionRulesOnly": false,
   "statusLine": {
     "type": "command",

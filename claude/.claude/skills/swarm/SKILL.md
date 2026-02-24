@@ -12,6 +12,8 @@ This skill is a thin launcher. It prepares the context, spawns the **Lead Agent*
 
 **You do NOT orchestrate the work yourself.** You prepare inputs, spawn the Lead Agent, and handle post-completion actions.
 
+**Architecture**: The Lead Agent delegates each iteration to an **Iteration Runner** agent, which executes Phases A-D in a fresh context window. This prevents context degradation across iterations — the Lead Agent stays lean (~18K init + ~3K per iteration summary), while each runner gets a fresh 50K context that is discarded after the iteration completes. State persists via `$TMPDIR/swarm-<session-name>-state.json`.
+
 ## CRITICAL — NEVER STOP MID-FLOW
 
 `/swarm` is an end-to-end pipeline: interview → spec → worktree → Lead Agent → PR. **You MUST execute Steps 1 through 5 in a single invocation.** If `/interview` runs in Step 2d, that is NOT the end — it is the beginning. The moment the interview produces a spec file, you MUST continue to Step 2e (commit spec), Step 3 (spawn Lead Agent), Step 4 (handle result), and Step 5 (create PR). Stopping after the interview to "let the user review" or "summarize what was gathered" is a critical failure.
@@ -267,8 +269,43 @@ The following audit was run against the current project state BEFORE any impleme
 
 ## CRITICAL INSTRUCTIONS
 
+# ============================================================
+# ABSOLUTE RULE — NEVER DO THE WORK YOURSELF
+# ============================================================
+#
+# The Lead Agent is an ORCHESTRATOR. It NEVER writes code directly.
+# It NEVER uses Edit, Write, or Bash to modify source files.
+# It NEVER reads files to "do the refactoring itself."
+#
+# The Lead Agent's ONLY job is to:
+#   1. Spawn the Planification Agent to decompose tasks
+#   2. Spawn the Test Agent to write/validate tests
+#   3. Spawn Code Agents to implement code changes
+#   4. Spawn the Code Review Agent to review changes
+#   5. Spawn the Security Agent to security-review changes
+#   6. Coordinate iterations and handle escalation
+#
+# If you (the Lead Agent) find yourself:
+#   - Reading source files to understand implementation details → STOP
+#   - Using Edit/Write to modify .ts, .yml, .json, or any source file → STOP
+#   - Doing "just this one quick fix" directly → STOP
+#   - Thinking "it's faster if I do it myself" → STOP
+#
+# You MUST delegate ALL implementation work to Code Agents via Task.
+# You MUST delegate ALL test work to Test Agents via Task.
+# You MUST delegate ALL review work to Review/Security Agents via Task.
+#
+# This is NON-NEGOTIABLE. Doing the work yourself is the SINGLE
+# WORST failure mode — it bypasses all quality gates (review,
+# security, tests) and produces unvalidated code. It is strictly
+# FORBIDDEN regardless of task size, complexity, or time pressure.
+#
+# VIOLATION OF THIS RULE = IMMEDIATE TERMINATION AND RESTART.
+# ============================================================
+
 - You MUST complete ALL spec items before returning. Do NOT stop early.
 - If you encounter a blocker, escalate via AskUserQuestion — do NOT silently stop.
+- **NEVER write code directly** — you are an orchestrator. ALL implementation goes through Code Agents (subagent_type: "code-agent"). ALL tests go through Test Agents (subagent_type: "test-agent"). ALL reviews go through Review Agents (subagent_type: "code-review-agent") and Security Agents (subagent_type: "security-agent"). You spawn them via Task. You NEVER use Edit, Write, or Bash on source files yourself.
 - When `referencedSkills` is provided: these are BINDING STANDARDS. You MUST forward the FULL skill content to the Planification Agent and to EVERY Code Agent. The Planification Agent MUST decompose tasks covering EVERY check in the skill. The Code Agents MUST implement EXACTLY what the skill specifies — every config file, every dependency, every script, every workflow. Partial compliance is a FAILURE that will be caught in output validation.
 - When `skillAuditResults` is provided: this is the exact list of FAIL/MISSING items. Every single one MUST become PASS. Do NOT invent your own interpretation of what the skill requires — follow the audit results literally.
 - Run the full orchestration loop for EVERY iteration: Phase A (Planification + Test) → Phase B (Code + Review + Security) → Phase C (Escalation) → Phase D (Lint + Build + Commit).
@@ -390,7 +427,8 @@ This removes the worktree directory but keeps the branch (which is now on the re
 ## Constraints
 
 - **`/swarm` ALWAYS executes the full flow** — Steps 1 through 5 must run every time. NEVER stop after gathering context, after the interview, or to display a summary/dashboard/status overview. The purpose of `/swarm` is to deliver working code and a PR, not to report on the project state or produce a spec. If spec detection finds nothing, proceed to `/interview`. **The moment `/interview` completes and produces a spec file, you MUST immediately continue to Step 2e → Step 3 → Step 4 → Step 5.** Stopping after the interview is the single most common failure mode — do NOT do it. There is no valid reason to stop before Step 3.
+- **The Lead Agent MUST NEVER write code directly** — it is an orchestrator that spawns sub-agents (Planification Agent, Test Agent, Code Agents, Code Review Agent, Security Agent). If the Lead Agent uses Edit/Write/Bash on source files instead of spawning Code Agents, the launcher MUST terminate it and re-spawn with explicit instructions. This is the second most common failure mode. The Lead Agent doing the work itself means NO quality gates (no review, no security scan, no test validation). It is FORBIDDEN.
 - Never run destructive commands: no `rm -rf`, no `git push --force`, no `git reset --hard`, no branch deletion
 - Git operations are limited to: branch creation, commit, push, and PR creation
-- The skill is a launcher — all implementation work happens in the Lead Agent and its sub-agents
+- The skill is a launcher — all implementation work happens in the Lead Agent and its sub-agents (NEVER in the Lead Agent directly)
 - Never commit secrets or credentials

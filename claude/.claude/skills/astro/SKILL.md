@@ -106,14 +106,61 @@ import { API_SECRET } from "astro:env/server";
 // API_SECRET is: never in client bundle, never inlined, always runtime, type-safe, validated
 ```
 
+### Shared files (server + client): `astro:env/server` is FORBIDDEN
+
+`astro:env/server` can ONLY be imported in server-only files (.astro frontmatter, middleware, API routes). If a `.ts` file is imported by BOTH server code AND client-side framework components (React, Svelte, etc.), importing `astro:env/server` will crash the browser with:
+
+> The "astro:env/server" module is only available server-side.
+
+**Fix:** Use `astro:env/client` for vars needed in shared files. For server-only vars in a shared file, use `import.meta.env.X` (which Vite strips/replaces correctly per context).
+
+```typescript
+// src/lib/supabase.ts — imported by BOTH server and client code
+import { SUPABASE_ANON_KEY } from "astro:env/client"; // works everywhere
+
+export function createServerSupabase(context) {
+  // SUPABASE_URL is server-only — use import.meta.env, NOT astro:env/server
+  return createServerClient(import.meta.env.SUPABASE_URL, SUPABASE_ANON_KEY, { ... });
+}
+
+export function createBrowserSupabase() {
+  return createBrowserClient(window.location.origin, SUPABASE_ANON_KEY, { ... });
+}
+```
+
+### Eliminating `PUBLIC_` prefix duplication with `astro:env`
+
+`import.meta.env.PUBLIC_X` requires a `PUBLIC_`-prefixed env var to expose values to client JS. This forces duplication when infra generates `X` (not `PUBLIC_X`).
+
+**`astro:env` eliminates this.** Define `context: "client", access: "public"` in the schema — Astro exposes the var to the browser using the ORIGINAL env var name. No `PUBLIC_` prefix, no mapping, no duplication.
+
+```typescript
+// astro.config.ts
+import { defineConfig, envField } from "astro/config";
+
+export default defineConfig({
+  env: {
+    schema: {
+      DB_URL: envField.string({ context: "server", access: "public" }),
+      ANON_KEY: envField.string({ context: "client", access: "public" }),
+    },
+  },
+});
+```
+
+- `ANON_KEY` is available client-side via `import { ANON_KEY } from "astro:env/client"` — no `PUBLIC_ANON_KEY` needed
+- Infra/Docker passes `ANON_KEY` as-is — one name everywhere
+- For Docker builds: pass as build arg (`ARG ANON_KEY`) so Astro bakes it into client JS
+
 ### Quick reference
 
 | Pattern | Safe for secrets? | Future-proof? |
 |---|---|---|
 | `import { X } from "astro:env/server"` (access: "secret") | Yes | Yes |
+| `import { X } from "astro:env/client"` (access: "public") | Public only | Yes |
 | `import.meta.env.SECRET` (current Astro default) | Yes (today) | **No** (inlined in Astro 6) |
 | `process.env.SECRET` | Yes (runtime) | Fragile (Vite may rewrite) |
-| `import.meta.env.PUBLIC_X` | Public only | Yes |
+| `import.meta.env.PUBLIC_X` | Public only | Legacy — prefer `astro:env/client` |
 
 ## Styling
 

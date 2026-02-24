@@ -1,7 +1,6 @@
 {
   "env": {
     "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-sonnet-4-5-20250929",
-    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
     "TMPDIR": "/tmp/claude",
     "PLANE_WORKSPACE_SLUG": "nextnode-internals"
   },
@@ -39,39 +38,7 @@
     ],
     "deny": []
   },
-  "hooks": {
-    "SubagentStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash ~/.claude/hooks/track-agent.sh"
-          }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash ~/.claude/hooks/clear-agent.sh"
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash ~/.claude/hooks/guard-orchestrator-writes.sh"
-          }
-        ]
-      }
-    ]
-  },
+  "hooks": {},
   "allowManagedPermissionRulesOnly": false,
   "statusLine": {
     "type": "command",
@@ -81,7 +48,6 @@
     "terraform-provider-development@hashicorp": true,
     "context7@claude-plugins-official": true,
     "github@claude-plugins-official": true,
-    "postgres-best-practices@supabase-agent-skills": true,
     "frontend-design@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {

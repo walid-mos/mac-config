@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BatchDecomposition",
+  "description": "Output of decomposing a spec into iteration batches (Phase 0)",
+  "type": "object",
+  "required": ["batches", "totalSpecItems", "totalBatches", "orderingRationale"],
+  "additionalProperties": false,
+  "properties": {
+    "batches": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["iteration", "specItemIds", "rationale", "complexity", "estimatedTasks"],
+        "properties": {
+          "iteration": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "1-indexed iteration number"
+          },
+          "specItemIds": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Spec item IDs in this batch"
+          },
+          "rationale": {
+            "type": "string",
+            "description": "Why these items are grouped"
+          },
+          "complexity": {
+            "type": "string",
+            "enum": ["low", "medium", "high"]
+          },
+          "estimatedTasks": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Rough count of PLAN-* items expected"
+          }
+        }
+      }
+    },
+    "totalSpecItems": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "totalBatches": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "orderingRationale": {
+      "type": "string",
+      "description": "Why this batch ordering was chosen"
+    }
+  }
+}

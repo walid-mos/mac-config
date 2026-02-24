@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ReviewAgentOutput",
+  "description": "Output of the Code Review Agent",
+  "type": "object",
+  "required": ["issues", "summary", "cleanFiles"],
+  "additionalProperties": false,
+  "properties": {
+    "issues": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ReviewIssue"
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["totalIssues", "quickFixes", "significant", "critical"],
+      "properties": {
+        "totalIssues": { "type": "integer" },
+        "quickFixes": { "type": "integer" },
+        "significant": { "type": "integer" },
+        "critical": { "type": "integer" }
+      }
+    },
+    "cleanFiles": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Files with no issues found"
+    }
+  },
+  "$defs": {
+    "ReviewIssue": {
+      "type": "object",
+      "required": ["id", "type", "severity", "file", "line", "description", "suggestedFix"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "e.g. REV-001"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["dry-violation", "dead-code", "bad-pattern", "code-quality"]
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["quick-fix", "significant", "critical"]
+        },
+        "file": { "type": "string" },
+        "line": { "type": ["integer", "null"] },
+        "description": { "type": "string" },
+        "suggestedFix": { "type": "string" }
+      }
+    }
+  }
+}

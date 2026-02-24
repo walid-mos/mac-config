@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SecurityAgentOutput",
+  "description": "Output of the Security Agent",
+  "type": "object",
+  "required": ["issues", "summary", "cleanFiles", "attackSurfaceSummary"],
+  "additionalProperties": false,
+  "properties": {
+    "issues": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SecurityIssue"
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["totalIssues", "quickFixes", "significant", "critical", "skippedLowValue"],
+      "properties": {
+        "totalIssues": { "type": "integer" },
+        "quickFixes": { "type": "integer" },
+        "significant": { "type": "integer" },
+        "critical": { "type": "integer" },
+        "skippedLowValue": {
+          "type": "integer",
+          "description": "Findings skipped via cost/benefit matrix"
+        }
+      }
+    },
+    "cleanFiles": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Files with zero issues"
+    },
+    "attackSurfaceSummary": {
+      "type": "string",
+      "description": "2-3 sentence overview of the attack surface"
+    }
+  },
+  "$defs": {
+    "SecurityIssue": {
+      "type": "object",
+      "required": [
+        "id",
+        "type",
+        "owaspCategory",
+        "cwe",
+        "severity",
+        "impact",
+        "fixComplexity",
+        "file",
+        "line",
+        "description",
+        "suggestedFix",
+        "needsManualReview"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "e.g. SEC-001"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "injection",
+            "broken-access-control",
+            "cryptographic-failure",
+            "security-misconfiguration",
+            "authentication-failure",
+            "insecure-design",
+            "integrity-failure",
+            "logging-failure"
+          ]
+        },
+        "owaspCategory": {
+          "type": "string",
+          "description": "e.g. A01:2025 Broken Access Control"
+        },
+        "cwe": {
+          "type": ["string", "null"],
+          "description": "e.g. CWE-89"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["quick-fix", "significant", "critical"]
+        },
+        "impact": {
+          "type": "string",
+          "enum": ["critical", "high", "medium", "low"]
+        },
+        "fixComplexity": {
+          "type": "string",
+          "enum": ["trivial", "low", "medium", "high"]
+        },
+        "file": { "type": "string" },
+        "line": { "type": ["integer", "null"] },
+        "description": { "type": "string" },
+        "suggestedFix": { "type": "string" },
+        "needsManualReview": {
+          "type": "boolean",
+          "description": "True if data flow tracing was incomplete"
+        }
+      }
+    }
+  }
+}

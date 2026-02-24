@@ -18,7 +18,8 @@ This skill auto-loads on all NextNode/SaaS projects. It defines what a compliant
 | `standards` | `@nextnode-solutions/standards` — linting, formatting, TypeScript, Tailwind, testing, commit conventions | Yes (same dirs) |
 | `logger` | `@nextnode-solutions/logger` — logging library API and patterns | Yes (when in deps) |
 | `email-manager` | `@nextnode-solutions/email-manager` — email sending library API | Yes (same dirs, conditional) |
-| `nextnode-infra` | Infrastructure operations — CLI commands, Terraform, VPS, deployment, DNS | Yes (same dirs) |
+| `nn` | `@nextnode-solutions/nn` — local dev DX CLI (nn up, nn env, nn down) | Yes (same dirs) |
+| `nextnode-infra` | Infrastructure operations — infra CLI commands, Terraform, VPS, deployment, DNS | Yes (same dirs) |
 | `nextnode-standards` | Compliance audit — checks all standards and produces a report | Yes (same dirs) |
 | `nextnode-brand` | Brand guidelines — colors, typography, logo system | No (manual `/nextnode-brand`) |
 | `structure-astro` | Astro project `src/` structure — domain-driven components, shared/page separation, lib layer, islands | Yes (same dirs + clients) |

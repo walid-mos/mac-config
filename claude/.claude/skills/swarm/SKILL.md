@@ -3,16 +3,16 @@ name: swarm
 description: Orchestrate a team of specialized agents to autonomously complete development tasks
 user-invocable: true
 argument-hint: [task description]
-allowed-tools: Task, Read, Glob, Grep, Write, Edit, Bash, Skill, AskUserQuestion
+allowed-tools: Read, Glob, Grep, Write, Edit, Bash, Skill, AskUserQuestion
 ---
 
 # Swarm Skill — Launcher
 
-This skill is a thin launcher. It prepares the context, spawns the **Lead Agent** via `Task`, and handles PR creation when the Lead Agent finishes.
+This skill is a thin launcher. It prepares the context, invokes `swarm.sh` via `Bash`, and handles PR creation when the script finishes.
 
-**You do NOT orchestrate the work yourself.** You prepare inputs, spawn the Lead Agent, and handle post-completion actions.
+**You do NOT orchestrate the work yourself.** You prepare inputs, run the shell orchestrator, and handle post-completion actions.
 
-**Architecture**: The Lead Agent delegates each iteration to an **Iteration Runner** agent, which executes Phases A-D in a fresh context window. This prevents context degradation across iterations — the Lead Agent stays lean (~18K init + ~3K per iteration summary), while each runner gets a fresh 50K context that is discarded after the iteration completes. State persists via `$TMPDIR/swarm-<session-name>-state.json`.
+**Architecture**: `swarm.sh` is a deterministic shell script that sequences all phases (decompose → plan → test → code → review → security → lint → build → commit) using `claude -p` for AI work and pure shell logic for orchestration. This eliminates the token cost and "creative interpretation" risks of AI-based orchestration. State persists via `$TMPDIR/swarm-<session-name>-state.json`.
 
 ## CRITICAL — NEVER STOP MID-FLOW
 
@@ -206,130 +206,113 @@ Now that the spec is qualified and we're on the feature branch, prepare the spec
 
 This ensures the spec is committed on the feature branch before any implementation begins.
 
-## Step 3 — Spawn the Lead Agent
+## Step 3 — Run the Shell Orchestrator
 
-Spawn the Lead Agent via `Task` with `subagent_type: "lead-agent"`.
+Invoke `swarm.sh` in the background and stream its log in real-time.
 
-Build the prompt as a structured `LeadAgentInput` (see `agents/schemas/lead-agent.md`):
+### 3a. Build the arguments
 
-```
-## LeadAgentInput
+Construct a JSON string for each structured argument:
 
-### taskDescription
-<original free-form task description>
+```bash
+# Tech stack JSON
+TECH_STACK_JSON='{"languages":["typescript","css"],"frameworks":["astro","react"],"testRunner":"vitest","packageManager":"pnpm","buildTool":"vite","configs":["tsconfig.json","astro.config.mjs"]}'
 
-### sessionName
-<kebab-case session name>
+# Swarm config JSON
+SWARM_CONFIG_JSON='{"specialists":["typescript","react","astro"],"defaultTestStrategy":"post-code","autoCommit":true,"prOnComplete":true,"confirmExit":"auto"}'
 
-### normalizedSpec
-type: full-spec
-path: <path to spec file>
-content:
----
-<full contents of the spec file>
----
+# Skills JSON (only if resolvedSkills is non-empty)
+SKILLS_JSON='{"nextnode-standards":"<full SKILL.md content>","standards":"<full content>"}'
 
-### techStack
-languages: [<detected languages>]
-frameworks: [<detected frameworks>]
-testRunner: <detected or null>
-packageManager: <detected>
-buildTool: <detected or null>
-configs: [<list of detected config file paths>]
-
-### swarmConfig
-specialists: [<resolved list or "auto-detect">]
-defaultTestStrategy: <resolved value>
-autoCommit: <resolved value>
-prOnComplete: <resolved value>
-confirmExit: <resolved value>
-
-### existingDocs
-troubleshooting: <contents of docs/troubleshooting.md, or "null">
-iterations: <contents of docs/swarm/<session-name>/iterations.md if resuming, or "null">
-
-### referencedSkills (from Step 1e — include ONLY if resolvedSkills is non-empty)
-
-The following skills were explicitly referenced in the task description. These are BINDING STANDARDS — every check, every config file, every pattern described in these skills MUST be implemented exactly as specified. Partial compliance is a FAILURE.
-
-#### <skillName>
-<full SKILL.md content>
-
-#### <dependentSkillName>
-<full SKILL.md content>
-
-(Repeat for each entry in resolvedSkills)
-
-### skillAuditResults (from Step 1e — include ONLY if audit was run)
-
-The following audit was run against the current project state BEFORE any implementation. This is the exact list of items to fix. Every FAIL and MISSING item MUST become PASS.
-
-#### <skillName> audit
-<full audit output>
-
-## CRITICAL INSTRUCTIONS
-
-# ============================================================
-# ABSOLUTE RULE — NEVER DO THE WORK YOURSELF
-# ============================================================
-#
-# The Lead Agent is an ORCHESTRATOR. It NEVER writes code directly.
-# It NEVER uses Edit, Write, or Bash to modify source files.
-# It NEVER reads files to "do the refactoring itself."
-#
-# The Lead Agent's ONLY job is to:
-#   1. Spawn the Planification Agent to decompose tasks
-#   2. Spawn the Test Agent to write/validate tests
-#   3. Spawn Code Agents to implement code changes
-#   4. Spawn the Code Review Agent to review changes
-#   5. Spawn the Security Agent to security-review changes
-#   6. Coordinate iterations and handle escalation
-#
-# If you (the Lead Agent) find yourself:
-#   - Reading source files to understand implementation details → STOP
-#   - Using Edit/Write to modify .ts, .yml, .json, or any source file → STOP
-#   - Doing "just this one quick fix" directly → STOP
-#   - Thinking "it's faster if I do it myself" → STOP
-#
-# You MUST delegate ALL implementation work to Code Agents via Task.
-# You MUST delegate ALL test work to Test Agents via Task.
-# You MUST delegate ALL review work to Review/Security Agents via Task.
-#
-# This is NON-NEGOTIABLE. Doing the work yourself is the SINGLE
-# WORST failure mode — it bypasses all quality gates (review,
-# security, tests) and produces unvalidated code. It is strictly
-# FORBIDDEN regardless of task size, complexity, or time pressure.
-#
-# VIOLATION OF THIS RULE = IMMEDIATE TERMINATION AND RESTART.
-# ============================================================
-
-- You MUST complete ALL spec items before returning. Do NOT stop early.
-- If you encounter a blocker, escalate via AskUserQuestion — do NOT silently stop.
-- **NEVER write code directly** — you are an orchestrator. ALL implementation goes through Code Agents (subagent_type: "code-agent"). ALL tests go through Test Agents (subagent_type: "test-agent"). ALL reviews go through Review Agents (subagent_type: "code-review-agent") and Security Agents (subagent_type: "security-agent"). You spawn them via Task. You NEVER use Edit, Write, or Bash on source files yourself.
-- When `referencedSkills` is provided: these are BINDING STANDARDS. You MUST forward the FULL skill content to the Planification Agent and to EVERY Code Agent. The Planification Agent MUST decompose tasks covering EVERY check in the skill. The Code Agents MUST implement EXACTLY what the skill specifies — every config file, every dependency, every script, every workflow. Partial compliance is a FAILURE that will be caught in output validation.
-- When `skillAuditResults` is provided: this is the exact list of FAIL/MISSING items. Every single one MUST become PASS. Do NOT invent your own interpretation of what the skill requires — follow the audit results literally.
-- Run the full orchestration loop for EVERY iteration: Phase A (Planification + Test) → Phase B (Code + Review + Security) → Phase C (Escalation) → Phase D (Lint + Build + Commit).
-- NEVER skip Code Review or Security Review — even for config-only packages, static sites, or "simple" changes. These gates are mandatory without exception.
-- ALWAYS spawn the Test Agent every iteration. If it returns `noTestsNeeded: true` with a valid reason aligned with the vitest skill's scope exclusions (config files, CI/CD, infra, type aliases, re-exports), accept it — do NOT force it to produce useless tests.
-- Commit each validated iteration.
-- Write the delivery report to docs/swarm/<session-name>/delivery-report.md before returning.
-- Before returning your completion report, run the SELF-AUDIT CHECKLIST (see your agent definition). Your report will be validated against it.
-- When you are done, return a structured completion report:
-  STATUS: completed | partial | blocked
-  COMPLETED: <N>/<total> spec items
-  FILES_CHANGED: <comma-separated list>
-  PENDING_ITEMS: <list or "none">
-  BLOCKER: <description or "none">
-  SUMMARY: <1-2 sentence summary>
+# Skill audit JSON (only if audit was run)
+SKILL_AUDIT_JSON='{"nextnode-standards":"<full audit output>"}'
 ```
 
-## Step 4 — Handle Lead Agent Result
+### 3b. Invoke swarm.sh (background + real-time streaming)
 
-When the Lead Agent returns, parse its completion report.
+**MANDATORY**: Run swarm.sh in the background and stream its output in real-time. NEVER run it as a blocking call — the user must see live progress.
+
+**Step 1** — Launch in background via `Bash(run_in_background: true)`:
+
+```bash
+bash ~/.claude/scripts/swarm.sh \
+  --session "<session-name>" \
+  --spec "<path-to-spec-file>" \
+  --tech-stack "$TECH_STACK_JSON" \
+  --swarm-config "$SWARM_CONFIG_JSON" \
+  --project-dir "$(pwd)" \
+  [--skills "$SKILLS_JSON"] \
+  [--skill-audit "$SKILL_AUDIT_JSON"]
+```
+
+Include `--skills` and `--skill-audit` only if the corresponding data was gathered in Step 1e.
+
+**Step 2** — Stream the log in real-time. Wait a moment for the log directory to be created, then stream:
+
+```bash
+LOG="$TMPDIR/swarm-<session>-logs/swarm.log"
+DONE="$TMPDIR/swarm-<session>-done"
+
+# Wait for log file to exist (max 10s)
+for i in $(seq 1 20); do [ -f "$LOG" ] && break; sleep 0.5; done
+
+# Stream log until the done marker appears, then stop
+tail -f "$LOG" &
+TAIL_PID=$!
+# Wait for done marker (event-driven via kqueue/inotify, not polling)
+while [ ! -f "$DONE" ]; do sleep 1; done
+kill $TAIL_PID 2>/dev/null || true
+cat "$DONE"
+```
+
+Use `Bash(timeout: 600000)` for the streaming call — swarm runs can take up to 10 minutes.
+
+**ANTI-PATTERN — NEVER DO THIS**:
+- `sleep 120 && tail -30 ...` — NO. This is polling, not streaming.
+- Running swarm.sh as a blocking `Bash` call with no output — NO. The user sees nothing.
+- Using `TaskOutput(block: false)` in a loop — NO. This is polling.
+
+### 3c. Handle exit codes
+
+Read the done marker file (`$TMPDIR/swarm-<session>-done`) to get the exit code:
+
+- **Exit code `0` — Success**: All iterations completed. The result JSON is at `$TMPDIR/swarm-<session>-result.json`. Proceed to Step 4.
+
+- **Exit code `1` — Failure**: Unrecoverable error. The log was already streamed in real-time. Read the last 50 lines of `$TMPDIR/swarm-<session>-logs/swarm.log` if needed. Present the error to the user via `AskUserQuestion` and offer options: retry, skip remaining items, or abort.
+
+- **Exit code `2` — User input needed**: A blocker requires human intervention. The blocker description is at `$TMPDIR/swarm-<session>-blocker.txt`. Read the blocker file, present it to the user via `AskUserQuestion`. Once the user confirms the prerequisite is met, re-run with `--resume`:
+
+```bash
+bash ~/.claude/scripts/swarm.sh \
+  --session "<session-name>" \
+  --spec "<path-to-spec-file>" \
+  --tech-stack "$TECH_STACK_JSON" \
+  --swarm-config "$SWARM_CONFIG_JSON" \
+  --project-dir "$(pwd)" \
+  --resume
+```
+
+## Step 4 — Handle Orchestrator Result
+
+Read the result JSON at `$TMPDIR/swarm-<session>-result.json`.
+
+### Result JSON format
+
+```json
+{
+  "status": "completed | partial | failed",
+  "completedItems": ["FR-1", "FR-2"],
+  "pendingItems": ["FR-3"],
+  "blockedItems": [],
+  "totalIterations": 2,
+  "filesChanged": ["src/auth.ts", "src/login.tsx"],
+  "filesCreated": ["src/types/auth.ts"],
+  "testResults": { "total": 28, "passed": 28, "failed": 0 },
+  "summary": "Implemented authentication with login form and auth service"
+}
+```
 
 ### Output Validation (mandatory — before proceeding to Step 5)
-
-Before accepting the Lead Agent's result, validate the delivery report:
 
 1. Read `docs/swarm/<session-name>/delivery-report.md`
 2. Check the "Per-Iteration Breakdown" table:
@@ -339,16 +322,10 @@ Before accepting the Lead Agent's result, validate the delivery report:
    - Every iteration entry MUST have `**Review**:` and `**Lint**:` and `**Build**:` lines
 4. **Skill compliance validation** (if `resolvedSkills` was non-empty): Re-run the skill audit from Step 1e against the CURRENT project state (post-implementation). Compare the new audit results against the original `skillAuditResults`. Every item that was FAIL or MISSING in the original audit MUST now be PASS. If ANY skill audit item is still FAIL or MISSING:
    - Do NOT proceed to Step 5
-   - Re-spawn the Lead Agent with:
-     - The remaining FAIL/MISSING items as the ONLY spec items
-     - The full skill content (from `resolvedSkills`)
-     - A directive: "SKILL COMPLIANCE FAILURE: The following audit items are still failing: [list]. You MUST fix these before returning. Here is the full skill definition: [content]."
+   - Re-run swarm.sh with `--resume` and a modified spec that targets only the failing audit items
 5. If ANY iteration is missing review/security/test evidence:
    - Do NOT proceed to Step 5
-   - Re-spawn the Lead Agent with:
-     - The current state of the codebase
-     - A directive: "VALIDATION FAILURE: Iterations [list] are missing mandatory review/security/test gates. You MUST run the missing phases before returning. Do NOT re-implement code — only run the missing Phase B agents (code-review-agent, security-agent) and Phase A (test-agent) on the existing files."
-   - Attach the list of changed files per iteration from the delivery report
+   - Re-run swarm.sh with `--resume` — the script will pick up from the last completed batch
 
 ### If status is "completed"
 
@@ -358,22 +335,25 @@ All spec items are done. Proceed to Step 5 (PR Creation).
 
 Some items remain. Evaluate:
 
-1. Read the Lead Agent's output to understand what was completed and what remains
+1. Read the result JSON and log file to understand what completed and what remains
 2. If remaining items are blocked by user decisions → ask the user via `AskUserQuestion`
-3. If remaining items failed due to technical issues → re-spawn the Lead Agent with:
-   - Only the pending items
-   - The troubleshooting history (updated with what failed)
-   - A directive to focus on the remaining work
+3. If remaining items failed due to technical issues → re-run with `--resume`:
+   ```bash
+   bash ~/.claude/scripts/swarm.sh --session "<name>" --spec "<path>" \
+     --tech-stack "$TECH_STACK_JSON" --swarm-config "$SWARM_CONFIG_JSON" \
+     --project-dir "$(pwd)" --resume
+   ```
 4. Repeat until all items are done or the user decides to stop
 
-### If status is "blocked"
+### If status is "failed"
 
-The Lead Agent hit an unresolvable issue:
+The orchestrator hit an unrecoverable error:
 
-1. Present the blocker to the user via `AskUserQuestion`
-2. Based on user response:
-   - **Fix and retry**: re-spawn Lead Agent with updated context
-   - **Skip blocked items**: proceed to PR with partial completion
+1. Read `$TMPDIR/swarm-<session>-logs/swarm.log` for error details
+2. Present the error to the user via `AskUserQuestion`
+3. Based on user response:
+   - **Fix and retry**: re-run swarm.sh with `--resume`
+   - **Skip remaining items**: proceed to PR with partial completion
    - **Abort**: stop without PR
 
 ## Step 5 — Pull Request Creation
@@ -427,8 +407,9 @@ This removes the worktree directory but keeps the branch (which is now on the re
 ## Constraints
 
 - **`/swarm` ALWAYS executes the full flow** — Steps 1 through 5 must run every time. NEVER stop after gathering context, after the interview, or to display a summary/dashboard/status overview. The purpose of `/swarm` is to deliver working code and a PR, not to report on the project state or produce a spec. If spec detection finds nothing, proceed to `/interview`. **The moment `/interview` completes and produces a spec file, you MUST immediately continue to Step 2e → Step 3 → Step 4 → Step 5.** Stopping after the interview is the single most common failure mode — do NOT do it. There is no valid reason to stop before Step 3.
-- **The Lead Agent MUST NEVER write code directly** — it is an orchestrator that spawns sub-agents (Planification Agent, Test Agent, Code Agents, Code Review Agent, Security Agent). If the Lead Agent uses Edit/Write/Bash on source files instead of spawning Code Agents, the launcher MUST terminate it and re-spawn with explicit instructions. This is the second most common failure mode. The Lead Agent doing the work itself means NO quality gates (no review, no security scan, no test validation). It is FORBIDDEN.
+- **The launcher NEVER writes implementation code** — `swarm.sh` orchestrates AI agents that do the work. The launcher's job is to prepare context (Steps 1-2), invoke the script (Step 3), validate results (Step 4), and create the PR (Step 5).
 - Never run destructive commands: no `rm -rf`, no `git push --force`, no `git reset --hard`, no branch deletion
 - Git operations are limited to: branch creation, commit, push, and PR creation
-- The skill is a launcher — all implementation work happens in the Lead Agent and its sub-agents (NEVER in the Lead Agent directly)
+- The skill is a launcher — all implementation work happens inside `swarm.sh` via `claude -p` agent calls
+- **NEVER use `sleep` to poll for swarm status** — swarm.sh writes a done marker file (`$TMPDIR/swarm-<session>-done`) on exit. Use `tail -f` on the log for real-time streaming, then check the done marker. No `sleep N && check`, no `while/sleep` loops, no `TaskOutput(block:false)` loops.
 - Never commit secrets or credentials

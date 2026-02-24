@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CodeAgentOutput",
+  "description": "Output of a Code Agent for a single task",
+  "type": "object",
+  "required": [
+    "taskId",
+    "status",
+    "filesChanged",
+    "filesCreated",
+    "testResults",
+    "acceptanceCriteriaMet",
+    "typeCheckResult",
+    "lintResult",
+    "bugsReported",
+    "concerns",
+    "sharedOutput"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "taskId": { "type": "string" },
+    "status": {
+      "type": "string",
+      "enum": ["completed", "failed", "blocked"]
+    },
+    "filesChanged": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "filesCreated": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "testResults": {
+      "type": "object",
+      "required": ["total", "passed", "failed", "skipped", "output"],
+      "properties": {
+        "total": { "type": "integer" },
+        "passed": { "type": "integer" },
+        "failed": { "type": "integer" },
+        "skipped": { "type": "integer" },
+        "output": {
+          "type": "string",
+          "description": "Raw test runner output (truncated)"
+        }
+      }
+    },
+    "acceptanceCriteriaMet": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["criterion", "met", "notes"],
+        "properties": {
+          "criterion": { "type": "string" },
+          "met": { "type": "boolean" },
+          "notes": { "type": "string" }
+        }
+      }
+    },
+    "typeCheckResult": {
+      "type": "object",
+      "required": ["ran", "tool", "passed", "errorCount", "errors"],
+      "properties": {
+        "ran": {
+          "type": "boolean",
+          "description": "Whether type-check was executed"
+        },
+        "tool": {
+          "type": ["string", "null"],
+          "description": "Tool used (e.g. astro check, tsc --noEmit)"
+        },
+        "passed": { "type": "boolean" },
+        "errorCount": { "type": "integer" },
+        "errors": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Truncated list of error messages (max 10)"
+        }
+      }
+    },
+    "lintResult": {
+      "type": "object",
+      "required": ["ran", "tool", "passed", "errorCount", "warningCount", "autoFixed"],
+      "properties": {
+        "ran": {
+          "type": "boolean",
+          "description": "Whether lint was executed"
+        },
+        "tool": {
+          "type": ["string", "null"],
+          "description": "Lint tool used (e.g. biome, eslint)"
+        },
+        "passed": { "type": "boolean" },
+        "errorCount": { "type": "integer" },
+        "warningCount": { "type": "integer" },
+        "autoFixed": {
+          "type": "integer",
+          "description": "Count of issues auto-fixed"
+        }
+      }
+    },
+    "bugsReported": {
+      "type": "integer",
+      "description": "Count of bugs written to fixes.md"
+    },
+    "concerns": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "sharedOutput": {
+      "type": "object",
+      "required": ["exports", "filePaths"],
+      "properties": {
+        "exports": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "filePaths": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "description": "Assets produced for dependent tasks"
+    }
+  }
+}

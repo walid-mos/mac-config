@@ -1,0 +1,245 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TestAgentOutput",
+  "description": "Output of the Test Agent",
+  "type": "object",
+  "required": [
+    "taskResults",
+    "summary",
+    "specFeedback",
+    "couplingWarnings",
+    "tddViolations",
+    "codeAgentContext"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "taskResults": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/TestTaskResult"
+      }
+    },
+    "summary": {
+      "$ref": "#/$defs/TestSummary"
+    },
+    "specFeedback": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/SpecFeedbackItem"
+      }
+    },
+    "couplingWarnings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/CouplingWarning"
+      }
+    },
+    "tddViolations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/TddViolation"
+      }
+    },
+    "codeAgentContext": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/CodeAgentTestContext"
+      }
+    }
+  },
+  "$defs": {
+    "TestTaskResult": {
+      "type": "object",
+      "required": ["taskId", "strategy", "status", "testFiles", "edgeCasesAdded", "blockedItems"],
+      "properties": {
+        "taskId": { "type": "string" },
+        "strategy": {
+          "type": "string",
+          "enum": ["tdd-strict", "tdd-flexible", "post-code"]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "tests-written",
+            "tests-written-partial",
+            "outlines-written",
+            "tests-complete",
+            "noted",
+            "blocked",
+            "validated"
+          ]
+        },
+        "testFiles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "isNew", "testCount", "passingCount", "failingCount", "todoCount", "behaviors"],
+            "properties": {
+              "path": { "type": "string" },
+              "isNew": { "type": "boolean" },
+              "testCount": { "type": "integer" },
+              "passingCount": { "type": "integer" },
+              "failingCount": { "type": "integer" },
+              "todoCount": { "type": "integer" },
+              "behaviors": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Top-level describe() names"
+              }
+            }
+          }
+        },
+        "edgeCasesAdded": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "blockedItems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["testName", "reason", "specFeedbackRef"],
+            "properties": {
+              "testName": { "type": "string" },
+              "reason": { "type": "string" },
+              "specFeedbackRef": {
+                "type": ["string", "null"],
+                "description": "References SpecFeedbackItem.id"
+              }
+            }
+          }
+        }
+      }
+    },
+    "TestSummary": {
+      "type": "object",
+      "required": [
+        "totalTasks",
+        "byStatus",
+        "totalTests",
+        "passing",
+        "failing",
+        "skipped",
+        "todo",
+        "qualityGates",
+        "noTestsNeeded",
+        "noTestsReason"
+      ],
+      "properties": {
+        "totalTasks": { "type": "integer" },
+        "byStatus": {
+          "type": "object",
+          "additionalProperties": { "type": "integer" },
+          "description": "Keyed by TestTaskStatus"
+        },
+        "totalTests": { "type": "integer" },
+        "passing": { "type": "integer" },
+        "failing": { "type": "integer" },
+        "skipped": { "type": "integer" },
+        "todo": { "type": "integer" },
+        "qualityGates": {
+          "type": "object",
+          "required": [
+            "allBehaviorsCovered",
+            "allErrorPathsCovered",
+            "edgeCasesCovered",
+            "noFlakyPatterns",
+            "noOverMocking",
+            "allAsyncCleanedUp",
+            "fileOrganization"
+          ],
+          "properties": {
+            "allBehaviorsCovered": { "type": "boolean" },
+            "allErrorPathsCovered": { "type": "boolean" },
+            "edgeCasesCovered": { "type": "boolean" },
+            "noFlakyPatterns": { "type": "boolean" },
+            "noOverMocking": { "type": "boolean" },
+            "allAsyncCleanedUp": { "type": "boolean" },
+            "fileOrganization": { "type": "boolean" }
+          }
+        },
+        "noTestsNeeded": { "type": "boolean" },
+        "noTestsReason": { "type": ["string", "null"] }
+      }
+    },
+    "SpecFeedbackItem": {
+      "type": "object",
+      "required": ["id", "taskId", "issueType", "details", "suggestion", "impact"],
+      "properties": {
+        "id": { "type": "string" },
+        "taskId": { "type": "string" },
+        "issueType": { "type": "string" },
+        "details": { "type": "string" },
+        "suggestion": { "type": "string" },
+        "impact": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "CouplingWarning": {
+      "type": "object",
+      "required": ["testFile", "mockCount", "mockedModules", "suggestion"],
+      "properties": {
+        "testFile": { "type": "string" },
+        "mockCount": { "type": "integer" },
+        "mockedModules": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "suggestion": { "type": "string" }
+      }
+    },
+    "TddViolation": {
+      "type": "object",
+      "required": ["testFile", "modifiedBy", "changes"],
+      "properties": {
+        "testFile": { "type": "string" },
+        "modifiedBy": { "type": "string" },
+        "changes": { "type": "string" }
+      }
+    },
+    "CodeAgentTestContext": {
+      "type": "object",
+      "required": [
+        "taskId",
+        "testFiles",
+        "strategy",
+        "keyAssertions",
+        "mustNotModifyTests",
+        "behaviorOrder",
+        "tracerBulletTest",
+        "interfaceDesignNotes"
+      ],
+      "properties": {
+        "taskId": { "type": "string" },
+        "testFiles": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "strategy": {
+          "type": "string",
+          "enum": ["tdd-strict", "tdd-flexible", "post-code"]
+        },
+        "keyAssertions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Plain-English critical assertions ordered by behavior priority"
+        },
+        "mustNotModifyTests": { "type": "boolean" },
+        "behaviorOrder": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Ordered behavior names: tracer bullet first, then progressive complexity"
+        },
+        "tracerBulletTest": {
+          "type": ["string", "null"],
+          "description": "Test name of the tracer bullet"
+        },
+        "interfaceDesignNotes": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

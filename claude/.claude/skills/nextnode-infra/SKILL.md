@@ -37,43 +37,7 @@ NextNode uses a **config-as-code driven, zero-manual-UI** infrastructure:
 
 **Repository:** `NextNodeSolutions/infrastructure`
 
-## `nn` DX CLI (`packages/nn/`)
-
-Published as `@nextnode-solutions/nn` — local development workflow tool. Built with citty, uses `@nextnode/cli` as a workspace dependency for shared types and config.
-
-| Command | Purpose | Key Args |
-|---------|---------|----------|
-| `nn up` | Start local dev environment (Docker services + app dev server) | `--containerized`, `--reset-ports` |
-| `nn down` | Stop local dev environment (kills dev server + Docker services) | `--clean` (removes volumes) |
-| `nn env show` | Display resolved environment variables | — |
-| `nn env check` | Validate env vars against Dockerfile/compose requirements | — |
-| `nn env init` | Initialize `.env.local` with computed service vars | — |
-| `nn env push` | Push env vars to GitHub environment secrets | — |
-
-### `nn up` Flow
-
-1. Detect services from `nextnode.toml` (`detectServices()`)
-2. Resolve port assignments (persisted to `.nn/ports.json`, reusable across restarts)
-3. Generate `docker-compose.local.yml` in `.nn/` with local service configs
-4. Start Docker services (Supabase, Redis, etc.)
-5. Build `.env.local` with computed service env vars + OAuth vars
-6. Detect and start app dev server (`detectDevCommand()`)
-7. Stream logs with prefixed output (Docker + app interleaved)
-
-### Key Libraries (`packages/nn/src/lib/`)
-
-| Library | Purpose |
-|---------|---------|
-| **config** | `requireConfig()` — loads `nextnode.toml` via `@nextnode/cli` |
-| **services** | `detectServices(config)` — identifies which services to start locally |
-| **ports** | `resolvePortMap(services, appPort, nnDir, opts)` — deterministic local port assignment |
-| **compose** | `generateLocalCompose()`, `writeLocalComposeFiles()` — local Docker Compose generation |
-| **docker** | `checkDockerAvailable()`, `startDockerServices()`, `stopDockerServices()`, `areServicesRunning()`, `getServiceStatuses()` |
-| **env** | `buildLocalEnvVars()`, `writeEnvLocal()` — `.env.local` generation |
-| **oauth** | `computeLocalOAuthEnvVars()` — local OAuth redirect config |
-| **dev-server** | `detectDevCommand()` — auto-detects `pnpm dev` / framework dev command |
-| **logs** | `pipeWithPrefix()`, `streamDockerLogs()` — prefixed log streaming |
-| **process** | `gracefulKill()`, `waitForHealthy()`, `writePidFile()`, `readPidFile()`, `isProcessRunning()`, `killProcess()`, `removePidFile()` |
+> **`nn` CLI** (`packages/nn/`) is documented in the dedicated `nn` skill. See that skill for commands, libraries, env pipeline, and `[secrets]` config.
 
 ## CLI Commands
 
@@ -118,7 +82,7 @@ The `infra` CLI (`packages/cli/`) is built with **citty**. All commands accept `
 | **terraform** | `terraformInit()`, `terraformPlan()`, `terraformApply()`, `terraformOutput()`, `terraformDestroy()`, `terraformStateList()`, `terraformDestroyTargeted()`, `resetTerraformCheck()` |
 | **tfcloud** | `getWorkspace()`, `ensureWorkspace()`, `deleteWorkspace()`, `hasResources()` |
 | **tailscale** | `deleteDevice()`, `generateAuthKey()`, `getDeviceIp()`, `resetTokenCache()` — OAuth token caching |
-| **caddy** | `generateHandleBlock()`, `generateBasicAuthBlock()`, `generateMaintenanceBlock()`, `generateCaddyFileContent()`, `generateRedirectBlock()`, `updateCaddyFile()`, `updateRedirectBlockInFile()`, `removeRedirectBlock()`, `deployCaddyConfig()`, `removeCaddyBlock()`, `removeCaddyAppConfig()`, `switchToReverseProxy()`, `switchToMaintenance()`, `writeCaddyConfigAtomic()`, `restoreCaddyBackup()`, `reloadCaddy()`, `waitForCaddy()`, `sanitizeAppIdentifier()`, `TAILSCALE_CGNAT_RANGE`, `SablierCaddyConfig` |
+| **caddy** | `generateHandleBlock()`, `generateBasicAuthBlock()`, `generateMaintenanceBlock()`, `generateCaddyFileContent()`, `generateRedirectBlock()`, `updateCaddyFile()`, `updateRedirectBlockInFile()`, `removeRedirectBlock()`, `deployCaddyConfig()`, `batchDeployCaddyConfigs()`, `removeCaddyBlock()`, `removeCaddyAppConfig()`, `switchToReverseProxy()`, `switchToMaintenance()`, `writeCaddyConfigAtomic()`, `restoreCaddyBackup()`, `reloadCaddy()`, `waitForCaddy()`, `sanitizeAppIdentifier()`, `SablierCaddyConfig`. Internal access enforced via DNS-level isolation (DNS → Tailscale IP), not Caddy guards. |
 | **caddy-lifecycle** | `createCaddyLifecycle()` — strategy pattern: `RealCaddyLifecycle` (domain) / `NoOpCaddyLifecycle` (no domain). Interface: `showMaintenance()`, `restoreProxy()`, `switchTraffic()` |
 | **compose-validation** | `validateCompose()` — check docker-compose.yml for common issues |
 | **port-validation** | `validatePortConsistency()`, `validateDockerfile()`, `validateComposePort()`, `validateFrameworkConfig()` |
@@ -147,6 +111,13 @@ type ProjectType = "app" | "package"
 type HealthType = "http" | "tcp"
 type PipelineAction = "ci" | "deploy-prod" | "destroy" | "force-redeploy" | "pr-preview" | "pr-cleanup"
 type SupabaseFeature = "storage" | "realtime"
+type GenerateAlgorithm = "hex" | "base64url" | "uuid"
+
+/** Discriminated union — bytes required for hex/base64url, absent for uuid. */
+type SecretDeclaration =
+  | { generate: "hex"; bytes: number }
+  | { generate: "base64url"; bytes: number }
+  | { generate: "uuid" }
 
 interface ResourcesConfig {
   cpu_limit?: string       // e.g. "1.0"
@@ -187,12 +158,10 @@ interface ProjectConfig {
   sablier?: { enabled: boolean; session_duration: string; display_name: string }
   services?: ServicesSection
   routes?: RouteConfig[]  // [[routes]] — subdomain-to-service mappings (apps only)
+  secrets?: Readonly<Record<string, SecretDeclaration>>  // auto-generated app-level secrets (nn up)
   computed: {
     isSharedVps: boolean
     wildcardDomain: string
-    hostPort: number
-    bluePort: number
-    greenPort: number
     developmentEnabled: boolean   // shorthand for environment.development.enabled
     prPreviewsEnabled: boolean    // shorthand for environment.development.pr_previews && enabled
   }
@@ -264,11 +233,11 @@ interface DeployOptions {
 
 interface CaddySiteConfig {
   appIdentifier: string; envDomain: string; wildcardDomain: string; baseDomain: string
-  hostPort: number; env: string; devPreviewPassword?: string; devPassword?: string
+  hostPort: number; isProduction: boolean; devPreviewPassword?: string; devPassword?: string
   mode?: "proxy" | "maintenance"
   sablier?: { group: string; sessionDuration: string; displayName: string }
   redirectDomains?: string[]; canonicalDomain?: string
-  internal?: boolean  // Tailscale-only (Caddy remote_ip guard)
+  // Note: `internal` field was removed — internal access is now enforced via DNS-level isolation
 }
 ```
 
@@ -317,25 +286,37 @@ interface AppStatus { vps: VpsStatus; containers: ContainerStatus[]; dns: DnsSta
 ### Workflow Architecture
 
 ```
-ci.yml (per-repo template — see `nextnode` skill)
+deploy-dev.yml (per-repo app template — see `nextnode` skill)
   └─> pipeline.yml (reusable workflow_call, in infrastructure repo)
-        ├─> Plan job (inline TOML parse, outputs project_type/has_lint/test/build)
-        ├─> Lint job (pnpm lint)
-        ├─> Test job (pnpm test)
-        ├─> Build job (dynamic matrix: `infra build --list` discovers services, one matrix slot per service via `--service`)
+        ├─> Plan job (TOML parse, outputs project_type/has_lint/test/build/buildable_services)
+        ├─> Quality job (dynamic matrix: lint/test/build as configured)
+        ├─> Build job (dynamic matrix: `infra build --list` discovers services, one matrix slot per service)
+        ├─> Service Setup job (parallel matrix: R2/Cloudflare provisioning per setupable service)
         ├─> [For packages] pipeline-package.yml
-        │     └─> publish (pnpm dlx semantic-release)
+        │     └─> publish (pnpm dlx semantic-release, monorepo-aware)
         └─> [For apps] After quality gates:
               ├─> Provision (infra provision, + GitHub App token, + R2 setup)
-              ├─> DNS (infra dns upsert --ip)
+              ├─> DNS (infra dns upsert --ip, CDN CNAMEs, redirect records)
               ├─> Deploy (infra deploy --sha, via Tailscale VPN)
               ├─> [PR preview] PR Comment (upsert preview URL, create GH Deployment)
-              ├─> [PR cleanup] preview-cleanup (scan + remove closed PR previews)
+              ├─> [PR cleanup] preview-cleanup (scan + remove closed PR previews, mark GH deployments inactive)
               └─> Prod gate: verify 3/3 CI checks passed via GitHub Checks API
+
+nn-pipeline.yml (reusable workflow_call — NN CLI package pipeline: quality gates + publish)
+
+pipeline-package.yml (reusable workflow_call — monorepo-aware package pipeline):
+  inputs: config_file, package_dir
+  jobs: plan → lint → test → build → publish (semantic-release, monorepo plugin when package_dir != ".")
+  outputs: publish_status, published_version
 
 destroy-vps.yml (workflow_dispatch — manual VPS destruction):
   inputs: mode (named|shared), names, environment, cleanup_workspace, confirm_prod
   jobs: validate → destroy (matrix over workspaces) → TF destroy + Tailscale cleanup
+
+Templates (in templates/):
+  deploy-dev.yml — app dev deploy caller (push to main + manual)
+  ci-package.yml — package CI caller
+  preview-cleanup.yml — daily cron for orphaned PR preview cleanup
 ```
 
 ### How Workflows Invoke the CLI
@@ -439,7 +420,8 @@ GitHub Actions triggers CLI pipeline (infra pipeline --sha <sha>)
      -> Check VPS resources (disk/memory warnings, abort if critical)
      -> Show maintenance page (default strategy) or prepare blue-green slot
      -> Create /opt/apps/<app> on VPS
-     -> Transform compose (AST-based via `yaml` package): replace all build: blocks with image: ${IMAGE_<SERVICE>}, inject per-service ports, ensure caddy-net
+     -> Transform compose (AST-based via `yaml` package): replace all build: blocks with image: ${IMAGE_<SERVICE>}, inject per-service ports
+     -> Inject caddy-net into all services via `injectComposeNetworks()` (single unified owner)
      -> Generate .env (IMAGE_APP, HOST_PORT_APP, APP_PORT_APP per buildable service, NODE_ENV, secrets, service vars, route vars, auto-vars)
      -> Checkpoint-based deploy: init → pull → compose-up → caddy-config → caddy-reload → health-check → cleanup → done
      -> If zero_downtime: blue-green (two slots, health check inactive, atomic Caddy switch, 30s drain)
@@ -466,7 +448,7 @@ The `infra destroy` command intelligently handles shared VPS:
 - **Caddy ACME** — origin certs via Let's Encrypt DNS-01 challenge (Cloudflare DNS plugin), HTTP-01 fallback, certs stored in Cloudflare R2 (`INTERNAL-caddy-certs` bucket via certmagic-s3)
 - **Full (Strict) SSL mode** — origin cert validation required
 - **Public apps** — orange cloud (Cloudflare proxied, CDN + DDoS protection)
-- **Internal apps** — grey cloud (DNS points to Tailscale IP)
+- **Internal apps** — grey cloud (DNS points to Tailscale IP, DNS-level isolation — no Caddy guards needed)
 - **DNS ownership**: CLI manages app DNS records via Cloudflare API. Terraform only manages zone-level settings (DNSSEC, SSL mode)
 - **Cleanup**: `infra dns delete` removes A/CNAME records for an app domain (including CDN CNAME records)
 - **Wildcard records**: `infra dns upsert` creates both `*.{domain}` and `{domain}` A records
@@ -571,7 +553,7 @@ health_path = "/_health"  # optional, defaults to main app's health.path
 - One handle block per route, placed in the correct site file:
   - Prod: `{domain}.caddy` (same as main app)
   - Dev/PR: `dev.{domain}.caddy` (same as PR previews)
-- Routes inherit main app's `basic_auth`, Sablier, and `internal` guard
+- Routes inherit main app's `basic_auth` and Sablier config
 - App identifier: `{sanitizedAppName}-{subdomain}` (e.g., `fleurs-daujourdhui-admin`)
 
 ### Deploy Functions
@@ -579,8 +561,8 @@ health_path = "/_health"  # optional, defaults to main app's health.path
 - `extractComposeServiceNames(content)` — parse service names from compose
 - `validateRouteServices(routes, composeServiceNames)` — deploy-time validation
 - `sanitizeServiceEnvName(serviceName)` — convert to env var suffix
-- `injectRouteCaddyNet(content, routeServiceNames)` — inject caddy-net into route services
-- `deployRouteCaddyConfigs(ctx, routes)` — deploy Caddy configs for all routes
+- `injectComposeNetworks(content)` — unified caddy-net injection into ALL services (single owner, replaces scattered injection calls)
+- `deployRouteCaddyConfigs(ctx, routes)` — deploy Caddy configs for all routes (uses `batchDeployCaddyConfigs()` for atomic multi-config deployment)
 
 ### Blue-Green
 

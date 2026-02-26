@@ -26,7 +26,9 @@ Auto-loads when writing or reviewing any Docker-related file. Every rule is mand
 3. **`node:XX-slim`** (Debian) as base — NOT full `node:XX`, NOT `alpine` (musl breaks native modules silently). Exception: pure JS apps with zero native deps MAY use `alpine` if explicitly justified.
 4. **Never hardcode pnpm version** — use `corepack prepare --activate` (reads `packageManager` from `package.json`). NEVER `corepack prepare pnpm@X.Y.Z --activate`. **IMPORTANT:** `corepack prepare --activate` requires `package.json` (with `packageManager` field) to exist in the current directory — always `COPY package.json ./` BEFORE running it in any stage.
 5. **`--frozen-lockfile`** on every `pnpm install` — no exceptions.
-6. **`pnpm.onlyBuiltDependencies`** MUST be set in `package.json` — this is the allowlist of packages permitted to run install scripts (e.g. `better-sqlite3`, `esbuild`, `sharp`). Everything else is blocked by default in pnpm v10+. NEVER use `--ignore-scripts` (breaks native module builds), `HUSKY=0`, `CI=true`, or any inline env hack. `husky` is excluded from the allowlist, so its `prepare` script never runs in Docker — no hack needed.
+6. **`pnpm.onlyBuiltDependencies`** MUST be set in `package.json` — this is the allowlist of packages permitted to run install scripts (e.g. `better-sqlite3`, `esbuild`, `sharp`). Everything else is blocked by default in pnpm v10+. NEVER use `--ignore-scripts` (breaks native module builds) or `CI=true`.
+   - **Important distinction:** `onlyBuiltDependencies` controls **dependency** install/postinstall scripts (packages in `node_modules`), NOT the root project's lifecycle scripts (like `prepare`). The root `prepare` script (e.g. `"prepare": "husky"`) still runs after every `pnpm install`.
+   - **Prod-deps stage and husky:** `--prod` skips devDependencies (husky isn't installed) but pnpm still triggers the root `prepare` lifecycle hook → `sh: husky: not found`. Fix: strip the `prepare` script from package.json before the prod install (scripts don't affect lockfile resolution). `HUSKY=0` does NOT help here — it makes the husky command a no-op, but the binary doesn't even exist in `--prod` so `sh` fails before husky can read the env var. See prod-deps stage in canonical templates.
 7. **Exec form ALWAYS** for `CMD` and `ENTRYPOINT` — `CMD ["node", "dist/server.js"]`, never `CMD node server.js`.
 8. **Non-root user** in the runtime stage — switch with `USER` before `CMD`.
 9. **Signal handler (tini or dumb-init)** as PID 1 — Node.js must not run as PID 1.
@@ -40,15 +42,21 @@ Auto-loads when writing or reviewing any Docker-related file. Every rule is mand
 
 When a project uses `nextnode.toml`, Docker config MUST derive values from it — never hardcode what the infrastructure manages.
 
-### Port Consistency Rule
+### Port Naming Convention
 
-`EXPOSE`, `ENV PORT`, and the app's listening port MUST all match `[deploy].port` from `nextnode.toml`:
+Dockerfile ARGs MUST use the infra CLI's `_{SERVICE}` suffix convention to stay consistent with the compose env vars the CLI generates. For the main app service, the suffix is `_APP`:
 
 ```dockerfile
-ARG APP_PORT=4321
-ENV PORT=$APP_PORT
-EXPOSE $APP_PORT
+ARG APP_PORT_APP=4321
+ENV PORT=$APP_PORT_APP
+EXPOSE $APP_PORT_APP
 ```
+
+The default value MUST match `[deploy].port` from `nextnode.toml`. The infra CLI generates `APP_PORT_APP` (and `HOST_PORT_APP`) into the `.env` at deploy time — the Dockerfile ARG name matches so there's a single naming convention across Dockerfile and compose.
+
+For multi-service projects with `[[routes]]`, each service gets its own suffix:
+- Main app: `APP_PORT_APP` (from `[deploy].port`)
+- Route service: `APP_PORT_{SERVICE}` (from `[[routes]].port`, e.g. `APP_PORT_STRAPI`)
 
 ### docker-compose.yml Rules
 
@@ -355,7 +363,7 @@ LABEL org.opencontainers.image.created="${BUILD_DATE}" \
 # syntax=docker/dockerfile:1
 
 ARG NODE_VERSION=22
-ARG APP_PORT=4321
+ARG APP_PORT_APP=4321
 
 # ── Base ─────────────────────────────────────────────────
 FROM node:${NODE_VERSION}-slim AS base
@@ -368,6 +376,9 @@ ENV PNPM_HOME="/pnpm" \
 # ── Prod deps ────────────────────────────────────────────
 FROM base AS prod-deps
 COPY pnpm-lock.yaml ./
+# Strip "prepare" script: runs `husky` (devDep, not in --prod).
+# Scripts don't affect lockfile resolution.
+RUN node -e "const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));delete p.scripts.prepare;require('fs').writeFileSync('package.json',JSON.stringify(p))"
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile --prod
 
@@ -395,15 +406,15 @@ COPY --chown=appuser:appgroup --from=prod-deps /app/node_modules ./node_modules
 COPY --chown=appuser:appgroup --from=build /app/dist ./dist
 COPY --chown=appuser:appgroup package.json ./
 
-ARG APP_PORT
+ARG APP_PORT_APP
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
-    PORT=${APP_PORT}
+    PORT=${APP_PORT_APP}
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD ["node", "-e", "require('http').get('http://localhost:' + (process.env.PORT || 4321) + '/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
 
-EXPOSE ${APP_PORT}
+EXPOSE ${APP_PORT_APP}
 
 USER appuser
 
@@ -418,7 +429,7 @@ Replace the CMD and add Astro-specific env:
 ```dockerfile
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
-    PORT=${APP_PORT} \
+    PORT=${APP_PORT_APP} \
     ASTRO_TELEMETRY_DISABLED=1
 
 CMD ["node", "dist/server/entry.mjs"]
@@ -487,7 +498,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # syntax=docker/dockerfile:1
 
 ARG NODE_VERSION=22
-ARG APP_PORT=3000
+ARG APP_PORT_APP=3000
 
 # ── Base ─────────────────────────────────────────────────
 FROM node:${NODE_VERSION}-slim AS base
@@ -516,6 +527,8 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json ./apps/api/
 COPY packages/shared/package.json ./packages/shared/
 
+# Strip "prepare" script: runs `husky` (devDep, not in --prod).
+RUN node -e "const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));delete p.scripts.prepare;require('fs').writeFileSync('package.json',JSON.stringify(p))"
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile --prod
 
@@ -538,15 +551,15 @@ COPY --chown=appuser:appgroup --from=build /app/apps/web/dist ./apps/web/dist
 COPY --chown=appuser:appgroup --from=build /app/packages/shared/dist ./packages/shared/dist
 COPY --chown=appuser:appgroup package.json ./
 
-ARG APP_PORT
+ARG APP_PORT_APP
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
-    PORT=${APP_PORT}
+    PORT=${APP_PORT_APP}
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD ["node", "-e", "require('http').get('http://localhost:' + (process.env.PORT || 3000) + '/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
 
-EXPOSE ${APP_PORT}
+EXPOSE ${APP_PORT_APP}
 
 USER appuser
 
@@ -633,7 +646,7 @@ docker-compose*.yaml
 | # | Anti-Pattern | Correct Approach |
 |---|-------------|------------------|
 | 1 | `corepack prepare pnpm@X.Y.Z --activate` | `corepack prepare --activate` — reads `packageManager` from `package.json` |
-| 2 | `--ignore-scripts` / `HUSKY=0` / `ENV CI=true` | `pnpm.onlyBuiltDependencies` allowlist in `package.json` — blocks all scripts except listed packages |
+| 2 | `--ignore-scripts` / `ENV CI=true` | `pnpm.onlyBuiltDependencies` allowlist in `package.json` — blocks all dependency scripts except listed packages. For the root `prepare` lifecycle (husky) in prod-deps stage, strip the script before install (see canonical templates). Never use `--ignore-scripts` (breaks native module builds). |
 | 3 | `COPY . .` before `pnpm install` | Copy `pnpm-lock.yaml` first, then `package.json`, then install, then source |
 | 4 | `CMD npm start` or `CMD pnpm start` | `CMD ["node", "dist/server.js"]` — exec form, direct node invocation. Exception: frameworks that need their CLI for bootstrapping (e.g. Strapi needs `pnpm start` for migration running, TypeScript detection). When using pnpm in CMD, corepack + `PNPM_HOME` must also be configured in the runtime stage |
 | 5 | Running as root in production | Create dedicated user, `USER appuser` before CMD |
@@ -643,7 +656,7 @@ docker-compose*.yaml
 | 9 | `ARG NPM_TOKEN` for secrets | `--mount=type=secret,id=npmrc,target=/root/.npmrc` |
 | 10 | Separate `RUN apt-get update` and `RUN apt-get install` | Single `RUN` with `&&` — prevents stale apt cache |
 | 11 | Missing `.dockerignore` | Always create — prevents sending `.git`, `node_modules`, `.env` to daemon |
-| 12 | `EXPOSE 4321` with hardcoded value | `ARG APP_PORT=4321` + `EXPOSE ${APP_PORT}` |
+| 12 | `EXPOSE 4321` with hardcoded value | `ARG APP_PORT_APP=4321` + `EXPOSE ${APP_PORT_APP}` — use infra CLI's `_{SERVICE}` suffix convention |
 | 13 | `RUN chown -R user:group /app` as separate layer | `COPY --chown=user:group` at copy time |
 | 14 | Full `node:22` as runtime base | `node:22-slim` — 1 GB vs 220 MB |
 | 15 | `pnpm fetch` + `pnpm install --offline` with cache mounts | Cache mount at `/pnpm/store` doesn't match pnpm's default store path — `--offline` finds an empty store and silently installs nothing. Use `pnpm install --frozen-lockfile` with cache mounts directly |
@@ -688,7 +701,8 @@ When reviewing any Dockerfile, verify ALL of the following:
 - [ ] Exec form CMD/ENTRYPOINT
 - [ ] HEALTHCHECK defined (apps)
 - [ ] `NODE_ENV=production`
-- [ ] `EXPOSE` matches `[deploy].port` from `nextnode.toml`
+- [ ] `ARG APP_PORT_APP` matches `[deploy].port` from `nextnode.toml` — uses infra CLI's `_{SERVICE}` suffix
+- [ ] `EXPOSE` uses `${APP_PORT_APP}` (not hardcoded)
 - [ ] OCI labels present
 
 **Files:**

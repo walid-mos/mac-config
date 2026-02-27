@@ -1,7 +1,7 @@
-// === Phase Result Accessors (Spec 3 — FR-8, Spec 4) ===
+// === Phase Result Accessors (Spec 3 — FR-8, Spec 4, Spec 5) ===
 
 import { z } from 'zod'
-import type { SwarmState } from './types.js'
+import type { SwarmState, SessionId, AgentRole } from './types.js'
 import type { TechStack } from './tech-stack.js'
 import type { PlannerTask, TaskTag } from './task-parser.js'
 import type { RedVerification } from './red-verification.js'
@@ -251,4 +251,148 @@ export function readCodePhaseResult(state: SwarmState): CodePhaseResult | null {
 
   const parsed = codePhaseResultSchema.parse(raw)
   return parsed as CodePhaseResult
+}
+
+// === Spec 5 Types ===
+
+export interface DeliveryReportInput {
+  sessionId: SessionId
+  specPath: string
+  specItems: SpecItemSummary[]
+  totalDuration: number
+  startedAt: string
+  completedAt: string
+}
+
+export interface SpecItemSummary {
+  title: string
+  iterationCount: number
+  success: boolean
+  tasks: TaskSummary[]
+  testResult: TestResult
+  reviewFindings: ReviewFindingSummary[]
+  commitHash?: string
+}
+
+export interface TaskSummary {
+  id: `TASK-${number}`
+  title: string
+  tag: TaskTag
+  filesModified: string[]
+}
+
+export type ReviewFindingSummary = Pick<ReviewFinding, 'severity' | 'category' | 'description'> & {
+  resolved: boolean
+  resolution?: string
+}
+
+export interface AgentInvocationRecord {
+  role: AgentRole
+  model: string
+  durationMs: number
+}
+
+export interface IterationLogEntry {
+  specItem: string
+  iterationIndex: number
+  agentsInvoked: AgentInvocationRecord[]
+  testResult?: TestResult
+  reviewFindingCount: number
+  filesChanged: string[]
+}
+
+export interface DocsPhaseResult {
+  deliveryReportPath: string
+  iterationsLogPath: string
+  commitHash?: string
+  prUpdated: boolean
+  prMarkedReady: boolean
+  usedFallbackReport: boolean
+  success: boolean
+}
+
+// Spec 5 Zod Schemas
+
+const agentInvocationRecordSchema = z.object({
+  role: z.union([
+    z.literal('plan'), z.literal('test'), z.literal('code'),
+    z.literal('review'), z.literal('security'), z.literal('merge'), z.literal('docs'),
+  ]),
+  model: z.string(),
+  durationMs: z.number(),
+})
+
+const reviewFindingSummarySchema = z.object({
+  severity: z.union([z.literal('critical'), z.literal('important'), z.literal('suggestion')]),
+  category: z.union([
+    z.literal('bug'), z.literal('security'), z.literal('quality'),
+    z.literal('performance'), z.literal('dry-violation'), z.literal('dead-code'),
+  ]),
+  description: z.string(),
+  resolved: z.boolean(),
+  resolution: z.string().optional(),
+})
+
+const taskSummarySchema = z.object({
+  id: z.string().regex(/^TASK-\d+$/),
+  title: z.string(),
+  tag: z.union([z.literal('backend'), z.literal('frontend'), z.literal('fullstack')]),
+  filesModified: z.array(z.string()),
+})
+
+const specItemSummarySchema = z.object({
+  title: z.string(),
+  iterationCount: z.number(),
+  success: z.boolean(),
+  tasks: z.array(taskSummarySchema),
+  testResult: testResultSchema,
+  reviewFindings: z.array(reviewFindingSummarySchema),
+  commitHash: z.string().optional(),
+})
+
+const deliveryReportInputSchema = z.object({
+  sessionId: z.string(),
+  specPath: z.string(),
+  specItems: z.array(specItemSummarySchema),
+  totalDuration: z.number(),
+  startedAt: z.string(),
+  completedAt: z.string(),
+})
+
+const iterationLogEntrySchema = z.object({
+  specItem: z.string(),
+  iterationIndex: z.number(),
+  agentsInvoked: z.array(agentInvocationRecordSchema),
+  testResult: testResultSchema.optional(),
+  reviewFindingCount: z.number(),
+  filesChanged: z.array(z.string()),
+})
+
+const docsPhaseResultSchema = z.object({
+  deliveryReportPath: z.string(),
+  iterationsLogPath: z.string(),
+  commitHash: z.string().optional(),
+  prUpdated: z.boolean(),
+  prMarkedReady: z.boolean(),
+  usedFallbackReport: z.boolean(),
+  success: z.boolean(),
+})
+
+// Export schemas for external use
+export {
+  deliveryReportInputSchema,
+  iterationLogEntrySchema,
+  docsPhaseResultSchema,
+  specItemSummarySchema,
+  taskSummarySchema,
+  reviewFindingSummarySchema,
+  agentInvocationRecordSchema,
+}
+
+export function readDocsPhaseResult(state: SwarmState): DocsPhaseResult | null {
+  const raw = state.phaseResults.docs
+  if (raw === undefined) return null
+
+  const parsed = docsPhaseResultSchema.parse(raw)
+  return parsed as DocsPhaseResult
 }

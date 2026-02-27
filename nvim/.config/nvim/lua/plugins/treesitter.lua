@@ -9,9 +9,15 @@ return {
 		"JoosepAlviste/nvim-ts-context-commentstring",
 	},
 
-	config = function()
-		-- Skip backwards compatibility for ts_context_commentstring (faster)
+	init = function()
 		vim.g.skip_ts_context_commentstring_module = true
+	end,
+
+	config = function()
+		require("ts_context_commentstring").setup({
+			enable_autocmd = false,
+		})
+
 		require("nvim-treesitter.configs").setup({
 			-- Auto-install parsers for these languages
 			ensure_installed = {

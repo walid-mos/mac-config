@@ -39,6 +39,18 @@ vim.api.nvim_create_autocmd("TextYankPost", {
 })
 
 -- ============================================================================
+-- Filetype Overrides
+-- ============================================================================
+
+-- Treat known JSON-with-comments files as jsonc
+vim.api.nvim_create_autocmd({ "BufRead", "BufNewFile" }, {
+	pattern = { "tsconfig.json", "tsconfig.*.json", ".vscode/*.json", "devcontainer.json" },
+	callback = function()
+		vim.bo.filetype = "jsonc"
+	end,
+})
+
+-- ============================================================================
 -- Treesitter
 -- ============================================================================
 

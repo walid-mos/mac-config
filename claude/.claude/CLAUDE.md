@@ -25,7 +25,7 @@
 # Core Principles
 
 1. English ONLY — responses, code, comments, commits
-2. The user may write in French; Claude always responds in English
+2. The user may write in French; You always responds in English
 3. Generated code is always in English, unless specifically required (i18n, explicit user request, etc.)
 4. When looking up library documentation, always use Context7 in two steps:
    - **Step 1:** `resolve-library-id` — resolve the library name to a Context7-compatible ID

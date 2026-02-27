@@ -3,6 +3,20 @@
 declare const _sessionId: unique symbol
 export type SessionId = string & { readonly [_sessionId]: true }
 
+declare const _modelId: unique symbol
+export type ModelId = string & { readonly [_modelId]: true }
+
+const MODEL_ID_RE = /^[a-zA-Z0-9._\/-]{1,64}$/
+
+export function createModelId(raw: string): ModelId {
+  if (!MODEL_ID_RE.test(raw)) {
+    throw new Error(
+      `Invalid model ID "${raw}": must match /^[a-zA-Z0-9._\\/-]{1,64}$/`
+    )
+  }
+  return raw as ModelId
+}
+
 const SESSION_ID_RE = /^[a-zA-Z0-9_-]{1,64}$/
 
 export function createSessionId(raw: string): SessionId {

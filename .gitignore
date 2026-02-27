@@ -35,3 +35,6 @@ __pycache__/
 
 # Node modules
 node_modules/
+
+# pnpm store
+.pnpm-store/

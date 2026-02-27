@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { readPlanPhaseResult, readTddPhaseResult } from '../src/phase-results.js'
-import type { PlanPhaseResult, TddPhaseResult } from '../src/phase-results.js'
+import { readPlanPhaseResult, readTddPhaseResult, readCodePhaseResult } from '../src/phase-results.js'
+import type { PlanPhaseResult, TddPhaseResult, CodePhaseResult } from '../src/phase-results.js'
 import { createSwarmState } from './__test-utils__/factories.js'
 
 // ---------------------------------------------------------------------------
@@ -199,5 +199,135 @@ describe('readTddPhaseResult', () => {
     expect(rv).toHaveProperty('syntaxErrors')
     expect(rv).toHaveProperty('testFiles')
     expect(rv).toHaveProperty('isRed')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Helpers for Spec 4 (CodePhaseResult)
+// ---------------------------------------------------------------------------
+
+function createValidCodePhaseResult(): CodePhaseResult {
+  return {
+    batches: [
+      {
+        batchIndex: 0,
+        tasks: [
+          {
+            id: 'TASK-1' as `TASK-${number}`,
+            title: 'Implement feature',
+            description: 'Feature implementation',
+            tag: 'backend',
+            files: ['src/feature.ts'],
+            dependencies: [],
+            testHints: ['test feature behavior'],
+          },
+        ],
+      },
+    ],
+    iterations: [
+      {
+        iteration: 1,
+        outcome: {
+          status: 'green',
+          testResult: { totalTests: 5, passingTests: 5, failingTests: 0, durationMs: 1200 },
+          review: { findings: [], criticalCount: 0, importantCount: 0, suggestionCount: 0 },
+        },
+        changedFiles: ['src/feature.ts'],
+      },
+    ],
+    finalTestResult: { totalTests: 5, passingTests: 5, failingTests: 0, durationMs: 1200 },
+    finalReview: { findings: [], criticalCount: 0, importantCount: 0, suggestionCount: 0 },
+    gitState: {
+      branch: 'feat/test-session',
+      prNumber: 42,
+      prUrl: 'https://github.com/org/repo/pull/42',
+      commits: [
+        { hash: 'abc1234', message: 'feat: implement feature', specItem: 'TASK-1', iteration: 1 },
+      ],
+    },
+    changedFiles: ['src/feature.ts'],
+    success: true,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// readCodePhaseResult
+// ---------------------------------------------------------------------------
+
+describe('readCodePhaseResult', () => {
+  it('returns null when phaseResults.code is absent', () => {
+    const state = createSwarmState({ phaseResults: {} })
+
+    const result = readCodePhaseResult(state)
+
+    expect(result).toBeNull()
+  })
+
+  it('returns validated CodePhaseResult when present', () => {
+    const codeResult = createValidCodePhaseResult()
+    const state = createSwarmState({
+      phaseResults: { code: codeResult },
+    })
+
+    const result = readCodePhaseResult(state)
+
+    expect(result).not.toBeNull()
+    expect(result!.success).toBe(true)
+    expect(result!.batches).toHaveLength(1)
+    expect(result!.iterations).toHaveLength(1)
+  })
+
+  it('throws on structurally invalid data', () => {
+    const state = createSwarmState({
+      phaseResults: { code: { invalid: 'structure' } },
+    })
+
+    expect(() => readCodePhaseResult(state)).toThrow()
+  })
+
+  it('validates nested IterationState', () => {
+    const codeResult = createValidCodePhaseResult()
+    const state = createSwarmState({
+      phaseResults: { code: codeResult },
+    })
+
+    const result = readCodePhaseResult(state)
+
+    const iter = result!.iterations[0]!
+    expect(iter).toHaveProperty('iteration')
+    expect(iter).toHaveProperty('outcome')
+    expect(iter).toHaveProperty('changedFiles')
+    expect(iter.outcome.status).toBe('green')
+  })
+
+  it('validates GitState', () => {
+    const codeResult = createValidCodePhaseResult()
+    const state = createSwarmState({
+      phaseResults: { code: codeResult },
+    })
+
+    const result = readCodePhaseResult(state)
+
+    const git = result!.gitState
+    expect(git).toHaveProperty('branch')
+    expect(git).toHaveProperty('commits')
+    expect(git.commits).toHaveLength(1)
+    expect(git.commits[0]!).toHaveProperty('hash')
+    expect(git.commits[0]!).toHaveProperty('message')
+  })
+
+  it('validates MergedReview', () => {
+    const codeResult = createValidCodePhaseResult()
+    const state = createSwarmState({
+      phaseResults: { code: codeResult },
+    })
+
+    const result = readCodePhaseResult(state)
+
+    const review = result!.finalReview!
+    expect(review).toHaveProperty('findings')
+    expect(review).toHaveProperty('criticalCount')
+    expect(review).toHaveProperty('importantCount')
+    expect(review).toHaveProperty('suggestionCount')
   })
 })

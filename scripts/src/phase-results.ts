@@ -1,12 +1,13 @@
-// === Phase Result Accessors (Spec 3 — FR-8) ===
+// === Phase Result Accessors (Spec 3 — FR-8, Spec 4) ===
 
 import { z } from 'zod'
 import type { SwarmState } from './types.js'
 import type { TechStack } from './tech-stack.js'
 import type { PlannerTask, TaskTag } from './task-parser.js'
 import type { RedVerification } from './red-verification.js'
+import type { TestResult } from './test-runner.js'
 
-// === Types ===
+// === Spec 3 Types ===
 
 export interface PlanPhaseResult {
   plannerOutput: string
@@ -19,6 +20,95 @@ export interface PlanPhaseResult {
 export interface TddPhaseResult {
   testFiles: string[]
   redVerification: RedVerification
+}
+
+// === Spec 4 Types ===
+
+export interface TaskBatch {
+  batchIndex: number
+  tasks: PlannerTask[]
+}
+
+export type CodeAgentOutput =
+  | {
+      taskId: `TASK-${number}`
+      status: 'completed'
+      filesModified: string[]
+      filesCreated: string[]
+      sanityChecksPassed: true
+    }
+  | {
+      taskId: `TASK-${number}`
+      status: 'failed' | 'blocked'
+      filesModified: string[]
+      filesCreated: string[]
+      sanityChecksPassed: false
+      sanityErrors: [string, ...string[]]
+    }
+
+export type ReviewCategory = 'bug' | 'security' | 'quality' | 'performance' | 'dry-violation' | 'dead-code'
+
+export interface ReviewFinding {
+  file: string
+  line?: number
+  severity: 'critical' | 'important' | 'suggestion'
+  category: ReviewCategory
+  description: string
+  suggestedFix?: string
+}
+
+export interface MergedReview {
+  findings: ReviewFinding[]
+  criticalCount: number
+  importantCount: number
+  suggestionCount: number
+}
+
+export type IterationOutcome =
+  | { status: 'green'; testResult: TestResult; review: MergedReview }
+  | { status: 'needs-iteration'; testResult: TestResult; review: MergedReview; reason: 'tests-failing' | 'review-findings' }
+  | { status: 'max-iterations'; testResult: TestResult; review?: MergedReview }
+  | { status: 'timeout'; testResult?: TestResult; review?: MergedReview }
+
+export interface IterationState {
+  iteration: number
+  outcome: IterationOutcome
+  changedFiles: string[]
+}
+
+export interface CommitRecord {
+  hash: string
+  message: string
+  specItem: string
+  iteration: number
+}
+
+export interface GitState {
+  branch: string
+  prNumber?: number
+  prUrl?: string
+  commits: CommitRecord[]
+}
+
+export interface FileContainmentResult {
+  violations: string[]
+  ciSensitive: string[]
+}
+
+export interface StagingCheckResult {
+  allowed: string[]
+  blocked: string[]
+}
+
+export interface CodePhaseResult {
+  batches: TaskBatch[]
+  iterations: IterationState[]
+  finalTestResult: TestResult
+  finalReview?: MergedReview
+  gitState: GitState
+  changedFiles: string[]
+  success: boolean
+  codePhaseTimeoutMs?: number
 }
 
 // === Zod Schemas ===
@@ -66,6 +156,77 @@ const tddPhaseResultSchema = z.object({
   redVerification: redVerificationSchema,
 })
 
+// Spec 4 Zod Schemas
+
+const testResultSchema = z.object({
+  totalTests: z.number(),
+  passingTests: z.number(),
+  failingTests: z.number(),
+  durationMs: z.number(),
+})
+
+const reviewFindingSchema = z.object({
+  file: z.string(),
+  line: z.number().optional(),
+  severity: z.union([z.literal('critical'), z.literal('important'), z.literal('suggestion')]),
+  category: z.union([
+    z.literal('bug'), z.literal('security'), z.literal('quality'),
+    z.literal('performance'), z.literal('dry-violation'), z.literal('dead-code'),
+  ]),
+  description: z.string(),
+  suggestedFix: z.string().optional(),
+})
+
+const mergedReviewSchema = z.object({
+  findings: z.array(reviewFindingSchema),
+  criticalCount: z.number(),
+  importantCount: z.number(),
+  suggestionCount: z.number(),
+})
+
+const iterationOutcomeSchema = z.discriminatedUnion('status', [
+  z.object({ status: z.literal('green'), testResult: testResultSchema, review: mergedReviewSchema }),
+  z.object({ status: z.literal('needs-iteration'), testResult: testResultSchema, review: mergedReviewSchema, reason: z.union([z.literal('tests-failing'), z.literal('review-findings')]) }),
+  z.object({ status: z.literal('max-iterations'), testResult: testResultSchema, review: mergedReviewSchema.optional() }),
+  z.object({ status: z.literal('timeout'), testResult: testResultSchema.optional(), review: mergedReviewSchema.optional() }),
+])
+
+const iterationStateSchema = z.object({
+  iteration: z.number(),
+  outcome: iterationOutcomeSchema,
+  changedFiles: z.array(z.string()),
+})
+
+const taskBatchSchema = z.object({
+  batchIndex: z.number(),
+  tasks: z.array(plannerTaskSchema),
+})
+
+const commitRecordSchema = z.object({
+  hash: z.string(),
+  message: z.string(),
+  specItem: z.string(),
+  iteration: z.number(),
+})
+
+const gitStateSchema = z.object({
+  branch: z.string(),
+  prNumber: z.number().optional(),
+  prUrl: z.string().optional(),
+  commits: z.array(commitRecordSchema),
+})
+
+const codePhaseResultSchema = z.object({
+  batches: z.array(taskBatchSchema),
+  iterations: z.array(iterationStateSchema),
+  finalTestResult: testResultSchema,
+  finalReview: mergedReviewSchema.optional(),
+  gitState: gitStateSchema,
+  changedFiles: z.array(z.string()),
+  success: z.boolean(),
+  codePhaseTimeoutMs: z.number().optional(),
+})
+
 // === API ===
 
 export function readPlanPhaseResult(state: SwarmState): PlanPhaseResult | null {
@@ -82,4 +243,12 @@ export function readTddPhaseResult(state: SwarmState): TddPhaseResult | null {
 
   const parsed = tddPhaseResultSchema.parse(raw)
   return parsed as TddPhaseResult
+}
+
+export function readCodePhaseResult(state: SwarmState): CodePhaseResult | null {
+  const raw = state.phaseResults.code
+  if (raw === undefined) return null
+
+  const parsed = codePhaseResultSchema.parse(raw)
+  return parsed as CodePhaseResult
 }

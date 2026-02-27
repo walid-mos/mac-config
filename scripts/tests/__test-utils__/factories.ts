@@ -1,18 +1,24 @@
+import { EventEmitter } from 'node:events'
+import type { ChildProcess } from 'node:child_process'
+import { Readable, Writable, PassThrough } from 'node:stream'
 import type {
   SwarmConfig,
   SwarmState,
   SessionId,
+  ModelId,
   ModelAssignment,
   AgentRole,
   Phase,
   PhaseError,
   SwarmEvent,
+  SwarmEventEmitter,
   SessionStartEvent,
   PhaseStartEvent,
   PhaseEndEvent,
   FileChangedEvent,
   CommitEvent,
 } from '../../src/types.js'
+import type { AgentRequest } from '../../src/drivers/driver.js'
 
 // ---------------------------------------------------------------------------
 // Model & Config factories
@@ -206,3 +212,124 @@ export const PARTIAL_TOML = buildTomlContent({
 export const ALL_AGENT_ROLES: readonly AgentRole[] = [
   'plan', 'test', 'code', 'review', 'security', 'merge', 'docs',
 ] as const
+
+// ---------------------------------------------------------------------------
+// Driver factories
+// ---------------------------------------------------------------------------
+
+export function createAgentRequest(
+  overrides: Partial<AgentRequest> = {}
+): AgentRequest {
+  return {
+    prompt: 'Test prompt content',
+    role: 'plan',
+    model: 'opus' as ModelId,
+    projectDir: '/tmp/project',
+    ...overrides,
+  }
+}
+
+/**
+ * A mock emitter that captures events in an array for assertion.
+ */
+export function createMockEmitter(): SwarmEventEmitter & { events: SwarmEvent[] } {
+  const events: SwarmEvent[] = []
+  return {
+    events,
+    emit(event: SwarmEvent): void {
+      events.push(event)
+    },
+    getEvents(filter?: { type?: SwarmEvent['type'] }): SwarmEvent[] {
+      if (!filter?.type) return [...events]
+      return events.filter(e => e.type === filter.type)
+    },
+  }
+}
+
+/**
+ * Builds a mock ChildProcess suitable for testing driver spawn behavior.
+ * Emits events via EventEmitter. stdout/stderr are PassThrough streams.
+ * stdin is a PassThrough writable.
+ */
+export interface MockChildProcess extends EventEmitter {
+  pid: number
+  killed: boolean
+  stdin: Writable
+  stdout: Readable
+  stderr: Readable
+  kill: (signal?: NodeJS.Signals | number) => boolean
+  /** Helper: simulate stdout data + close + exit */
+  simulateOutput: (stdout: string, exitCode?: number) => void
+  /** Helper: simulate stderr data */
+  simulateStderr: (data: string) => void
+  /** Helper: simulate exit with code */
+  simulateExit: (code: number) => void
+  /** Helper: simulate spawn error */
+  simulateError: (err: Error) => void
+}
+
+export function createMockChildProcess(pid = 12345): MockChildProcess {
+  const emitter = new EventEmitter() as MockChildProcess
+  const stdoutStream = new PassThrough()
+  const stderrStream = new PassThrough()
+  const stdinStream = new PassThrough()
+
+  emitter.pid = pid
+  emitter.killed = false
+  emitter.stdin = stdinStream
+  emitter.stdout = stdoutStream
+  emitter.stderr = stderrStream
+  emitter.kill = (_signal?: NodeJS.Signals | number) => {
+    emitter.killed = true
+    return true
+  }
+
+  emitter.simulateOutput = (stdout: string, exitCode = 0) => {
+    stdoutStream.write(stdout)
+    stdoutStream.end()
+    stderrStream.end()
+    emitter.emit('close', exitCode, null)
+  }
+
+  emitter.simulateStderr = (data: string) => {
+    stderrStream.write(data)
+  }
+
+  emitter.simulateExit = (code: number) => {
+    stdoutStream.end()
+    stderrStream.end()
+    emitter.emit('close', code, null)
+  }
+
+  emitter.simulateError = (err: Error) => {
+    emitter.emit('error', err)
+    stdoutStream.end()
+    stderrStream.end()
+  }
+
+  return emitter
+}
+
+/**
+ * Create a config that maps specific roles to specific backends.
+ * Useful for testing the driver registry.
+ */
+export function createMixedBackendConfig(): SwarmConfig {
+  return createSwarmConfig({
+    models: {
+      agents: {
+        plan: { backend: 'claude', model: 'opus' },
+        test: { backend: 'opencode', model: 'gpt-5.3' },
+        code: { backend: 'opencode', model: 'openai/gpt-5.3-codex' },
+        review: { backend: 'claude', model: 'opus' },
+        security: { backend: 'opencode', model: 'gpt-5.3' },
+        merge: { backend: 'claude', model: 'opus' },
+        docs: { backend: 'opencode', model: 'moonshot/kimi-k2.5' },
+      },
+      tagged: {
+        'code-frontend': { backend: 'opencode', model: 'google/gemini-2.5-pro' },
+        'code-backend': { backend: 'opencode', model: 'openai/gpt-5.3-codex' },
+      },
+    },
+  })
+}

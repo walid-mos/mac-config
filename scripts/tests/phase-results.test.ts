@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { readPlanPhaseResult, readTddPhaseResult, readCodePhaseResult } from '../src/phase-results.js'
-import type { PlanPhaseResult, TddPhaseResult, CodePhaseResult } from '../src/phase-results.js'
+import {
+  readPlanPhaseResult,
+  readTddPhaseResult,
+  readCodePhaseResult,
+  readDocsPhaseResult,
+  deliveryReportInputSchema,
+  iterationLogEntrySchema,
+  docsPhaseResultSchema,
+} from '../src/phase-results.js'
+import type { PlanPhaseResult, TddPhaseResult, CodePhaseResult, DocsPhaseResult } from '../src/phase-results.js'
 import { createSwarmState } from './__test-utils__/factories.js'
 
 // ---------------------------------------------------------------------------
@@ -329,5 +337,152 @@ describe('readCodePhaseResult', () => {
     expect(review).toHaveProperty('criticalCount')
     expect(review).toHaveProperty('importantCount')
     expect(review).toHaveProperty('suggestionCount')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Helpers for Spec 5 (DocsPhaseResult)
+// ---------------------------------------------------------------------------
+
+function createValidDocsPhaseResult(): DocsPhaseResult {
+  return {
+    deliveryReportPath: 'docs/swarm/test-session/delivery-report.md',
+    iterationsLogPath: 'docs/swarm/test-session/iterations.md',
+    commitHash: 'def5678',
+    prUpdated: true,
+    prMarkedReady: true,
+    usedFallbackReport: false,
+    success: true,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// readDocsPhaseResult
+// ---------------------------------------------------------------------------
+
+describe('readDocsPhaseResult', () => {
+  it('returns null when phaseResults.docs is absent', () => {
+    const state = createSwarmState({ phaseResults: {} })
+
+    const result = readDocsPhaseResult(state)
+
+    expect(result).toBeNull()
+  })
+
+  it('returns validated DocsPhaseResult when present', () => {
+    const docsResult = createValidDocsPhaseResult()
+    const state = createSwarmState({
+      phaseResults: { docs: docsResult },
+    })
+
+    const result = readDocsPhaseResult(state)
+
+    expect(result).not.toBeNull()
+    expect(result!.success).toBe(true)
+    expect(result!.deliveryReportPath).toContain('delivery-report.md')
+    expect(result!.iterationsLogPath).toContain('iterations.md')
+    expect(result!.prUpdated).toBe(true)
+    expect(result!.prMarkedReady).toBe(true)
+    expect(result!.usedFallbackReport).toBe(false)
+  })
+
+  it('throws on structurally invalid data', () => {
+    const state = createSwarmState({
+      phaseResults: { docs: { invalid: 'structure' } },
+    })
+
+    expect(() => readDocsPhaseResult(state)).toThrow()
+  })
+
+  it('validates optional commitHash field', () => {
+    const docsResult = createValidDocsPhaseResult()
+    delete (docsResult as Record<string, unknown>).commitHash
+    const state = createSwarmState({
+      phaseResults: { docs: docsResult },
+    })
+
+    const result = readDocsPhaseResult(state)
+
+    expect(result).not.toBeNull()
+    expect(result!.commitHash).toBeUndefined()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Zod schema validation for Spec 5 types
+// ---------------------------------------------------------------------------
+
+describe('Spec 5 Zod schemas', () => {
+  it('deliveryReportInputSchema validates a well-formed input', () => {
+    const valid = {
+      sessionId: 'test-session',
+      specPath: '/tmp/project/spec.md',
+      specItems: [
+        {
+          title: 'Feature',
+          iterationCount: 1,
+          success: true,
+          tasks: [{
+            id: 'TASK-1',
+            title: 'Task',
+            tag: 'backend',
+            filesModified: ['src/a.ts'],
+          }],
+          testResult: { totalTests: 5, passingTests: 5, failingTests: 0, durationMs: 1000 },
+          reviewFindings: [],
+          commitHash: 'abc1234',
+        },
+      ],
+      totalDuration: 60000,
+      startedAt: '2026-01-15T10:00:00.000Z',
+      completedAt: '2026-01-15T10:01:00.000Z',
+    }
+
+    const result = deliveryReportInputSchema.safeParse(valid)
+    expect(result.success).toBe(true)
+  })
+
+  it('deliveryReportInputSchema rejects missing required fields', () => {
+    const result = deliveryReportInputSchema.safeParse({ sessionId: 'x' })
+    expect(result.success).toBe(false)
+  })
+
+  it('iterationLogEntrySchema validates a well-formed entry', () => {
+    const valid = {
+      specItem: 'Feature',
+      iterationIndex: 1,
+      agentsInvoked: [{ role: 'code', model: 'opus', durationMs: 5000 }],
+      testResult: { totalTests: 10, passingTests: 10, failingTests: 0, durationMs: 2000 },
+      reviewFindingCount: 0,
+      filesChanged: ['src/a.ts'],
+    }
+
+    const result = iterationLogEntrySchema.safeParse(valid)
+    expect(result.success).toBe(true)
+  })
+
+  it('iterationLogEntrySchema allows optional testResult', () => {
+    const valid = {
+      specItem: 'Feature',
+      iterationIndex: 1,
+      agentsInvoked: [],
+      reviewFindingCount: 0,
+      filesChanged: [],
+    }
+
+    const result = iterationLogEntrySchema.safeParse(valid)
+    expect(result.success).toBe(true)
+  })
+
+  it('docsPhaseResultSchema validates a well-formed result', () => {
+    const valid = createValidDocsPhaseResult()
+
+    const result = docsPhaseResultSchema.safeParse(valid)
+    expect(result.success).toBe(true)
+  })
+
+  it('docsPhaseResultSchema rejects missing required fields', () => {
+    const result = docsPhaseResultSchema.safeParse({ success: true })
+    expect(result.success).toBe(false)
   })
 })

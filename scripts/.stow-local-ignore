@@ -1,8 +1,2 @@
-src/
-tests/
-package.json
-tsconfig.json
-pnpm-lock.yaml
-node_modules/
-vitest.config.ts
-.local/share/swarm/dist/*.map
+.local/share/swarm/node_modules
+.local/share/swarm/dist/.*\.map

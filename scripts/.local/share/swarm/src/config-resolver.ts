@@ -15,7 +15,7 @@ const TAG_RE = /^[a-zA-Z0-9_-]{1,32}$/
 const TAG_OVERRIDE_RE = /^(?:code|test|plan|review|security|merge|docs)-[a-zA-Z0-9_-]{1,32}$/
 const AGENT_ROLE_SET = new Set<string>(AGENT_ROLES)
 
-const DEFAULT_ASSIGNMENT: ModelAssignment = { backend: 'claude', model: 'opus' }
+const DEFAULT_ASSIGNMENT: ModelAssignment = { backend: 'claude', model: 'claude-opus-4-6' }
 
 // ---------------------------------------------------------------------------
 // resolveSwarmConfig

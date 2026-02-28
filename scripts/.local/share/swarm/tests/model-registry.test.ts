@@ -14,6 +14,10 @@ describe('resolveModel', () => {
     expect(resolveModel('haiku')).toBe('claude-haiku-4-5-20251001')
   })
 
+  it('resolves "kimi" to explicit moonshot model ID', () => {
+    expect(resolveModel('kimi')).toBe('moonshotai/kimi-k2.5')
+  })
+
   it('passes through explicit model IDs unchanged', () => {
     expect(resolveModel('claude-opus-4-6')).toBe('claude-opus-4-6')
     expect(resolveModel('claude-sonnet-4-6')).toBe('claude-sonnet-4-6')
@@ -31,6 +35,7 @@ describe('isKnownAlias', () => {
     expect(isKnownAlias('opus')).toBe(true)
     expect(isKnownAlias('sonnet')).toBe(true)
     expect(isKnownAlias('haiku')).toBe(true)
+    expect(isKnownAlias('kimi')).toBe(true)
   })
 
   it('returns false for explicit IDs', () => {
@@ -47,10 +52,11 @@ describe('getAliases', () => {
   it('returns all registered aliases', () => {
     const aliases = getAliases()
 
-    expect(aliases.size).toBeGreaterThanOrEqual(3)
+    expect(aliases.size).toBeGreaterThanOrEqual(4)
     expect(aliases.get('opus')).toBe('claude-opus-4-6')
     expect(aliases.get('sonnet')).toBe('claude-sonnet-4-6')
     expect(aliases.get('haiku')).toBe('claude-haiku-4-5-20251001')
+    expect(aliases.get('kimi')).toBe('moonshotai/kimi-k2.5')
   })
 
   it('returns a read-only map', () => {

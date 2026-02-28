@@ -1,8 +1,8 @@
 [models]
-plan     = { backend = "claude", model = "claude-opus-4-6" }
-test     = { backend = "claude", model = "claude-opus-4-6" }
-code     = { backend = "claude", model = "claude-opus-4-6" }
-review   = { backend = "claude", model = "claude-opus-4-6" }
-security = { backend = "claude", model = "claude-opus-4-6" }
-merge    = { backend = "claude", model = "claude-opus-4-6" }
-docs     = { backend = "claude", model = "claude-opus-4-6" }
+plan     = { backend = "claude", model = "opus" }
+test     = { backend = "claude", model = "opus" }
+code     = { backend = "claude", model = "opus" }
+review   = { backend = "claude", model = "opus" }
+security = { backend = "claude", model = "opus" }
+merge    = { backend = "claude", model = "opus" }
+docs     = { backend = "claude", model = "opus" }

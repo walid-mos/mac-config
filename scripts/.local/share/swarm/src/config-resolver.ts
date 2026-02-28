@@ -6,6 +6,7 @@ import type { SwarmConfig, AgentRole, ModelAssignment, ResolvedConfig } from './
 import { AGENT_ROLES } from './types.js'
 import { ConfigValidationError } from './errors.js'
 import { ModelAssignmentSchema } from './validation.js'
+import { resolveModel } from './model-registry.js'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -15,7 +16,7 @@ const TAG_RE = /^[a-zA-Z0-9_-]{1,32}$/
 const TAG_OVERRIDE_RE = /^(?:code|test|plan|review|security|merge|docs)-[a-zA-Z0-9_-]{1,32}$/
 const AGENT_ROLE_SET = new Set<string>(AGENT_ROLES)
 
-const DEFAULT_ASSIGNMENT: ModelAssignment = { backend: 'claude', model: 'claude-opus-4-6' }
+const DEFAULT_ASSIGNMENT: ModelAssignment = { backend: 'claude', model: resolveModel('opus') }
 
 // ---------------------------------------------------------------------------
 // resolveSwarmConfig
@@ -116,10 +117,15 @@ function parseAndBuildConfig(filePath: string): ResolvedConfig {
       )
     }
 
+    const assignment: ModelAssignment = {
+      ...result.data as ModelAssignment,
+      model: resolveModel((result.data as ModelAssignment).model),
+    }
+
     if (AGENT_ROLE_SET.has(key)) {
-      agents[key as AgentRole] = result.data as ModelAssignment
+      agents[key as AgentRole] = assignment
     } else if (TAG_OVERRIDE_RE.test(key)) {
-      tagged[key] = result.data as ModelAssignment
+      tagged[key] = assignment
     } else {
       // Unrecognized key — warn to stderr
       process.stderr.write(

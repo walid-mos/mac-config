@@ -48,7 +48,7 @@ describe('resolveSwarmConfig — TOML parsing (FR-3)', () => {
 
     expect(result.config.models.agents.plan).toEqual({
       backend: 'claude',
-      model: 'opus',
+      model: 'claude-opus-4-6',
     })
     expect(result.config.models.agents.test).toEqual({
       backend: 'opencode',
@@ -250,7 +250,7 @@ describe('resolveSwarmConfig — invalid config', () => {
 // ---------------------------------------------------------------------------
 
 describe('resolveSwarmConfig — model name validation (SC-7)', () => {
-  it('accepts simple model names', () => {
+  it('resolves known aliases to explicit model IDs', () => {
     const toml = buildTomlContent({
       plan: { backend: 'claude', model: 'opus' },
     })
@@ -258,7 +258,7 @@ describe('resolveSwarmConfig — model name validation (SC-7)', () => {
 
     const result = resolveSwarmConfig(tmpDir)
 
-    expect(result.config.models.agents.plan.model).toBe('opus')
+    expect(result.config.models.agents.plan.model).toBe('claude-opus-4-6')
   })
 
   it('accepts model names with dots and hyphens', () => {

@@ -114,11 +114,11 @@ describe('resolveSwarmConfig — precedence (FR-4)', () => {
     try {
       const result = resolveSwarmConfig(emptyDir)
 
-      // All roles should get the default (claude/opus)
+      // All roles should get the default (claude/claude-opus-4-6)
       for (const role of ALL_AGENT_ROLES) {
         expect(result.config.models.agents[role]).toEqual({
           backend: 'claude',
-          model: 'opus',
+          model: 'claude-opus-4-6',
         })
       }
     } finally {
@@ -149,23 +149,23 @@ describe('resolveSwarmConfig — precedence (FR-4)', () => {
     // Auto-filled defaults
     expect(result.config.models.agents.review).toEqual({
       backend: 'claude',
-      model: 'opus',
+      model: 'claude-opus-4-6',
     })
     expect(result.config.models.agents.security).toEqual({
       backend: 'claude',
-      model: 'opus',
+      model: 'claude-opus-4-6',
     })
     expect(result.config.models.agents.merge).toEqual({
       backend: 'claude',
-      model: 'opus',
+      model: 'claude-opus-4-6',
     })
     expect(result.config.models.agents.docs).toEqual({
       backend: 'claude',
-      model: 'opus',
+      model: 'claude-opus-4-6',
     })
     expect(result.config.models.agents.test).toEqual({
       backend: 'claude',
-      model: 'opus',
+      model: 'claude-opus-4-6',
     })
   })
 
@@ -222,7 +222,7 @@ describe('resolveSwarmConfig — invalid config', () => {
     for (const role of ALL_AGENT_ROLES) {
       expect(result.config.models.agents[role]).toEqual({
         backend: 'claude',
-        model: 'opus',
+        model: 'claude-opus-4-6',
       })
     }
   })

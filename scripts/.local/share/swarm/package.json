@@ -5,7 +5,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "build": "tsup src/cli.ts --format esm --dts --out-dir .local/share/swarm/dist",
+    "build": "tsup src/cli.ts --format esm --dts --out-dir dist",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"

@@ -17,7 +17,7 @@ import type {
   PhaseEndEvent,
   FileChangedEvent,
   CommitEvent,
-} from '../../src/types.js'
+} from '../../src/core/types.js'
 import type { AgentRequest } from '../../src/drivers/driver.js'
 
 // ---------------------------------------------------------------------------

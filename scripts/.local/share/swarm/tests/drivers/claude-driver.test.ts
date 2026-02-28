@@ -3,7 +3,7 @@ import * as childProcess from 'node:child_process'
 import * as fs from 'node:fs'
 import { createClaudeDriver } from '../../src/drivers/claude-driver.js'
 import type { Driver, AgentRequest } from '../../src/drivers/driver.js'
-import type { ModelId, SwarmEventEmitter } from '../../src/types.js'
+import type { ModelId, SwarmEventEmitter } from '../../src/core/types.js'
 import {
   createAgentRequest,
   createMockChildProcess,

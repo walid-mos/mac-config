@@ -1,4 +1,4 @@
-import type { AgentRole, ModelId } from '../types.js'
+import type { AgentRole, ModelId } from '../core/types.js'
 
 // === Backend ===
 

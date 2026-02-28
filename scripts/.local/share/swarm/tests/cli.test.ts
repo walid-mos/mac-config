@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import * as os from 'node:os'
-import { createSessionId } from '../src/types.js'
+import { createSessionId } from '../src/core/types.js'
 
 // ---------------------------------------------------------------------------
 // Helpers

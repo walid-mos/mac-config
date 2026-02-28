@@ -1,5 +1,5 @@
-import type { SwarmConfig, SwarmEventEmitter, AgentRole, ModelId } from '../types.js'
-import { getModelAssignment } from '../config-resolver.js'
+import type { SwarmConfig, SwarmEventEmitter, AgentRole, ModelId } from '../core/types.js'
+import { getModelAssignment } from '../config/config-resolver.js'
 import { createClaudeDriver } from './claude-driver.js'
 import { createOpenCodeDriver } from './opencode-driver.js'
 import type { DriverRegistry, DriverResolution, BackendName, DriverAvailability, Driver } from './driver.js'

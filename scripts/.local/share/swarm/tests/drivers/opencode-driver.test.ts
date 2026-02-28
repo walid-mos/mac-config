@@ -3,7 +3,7 @@ import * as childProcess from 'node:child_process'
 import * as fs from 'node:fs'
 import { createOpenCodeDriver } from '../../src/drivers/opencode-driver.js'
 import type { Driver } from '../../src/drivers/driver.js'
-import type { ModelId } from '../../src/types.js'
+import type { ModelId } from '../../src/core/types.js'
 import {
   createAgentRequest,
   createMockChildProcess,

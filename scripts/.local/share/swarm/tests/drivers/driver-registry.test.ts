@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import * as childProcess from 'node:child_process'
 import { createDriverRegistry } from '../../src/drivers/driver-registry.js'
 import type { DriverRegistry, DriverResolution, BackendName } from '../../src/drivers/driver.js'
-import type { ModelId } from '../../src/types.js'
+import type { ModelId } from '../../src/core/types.js'
 import {
   createSwarmConfig,
   createMixedBackendConfig,

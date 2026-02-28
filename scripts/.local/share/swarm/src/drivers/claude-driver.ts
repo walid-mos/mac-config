@@ -1,6 +1,6 @@
 import * as childProcess from 'node:child_process'
 import * as fs from 'node:fs'
-import type { SessionId, SwarmEventEmitter } from '../types.js'
+import type { SessionId, SwarmEventEmitter } from '../core/types.js'
 import type { Driver, AgentRequest, AgentResult, DriverAvailability } from './driver.js'
 import { parseStructuredOutput } from './output-parser.js'
 

@@ -160,3 +160,4 @@ interface TestFileResult {
 6. **NEVER leave broken imports that prevent compilation** — Tests must compile
 7. **NEVER skip edge cases** — Empty, null, boundary conditions matter
 8. **NEVER write a single giant test** — One behavior per test
+9. **NEVER run build commands inside tests** — No `execSync('pnpm build')`, no `npm run build`, no shell-out to any build tool. Builds are slow, couple tests to the entire project, and belong in CI pipelines. To verify that components compose correctly, read the source files and assert on their content/structure instead.

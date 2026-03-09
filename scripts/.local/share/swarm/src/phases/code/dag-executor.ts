@@ -18,6 +18,7 @@ import { runReviewPhase } from './review-merge.js'
 import { buildCodeAgentPrompt, buildFindingFixPrompt } from './code-agent-prompt.js'
 import { commitSpecItem, getChangedFiles } from '../../git/git-operations.js'
 import type { IterationLogger } from './iteration-logger.js'
+import { runTddForTasks } from '../tdd/tdd-phase.js'
 import {
   type AgentHandle,
   attributeFindingsToAgents,
@@ -253,7 +254,7 @@ export async function executeDag(
   tasks: PlannerTask[],
   techStack: TechStack,
   specItemContext: string,
-  testFiles: string[] | undefined,
+  plannerOutput: string,
   signal: AbortSignal | undefined,
   logger: IterationLogger,
   gitState: GitState,
@@ -294,7 +295,7 @@ export async function executeDag(
   const iterations: IterationState[] = []
   let lastOutcome: IterationOutcome | undefined
   let waveIndex = 0
-  const safeTestFiles = testFiles ?? []
+  const accumulatedTestFiles: string[] = []
 
   // Main loop — each iteration is one "wave"
   while (true) {
@@ -335,7 +336,26 @@ export async function executeDag(
       },
     })
 
-    // 4. For each task in wave: spawn fresh (pending) or resume with findings (converging)
+    // 4. Run TDD for pending tasks in this wave (not converging/fix tasks)
+    const pendingInWave = wave.filter(n => n.status === 'pending')
+    if (pendingInWave.length > 0) {
+      try {
+        const tddResult = await runTddForTasks(
+          ctx, registry, plannerOutput,
+          pendingInWave.map(n => n.task), techStack, signal
+        )
+        for (const f of tddResult.testFiles) {
+          if (!accumulatedTestFiles.includes(f)) {
+            accumulatedTestFiles.push(f)
+          }
+        }
+      } catch (err) {
+        // TDD failure is non-fatal — log and continue with whatever test files we have
+        process.stderr.write(`Warning: TDD for wave ${waveIndex} failed: ${(err as Error).message}\n`)
+      }
+    }
+
+    // 5. For each task in wave: spawn fresh (pending) or resume with findings (converging)
     let agentTestResult: TestResult = DEFAULT_TEST_RESULT
 
     const agentOutputs = await Promise.all(
@@ -344,22 +364,22 @@ export async function executeDag(
 
         if (node.status === 'pending') {
           node.status = 'running'
-          return spawnFreshAgent(node, ctx, registry, techStack, safeTestFiles, decisionLog, signal)
+          return spawnFreshAgent(node, ctx, registry, techStack, accumulatedTestFiles, decisionLog, signal)
         }
 
         // Converging — resume with findings
-        return resumeAgentWithFindings(node, ctx, registry, techStack, safeTestFiles, decisionLog, signal)
+        return resumeAgentWithFindings(node, ctx, registry, techStack, accumulatedTestFiles, decisionLog, signal)
       })
     )
 
-    // 5. Extract best test result from agent outputs
+    // 6. Extract best test result from agent outputs
     for (const output of agentOutputs) {
       if (output?.testResult && output.testResult.totalTests > agentTestResult.totalTests) {
         agentTestResult = output.testResult
       }
     }
 
-    // 6. Run GLOBAL review on all changed files
+    // 7. Run GLOBAL review on all changed files
     const allChangedFiles = await getChangedFiles(ctx.projectDir)
     const globalDecisionLog = buildDecisionLogSection(
       [...nodes.values()].flatMap(n => n.decisionLogEntries)
@@ -392,7 +412,7 @@ export async function executeDag(
       data: { iteration: waveIndex, success, reason: success ? undefined : 'review-findings' },
     })
 
-    // 7. Attribute blocking findings to wave tasks
+    // 8. Attribute blocking findings to wave tasks
     const blockingFindings = review.findings.filter(
       f => f.severity === 'critical' || f.severity === 'important'
     )
@@ -401,7 +421,7 @@ export async function executeDag(
     // Track which files are still uncommitted for per-task commits
     const uncommittedFiles = new Set(allChangedFiles)
 
-    // 8. Per-task decision
+    // 9. Per-task decision
     const greenNodes: TaskNode[] = []
     const failedNodes: TaskNode[] = []
 
@@ -415,7 +435,7 @@ export async function executeDag(
         node.handle.status = 'green'
         greenNodes.push(node)
 
-        // 9. Decrement dependents' remaining deps — they may become ready next wave
+        // 10. Decrement dependents' remaining deps — they may become ready next wave
         for (const depId of dependents.get(node.taskId) ?? []) {
           remainingDeps.set(depId, (remainingDeps.get(depId) ?? 1) - 1)
         }

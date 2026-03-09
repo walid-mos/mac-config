@@ -74,15 +74,16 @@ function spawnCommand(
 
 export async function createWorktree(
   sessionId: SessionId,
-  projectDir: string
+  projectDir: string,
+  branch?: string
 ): Promise<{ branch: string; worktreePath: string }> {
   if (!SESSION_ID_RE.test(sessionId)) {
     throw new Error(`Invalid session ID "${sessionId}": must match /^[a-zA-Z0-9_-]{1,64}$/`)
   }
 
-  const branch = `swarm/${sessionId}`
+  const resolvedBranch = branch ?? `swarm/${sessionId}`
   const binWt = new URL('../bin/wt', import.meta.url).pathname
-  const { stdout } = await spawnCommand('zsh', [binWt, 'new', branch, '-y'], projectDir)
+  const { stdout } = await spawnCommand('zsh', [binWt, 'new', resolvedBranch, '-y'], projectDir)
 
   const pathMatch = /Path:\s*(.+)/.exec(stdout)
   if (!pathMatch?.[1]) {
@@ -110,18 +111,17 @@ export async function createWorktree(
     throw err
   }
 
-  return { branch, worktreePath }
+  return { branch: resolvedBranch, worktreePath }
 }
 
 export async function removeWorktree(
-  sessionId: SessionId,
+  branchOrSessionId: string,
   projectDir: string
 ): Promise<void> {
-  if (!SESSION_ID_RE.test(sessionId)) {
-    throw new Error(`Invalid session ID "${sessionId}": must match /^[a-zA-Z0-9_-]{1,64}$/`)
-  }
-
-  const branch = `swarm/${sessionId}`
+  // Accept either a full branch name (swarm/session/spec-slug) or a bare sessionId.
+  const branch = branchOrSessionId.includes('/')
+    ? branchOrSessionId
+    : `swarm/${branchOrSessionId}`
   const binWt = new URL('../bin/wt', import.meta.url).pathname
   await spawnCommand('zsh', [binWt, 'clean', branch, '-y'], projectDir)
 }

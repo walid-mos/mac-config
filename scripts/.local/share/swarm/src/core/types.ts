@@ -291,6 +291,8 @@ export interface SessionContext {
   specPath: string
   projectDir: string
   dryRun: boolean
+  /** Git branch used for this session's worktree (e.g. swarm/blog/02-contact-page). */
+  worktreeBranch?: string
 }
 
 // === Exhaustiveness Helper ===

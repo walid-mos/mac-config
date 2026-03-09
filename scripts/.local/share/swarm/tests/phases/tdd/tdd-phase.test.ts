@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { runTddPhase } from '../../../src/phases/tdd/tdd-phase.js'
+import { runTddPhase, runTddForTasks } from '../../../src/phases/tdd/tdd-phase.js'
 import type { PlanPhaseResult, TddPhaseResult, TddAgentOutput } from '../../../src/phases/phase-results.js'
 import type { SessionContext, SessionId, ModelId, SwarmStateManager } from '../../../src/core/types.js'
 import type { DriverRegistry, Driver, AgentResult, BackendName } from '../../../src/drivers/driver.js'
@@ -522,5 +522,78 @@ describe('runTddPhase — AbortSignal', () => {
     await expect(
       runTddPhase(ctx, registry, createPlanPhaseResult(), controller.signal)
     ).rejects.toThrow()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// runTddForTasks — subset support
+// ---------------------------------------------------------------------------
+
+describe('runTddForTasks — subset of tasks', () => {
+  it('accepts a subset of tasks and returns TddPhaseResult', async () => {
+    const ctx = createSessionContext()
+    const registry = createMockDriverRegistry(createSuccessAgentResult(AGENT_OUTPUT_JSON))
+    const plan = createPlanPhaseResult()
+
+    const result = await runTddForTasks(
+      ctx, registry, plan.plannerOutput, plan.tasks, plan.techStack
+    )
+
+    expect(result).toHaveProperty('testFiles')
+    expect(result).toHaveProperty('agentReport')
+    expect(Array.isArray(result.testFiles)).toBe(true)
+  })
+
+  it('calls buildTestPrompt with the provided tasks subset', async () => {
+    const ctx = createSessionContext()
+    const registry = createMockDriverRegistry(createSuccessAgentResult(AGENT_OUTPUT_JSON))
+
+    const subset = [{
+      id: 'TASK-2' as `TASK-${number}`,
+      title: 'Second task',
+      description: 'Second task description',
+      tag: 'frontend' as const,
+      dependencies: [] as `TASK-${number}`[],
+      testHints: ['test second task'],
+    }]
+
+    await runTddForTasks(
+      ctx, registry, 'planner output', subset,
+      { languages: ['typescript'], frameworks: [], testRunner: 'vitest', packageManager: 'pnpm', buildTool: null, configFiles: [], testCommand: 'vitest run', buildCommand: null }
+    )
+
+    expect(buildTestPrompt).toHaveBeenCalledWith(
+      'planner output',
+      subset,
+      expect.any(Object),
+      expect.any(Array)
+    )
+  })
+
+  it('respects AbortSignal', async () => {
+    const controller = new AbortController()
+    controller.abort()
+
+    const ctx = createSessionContext()
+    const registry = createMockDriverRegistry(createSuccessAgentResult(AGENT_OUTPUT_JSON))
+    const plan = createPlanPhaseResult()
+
+    await expect(
+      runTddForTasks(ctx, registry, plan.plannerOutput, plan.tasks, plan.techStack, controller.signal)
+    ).rejects.toThrow('TDD aborted')
+  })
+
+  it('does not emit phase:start or phase:end (those are runTddPhase concerns)', async () => {
+    const ctx = createSessionContext()
+    const emitter = ctx.emitter as ReturnType<typeof createMockEmitter>
+    const registry = createMockDriverRegistry(createSuccessAgentResult(AGENT_OUTPUT_JSON))
+    const plan = createPlanPhaseResult()
+
+    await runTddForTasks(ctx, registry, plan.plannerOutput, plan.tasks, plan.techStack)
+
+    const phaseStarts = emitter.events.filter(e => e.type === 'phase:start')
+    const phaseEnds = emitter.events.filter(e => e.type === 'phase:end')
+    expect(phaseStarts).toHaveLength(0)
+    expect(phaseEnds).toHaveLength(0)
   })
 })

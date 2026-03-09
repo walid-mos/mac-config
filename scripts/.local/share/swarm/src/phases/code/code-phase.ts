@@ -4,7 +4,6 @@ import type { SessionContext } from '../../core/types.js'
 import type { DriverRegistry } from '../../drivers/driver.js'
 import type {
   PlanPhaseResult,
-  TddPhaseResult,
   CodePhaseResult,
   ReviewFinding,
   TestResult,
@@ -155,7 +154,6 @@ export async function runCodePhase(
   ctx: SessionContext,
   registry: DriverRegistry,
   plan: PlanPhaseResult,
-  tdd: TddPhaseResult,
   signal?: AbortSignal
 ): Promise<CodePhaseResult> {
   const startTime = Date.now()
@@ -201,7 +199,7 @@ export async function runCodePhase(
   }
 
   // Branch is created as a worktree by CLI before code phase
-  const gitState: GitState = { branch: `swarm/${ctx.sessionId}`, commits: [] }
+  const gitState: GitState = { branch: ctx.worktreeBranch ?? `swarm/${ctx.sessionId}`, commits: [] }
 
   try {
     if (gitState.branch) {
@@ -218,12 +216,11 @@ export async function runCodePhase(
 
   // Spec context for review
   const specItemContext = plan.plannerOutput.slice(0, 4096)
-  const testFiles = tdd.testFiles
 
-  // Execute DAG (wave-based scheduling)
+  // Execute DAG (wave-based scheduling — TDD runs per-wave inside)
   const dagResult = await executeDag(
     ctx, registry, plan.tasks, plan.techStack,
-    specItemContext, testFiles, signal, logger, gitState
+    specItemContext, plan.plannerOutput, signal, logger, gitState
   )
 
   const lastOutcome = dagResult.lastOutcome

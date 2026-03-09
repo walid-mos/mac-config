@@ -34,8 +34,10 @@ const mockSpawn = vi.mocked(spawn)
 // ---------------------------------------------------------------------------
 
 describe('createWorktree', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.restoreAllMocks()
+    const fs = await import('node:fs')
+    vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as never)
   })
 
   it('creates worktree via bin/wt and returns branch + path', async () => {
@@ -49,6 +51,18 @@ describe('createWorktree', () => {
     expect(result.branch).toBe('swarm/my-session')
     expect(result.worktreePath).toBe('/home/user/development/worktrees/project-swarm-my-session')
     expect(mockSpawn).toHaveBeenCalledWith('zsh', expect.arrayContaining(['new', 'swarm/my-session', '-y']), { cwd: '/tmp/project' })
+  })
+
+  it('uses explicit branch when provided', async () => {
+    const sessionId = 'my-session' as SessionId
+    const proc = createMockChildProcess()
+    mockSpawn.mockReturnValue(proc as never)
+    setTimeout(() => proc.simulateOutput('Path: /home/user/development/worktrees/project-swarm-my-session-contact', 0), 0)
+
+    const result = await createWorktree(sessionId, '/tmp/project', 'swarm/my-session/02-contact-page')
+
+    expect(result.branch).toBe('swarm/my-session/02-contact-page')
+    expect(mockSpawn).toHaveBeenCalledWith('zsh', expect.arrayContaining(['new', 'swarm/my-session/02-contact-page', '-y']), { cwd: '/tmp/project' })
   })
 
   it('validates sessionId format (DL-SC-10)', async () => {
@@ -80,23 +94,24 @@ describe('removeWorktree', () => {
     vi.restoreAllMocks()
   })
 
-  it('removes worktree via bin/wt clean', async () => {
-    const sessionId = 'my-session' as SessionId
+  it('removes worktree via bin/wt clean with full branch name', async () => {
     const proc = createMockChildProcess()
     mockSpawn.mockReturnValue(proc as never)
     setTimeout(() => proc.simulateOutput('', 0), 0)
 
-    await removeWorktree(sessionId, '/tmp/project')
+    await removeWorktree('swarm/my-session/02-contact-page', '/tmp/project')
 
-    expect(mockSpawn).toHaveBeenCalledWith('zsh', expect.arrayContaining(['clean', 'swarm/my-session', '-y']), { cwd: '/tmp/project' })
+    expect(mockSpawn).toHaveBeenCalledWith('zsh', expect.arrayContaining(['clean', 'swarm/my-session/02-contact-page', '-y']), { cwd: '/tmp/project' })
   })
 
-  it('validates sessionId format', async () => {
-    const invalidSessionId = 'invalid session; rm -rf /' as SessionId
+  it('derives branch from bare sessionId for backward compat', async () => {
+    const proc = createMockChildProcess()
+    mockSpawn.mockReturnValue(proc as never)
+    setTimeout(() => proc.simulateOutput('', 0), 0)
 
-    await expect(
-      removeWorktree(invalidSessionId, '/tmp/project')
-    ).rejects.toThrow('Invalid session ID')
+    await removeWorktree('my-session', '/tmp/project')
+
+    expect(mockSpawn).toHaveBeenCalledWith('zsh', expect.arrayContaining(['clean', 'swarm/my-session', '-y']), { cwd: '/tmp/project' })
   })
 })
 

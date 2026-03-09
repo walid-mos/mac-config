@@ -12,7 +12,7 @@ import type {
 } from '../../../src/phases/phase-results.js'
 import type { SessionContext, SessionId } from '../../../src/core/types.js'
 import type { PlannerTask } from '../../../src/phases/plan/task-parser.js'
-import type { TestResult } from '../../../src/phases/tdd/test-runner.js'
+import type { TestResult } from '../../../src/phases/phase-results.js'
 import { createMockEmitter, createSwarmConfig } from '../../__test-utils__/factories.js'
 
 // ---------------------------------------------------------------------------
@@ -41,7 +41,6 @@ function createTask(
     title: `Task ${id}`,
     description: `Implement ${id}`,
     tag: 'backend',
-    files: [`src/${id.toLowerCase()}.ts`],
     dependencies: [],
     testHints: ['test basic behavior'],
     ...overrides,
@@ -60,6 +59,7 @@ function createPlanResult(overrides: Partial<PlanPhaseResult> = {}): PlanPhaseRe
       buildTool: 'vite',
       configFiles: ['tsconfig.json'],
       testCommand: 'vitest run',
+      buildCommand: null,
     },
     taskCount: 1,
     tags: { backend: 1 },
@@ -70,13 +70,9 @@ function createPlanResult(overrides: Partial<PlanPhaseResult> = {}): PlanPhaseRe
 function createTddResult(overrides: Partial<TddPhaseResult> = {}): TddPhaseResult {
   return {
     testFiles: ['tests/feature.test.ts'],
-    redVerification: {
-      totalTests: 5,
-      passingTests: 0,
-      failingTests: 5,
-      durationMs: 300,
-      syntaxErrors: [],
+    agentReport: {
       testFiles: ['tests/feature.test.ts'],
+      testResult: { totalTests: 5, passingTests: 0, failingTests: 5, durationMs: 300 },
       isRed: true,
     },
     ...overrides,
@@ -115,9 +111,9 @@ function createFinding(overrides: Partial<ReviewFinding> = {}): ReviewFinding {
 
 function createCodeResult(overrides: Partial<CodePhaseResult> = {}): CodePhaseResult {
   return {
-    batches: [
+    waves: [
       {
-        batchIndex: 0,
+        waveIndex: 0,
         tasks: [createTask('TASK-1')],
       },
     ],
@@ -209,7 +205,7 @@ describe('buildDeliveryReportInput', () => {
       taskCount: 2,
     })
     const code = createCodeResult({
-      batches: [{ batchIndex: 0, tasks: [task1, task2] }],
+      waves: [{ waveIndex: 0, tasks: [task1, task2] }],
       iterations: [
         {
           iteration: 1,

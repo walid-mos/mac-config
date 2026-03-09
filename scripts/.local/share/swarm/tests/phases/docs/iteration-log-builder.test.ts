@@ -19,7 +19,7 @@ import type {
   FileChangedEvent,
 } from '../../../src/core/types.js'
 import type { PlannerTask } from '../../../src/phases/plan/task-parser.js'
-import type { TestResult } from '../../../src/phases/tdd/test-runner.js'
+import type { TestResult } from '../../../src/phases/phase-results.js'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -32,12 +32,12 @@ function ts(offsetMs: number): string {
   return new Date(new Date(BASE_TS).getTime() + offsetMs).toISOString()
 }
 
-function createIterationStartEvent(iteration: number, batchCount = 1, offsetMs = 0): IterationStartEvent {
+function createIterationStartEvent(iteration: number, _waveIndex = 0, offsetMs = 0): IterationStartEvent {
   return {
     type: 'iteration:start',
     timestamp: ts(offsetMs),
     sessionId: SESSION_ID,
-    data: { iteration, batchCount },
+    data: { iteration, waveIndex: _waveIndex, taskCount: 1 },
   }
 }
 
@@ -66,13 +66,14 @@ function createAgentInvokeEvent(
 function createAgentResultEvent(
   role: AgentResultEvent['data']['role'],
   durationMs: number,
-  offsetMs = 5000
+  offsetMs = 5000,
+  tokenUsage?: { input: number; output: number; cacheCreation: number; cacheRead: number },
 ): AgentResultEvent {
   return {
     type: 'agent:result',
     timestamp: ts(offsetMs),
     sessionId: SESSION_ID,
-    data: { role, durationMs },
+    data: { role, durationMs, ...(tokenUsage ? { tokenUsage } : {}) },
   }
 }
 
@@ -123,7 +124,6 @@ function createTask(id: `TASK-${number}` = 'TASK-1'): PlannerTask {
     title: `Task ${id}`,
     description: `Implement ${id}`,
     tag: 'backend',
-    files: [`src/${id.toLowerCase()}.ts`],
     dependencies: [],
     testHints: [],
   }
@@ -139,7 +139,7 @@ function createMergedReview(overrides: Partial<MergedReview> = {}): MergedReview
 
 function createCodeResult(overrides: Partial<CodePhaseResult> = {}): CodePhaseResult {
   return {
-    batches: [{ batchIndex: 0, tasks: [createTask('TASK-1')] }],
+    waves: [{ waveIndex: 0, tasks: [createTask('TASK-1')] }],
     iterations: [
       {
         iteration: 1,
@@ -275,7 +275,8 @@ describe('buildIterationLog', () => {
     const task = createTask('TASK-1')
     task.title = 'Build authentication'
     const codeResult = createCodeResult({
-      batches: [{ batchIndex: 0, tasks: [task] }],
+      waves: [{ waveIndex: 0, tasks: [task] }],
+      taskCompletions: [{ taskId: 'TASK-1', title: 'Build authentication', status: 'green' as const, attempts: 1 }],
       iterations: [{
         iteration: 1,
         outcome: { status: 'green', testResult: createTestResult(), review: createMergedReview() },
@@ -291,6 +292,35 @@ describe('buildIterationLog', () => {
 
     expect(entries[0]!.specItem).toBeDefined()
     expect(typeof entries[0]!.specItem).toBe('string')
+  })
+
+  it('captures tokenUsage from agent:result events into AgentInvocationRecord', () => {
+    const tokenUsage = { input: 12400, output: 820, cacheCreation: 5200, cacheRead: 98000 }
+    const events: SwarmEvent[] = [
+      createIterationStartEvent(1, 1, 0),
+      createAgentInvokeEvent('code', 'claude-opus-4-6', 1000),
+      createAgentResultEvent('code', 164348, 5000, tokenUsage),
+      createIterationEndEvent(1, true, 10000),
+    ]
+    const codeResult = createCodeResult()
+
+    const entries = buildIterationLog(events, codeResult)
+
+    expect(entries[0]!.agentsInvoked[0]!.tokenUsage).toEqual(tokenUsage)
+  })
+
+  it('omits tokenUsage from AgentInvocationRecord when not present in events', () => {
+    const events: SwarmEvent[] = [
+      createIterationStartEvent(1, 1, 0),
+      createAgentInvokeEvent('code', 'opus', 1000),
+      createAgentResultEvent('code', 4000, 5000),
+      createIterationEndEvent(1, true, 10000),
+    ]
+    const codeResult = createCodeResult()
+
+    const entries = buildIterationLog(events, codeResult)
+
+    expect(entries[0]!.agentsInvoked[0]!.tokenUsage).toBeUndefined()
   })
 
   it('handles fewer iteration:start events than codeResult.iterations (eviction)', () => {
@@ -357,6 +387,51 @@ describe('renderIterationLog', () => {
 
     expect(markdown).toContain('# Iterations')
     expect(markdown).toContain('No iterations recorded')
+  })
+
+  it('renders token usage suffix when tokenUsage is present', () => {
+    const entries: IterationLogEntry[] = [
+      {
+        specItem: 'Build feature',
+        iterationIndex: 1,
+        agentsInvoked: [{
+          role: 'code',
+          model: 'claude-opus-4-6',
+          durationMs: 164348,
+          tokenUsage: { input: 12400, output: 820, cacheCreation: 5200, cacheRead: 98000 },
+        }],
+        testResult: { totalTests: 10, passingTests: 10, failingTests: 0, durationMs: 2000 },
+        reviewFindingCount: 0,
+        filesChanged: ['src/feature.ts'],
+      },
+    ]
+
+    const markdown = renderIterationLog(entries)
+
+    expect(markdown).toContain('164348ms')
+    expect(markdown).toContain('12,400 in')
+    expect(markdown).toContain('820 out')
+    expect(markdown).toContain('5,200 cache_w')
+    expect(markdown).toContain('98,000 cache_r')
+  })
+
+  it('renders without token suffix when tokenUsage is absent (backward compat)', () => {
+    const entries: IterationLogEntry[] = [
+      {
+        specItem: 'Build feature',
+        iterationIndex: 1,
+        agentsInvoked: [{ role: 'code', model: 'opus', durationMs: 5000 }],
+        testResult: { totalTests: 10, passingTests: 10, failingTests: 0, durationMs: 2000 },
+        reviewFindingCount: 0,
+        filesChanged: ['src/feature.ts'],
+      },
+    ]
+
+    const markdown = renderIterationLog(entries)
+
+    expect(markdown).toContain('5000ms')
+    expect(markdown).not.toContain('in /')
+    expect(markdown).not.toContain('cache_w')
   })
 
   it('includes agent invocation details', () => {

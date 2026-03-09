@@ -2,7 +2,7 @@
 
 import type { TechStack } from '../../detect/tech-stack.js'
 import type { PlannerTask } from '../plan/task-parser.js'
-import type { ReviewFinding } from '../phase-results.js'
+import type { ReviewFinding, ReviewCategory } from '../phase-results.js'
 
 // === Constants ===
 
@@ -14,7 +14,8 @@ export function buildCodeAgentPrompt(
   task: PlannerTask,
   testFiles: string[],
   techStack: TechStack,
-  previousFindings?: ReviewFinding[]
+  previousFindings?: ReviewFinding[],
+  decisionLog: string = ''
 ): string {
   const sections: string[] = []
 
@@ -23,9 +24,6 @@ export function buildCodeAgentPrompt(
 
   // Task details
   sections.push(`# Task\n\n- **ID**: ${task.id}\n- **Title**: ${task.title}\n- **Description**: ${task.description}`)
-
-  // Files
-  sections.push(`# Files\n\n${task.files.map(f => `- ${f}`).join('\n')}`)
 
   // Test hints
   if (task.testHints.length > 0) {
@@ -38,7 +36,7 @@ export function buildCodeAgentPrompt(
   }
 
   // Tech stack
-  sections.push(`# Tech Stack\n\n- Languages: ${techStack.languages.join(', ')}\n- Frameworks: ${techStack.frameworks.join(', ')}\n- Test runner: ${techStack.testRunner ?? 'none'}\n- Package manager: ${techStack.packageManager}\n- Build tool: ${techStack.buildTool ?? 'none'}\n- Test command: ${techStack.testCommand}`)
+  sections.push(`# Tech Stack\n\n- Languages: ${techStack.languages.join(', ')}\n- Frameworks: ${techStack.frameworks.join(', ')}\n- Test runner: ${techStack.testRunner ?? 'none'}\n- Package manager: ${techStack.packageManager}\n- Build tool: ${techStack.buildTool ?? 'none'}\n- Test command: ${techStack.testCommand}${techStack.buildCommand ? `\n- Build command: ${techStack.buildCommand}` : ''}${techStack.typecheckCommand ? `\n- Typecheck command: ${techStack.typecheckCommand}` : ''}${techStack.lintCommand ? `\n- Lint command: ${techStack.lintCommand}` : ''}`)
 
   // Previous findings (iteration 2+)
   if (previousFindings && previousFindings.length > 0) {
@@ -55,11 +53,89 @@ export function buildCodeAgentPrompt(
     sections.push(`# Previous Review Findings\n\nAddress these findings from the previous iteration:\n\n${findingsText}`)
   }
 
-  // Constraints
-  sections.push('# Constraints\n\n- Follow existing code patterns and conventions\n- Write minimal, focused code\n- Handle errors properly\n- Type everything — no `any` types\n- Guard clauses (early returns) over nested ifs')
+  // Decision log from previous iterations (prevents flip-flop)
+  if (decisionLog) {
+    sections.push(decisionLog)
+  }
 
-  // Output format
-  sections.push(`# Output Format\n\nReturn valid JSON matching this structure:\n\n\`\`\`json\n{\n  "taskId": "${task.id}",\n  "status": "completed" | "failed" | "blocked",\n  "filesModified": ["string"],\n  "filesCreated": ["string"],\n  "sanityChecksPassed": true | false,\n  "sanityErrors": ["string"] // only when status is "failed" or "blocked"\n}\n\`\`\``)
+  // Constraints
+  sections.push(`# Constraints\n\n- Focus on implementing the task described above. Other tasks are handled by other agents — avoid implementing functionality that belongs to a different task.\n- Follow existing code patterns and conventions\n- Write minimal, focused code\n- Handle errors properly\n- Type everything — no \`any\` types\n- Guard clauses (early returns) over nested ifs\n- Implement all changes by writing files directly — do not just describe changes\n- When a dependency is needed: if the project has a bundler, install it via the package manager (e.g., \`pnpm add <pkg>\`) and import it. If no bundler, CDN is acceptable — use HTTPS and add Subresource Integrity (SRI) hashes.\n- NEVER delete functionality that the spec requires. If a review finding conflicts with the spec, find a way to satisfy BOTH — do not simply remove the feature.`)
+
+  // Execution section — agent runs tests and builds itself
+  const executionLines: string[] = ['# Execution', '', 'You MUST run tests and build after making changes — do NOT just write code and stop.']
+
+  executionLines.push('', '## Test Execution', `- Run: ${techStack.testCommand}`, '- If tests fail, read the output, fix your code, and re-run until ALL tests pass', '- Do NOT report back with failing tests — iterate until green')
+
+  if (techStack.buildCommand) {
+    executionLines.push('', '## Build Execution', `- Run: ${techStack.buildCommand}`, '- If build fails, read errors, fix, and re-run until it succeeds', '- A passing test suite with a broken build is NOT acceptable')
+  }
+
+  if (techStack.typecheckCommand) {
+    executionLines.push('', '## Type Check Execution', `- Run: ${techStack.typecheckCommand}`, '- If type errors appear, fix your code and re-run until clean', '- A passing test suite with type errors is NOT acceptable')
+  }
+
+  if (techStack.lintCommand) {
+    executionLines.push('', '## Lint Execution', `- Run: ${techStack.lintCommand}`, '- If lint errors appear, fix your code and re-run until clean', '- Do NOT disable lint rules — fix the underlying issue')
+  }
+
+  executionLines.push('', '## Output', 'When done, output this JSON block:', '```json', '{ "filesChanged": ["path/to/file.ts"], "testResult": { "totalTests": 0, "passingTests": 0, "failingTests": 0 }, "buildResult": { "success": true, "error": null }, "summary": "Brief description of changes" }', '```')
+
+  sections.push(executionLines.join('\n'))
+
+  // Handling review findings
+  sections.push(`# Handling Review Findings\n\nWhen addressing review findings from previous iterations:\n1. Read the \`suggestedFix\` — if it names a file and a specific change, implement it.\n2. If the fix is vague, use the \`file\` and \`description\` fields to determine what to change. Apply standard best practices for the \`category\`.\n3. If a finding conflicts with spec requirements:\n   - NEVER remove spec-required functionality to satisfy a finding\n   - Instead, fix the ENVIRONMENT (config, settings, framework setup) to make the spec-required feature work correctly\n4. Findings prefixed \`[RECURRING]\` failed to be fixed in previous iterations. Try a DIFFERENT approach than what was attempted before.`)
+
+  return sections.join('\n\n')
+}
+
+// === Finding Fix Prompt (concise — for resumed agents that already have full context) ===
+
+const SEVERITY_ORDER: Record<ReviewFinding['severity'], number> = {
+  critical: 0,
+  important: 1,
+  suggestion: 2,
+}
+
+export function buildFindingFixPrompt(
+  findings: ReviewFinding[],
+  decisionLog: string = ''
+): string {
+  const sections: string[] = []
+
+  sections.push('# Fix Required')
+
+  // Group findings by severity
+  const grouped = new Map<ReviewFinding['severity'], ReviewFinding[]>()
+  for (const f of findings) {
+    const list = grouped.get(f.severity) ?? []
+    list.push(f)
+    grouped.set(f.severity, list)
+  }
+
+  // Output in severity order
+  const sortedSeverities = [...grouped.keys()].sort(
+    (a, b) => SEVERITY_ORDER[a] - SEVERITY_ORDER[b]
+  )
+
+  for (const severity of sortedSeverities) {
+    const items = grouped.get(severity)!
+    const label = severity.charAt(0).toUpperCase() + severity.slice(1)
+    const lines = items.map(f => {
+      const loc = f.line ? `${f.file}:${f.line}` : f.file
+      const fix = f.suggestedFix ? `\n  Suggested fix: ${f.suggestedFix}` : ''
+      return `- ${loc} [${f.category}] — ${f.description}${fix}`
+    })
+    sections.push(`## ${label}\n${lines.join('\n')}`)
+  }
+
+  sections.push('Fix ONLY these issues. Run tests after fixing.')
+
+  // Decision log from previous iterations (prevents flip-flop)
+  if (decisionLog) {
+    sections.push(decisionLog)
+  }
+
+  sections.push('## Output\n```json\n{ "filesChanged": [...], "testResult": {...}, "buildResult": {...}, "summary": "..." }\n```')
 
   return sections.join('\n\n')
 }

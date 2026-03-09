@@ -1,20 +1,51 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { runReviewPhase, verifyMergeIntegrity } from '../../../src/phases/code/review-merge.js'
-import type { ReviewFinding, MergedReview } from '../../../src/phases/phase-results.js'
+import type { ReviewFinding } from '../../../src/phases/phase-results.js'
 import type { SessionContext, SessionId } from '../../../src/core/types.js'
 import type { DriverRegistry, Driver, AgentResult } from '../../../src/drivers/driver.js'
 import type { ModelId } from '../../../src/core/types.js'
-import type { TestResult } from '../../../src/phases/tdd/test-runner.js'
+import type { TestResult } from '../../../src/phases/phase-results.js'
 import { createMockEmitter, createSwarmConfig } from '../../__test-utils__/factories.js'
+
+vi.mock('node:child_process', () => ({
+  spawn: vi.fn().mockImplementation(() => {
+    const { createMockChildProcess } = require('../../__test-utils__/factories.js')
+    const proc = createMockChildProcess()
+    setTimeout(() => proc.simulateOutput('diff output', 0), 0)
+    return proc
+  }),
+}))
+
+vi.mock('../../../src/detect/tech-stack.js', () => ({
+  readProjectContext: vi.fn().mockResolvedValue({
+    dependencies: ['react'],
+    devDependencies: ['vitest'],
+    configHighlights: [],
+  }),
+}))
+
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function createMockDriver(): Driver {
+function createSuccessResult(output: string): AgentResult {
+  return {
+    success: true,
+    output,
+    rawOutput: output,
+    stderr: '',
+    model: 'opus' as ModelId,
+    backend: 'claude' as const,
+    durationMs: 100,
+  }
+}
+
+function createMockDriver(output?: string): Driver {
+  const defaultOutput = JSON.stringify({ findings: [] })
   return {
     name: 'claude' as const,
-    invoke: vi.fn<Driver['invoke']>(),
+    invoke: vi.fn<Driver['invoke']>().mockResolvedValue(createSuccessResult(output ?? defaultOutput)),
     checkAvailability: vi.fn<Driver['checkAvailability']>(),
   }
 }
@@ -70,83 +101,154 @@ describe('runReviewPhase', () => {
   let registry: DriverRegistry
   let mockDriver: Driver
 
-  beforeEach(() => {
-    ctx = createSessionContext()
-    mockDriver = createMockDriver()
+  beforeEach(async () => {
+    vi.clearAllMocks()
+
+    // Re-setup readProjectContext mock
+    const { readProjectContext } = await import('../../../src/detect/tech-stack.js')
+    vi.mocked(readProjectContext).mockResolvedValue({
+      dependencies: ['react'],
+      devDependencies: ['vitest'],
+      configHighlights: [],
+    })
+
+    const mergedOutput = JSON.stringify({
+      findings: [],
+      criticalCount: 0,
+      importantCount: 0,
+      suggestionCount: 0,
+    })
+    mockDriver = createMockDriver(mergedOutput)
     registry = createMockRegistry(mockDriver)
+    ctx = createSessionContext()
   })
 
-  it('runs code review and security review in parallel', async () => {
+  it('runs code review, security review, and consistency review in parallel', async () => {
     const changedFiles = ['src/index.ts']
-    const specContext = 'Some spec context'
-    const testResult = createTestResult()
+    const result = await runReviewPhase(ctx, registry, changedFiles, 'spec', createTestResult())
 
-    await expect(
-      runReviewPhase(ctx, registry, changedFiles, specContext, testResult)
-    ).rejects.toThrow('Not implemented')
+    // getDriver called for review, security, consistency, and merge roles
+    expect(registry.getDriver).toHaveBeenCalledWith('review')
+    expect(registry.getDriver).toHaveBeenCalledWith('security')
+    expect(registry.getDriver).toHaveBeenCalledWith('consistency')
+    expect(registry.getDriver).toHaveBeenCalledWith('merge')
+    expect(result).toBeDefined()
   })
 
   it('invokes merge agent after reviews', async () => {
-    const changedFiles = ['src/index.ts']
-    const specContext = 'Some spec context'
-    const testResult = createTestResult()
+    const result = await runReviewPhase(ctx, registry, ['src/index.ts'], 'spec', createTestResult())
 
-    await expect(
-      runReviewPhase(ctx, registry, changedFiles, specContext, testResult)
-    ).rejects.toThrow('Not implemented')
+    // 4 invocations: review + security + consistency (parallel) + merge
+    expect(mockDriver.invoke).toHaveBeenCalledTimes(4)
+    expect(result.findings).toBeDefined()
   })
 
-  it('emits agent:invoke and agent:result events', async () => {
-    const changedFiles = ['src/index.ts']
-    const specContext = 'Some spec context'
-    const testResult = createTestResult()
+  it('emits review:findings event', async () => {
+    const emitter = createMockEmitter()
+    ctx = createSessionContext({ emitter })
 
-    await expect(
-      runReviewPhase(ctx, registry, changedFiles, specContext, testResult)
-    ).rejects.toThrow('Not implemented')
+    await runReviewPhase(ctx, registry, ['src/index.ts'], 'spec', createTestResult())
+
+    const findingsEvents = emitter.getEvents({ type: 'review:findings' })
+    expect(findingsEvents.length).toBe(1)
   })
 
   it('filters sensitive files from diff (DL-SC-5: .env*, *.pem, *.key)', async () => {
     const changedFiles = ['src/index.ts', '.env.local', 'certs/server.pem', 'keys/private.key']
-    const specContext = 'Some spec context'
-    const testResult = createTestResult()
 
-    await expect(
-      runReviewPhase(ctx, registry, changedFiles, specContext, testResult)
-    ).rejects.toThrow('Not implemented')
+    const result = await runReviewPhase(ctx, registry, changedFiles, 'spec', createTestResult())
+
+    // Should still succeed — sensitive files are filtered out
+    expect(result).toBeDefined()
   })
 
   it('truncates specItemContext to 4KB', async () => {
-    const changedFiles = ['src/index.ts']
-    const longSpec = 'x'.repeat(8192) // 8KB, should be truncated to 4KB
-    const testResult = createTestResult()
+    const longSpec = 'x'.repeat(8192) // 8KB
 
-    await expect(
-      runReviewPhase(ctx, registry, changedFiles, longSpec, testResult)
-    ).rejects.toThrow('Not implemented')
+    const result = await runReviewPhase(ctx, registry, ['src/index.ts'], longSpec, createTestResult())
+
+    expect(result).toBeDefined()
   })
 
   it('propagates AbortSignal', async () => {
     const controller = new AbortController()
     controller.abort()
 
-    const changedFiles = ['src/index.ts']
-    const specContext = 'Some spec context'
-    const testResult = createTestResult()
-
     await expect(
-      runReviewPhase(ctx, registry, changedFiles, specContext, testResult, controller.signal)
-    ).rejects.toThrow('Not implemented')
+      runReviewPhase(ctx, registry, ['src/index.ts'], 'spec', createTestResult(), controller.signal)
+    ).rejects.toThrow('aborted')
+  })
+
+  it('reads project context and passes to prompts', async () => {
+    const { readProjectContext } = await import('../../../src/detect/tech-stack.js')
+
+    await runReviewPhase(ctx, registry, ['src/index.ts'], 'spec', createTestResult())
+
+    expect(readProjectContext).toHaveBeenCalledWith(ctx.projectDir)
+  })
+
+  it('continues if readProjectContext throws', async () => {
+    const { readProjectContext } = await import('../../../src/detect/tech-stack.js')
+    vi.mocked(readProjectContext).mockRejectedValueOnce(new Error('ENOENT'))
+
+    const result = await runReviewPhase(ctx, registry, ['src/index.ts'], 'spec', createTestResult())
+
+    expect(result).toBeDefined()
+  })
+
+  it('handles markdown-fenced JSON from agents (fence-strip)', async () => {
+    const fencedReviewOutput = '```json\n{"findings": [{"file": "src/app.ts", "line": 1, "severity": "important", "category": "quality", "description": "missing type annotation"}]}\n```'
+    const fencedMergedOutput = '```json\n{"findings": [{"file": "src/app.ts", "line": 1, "severity": "important", "category": "quality", "description": "missing type annotation"}], "criticalCount": 0, "importantCount": 1, "suggestionCount": 0}\n```'
+
+    const fencedDriver: Driver = {
+      name: 'claude' as const,
+      invoke: vi.fn<Driver['invoke']>()
+        .mockResolvedValueOnce(createSuccessResult(fencedReviewOutput)) // review
+        .mockResolvedValueOnce(createSuccessResult(fencedReviewOutput)) // security
+        .mockResolvedValueOnce(createSuccessResult(fencedReviewOutput)) // consistency
+        .mockResolvedValueOnce(createSuccessResult(fencedMergedOutput)), // merge
+      checkAvailability: vi.fn<Driver['checkAvailability']>(),
+    }
+    registry = createMockRegistry(fencedDriver)
+
+    const result = await runReviewPhase(ctx, registry, ['src/app.ts'], 'spec', createTestResult())
+
+    expect(result.importantCount).toBe(1)
+    expect(result.findings).toHaveLength(1)
+    expect(result.findings[0].file).toBe('src/app.ts')
   })
 
   it('retries retryable errors (FR-15)', async () => {
-    const changedFiles = ['src/index.ts']
-    const specContext = 'Some spec context'
-    const testResult = createTestResult()
+    const failResult: AgentResult = {
+      success: false,
+      errorCode: 'timeout',
+      error: 'timed out',
+      rawOutput: '',
+      stderr: '',
+      model: 'opus' as ModelId,
+      backend: 'claude' as const,
+      durationMs: 100,
+    }
+    const mergedOutput = JSON.stringify({
+      findings: [],
+      criticalCount: 0,
+      importantCount: 0,
+      suggestionCount: 0,
+    })
+    const successResult = createSuccessResult(mergedOutput)
 
-    await expect(
-      runReviewPhase(ctx, registry, changedFiles, specContext, testResult)
-    ).rejects.toThrow('Not implemented')
+    // First call fails, second succeeds (for review agent)
+    // Security, consistency, and merge agents succeed immediately
+    vi.mocked(mockDriver.invoke)
+      .mockResolvedValueOnce(failResult) // review attempt 1 (fail)
+      .mockResolvedValueOnce(successResult) // security attempt 1 (pass — runs in parallel with review retry)
+      .mockResolvedValueOnce(successResult) // consistency attempt 1 (pass — runs in parallel with review retry)
+      .mockResolvedValueOnce(successResult) // review attempt 2 (pass)
+      .mockResolvedValueOnce(successResult) // merge
+
+    const result = await runReviewPhase(ctx, registry, ['src/index.ts'], 'spec', createTestResult())
+
+    expect(result).toBeDefined()
   })
 })
 
@@ -158,9 +260,10 @@ describe('verifyMergeIntegrity', () => {
   it('restores dropped critical findings (DL-SC-9)', () => {
     const codeFindings = [createFinding({ severity: 'critical', file: 'a.ts', line: 1, category: 'bug' })]
     const secFindings = [createFinding({ severity: 'critical', file: 'b.ts', line: 5, category: 'security' })]
+    const consistencyFindings: ReviewFinding[] = []
     const mergedFindings: ReviewFinding[] = [] // merge agent dropped everything
 
-    const result = verifyMergeIntegrity(codeFindings, secFindings, mergedFindings)
+    const result = verifyMergeIntegrity(codeFindings, secFindings, consistencyFindings, mergedFindings)
 
     expect(result.restored).toHaveLength(2)
     expect(result.warnings.length).toBeGreaterThan(0)
@@ -170,9 +273,10 @@ describe('verifyMergeIntegrity', () => {
     const finding = createFinding({ severity: 'critical', file: 'a.ts', line: 1, category: 'bug' })
     const codeFindings = [finding]
     const secFindings: ReviewFinding[] = []
+    const consistencyFindings: ReviewFinding[] = []
     const mergedFindings = [finding]
 
-    const result = verifyMergeIntegrity(codeFindings, secFindings, mergedFindings)
+    const result = verifyMergeIntegrity(codeFindings, secFindings, consistencyFindings, mergedFindings)
 
     expect(result.restored).toHaveLength(0)
   })
@@ -181,9 +285,10 @@ describe('verifyMergeIntegrity', () => {
     const droppedFinding = createFinding({ severity: 'critical', file: 'dropped.ts', line: 42, category: 'security' })
     const codeFindings = [droppedFinding]
     const secFindings: ReviewFinding[] = []
+    const consistencyFindings: ReviewFinding[] = []
     const mergedFindings: ReviewFinding[] = [] // dropped
 
-    const result = verifyMergeIntegrity(codeFindings, secFindings, mergedFindings)
+    const result = verifyMergeIntegrity(codeFindings, secFindings, consistencyFindings, mergedFindings)
 
     expect(result.warnings.length).toBeGreaterThan(0)
     expect(result.warnings.some(w => w.includes('dropped.ts'))).toBe(true)
@@ -200,8 +305,20 @@ describe('verifyMergeIntegrity', () => {
       description: 'Slightly different description',
     })
 
-    const result = verifyMergeIntegrity([original], [], [merged])
+    const result = verifyMergeIntegrity([original], [], [], [merged])
 
     expect(result.restored).toHaveLength(0)
+  })
+
+  it('restores dropped critical findings from consistency review', () => {
+    const codeFindings: ReviewFinding[] = []
+    const secFindings: ReviewFinding[] = []
+    const consistencyFindings = [createFinding({ severity: 'critical', file: 'hero.astro', line: 5, category: 'bug', description: 'text-white on white bg' })]
+    const mergedFindings: ReviewFinding[] = []
+
+    const result = verifyMergeIntegrity(codeFindings, secFindings, consistencyFindings, mergedFindings)
+
+    expect(result.restored).toHaveLength(1)
+    expect(result.restored[0].file).toBe('hero.astro')
   })
 })

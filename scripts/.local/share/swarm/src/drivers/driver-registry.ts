@@ -26,7 +26,7 @@ export function createDriverRegistry(
     const driver = drivers[assignment.backend]
     const model = assignment.model as ModelId
 
-    return { driver, model }
+    return { driver, model, agent: assignment.agent }
   }
 
   async function checkAll(): Promise<Record<BackendName, DriverAvailability>> {

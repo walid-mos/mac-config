@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseStructuredOutput } from '../../src/drivers/output-parser.js'
+import { parseStructuredOutput, extractStreamResult } from '../../src/drivers/output-parser.js'
 import type { ParseResult } from '../../src/drivers/output-parser.js'
 
 // ---------------------------------------------------------------------------
@@ -168,6 +168,20 @@ describe('parseStructuredOutput', () => {
       }
     })
 
+    it('handles JSON with nested code fences in string values', () => {
+      const nested = '```json\n{"findings": [{"description": "Missing import:\\n```astro\\nimport X\\n```"}]}\n```'
+
+      const parsed = parseStructuredOutput(nested)
+
+      expect(parsed.ok).toBe(true)
+      if (parsed.ok) {
+        expect(parsed.strategy).toBe('fence-strip')
+        const obj = JSON.parse(parsed.output)
+        expect(obj.findings).toHaveLength(1)
+        expect(obj.findings[0].description).toContain('Missing import')
+      }
+    })
+
     it('handles fences with surrounding prose', () => {
       const withProse = 'Here is the output:\n```json\n{"result": true}\n```\nDone.'
 
@@ -177,6 +191,74 @@ describe('parseStructuredOutput', () => {
       if (parsed.ok) {
         // Should be fence-strip since the raw input is not valid JSON
         expect(parsed.strategy).toBe('fence-strip')
+      }
+    })
+
+    it('handles \\r\\n line endings', () => {
+      const crlf = '```json\r\n{"answer": 42}\r\n```'
+
+      const parsed = parseStructuredOutput(crlf)
+
+      expect(parsed.ok).toBe(true)
+      if (parsed.ok) {
+        expect(parsed.strategy).toBe('fence-strip')
+        expect(JSON.parse(parsed.output)).toEqual({ answer: 42 })
+      }
+    })
+
+    it('handles fences with trailing whitespace on fence lines', () => {
+      const trailingWs = '```json  \n{"answer": 42}\n```  \n'
+
+      const parsed = parseStructuredOutput(trailingWs)
+
+      expect(parsed.ok).toBe(true)
+      if (parsed.ok) {
+        expect(parsed.strategy).toBe('fence-strip')
+      }
+    })
+
+    it('handles 4+ backtick fences', () => {
+      const quadFence = '````json\n{"answer": 42}\n````'
+
+      const parsed = parseStructuredOutput(quadFence)
+
+      expect(parsed.ok).toBe(true)
+      if (parsed.ok) {
+        expect(parsed.strategy).toBe('fence-strip')
+      }
+    })
+
+    it('handles fences at end of string without trailing newline', () => {
+      const noTrailing = '```json\n{"answer": 42}\n```'
+
+      const parsed = parseStructuredOutput(noTrailing)
+
+      expect(parsed.ok).toBe(true)
+      if (parsed.ok) {
+        expect(parsed.strategy).toBe('fence-strip')
+      }
+    })
+
+    it('handles real-world review output with suggestedFix containing code blocks', () => {
+      const reviewJson = JSON.stringify({
+        findings: [{
+          file: 'src/layouts/BaseLayout.astro',
+          line: 9,
+          severity: 'critical',
+          category: 'bug',
+          description: 'Missing is:inline directive',
+          suggestedFix: 'Add is:inline to the script tag:\n\n```astro\n<script is:inline src="https://cdn.tailwindcss.com"></script>\n```\n\nThis bypasses Vite processing.',
+        }],
+      })
+      const fenced = '```json\n' + reviewJson + '\n```'
+
+      const parsed = parseStructuredOutput(fenced)
+
+      expect(parsed.ok).toBe(true)
+      if (parsed.ok) {
+        expect(parsed.strategy).toBe('fence-strip')
+        const obj = JSON.parse(parsed.output)
+        expect(obj.findings[0].suggestedFix).toContain('is:inline')
       }
     })
   })
@@ -207,6 +289,24 @@ describe('parseStructuredOutput', () => {
         expect(parsed.strategy).toBe('brace-extract')
         const obj = JSON.parse(parsed.output)
         expect(obj.outer.inner).toBe('value')
+      }
+    })
+  })
+
+  // -----------------------------------------------------------------------
+  // Strategy 6: bracket-extract
+  // -----------------------------------------------------------------------
+  describe('bracket-extract strategy', () => {
+    it('extracts first [ to last ] as JSON array', () => {
+      const messy = 'Here are the findings: [{"id": 1}, {"id": 2}] end'
+
+      const parsed = parseStructuredOutput(messy)
+
+      expect(parsed.ok).toBe(true)
+      if (parsed.ok) {
+        expect(parsed.strategy).toBe('bracket-extract')
+        const arr = JSON.parse(parsed.output)
+        expect(arr).toHaveLength(2)
       }
     })
   })
@@ -281,10 +381,118 @@ describe('parseStructuredOutput', () => {
 
       expect(parsed.ok).toBe(true)
       if (parsed.ok) {
-        expect(['event-array', 'result-field', 'direct', 'fence-strip', 'brace-extract']).toContain(
+        expect(['stream-json', 'event-array', 'result-field', 'direct', 'fence-strip', 'brace-extract', 'bracket-extract']).toContain(
           parsed.strategy
         )
       }
     })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// extractStreamResult (NDJSON from --output-format stream-json)
+// ---------------------------------------------------------------------------
+
+describe('extractStreamResult', () => {
+  function ndjson(...events: Record<string, unknown>[]): string {
+    return events.map(e => JSON.stringify(e)).join('\n') + '\n'
+  }
+
+  it('extracts result from a typical stream-json output', () => {
+    const input = ndjson(
+      { type: 'system', subtype: 'init', session_id: 'abc' },
+      { type: 'assistant', message: { type: 'text', text: 'Working...' } },
+      { type: 'result', subtype: 'success', result: 'The answer is 42' },
+    )
+
+    const parsed = extractStreamResult(input)
+
+    expect(parsed.ok).toBe(true)
+    if (parsed.ok) {
+      expect(parsed.output).toBe('The answer is 42')
+      expect(parsed.strategy).toBe('stream-json')
+    }
+  })
+
+  it('extracts JSON string result', () => {
+    const input = ndjson(
+      { type: 'result', result: '{"tasks": [{"id": 1}]}' },
+    )
+
+    const parsed = extractStreamResult(input)
+
+    expect(parsed.ok).toBe(true)
+    if (parsed.ok) {
+      expect(parsed.output).toBe('{"tasks": [{"id": 1}]}')
+    }
+  })
+
+  it('stringifies object result', () => {
+    const input = ndjson(
+      { type: 'result', result: { key: 'value' } },
+    )
+
+    const parsed = extractStreamResult(input)
+
+    expect(parsed.ok).toBe(true)
+    if (parsed.ok) {
+      expect(JSON.parse(parsed.output)).toEqual({ key: 'value' })
+    }
+  })
+
+  it('returns ok: false when no result event exists', () => {
+    const input = ndjson(
+      { type: 'system', subtype: 'init' },
+      { type: 'assistant', message: { type: 'text', text: 'hello' } },
+    )
+
+    const parsed = extractStreamResult(input)
+
+    expect(parsed.ok).toBe(false)
+  })
+
+  it('returns ok: false for empty input', () => {
+    const parsed = extractStreamResult('')
+    expect(parsed.ok).toBe(false)
+  })
+
+  it('returns ok: false when result is empty string', () => {
+    const input = ndjson(
+      { type: 'result', result: '' },
+    )
+
+    const parsed = extractStreamResult(input)
+    expect(parsed.ok).toBe(false)
+  })
+
+  it('handles mixed valid and invalid lines', () => {
+    const input = [
+      'not json at all',
+      JSON.stringify({ type: 'system', subtype: 'init' }),
+      '{"broken json',
+      JSON.stringify({ type: 'result', result: 'found it' }),
+    ].join('\n') + '\n'
+
+    const parsed = extractStreamResult(input)
+
+    expect(parsed.ok).toBe(true)
+    if (parsed.ok) {
+      expect(parsed.output).toBe('found it')
+    }
+  })
+
+  it('uses the last result event when multiple exist', () => {
+    const input = ndjson(
+      { type: 'result', result: 'first' },
+      { type: 'result', result: 'second' },
+    )
+
+    const parsed = extractStreamResult(input)
+
+    expect(parsed.ok).toBe(true)
+    if (parsed.ok) {
+      // Scans from end, so should get 'second'
+      expect(parsed.output).toBe('second')
+    }
   })
 })

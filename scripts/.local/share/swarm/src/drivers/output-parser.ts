@@ -1,10 +1,33 @@
 // === Parse Result ===
 
-export type ParseStrategy = 'event-array' | 'result-field' | 'direct' | 'fence-strip' | 'brace-extract'
+export type ParseStrategy = 'stream-json' | 'event-array' | 'result-field' | 'direct' | 'fence-strip' | 'brace-extract' | 'bracket-extract'
 
 export type ParseResult =
   | { ok: true; output: string; strategy: ParseStrategy }
   | { ok: false; raw: string }
+
+// === Stream JSON extractor (NDJSON from --output-format stream-json) ===
+
+export function extractStreamResult(ndjson: string): ParseResult {
+  const lines = ndjson.split('\n')
+  // Scan from end — result event is always last
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i].trim()
+    if (!line) continue
+    try {
+      const event = JSON.parse(line)
+      if (event.type === 'result' && event.result !== undefined) {
+        const output = typeof event.result === 'string'
+          ? event.result
+          : JSON.stringify(event.result)
+        if (output.trim()) return { ok: true, output, strategy: 'stream-json' }
+      }
+    } catch {
+      continue
+    }
+  }
+  return { ok: false, raw: ndjson }
+}
 
 // === Shared Output Parser ===
 
@@ -32,6 +55,10 @@ export function parseStructuredOutput(raw: string): ParseResult {
   // Strategy 5: brace-extract (first { to last })
   const braceResult = tryBraceExtract(raw)
   if (braceResult) return braceResult
+
+  // Strategy 6: bracket-extract (first [ to last ])
+  const bracketResult = tryBracketExtract(raw)
+  if (bracketResult) return bracketResult
 
   // All strategies failed
   return { ok: false, raw }
@@ -71,6 +98,8 @@ function tryEventArray(raw: string): ParseResult | null {
     ? resultElement.result
     : JSON.stringify(resultElement.result)
 
+  if (output.trim() === '') return null
+
   return { ok: true, output, strategy: 'event-array' }
 }
 
@@ -91,6 +120,8 @@ function tryResultField(raw: string): ParseResult | null {
     ? result
     : JSON.stringify(result)
 
+  if (output.trim() === '') return null
+
   return { ok: true, output, strategy: 'result-field' }
 }
 
@@ -103,19 +134,50 @@ function tryDirect(raw: string): ParseResult | null {
   }
 }
 
-const FENCE_RE = /```(?:json)?\s*\n([\s\S]*?)\n```/
+// Fence regexes: handle \r\n, optional trailing whitespace on fence lines, and end-of-string
+const FENCE_OPEN = /`{3,}(?:json)?\s*(?:\r?\n|$)/
+const FENCE_CLOSE_LAZY = /\r?\n\s*`{3,}\s*(?:\r?\n|$)/
+const FENCE_CLOSE_GREEDY = /\r?\n\s*`{3,}\s*(?:\r?\n|[\s\S]*$)/
 
 function tryFenceStrip(raw: string): ParseResult | null {
-  const match = FENCE_RE.exec(raw)
-  if (!match) return null
+  const openMatch = FENCE_OPEN.exec(raw)
+  if (!openMatch) return null
 
-  const content = match[1]!.trim()
-  try {
-    JSON.parse(content)
-    return { ok: true, output: content, strategy: 'fence-strip' }
-  } catch {
-    return null
+  const contentStart = openMatch.index + openMatch[0].length
+
+  // Try non-greedy: find FIRST closing fence and check if content is valid JSON
+  const afterOpen = raw.slice(contentStart)
+  const lazyClose = FENCE_CLOSE_LAZY.exec(afterOpen)
+  if (lazyClose) {
+    const content = afterOpen.slice(0, lazyClose.index).trim()
+    try {
+      JSON.parse(content)
+      return { ok: true, output: content, strategy: 'fence-strip' }
+    } catch {
+      // Partial capture — fall through to greedy
+    }
   }
+
+  // Try greedy: find LAST closing fence (handles nested fences in string values)
+  const remaining = raw.slice(contentStart)
+  // Find the last occurrence of ``` on its own line
+  let lastFenceIdx = -1
+  const closeFenceGlobal = /\r?\n\s*`{3,}\s*(?:\r?\n|$)/g
+  let match: RegExpExecArray | null
+  while ((match = closeFenceGlobal.exec(remaining)) !== null) {
+    lastFenceIdx = match.index
+  }
+  if (lastFenceIdx > 0) {
+    const content = remaining.slice(0, lastFenceIdx).trim()
+    try {
+      JSON.parse(content)
+      return { ok: true, output: content, strategy: 'fence-strip' }
+    } catch {
+      // Fall through
+    }
+  }
+
+  return null
 }
 
 function tryBraceExtract(raw: string): ParseResult | null {
@@ -128,6 +190,21 @@ function tryBraceExtract(raw: string): ParseResult | null {
   try {
     JSON.parse(candidate)
     return { ok: true, output: candidate, strategy: 'brace-extract' }
+  } catch {
+    return null
+  }
+}
+
+function tryBracketExtract(raw: string): ParseResult | null {
+  const firstBracket = raw.indexOf('[')
+  const lastBracket = raw.lastIndexOf(']')
+
+  if (firstBracket === -1 || lastBracket === -1 || lastBracket <= firstBracket) return null
+
+  const candidate = raw.slice(firstBracket, lastBracket + 1)
+  try {
+    JSON.parse(candidate)
+    return { ok: true, output: candidate, strategy: 'bracket-extract' }
   } catch {
     return null
   }

@@ -1,0 +1,868 @@
+#!/bin/zsh
+# Git Worktree Manager - Centralized worktree management
+#
+# Manages git worktrees in a centralized location (~/development/worktrees)
+# with organized naming and easy navigation
+
+# Remove any existing aliases to avoid conflicts
+unalias wt 2>/dev/null
+unalias wtn 2>/dev/null
+unalias wts 2>/dev/null
+unalias wtl 2>/dev/null
+unalias wtd 2>/dev/null
+unalias wtc 2>/dev/null
+unalias wtp 2>/dev/null
+
+# ============================================================================
+# CONSTANTS AND CONFIGURATION
+# ============================================================================
+
+# Worktrees base directory
+: ${WORKTREES_BASE:="$HOME/development/worktrees"}
+
+# State file for tracking worktrees
+: ${WORKTREE_STATE_FILE:="$HOME/.config/worktree-state.json"}
+
+# ============================================================================
+# UTILITY FUNCTIONS
+# ============================================================================
+
+# Check if command exists
+command_exists() {
+    command -v "$1" &> /dev/null
+}
+
+# Check if we're in a git repository
+is_git_repo() {
+    git rev-parse --git-dir > /dev/null 2>&1
+}
+
+# Validate dependencies
+validate_dependencies() {
+    if ! is_git_repo; then
+        echo "❌ Not in a git repository"
+        return 1
+    fi
+
+    if ! command_exists fzf; then
+        echo "❌ fzf is required for interactive selection. Install it with: brew install fzf"
+        return 1
+    fi
+
+    return 0
+}
+
+# Get current project name from git remote or directory
+get_project_name() {
+    local project_name
+
+    # Try to get from git remote first
+    local remote_url=$(git config --get remote.origin.url 2>/dev/null)
+
+    if [ -n "$remote_url" ]; then
+        # Extract project name from URL
+        project_name=$(echo "$remote_url" | sed -E 's#.*/([^/]+)(\.git)?$#\1#' | sed 's/\.git$//')
+    else
+        # Fallback to directory name
+        project_name=$(basename "$(git rev-parse --show-toplevel)")
+    fi
+
+    echo "$project_name"
+}
+
+# Get git root directory
+get_git_root() {
+    git rev-parse --show-toplevel
+}
+
+# Normalize name for worktree directory (only alphanumeric and dashes)
+normalize_name() {
+    echo "$1" | sed -E 's/[^a-zA-Z0-9-]/-/g' | sed -E 's/-+/-/g' | sed -E 's/^-+|-+$//g'
+}
+
+# Initialize state file if it doesn't exist
+init_state_file() {
+    if [ ! -f "$WORKTREE_STATE_FILE" ]; then
+        mkdir -p "$(dirname "$WORKTREE_STATE_FILE")"
+        echo '{"worktrees": {}, "created": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'"}' > "$WORKTREE_STATE_FILE"
+    fi
+}
+
+# Add worktree to state
+add_to_state() {
+    local project="$1"
+    local branch="$2"
+    local wt_path="$3"
+    local git_root="$4"
+
+    init_state_file
+
+    # Use jq to update the JSON, or fallback to manual update
+    if command_exists jq; then
+        local temp_file=$(mktemp)
+        jq --arg proj "$project" \
+           --arg br "$branch" \
+           --arg p "$wt_path" \
+           --arg gr "$git_root" \
+           '.worktrees[$proj + "/" + $br] = {
+               "path": $p,
+               "branch": $br,
+               "project": $proj,
+               "git_root": $gr,
+               "created": (now | strftime("%Y-%m-%dT%H:%M:%SZ"))
+           }' "$WORKTREE_STATE_FILE" > "$temp_file"
+        mv "$temp_file" "$WORKTREE_STATE_FILE"
+    fi
+}
+
+# Remove worktree from state
+remove_from_state() {
+    local project="$1"
+    local branch="$2"
+
+    if [ -f "$WORKTREE_STATE_FILE" ] && command_exists jq; then
+        local temp_file=$(mktemp)
+        jq --arg proj "$project" \
+           --arg br "$branch" \
+           'del(.worktrees[$proj + "/" + $br])' "$WORKTREE_STATE_FILE" > "$temp_file"
+        mv "$temp_file" "$WORKTREE_STATE_FILE"
+    fi
+}
+
+# Get all worktrees for current project from git
+get_project_worktrees() {
+    local git_root=$(get_git_root)
+    git worktree list --porcelain | awk -v root="$git_root" '
+        /^worktree / { path = substr($0, 10) }
+        /^branch / {
+            branch = substr($0, 8)
+            gsub(/^refs\/heads\//, "", branch)
+            if (path != root) {
+                print path "|" branch
+            }
+            path = ""
+            branch = ""
+        }
+    '
+}
+
+# Check if branch exists
+branch_exists() {
+    git show-ref --verify --quiet "refs/heads/$1"
+}
+
+# ============================================================================
+# WORKTREE COMMANDS
+# ============================================================================
+
+# Create new worktree
+wt_new() {
+    local branch_name=""
+    local auto_yes=false
+
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -y|--yes) auto_yes=true; shift ;;
+            -*) echo "❌ Unknown option: $1"; return 1 ;;
+            *) branch_name="$1"; shift ;;
+        esac
+    done
+
+    if [ -z "$branch_name" ]; then
+        echo "❌ Branch name required"
+        echo "Usage: wt new <branch-name> [-y|--yes]"
+        return 1
+    fi
+
+    local project=$(get_project_name)
+    local git_root=$(get_git_root)
+    local normalized_project=$(normalize_name "$project")
+    local normalized_branch=$(normalize_name "$branch_name")
+    local worktree_name="${normalized_project}-${normalized_branch}"
+    local worktree_path="${WORKTREES_BASE}/${worktree_name}"
+
+    # Check if worktree already exists
+    if [ -d "$worktree_path" ]; then
+        if [ "$auto_yes" = true ]; then
+            if cd "$worktree_path" 2>/dev/null; then
+                echo "✅ Worktree already exists, switched to: $worktree_path"
+            else
+                echo "❌ Failed to switch to worktree: $worktree_path"
+                return 1
+            fi
+            return 0
+        fi
+        echo "⚠️  Worktree already exists at: $worktree_path"
+        echo -n "📂 Navigate to it? (Y/n): "
+        read -r response
+        case $response in
+            [Nn]|no)
+                return 0
+                ;;
+            *)
+                if cd "$worktree_path" 2>/dev/null; then
+                    echo "✅ Switched to worktree: $worktree_path"
+                else
+                    echo "❌ Failed to switch to worktree: $worktree_path"
+                fi
+                return 0
+                ;;
+        esac
+    fi
+
+    # Create base directory if it doesn't exist
+    mkdir -p "$WORKTREES_BASE"
+
+    echo "📦 Project: $project"
+    echo "🌿 Branch: $branch_name"
+    echo "📂 Path: $worktree_path"
+    echo ""
+
+    # Check if branch exists
+    if branch_exists "$branch_name"; then
+        echo "✅ Branch exists, creating worktree..."
+        if git worktree add "$worktree_path" "$branch_name"; then
+            add_to_state "$project" "$branch_name" "$worktree_path" "$git_root"
+            if cd "$worktree_path" 2>/dev/null; then
+                echo ""
+                echo "✅ Worktree created and switched!"
+                echo "📍 You are now in: $worktree_path"
+            else
+                echo ""
+                echo "⚠️  Worktree created but failed to switch to: $worktree_path"
+            fi
+        else
+            echo "❌ Failed to create worktree"
+            return 1
+        fi
+    else
+        if [ "$auto_yes" = false ]; then
+            echo "⚠️  Branch does not exist"
+            echo -n "📝 Create new branch from current HEAD? (Y/n): "
+            read -r response
+            case $response in
+                [Nn]|no)
+                    echo "❌ Operation cancelled"
+                    return 0
+                    ;;
+            esac
+        fi
+        if git worktree add -b "$branch_name" "$worktree_path"; then
+            add_to_state "$project" "$branch_name" "$worktree_path" "$git_root"
+            if cd "$worktree_path" 2>/dev/null; then
+                echo ""
+                echo "✅ Branch and worktree created and switched!"
+                echo "📍 You are now in: $worktree_path"
+            else
+                echo ""
+                echo "⚠️  Worktree created but failed to switch to: $worktree_path"
+            fi
+        else
+            echo "❌ Failed to create worktree"
+            return 1
+        fi
+    fi
+}
+
+# Switch to existing worktree
+wt_switch() {
+    local target_branch="$1"
+    local worktrees=$(get_project_worktrees)
+
+    if [ -z "$worktrees" ]; then
+        echo "❌ No worktrees found for this project"
+        echo "💡 Create one with: wt new <branch-name>"
+        return 1
+    fi
+
+    # If branch name provided, switch directly
+    if [ -n "$target_branch" ]; then
+        local target_path=""
+        while IFS='|' read -r wt_path branch; do
+            if [ "$branch" = "$target_branch" ]; then
+                target_path="$wt_path"
+                break
+            fi
+        done <<< "$worktrees"
+
+        if [ -z "$target_path" ]; then
+            echo "❌ No worktree found for branch: $target_branch"
+            echo ""
+            echo "Available branches:"
+            while IFS='|' read -r wt_path branch; do
+                echo "  - $branch"
+            done <<< "$worktrees"
+            return 1
+        fi
+
+        if [ -d "$target_path" ]; then
+            if cd "$target_path" 2>/dev/null; then
+                echo "✅ Switched to: $target_path"
+                return 0
+            else
+                echo "❌ Failed to switch to: $target_path"
+                return 1
+            fi
+        else
+            echo "❌ Worktree path not found: $target_path"
+            return 1
+        fi
+    fi
+
+    # Interactive mode with fzf
+    local current_dir=$(pwd)
+    local selected=$(echo "$worktrees" | while IFS='|' read -r wt_path branch; do
+        if [ "$wt_path" = "$current_dir" ]; then
+            echo "✓ $branch → $wt_path"
+        else
+            echo "  $branch → $wt_path"
+        fi
+    done | fzf \
+        --prompt="Switch to worktree: " \
+        --height=40% \
+        --border \
+        --header="Select worktree to switch to (↑↓ to navigate, Enter to select)" \
+        --preview-window=hidden)
+
+    if [ -z "$selected" ]; then
+        echo "❌ No worktree selected"
+        return 1
+    fi
+
+    # Extract path from selection (remove prefix and extract after →)
+    local target_path=$(echo "$selected" | sed -E 's/^[✓ ]+//' | sed -E 's/.* → //')
+
+    if [ -d "$target_path" ]; then
+        if cd "$target_path" 2>/dev/null; then
+            echo "✅ Switched to: $target_path"
+        else
+            echo "❌ Failed to switch to: $target_path"
+            return 1
+        fi
+    else
+        echo "❌ Worktree path not found: $target_path"
+        return 1
+    fi
+}
+
+# List all worktrees
+wt_list() {
+    local worktrees=$(get_project_worktrees)
+
+    if [ -z "$worktrees" ]; then
+        echo "📋 No worktrees found for this project"
+        echo "💡 Create one with: wt new <branch-name>"
+        return 0
+    fi
+
+    local project=$(get_project_name)
+    echo "📦 Project: $project"
+    echo ""
+    echo "🌿 Worktrees:"
+
+    local current_dir=$(pwd)
+    while IFS='|' read -r wt_path branch; do
+        if [ "$wt_path" = "$current_dir" ]; then
+            echo "  ✓ $branch"
+        else
+            echo "    $branch"
+        fi
+        echo "      📂 $wt_path"
+    done <<< "$worktrees"
+}
+
+# Show status of all worktrees
+wt_status() {
+    local worktrees=$(get_project_worktrees)
+
+    if [ -z "$worktrees" ]; then
+        echo "📋 No worktrees found for this project"
+        return 0
+    fi
+
+    local project=$(get_project_name)
+    echo "📦 Project: $project"
+    echo ""
+
+    while IFS='|' read -r wt_path branch; do
+        echo "🌿 $branch"
+        echo "   📂 $wt_path"
+
+        if [ -d "$wt_path" ]; then
+            local status=$(cd "$wt_path" && git status --short)
+            if [ -z "$status" ]; then
+                echo "   ✅ Clean working tree"
+            else
+                echo "   📝 Changes:"
+                echo "$status" | head -5 | sed 's/^/      /'
+                local count=$(echo "$status" | wc -l | tr -d ' ')
+                if [ "$count" -gt 5 ]; then
+                    echo "      ... and $((count - 5)) more"
+                fi
+            fi
+        else
+            echo "   ❌ Path not found"
+        fi
+        echo ""
+    done <<< "$worktrees"
+}
+
+# Clean up worktrees
+wt_clean() {
+    local auto_yes=false
+    local -a target_branches=()
+
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -y|--yes) auto_yes=true; shift ;;
+            -*) echo "❌ Unknown option: $1"; return 1 ;;
+            *) target_branches+=("$1"); shift ;;
+        esac
+    done
+
+    local worktrees=$(get_project_worktrees)
+    local project=$(get_project_name)
+
+    if [ -z "$worktrees" ]; then
+        echo "📋 No worktrees to clean"
+        return 0
+    fi
+
+    local selected=""
+
+    if [ ${#target_branches[@]} -gt 0 ]; then
+        # Non-interactive: resolve branch names to branch|path pairs
+        for target in "${target_branches[@]}"; do
+            local found=false
+            while IFS='|' read -r wt_path branch; do
+                if [ "$branch" = "$target" ]; then
+                    if [ -n "$selected" ]; then
+                        selected="${selected}\n${branch}|${wt_path}"
+                    else
+                        selected="${branch}|${wt_path}"
+                    fi
+                    found=true
+                    break
+                fi
+            done <<< "$worktrees"
+            if [ "$found" = false ]; then
+                echo "⚠️  No worktree found for branch: $target"
+            fi
+        done
+
+        if [ -z "$selected" ]; then
+            echo "❌ No matching worktrees found"
+            return 1
+        fi
+    else
+        # Interactive mode with fzf
+        echo "🧹 Cleanup mode for project: $project"
+        echo ""
+        echo "Select worktrees to remove (Space to select, Enter to confirm):"
+        echo ""
+
+        selected=$(echo "$worktrees" | while IFS='|' read -r wt_path branch; do
+            echo "$branch|$wt_path"
+        done | fzf \
+            --multi \
+            --prompt="Select worktrees to remove: " \
+            --height=60% \
+            --border \
+            --header="Space to select, Enter to confirm, Ctrl-C to cancel" \
+            --preview='echo "Branch: {1}\nPath: {2}"' \
+            --preview-window=up:3 \
+            --delimiter='|')
+
+        if [ -z "$selected" ]; then
+            echo "❌ No worktrees selected"
+            return 0
+        fi
+    fi
+
+    if [ "$auto_yes" = false ]; then
+        echo ""
+        echo "📋 Worktrees to remove:"
+        echo -e "$selected" | while IFS='|' read -r branch wt_path; do
+            echo "  - $branch ($wt_path)"
+        done
+        echo ""
+        echo -n "⚠️  Remove these worktrees? (Y/n): "
+        read -r confirm
+
+        case $confirm in
+            [Nn]|no)
+                echo "❌ Operation cancelled"
+                return 0
+                ;;
+        esac
+    fi
+
+    echo ""
+    echo -e "$selected" | while IFS='|' read -r branch wt_path; do
+        echo "🗑️  Removing worktree: $branch"
+        if git worktree remove "$wt_path" --force 2>/dev/null; then
+            echo "   ✅ Removed from git"
+        else
+            echo "   ⚠️  Failed to remove from git, removing directory..."
+        fi
+
+        if [ -d "$wt_path" ]; then
+            rm -rf "$wt_path"
+            echo "   ✅ Removed directory"
+        fi
+
+        remove_from_state "$project" "$branch"
+    done
+
+    echo ""
+    echo "✅ Cleanup complete!"
+}
+
+# Prune worktrees for deleted branches
+wt_prune() {
+    local interactive_mode=false
+
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --interactive|-i)
+                interactive_mode=true
+                shift
+                ;;
+            --help|-h)
+                echo "Usage: wt prune [--interactive|-i]"
+                echo "  --interactive, -i    Ask confirmation for each worktree individually"
+                echo "  --help, -h          Show this help message"
+                echo ""
+                echo "Automatically removes worktrees AND local branches for branches deleted on remote."
+                echo "This command will:"
+                echo "  1. Fetch with --prune to update remote tracking"
+                echo "  2. Identify branches marked as 'gone' on remote"
+                echo "  3. Remove the associated worktrees"
+                echo "  4. Delete the local branches (git branch -D)"
+                return 0
+                ;;
+            *)
+                echo "❌ Unknown argument: $1"
+                echo "Usage: wt prune [--interactive|-i]"
+                return 1
+                ;;
+        esac
+    done
+
+    echo "🔍 Fetching with prune to update remote tracking..."
+    git fetch --prune
+    echo ""
+
+    # Get all worktrees for this project
+    local worktrees=$(get_project_worktrees)
+
+    if [ -z "$worktrees" ]; then
+        echo "📋 No worktrees found for this project"
+        return 0
+    fi
+
+    # Find worktrees whose branches are gone on remote
+    local -a gone_worktrees_branches=()
+    local -a gone_worktrees_paths=()
+
+    while IFS='|' read -r wt_path branch; do
+        # Check if branch is gone on remote
+        # Note: ^. matches any symbol (*, +, or space) at the start
+        local branch_info=$(git branch -vv | grep "^. $branch " | grep ": gone]")
+        if [ -n "$branch_info" ]; then
+            gone_worktrees_branches+=("$branch")
+            gone_worktrees_paths+=("$wt_path")
+        fi
+    done <<< "$worktrees"
+
+    local gone_count=${#gone_worktrees_branches[@]}
+
+    if [ $gone_count -eq 0 ]; then
+        echo "✅ No worktrees to prune (all branches are up to date)"
+        return 0
+    fi
+
+    local project=$(get_project_name)
+
+    echo "🧹 Found $gone_count worktree(s) for deleted branches:"
+    for i in {1..$gone_count}; do
+        echo "  - ${gone_worktrees_branches[$i]}"
+        echo "    📂 ${gone_worktrees_paths[$i]}"
+    done
+    echo ""
+
+    if [ "$interactive_mode" = true ]; then
+        # Interactive mode: ask for each worktree
+        for i in {1..$gone_count}; do
+            local branch="${gone_worktrees_branches[$i]}"
+            local wt_path="${gone_worktrees_paths[$i]}"
+
+            while true; do
+                echo -n "Remove worktree for '$branch'? (y/n/a/q): "
+                read -r response
+                case $response in
+                    [Yy]|yes)
+                        echo "🗑️  Removing worktree and branch: $branch"
+                        if git worktree remove "$wt_path" --force 2>/dev/null; then
+                            echo "   ✅ Removed worktree from git"
+                        else
+                            echo "   ⚠️  Failed to remove worktree from git, removing directory..."
+                        fi
+
+                        if [ -d "$wt_path" ]; then
+                            rm -rf "$wt_path"
+                            echo "   ✅ Removed directory"
+                        fi
+
+                        # Delete the local branch (now that worktree is removed)
+                        echo "   🗑️  Deleting local branch: $branch"
+                        if git branch -D "$branch" 2>/dev/null; then
+                            echo "   ✅ Deleted branch"
+                        else
+                            echo "   ⚠️  Failed to delete branch (may not exist)"
+                        fi
+
+                        remove_from_state "$project" "$branch"
+                        echo "   ✅ Updated state"
+                        echo ""
+                        break
+                        ;;
+                    [Nn]|no)
+                        echo "⏭️  Skipping '$branch'"
+                        echo ""
+                        break
+                        ;;
+                    [Aa]|all)
+                        echo "🗑️  Removing all remaining worktrees and branches..."
+                        echo ""
+                        for j in {$i..$gone_count}; do
+                            local remaining_branch="${gone_worktrees_branches[$j]}"
+                            local remaining_path="${gone_worktrees_paths[$j]}"
+
+                            echo "🗑️  Removing worktree and branch: $remaining_branch"
+                            if git worktree remove "$remaining_path" --force 2>/dev/null; then
+                                echo "   ✅ Removed worktree from git"
+                            else
+                                echo "   ⚠️  Failed to remove worktree from git, removing directory..."
+                            fi
+
+                            if [ -d "$remaining_path" ]; then
+                                rm -rf "$remaining_path"
+                                echo "   ✅ Removed directory"
+                            fi
+
+                            # Delete the local branch (now that worktree is removed)
+                            echo "   🗑️  Deleting local branch: $remaining_branch"
+                            if git branch -D "$remaining_branch" 2>/dev/null; then
+                                echo "   ✅ Deleted branch"
+                            else
+                                echo "   ⚠️  Failed to delete branch (may not exist)"
+                            fi
+
+                            remove_from_state "$project" "$remaining_branch"
+                            echo "   ✅ Updated state"
+                            echo ""
+                        done
+                        echo "✅ Prune complete!"
+                        return 0
+                        ;;
+                    [Qq]|quit)
+                        echo "❌ Cancelled"
+                        return 0
+                        ;;
+                    *)
+                        echo "Please answer y(es), n(o), a(ll), or q(uit)"
+                        ;;
+                esac
+            done
+        done
+        echo "✅ Prune complete!"
+    else
+        # Default mode: global confirmation (default to Y)
+        echo -n "⚠️  Remove all $gone_count worktree(s)? (Y/n): "
+        read -r response
+        case $response in
+            [Nn]|no)
+                echo "❌ Cancelled"
+                return 0
+                ;;
+            *)
+                # Default to yes for empty input or 'y'/'yes'
+                echo ""
+                for i in {1..$gone_count}; do
+                    local branch="${gone_worktrees_branches[$i]}"
+                    local wt_path="${gone_worktrees_paths[$i]}"
+
+                    echo "🗑️  Removing worktree and branch: $branch"
+                    if git worktree remove "$wt_path" --force 2>/dev/null; then
+                        echo "   ✅ Removed worktree from git"
+                    else
+                        echo "   ⚠️  Failed to remove worktree from git, removing directory..."
+                    fi
+
+                    if [ -d "$wt_path" ]; then
+                        rm -rf "$wt_path"
+                        echo "   ✅ Removed directory"
+                    fi
+
+                    # Delete the local branch (now that worktree is removed)
+                    echo "   🗑️  Deleting local branch: $branch"
+                    if git branch -D "$branch" 2>/dev/null; then
+                        echo "   ✅ Deleted branch"
+                    else
+                        echo "   ⚠️  Failed to delete branch (may not exist)"
+                    fi
+
+                    remove_from_state "$project" "$branch"
+                    echo "   ✅ Updated state"
+                    echo ""
+                done
+                echo "✅ Prune complete!"
+                ;;
+        esac
+    fi
+}
+
+# Show help
+wt_help() {
+    echo "Git Worktree Manager - Centralized worktree management"
+    echo ""
+    echo "USAGE:"
+    echo "    wt <command> [options]"
+    echo ""
+    echo "COMMANDS:"
+    echo "    new <branch> [-y]       Create new worktree for branch"
+    echo "    switch [branch]         Switch to existing worktree (interactive without args)"
+    echo "    list                    List all worktrees for current project"
+    echo "    status                  Show git status for all worktrees"
+    echo "    clean [branches] [-y]   Remove worktrees (interactive without args)"
+    echo "    prune [-i]              Auto-remove worktrees AND branches deleted on remote"
+    echo "    help                    Show this help message"
+    echo ""
+    echo "OPTIONS:"
+    echo "    -y, --yes         Auto-confirm all prompts (non-interactive mode)"
+    echo ""
+    echo "EXAMPLES:"
+    echo "    wt new feature-auth              Create worktree for branch 'feature-auth'"
+    echo "    wt new feature-auth -y           Create worktree, auto-confirm (for scripts/CI)"
+    echo "    wt switch                        Interactive worktree selection"
+    echo "    wt switch feature-auth           Direct switch (already non-interactive)"
+    echo "    wt list                          List all worktrees"
+    echo "    wt status                        Show status of all worktrees"
+    echo "    wt clean                         Clean up worktrees interactively (keeps local branches)"
+    echo "    wt clean feature-auth -y         Remove specific worktree without prompts"
+    echo "    wt prune                         Remove worktrees + local branches for deleted remotes"
+    echo "    wt prune -i                      Interactive prune (confirm each individually)"
+    echo ""
+    echo "WORKTREE LOCATION:"
+    echo "    All worktrees are stored in: ~/development/worktrees"
+    echo "    Format: {project-name}-{branch-name}"
+    echo ""
+    echo "ALIASES:"
+    echo "    wtn    Alias for 'wt new'"
+    echo "    wts    Alias for 'wt switch'"
+    echo "    wtl    Alias for 'wt list'"
+    echo "    wtd    Alias for 'wt status'"
+    echo "    wtc    Alias for 'wt clean'"
+    echo "    wtp    Alias for 'wt prune'"
+    echo ""
+    echo "REQUIREMENTS:"
+    echo "    - Git repository"
+    echo "    - fzf (fuzzy finder)"
+    echo "    - jq (optional, for state management)"
+}
+
+# ============================================================================
+# MAIN ENTRY POINT
+# ============================================================================
+
+local command="$1"
+local _wt_rc=0
+
+# Only shift if there are arguments
+if [ $# -gt 0 ]; then
+    shift
+fi
+
+case "$command" in
+    new)
+        if ! validate_dependencies; then
+            return 1
+        fi
+        wt_new "$@"
+        ;;
+    switch)
+        if ! validate_dependencies; then
+            return 1
+        fi
+        wt_switch "$@"
+        ;;
+    list)
+        if ! is_git_repo; then
+            echo "❌ Not in a git repository"
+            return 1
+        fi
+        wt_list "$@"
+        ;;
+    status)
+        if ! is_git_repo; then
+            echo "❌ Not in a git repository"
+            return 1
+        fi
+        wt_status "$@"
+        ;;
+    clean)
+        # Skip fzf check if branch names are provided as arguments
+        local has_branch_args=false
+        for arg in "$@"; do
+            case $arg in
+                -y|--yes|-*) ;;
+                *) has_branch_args=true; break ;;
+            esac
+        done
+        if [ "$has_branch_args" = false ]; then
+            if ! validate_dependencies; then
+                return 1
+            fi
+        elif ! is_git_repo; then
+            echo "❌ Not in a git repository"
+            return 1
+        fi
+        wt_clean "$@"
+        ;;
+    prune)
+        if ! is_git_repo; then
+            echo "❌ Not in a git repository"
+            return 1
+        fi
+        wt_prune "$@"
+        ;;
+    help|--help|-h|"")
+        wt_help
+        ;;
+    *)
+        echo "❌ Unknown command: $command"
+        echo ""
+        wt_help
+        _wt_rc=1
+        ;;
+esac
+
+# Capture exit code BEFORE alias definitions (function defs reset $? to 0).
+: ${_wt_rc:=$?}
+
+# ============================================================================
+# CONVENIENCE ALIASES (as functions)
+# ============================================================================
+
+wtn() { wt new "$@"; }
+wts() { wt switch "$@"; }
+wtl() { wt list "$@"; }
+wtd() { wt status "$@"; }
+wtc() { wt clean "$@"; }
+wtp() { wt prune "$@"; }
+
+return $_wt_rc

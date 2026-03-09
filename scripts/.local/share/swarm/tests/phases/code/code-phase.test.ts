@@ -4,11 +4,9 @@ import { TaskExhaustedError } from '../../../src/phases/code/dag-executor.js'
 import type { AgentHandle } from '../../../src/phases/code/code-phase.js'
 import type {
   PlanPhaseResult,
-  TddPhaseResult,
   ReviewFinding,
   MergedReview,
   TestResult,
-  TddAgentOutput,
   TaskCompletionRecord,
 } from '../../../src/phases/phase-results.js'
 import type { SessionContext, SessionId, IterationEndEvent } from '../../../src/core/types.js'
@@ -47,6 +45,9 @@ vi.mock('../../../src/phases/code/file-verification.js', () => ({
 vi.mock('../../../src/phases/code/code-agent-prompt.js', () => ({
   buildCodeAgentPrompt: vi.fn().mockReturnValue('mock prompt'),
   buildFindingFixPrompt: vi.fn().mockReturnValue('mock finding fix prompt'),
+}))
+vi.mock('../../../src/phases/tdd/tdd-phase.js', () => ({
+  runTddForTasks: vi.fn().mockResolvedValue({ testFiles: ['tests/feature.test.ts'], agentReport: { testFiles: ['tests/feature.test.ts'], testResult: { totalTests: 3, passingTests: 0, failingTests: 3, durationMs: 100 }, isRed: true } }),
 }))
 vi.mock('../../../src/phases/code/iteration-logger.js', () => ({
   createIterationLogger: vi.fn().mockReturnValue({
@@ -164,18 +165,6 @@ function createPlanResult(overrides: Partial<PlanPhaseResult> = {}): PlanPhaseRe
   }
 }
 
-function createTddResult(overrides: Partial<TddPhaseResult> = {}): TddPhaseResult {
-  return {
-    testFiles: ['tests/feature.test.ts'],
-    agentReport: {
-      testFiles: ['tests/feature.test.ts'],
-      testResult: { totalTests: 5, passingTests: 0, failingTests: 5, durationMs: 300 },
-      isRed: true,
-    } satisfies TddAgentOutput,
-    ...overrides,
-  }
-}
-
 function createMergedReview(overrides: Partial<MergedReview> = {}): MergedReview {
   return {
     findings: [],
@@ -198,6 +187,7 @@ async function resetMocks() {
   const { buildCodeAgentPrompt, buildFindingFixPrompt } = await import('../../../src/phases/code/code-agent-prompt.js')
   const { createIterationLogger } = await import('../../../src/phases/code/iteration-logger.js')
   const { parseStructuredOutput } = await import('../../../src/drivers/output-parser.js')
+  const { runTddForTasks } = await import('../../../src/phases/tdd/tdd-phase.js')
 
   vi.mocked(buildDependencyGraph).mockImplementation((tasks) => {
     const taskMap = new Map()
@@ -235,6 +225,10 @@ async function resetMocks() {
     logBuildResult: vi.fn(),
     logIterationSummary: vi.fn(),
   })
+  vi.mocked(runTddForTasks).mockResolvedValue({
+    testFiles: ['tests/feature.test.ts'],
+    agentReport: { testFiles: ['tests/feature.test.ts'], testResult: { totalTests: 3, passingTests: 0, failingTests: 3, durationMs: 100 }, isRed: true },
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -254,9 +248,8 @@ describe('runCodePhase', () => {
 
   it('returns empty waves array', async () => {
     const plan = createPlanResult()
-    const tdd = createTddResult()
 
-    const result = await runCodePhase(ctx, registry, plan, tdd)
+    const result = await runCodePhase(ctx, registry, plan)
 
     expect(result.waves).toEqual([])
   })
@@ -266,7 +259,7 @@ describe('runCodePhase', () => {
     vi.mocked(runReviewPhase).mockResolvedValue(createMergedReview())
 
     const plan = createPlanResult()
-    const result = await runCodePhase(ctx, registry, plan, createTddResult())
+    const result = await runCodePhase(ctx, registry, plan)
 
     expect(result.success).toBe(true)
     expect(result.iterations.length).toBe(1)
@@ -294,7 +287,7 @@ describe('runCodePhase', () => {
     }))
 
     await expect(
-      runCodePhase(ctx, registry, createPlanResult(), createTddResult())
+      runCodePhase(ctx, registry, createPlanResult())
     ).rejects.toThrow(TaskExhaustedError)
   })
 
@@ -320,7 +313,7 @@ describe('runCodePhase', () => {
     }))
 
     try {
-      await runCodePhase(ctx, registry, createPlanResult(), createTddResult())
+      await runCodePhase(ctx, registry, createPlanResult())
       expect.unreachable('Should have thrown')
     } catch (err) {
       expect(err).toBeInstanceOf(TaskExhaustedError)
@@ -335,7 +328,7 @@ describe('runCodePhase', () => {
     const emitter = createMockEmitter()
     ctx = createSessionContext({ emitter })
 
-    await runCodePhase(ctx, registry, createPlanResult(), createTddResult())
+    await runCodePhase(ctx, registry, createPlanResult())
 
     const starts = emitter.getEvents({ type: 'phase:start' })
     const ends = emitter.getEvents({ type: 'phase:end' })
@@ -362,7 +355,7 @@ describe('runCodePhase', () => {
     vi.mocked(getChangedFiles).mockResolvedValue(['src/a.ts'])
     vi.mocked(commitSpecItem).mockResolvedValue('commitsha')
 
-    const result = await runCodePhase(ctx, registry, createPlanResult(), createTddResult())
+    const result = await runCodePhase(ctx, registry, createPlanResult())
 
     expect(result.success).toBe(true)
   })
@@ -390,7 +383,7 @@ describe('runCodePhase', () => {
     vi.mocked(commitSpecItem).mockResolvedValue('wip-hash')
 
     await expect(
-      runCodePhase(ctx, registry, createPlanResult(), createTddResult())
+      runCodePhase(ctx, registry, createPlanResult())
     ).rejects.toThrow(TaskExhaustedError)
 
     // Safety commit should have been made with wip prefix
@@ -429,7 +422,7 @@ describe('runCodePhase', () => {
     vi.mocked(commitSpecItem).mockResolvedValue('sha1')
 
     const plan = createPlanResult({ tasks: [task1, task2] })
-    const result = await runCodePhase(ctx, registry, plan, createTddResult())
+    const result = await runCodePhase(ctx, registry, plan)
 
     expect(result.success).toBe(true)
     // Per-task commits
@@ -444,12 +437,12 @@ describe('runCodePhase', () => {
     controller.abort()
 
     await expect(
-      runCodePhase(ctx, registry, createPlanResult(), createTddResult(), controller.signal)
+      runCodePhase(ctx, registry, createPlanResult(), controller.signal)
     ).rejects.toThrow('aborted')
   })
 
   it('enforces phase-level timeout (FR-18)', async () => {
-    const result = await runCodePhase(ctx, registry, createPlanResult(), createTddResult())
+    const result = await runCodePhase(ctx, registry, createPlanResult())
     expect(result).toBeDefined()
   })
 
@@ -458,7 +451,7 @@ describe('runCodePhase', () => {
     vi.mocked(runReviewPhase).mockResolvedValue(createMergedReview())
 
     const plan = createPlanResult()
-    const result = await runCodePhase(ctx, registry, plan, createTddResult())
+    const result = await runCodePhase(ctx, registry, plan)
 
     expect(result.taskCompletions).toBeDefined()
     expect(result.taskCompletions!.length).toBe(1)

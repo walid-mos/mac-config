@@ -32,11 +32,10 @@ if (isDirectExecution) {
   const { resolveSwarmConfig } = await import("./config-resolver-5ZKRUSDF.js");
   const { createEventEmitter } = await import("./event-emitter-EY2OHEMR.js");
   const { createStateManager } = await import("./state-manager-7T54546C.js");
-  const { createDriverRegistry } = await import("./driver-registry-SNOLNX4R.js");
+  const { createDriverRegistry } = await import("./driver-registry-ENT3H3OR.js");
   const { runPlanPhase } = await import("./plan-phase-2U4R7EOX.js");
-  const { runTddPhase } = await import("./tdd-phase-X6HWKJM3.js");
-  const { runCodePhase } = await import("./code-phase-ZHY6WJRX.js");
-  const { runDocsPhase } = await import("./docs-phase-VFVR6FHM.js");
+  const { runCodePhase } = await import("./code-phase-I52ZSWMA.js");
+  const { runDocsPhase } = await import("./docs-phase-C5JLT5KX.js");
   const program = new Command().name("swarm").description("AI agent orchestrator for autonomous software development").version("0.1.0");
   program.command("run").description("Execute a swarm session").requiredOption("--session <name>", "Session identifier").requiredOption("--spec <path>", "Path to the spec file").requiredOption("--project-dir <path>", "Target project directory").option("--config <path>", "Explicit config file path").option("--dry-run", "Validate config and print plan without running").action(async (options) => {
     try {
@@ -90,6 +89,10 @@ if (isDirectExecution) {
         data: { specPath, projectDir }
       });
       const signal = controller.signal;
+      const specSlug = path.basename(specPath, path.extname(specPath));
+      const worktreeBranch = `swarm/${sessionId}/${specSlug}`;
+      let exitCode = 1;
+      let worktreeCreated = false;
       try {
         const specContent = fs.readFileSync(specPath, "utf-8");
         const registry = createDriverRegistry(resolvedConfig.config, emitter);
@@ -116,10 +119,12 @@ if (isDirectExecution) {
           });
           return;
         }
-        const { createWorktree } = await import("./git-operations-PQITR2DQ.js");
-        const { worktreePath } = await createWorktree(sessionId, projectDir);
+        const { createWorktree } = await import("./git-operations-E43JI3IJ.js");
+        const { worktreePath } = await createWorktree(sessionId, projectDir, worktreeBranch);
+        worktreeCreated = true;
         ctx.projectDir = worktreePath;
         ctx.specPath = path.join(worktreePath, path.relative(projectDir, specPath));
+        ctx.worktreeBranch = worktreeBranch;
         const wtLoadResult = state.load();
         if (wtLoadResult.found && "valid" in wtLoadResult && wtLoadResult.valid) {
           const s = wtLoadResult.state;
@@ -128,9 +133,7 @@ if (isDirectExecution) {
           s.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
           state.save(s);
         }
-        const tddResult = await runTddPhase(ctx, registry, planResult, signal);
-        savePhaseResult("tdd", tddResult);
-        const codeResult = await runCodePhase(ctx, registry, planResult, tddResult, signal);
+        const codeResult = await runCodePhase(ctx, registry, planResult, signal);
         savePhaseResult("code", codeResult);
         await runDocsPhase(ctx, registry, signal);
         try {
@@ -157,7 +160,7 @@ if (isDirectExecution) {
           sessionId,
           data: { success: codeResult.success, durationMs: Date.now() - Date.parse(swarmState.startedAt) }
         });
-        process.exit(codeResult.success ? 0 : 1);
+        exitCode = codeResult.success ? 0 : 1;
       } catch (err) {
         emitter.emit({
           type: "session:error",
@@ -167,19 +170,28 @@ if (isDirectExecution) {
         });
         process.stderr.write(`Error: ${err.message}
 `);
-        process.exit(1);
+        exitCode = 1;
       } finally {
-        try {
-          const { removeWorktree } = await import("./git-operations-PQITR2DQ.js");
-          await removeWorktree(sessionId, projectDir);
-        } catch (err) {
-          process.stderr.write(`WARNING: Worktree cleanup failed: ${err.message}
+        if (worktreeCreated) {
+          const CLEANUP_TIMEOUT_MS = 15e3;
+          try {
+            const { removeWorktree } = await import("./git-operations-E43JI3IJ.js");
+            await Promise.race([
+              removeWorktree(worktreeBranch, projectDir),
+              new Promise(
+                (_, reject) => setTimeout(() => reject(new Error("Worktree cleanup timed out")), CLEANUP_TIMEOUT_MS)
+              )
+            ]);
+          } catch (err) {
+            process.stderr.write(`WARNING: Worktree cleanup failed: ${err.message}
 `);
+          }
         }
         process.off("SIGINT", onSignal);
         process.off("SIGTERM", onSignal);
         state.releaseLock();
       }
+      process.exit(exitCode);
     } catch (err) {
       process.stderr.write(`Error: ${err.message}
 `);

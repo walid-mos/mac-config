@@ -50,39 +50,25 @@ const DEFAULT_AGENT_OUTPUT: TddAgentOutput = {
 
 // === API ===
 
-export async function runTddPhase(
+export async function runTddForTasks(
   ctx: SessionContext,
   registry: DriverRegistry,
-  plan: PlanPhaseResult,
+  plannerOutput: string,
+  tasks: import('../plan/task-parser.js').PlannerTask[],
+  techStack: import('../../detect/tech-stack.js').TechStack,
   signal?: AbortSignal
 ): Promise<TddPhaseResult> {
-  const startTime = Date.now()
-
   // Check abort signal
   if (signal?.aborted) {
-    ctx.emitter.emit({
-      type: 'phase:error',
-      timestamp: new Date().toISOString(),
-      sessionId: ctx.sessionId,
-      data: { phase: 'tdd', reason: 'Aborted' },
-    })
-    throw new Error('TDD phase aborted')
+    throw new Error('TDD aborted')
   }
-
-  // Emit phase:start
-  ctx.emitter.emit({
-    type: 'phase:start',
-    timestamp: new Date().toISOString(),
-    sessionId: ctx.sessionId,
-    data: { phase: 'tdd' },
-  })
 
   // Build test prompt
   const testConventions = [
     'tests/**/*.test.ts',
-    `Use ${plan.techStack.testRunner ?? 'default'} test runner`,
+    `Use ${techStack.testRunner ?? 'default'} test runner`,
   ]
-  const prompt = buildTestPrompt(plan.plannerOutput, plan.tasks, plan.techStack, testConventions)
+  const prompt = buildTestPrompt(plannerOutput, tasks, techStack, testConventions)
 
   // Get driver
   const { driver, model, agent } = registry.getDriver('test')
@@ -92,13 +78,7 @@ export async function runTddPhase(
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     // Check abort before each attempt
     if (signal?.aborted) {
-      ctx.emitter.emit({
-        type: 'phase:error',
-        timestamp: new Date().toISOString(),
-        sessionId: ctx.sessionId,
-        data: { phase: 'tdd', reason: 'Aborted' },
-      })
-      throw new Error('TDD phase aborted')
+      throw new Error('TDD aborted')
     }
 
     const agentResult: AgentResult = await driver.invoke({
@@ -118,7 +98,7 @@ export async function runTddPhase(
           sessionId: ctx.sessionId,
           data: { phase: 'tdd', reason: `${agentResult.errorCode}: ${agentResult.error}` },
         })
-        throw new Error(`TDD phase failed: ${agentResult.errorCode}: ${agentResult.error}`)
+        throw new Error(`TDD failed: ${agentResult.errorCode}: ${agentResult.error}`)
       }
 
       if (isRetryableErrorCode(agentResult.errorCode) && attempt < MAX_RETRIES) {
@@ -141,7 +121,7 @@ export async function runTddPhase(
         sessionId: ctx.sessionId,
         data: { phase: 'tdd', reason: `All retries exhausted: ${agentResult.errorCode}` },
       })
-      throw new Error(`TDD phase failed after ${attempt + 1} attempts: ${agentResult.errorCode}`)
+      throw new Error(`TDD failed after ${attempt + 1} attempts: ${agentResult.errorCode}`)
     }
 
     // Agent succeeded — parse structured JSON output
@@ -165,12 +145,6 @@ export async function runTddPhase(
         timestamp: new Date().toISOString(),
         sessionId: ctx.sessionId,
         data: { totalTests: 0, failingTests: 0, reason: 'Test agent produced zero tests' },
-      })
-      ctx.emitter.emit({
-        type: 'phase:end',
-        timestamp: new Date().toISOString(),
-        sessionId: ctx.sessionId,
-        data: { phase: 'tdd', durationMs: Date.now() - startTime },
       })
       return { testFiles: agentOutput.testFiles, agentReport: agentOutput }
     }
@@ -211,14 +185,6 @@ export async function runTddPhase(
       })
     }
 
-    // Emit phase:end
-    ctx.emitter.emit({
-      type: 'phase:end',
-      timestamp: new Date().toISOString(),
-      sessionId: ctx.sessionId,
-      data: { phase: 'tdd', durationMs: Date.now() - startTime },
-    })
-
     return {
       testFiles: agentOutput.testFiles,
       agentReport: agentOutput,
@@ -232,5 +198,45 @@ export async function runTddPhase(
     sessionId: ctx.sessionId,
     data: { phase: 'tdd', reason: 'Unknown error' },
   })
-  throw new Error('TDD phase failed')
+  throw new Error('TDD failed')
+}
+
+export async function runTddPhase(
+  ctx: SessionContext,
+  registry: DriverRegistry,
+  plan: PlanPhaseResult,
+  signal?: AbortSignal
+): Promise<TddPhaseResult> {
+  const startTime = Date.now()
+
+  // Check abort signal
+  if (signal?.aborted) {
+    ctx.emitter.emit({
+      type: 'phase:error',
+      timestamp: new Date().toISOString(),
+      sessionId: ctx.sessionId,
+      data: { phase: 'tdd', reason: 'Aborted' },
+    })
+    throw new Error('TDD phase aborted')
+  }
+
+  // Emit phase:start
+  ctx.emitter.emit({
+    type: 'phase:start',
+    timestamp: new Date().toISOString(),
+    sessionId: ctx.sessionId,
+    data: { phase: 'tdd' },
+  })
+
+  const result = await runTddForTasks(ctx, registry, plan.plannerOutput, plan.tasks, plan.techStack, signal)
+
+  // Emit phase:end
+  ctx.emitter.emit({
+    type: 'phase:end',
+    timestamp: new Date().toISOString(),
+    sessionId: ctx.sessionId,
+    data: { phase: 'tdd', durationMs: Date.now() - startTime },
+  })
+
+  return result
 }

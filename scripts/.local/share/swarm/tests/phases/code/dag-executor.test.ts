@@ -29,6 +29,9 @@ vi.mock('../../../src/phases/code/code-agent-prompt.js', () => ({
   buildCodeAgentPrompt: vi.fn().mockReturnValue('mock prompt'),
   buildFindingFixPrompt: vi.fn().mockReturnValue('mock finding fix prompt'),
 }))
+vi.mock('../../../src/phases/tdd/tdd-phase.js', () => ({
+  runTddForTasks: vi.fn().mockResolvedValue({ testFiles: ['tests/feature.test.ts'], agentReport: { testFiles: ['tests/feature.test.ts'], testResult: { totalTests: 3, passingTests: 0, failingTests: 3, durationMs: 100 }, isRed: true } }),
+}))
 vi.mock('../../../src/phases/code/iteration-logger.js', () => ({
   createIterationLogger: vi.fn().mockReturnValue({
     sessionDir: '/tmp/.swarm/sessions/test',
@@ -157,6 +160,7 @@ async function resetMocks() {
   const { commitSpecItem, getChangedFiles } = await import('../../../src/git/git-operations.js')
   const { buildCodeAgentPrompt, buildFindingFixPrompt } = await import('../../../src/phases/code/code-agent-prompt.js')
   const { parseStructuredOutput } = await import('../../../src/drivers/output-parser.js')
+  const { runTddForTasks } = await import('../../../src/phases/tdd/tdd-phase.js')
 
   vi.mocked(runReviewPhase).mockResolvedValue(createMergedReview())
   vi.mocked(commitSpecItem).mockResolvedValue('abc123')
@@ -164,6 +168,10 @@ async function resetMocks() {
   vi.mocked(buildCodeAgentPrompt).mockReturnValue('mock prompt')
   vi.mocked(buildFindingFixPrompt).mockReturnValue('mock finding fix prompt')
   vi.mocked(parseStructuredOutput).mockReturnValue({ ok: false, raw: '' })
+  vi.mocked(runTddForTasks).mockResolvedValue({
+    testFiles: ['tests/feature.test.ts'],
+    agentReport: { testFiles: ['tests/feature.test.ts'], testResult: { totalTests: 3, passingTests: 0, failingTests: 3, durationMs: 100 }, isRed: true },
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -183,7 +191,7 @@ describe('executeDag', () => {
 
   it('returns immediately for empty task list', async () => {
     const result = await executeDag(
-      ctx, registry, [], createTechStack(), 'spec', [], undefined, createMockLogger(), createGitState()
+      ctx, registry, [], createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
     )
 
     expect(result.taskCompletions).toEqual([])
@@ -195,7 +203,7 @@ describe('executeDag', () => {
     const tasks = [createTask('TASK-1')]
 
     const result = await executeDag(
-      ctx, registry, tasks, createTechStack(), 'spec', [], undefined, createMockLogger(), createGitState()
+      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
     )
 
     expect(result.taskCompletions).toHaveLength(1)
@@ -212,7 +220,7 @@ describe('executeDag', () => {
     ]
 
     const result = await executeDag(
-      ctx, registry, tasks, createTechStack(), 'spec', [], undefined, createMockLogger(), createGitState()
+      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
     )
 
     expect(result.taskCompletions).toHaveLength(3)
@@ -233,7 +241,7 @@ describe('executeDag', () => {
     ctx = createSessionContext({ emitter })
 
     const result = await executeDag(
-      ctx, registry, tasks, createTechStack(), 'spec', [], undefined, createMockLogger(), createGitState()
+      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
     )
 
     expect(result.taskCompletions).toHaveLength(4)
@@ -260,7 +268,7 @@ describe('executeDag', () => {
     ctx = createSessionContext({ emitter })
 
     const result = await executeDag(
-      ctx, registry, tasks, createTechStack(), 'spec', [], undefined, createMockLogger(), createGitState()
+      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
     )
 
     expect(result.taskCompletions).toHaveLength(3)
@@ -316,7 +324,7 @@ describe('executeDag', () => {
     ctx = createSessionContext({ emitter })
 
     const result = await executeDag(
-      ctx, registry, tasks, createTechStack(), 'spec', [], undefined, createMockLogger(), createGitState()
+      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
     )
 
     expect(result.taskCompletions).toHaveLength(3)
@@ -364,7 +372,7 @@ describe('executeDag', () => {
     }))
 
     const result = await executeDag(
-      ctx, registry, tasks, createTechStack(), 'spec', [], undefined, createMockLogger(), createGitState()
+      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
     )
 
     expect(result.taskCompletions).toHaveLength(1)
@@ -416,7 +424,7 @@ describe('executeDag', () => {
     }))
 
     const result = await executeDag(
-      ctx, registry, tasks, createTechStack(), 'spec', [], undefined, createMockLogger(), createGitState()
+      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
     )
 
     // TASK-1 failed, TASK-2 and TASK-3 should be failed due to dependency propagation
@@ -435,7 +443,7 @@ describe('executeDag', () => {
     await expect(
       executeDag(
         ctx, registry, [createTask('TASK-1')], createTechStack(), 'spec',
-        [], controller.signal, createMockLogger(), createGitState()
+        'planner output', controller.signal, createMockLogger(), createGitState()
       )
     ).rejects.toThrow('aborted')
   })
@@ -481,7 +489,7 @@ describe('executeDag', () => {
     const tasks = [createTask('TASK-1'), createTask('TASK-2')]
 
     await executeDag(
-      ctx, registry, tasks, createTechStack(), 'spec', [], undefined, createMockLogger(), createGitState()
+      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
     )
 
     const starts = emitter.getEvents({ type: 'iteration:start' })
@@ -558,7 +566,7 @@ describe('executeDag', () => {
       .mockResolvedValueOnce(createMergedReview()) // green
 
     await executeDag(
-      ctx, registry, tasks, createTechStack(), 'spec', [], undefined, createMockLogger(), createGitState()
+      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
     )
 
     // buildFindingFixPrompt should be called with decision log on second iteration
@@ -570,10 +578,105 @@ describe('executeDag', () => {
     const tasks = [createTask('TASK-1', { tag: 'frontend' })]
 
     await executeDag(
-      ctx, registry, tasks, createTechStack(), 'spec', [], undefined, createMockLogger(), createGitState()
+      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
     )
 
     expect(registry.getDriver).toHaveBeenCalledWith('code', 'frontend')
+  })
+
+  it('calls runTddForTasks per-wave with pending tasks only', async () => {
+    const { runTddForTasks } = await import('../../../src/phases/tdd/tdd-phase.js')
+
+    const tasks = [
+      createTask('TASK-1'),
+      createTask('TASK-2', { dependencies: ['TASK-1'] }),
+    ]
+
+    await executeDag(
+      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
+    )
+
+    // Wave 1: TASK-1, Wave 2: TASK-2
+    const tddCalls = vi.mocked(runTddForTasks).mock.calls
+    expect(tddCalls).toHaveLength(2)
+
+    // Wave 1 should have TASK-1
+    const wave1Tasks = tddCalls[0]![3] as PlannerTask[]
+    expect(wave1Tasks).toHaveLength(1)
+    expect(wave1Tasks[0]!.id).toBe('TASK-1')
+
+    // Wave 2 should have TASK-2
+    const wave2Tasks = tddCalls[1]![3] as PlannerTask[]
+    expect(wave2Tasks).toHaveLength(1)
+    expect(wave2Tasks[0]!.id).toBe('TASK-2')
+  })
+
+  it('accumulates test files across waves', async () => {
+    const { runTddForTasks } = await import('../../../src/phases/tdd/tdd-phase.js')
+    const { buildCodeAgentPrompt } = await import('../../../src/phases/code/code-agent-prompt.js')
+
+    vi.mocked(runTddForTasks)
+      .mockResolvedValueOnce({
+        testFiles: ['tests/task1.test.ts'],
+        agentReport: { testFiles: ['tests/task1.test.ts'], testResult: { totalTests: 2, passingTests: 0, failingTests: 2, durationMs: 50 }, isRed: true },
+      })
+      .mockResolvedValueOnce({
+        testFiles: ['tests/task2.test.ts'],
+        agentReport: { testFiles: ['tests/task2.test.ts'], testResult: { totalTests: 2, passingTests: 0, failingTests: 2, durationMs: 50 }, isRed: true },
+      })
+
+    const tasks = [
+      createTask('TASK-1'),
+      createTask('TASK-2', { dependencies: ['TASK-1'] }),
+    ]
+
+    await executeDag(
+      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
+    )
+
+    // Wave 2 code agents should receive both wave 1 and wave 2 test files
+    const promptCalls = vi.mocked(buildCodeAgentPrompt).mock.calls
+    // Last call is for TASK-2 — should have accumulated test files
+    const lastCall = promptCalls[promptCalls.length - 1]!
+    const testFilesArg = lastCall[1] as string[]
+    expect(testFilesArg).toContain('tests/task1.test.ts')
+    expect(testFilesArg).toContain('tests/task2.test.ts')
+  })
+
+  it('does not call runTddForTasks for converging (fix) tasks', async () => {
+    const { runTddForTasks } = await import('../../../src/phases/tdd/tdd-phase.js')
+    const { runReviewPhase } = await import('../../../src/phases/code/review-merge.js')
+    const { getChangedFiles } = await import('../../../src/git/git-operations.js')
+    const { parseStructuredOutput } = await import('../../../src/drivers/output-parser.js')
+
+    const tasks = [createTask('TASK-1')]
+
+    vi.mocked(parseStructuredOutput).mockReturnValue({
+      ok: true,
+      output: JSON.stringify({
+        filesChanged: ['src/a.ts'],
+        testResult: { totalTests: 1, passingTests: 1, failingTests: 0, durationMs: 100 },
+        buildResult: null,
+        summary: 'done',
+      }),
+      raw: '',
+    })
+    vi.mocked(getChangedFiles).mockResolvedValue(['src/a.ts'])
+
+    // Wave 1: finding → converge. Wave 2: fix → green.
+    vi.mocked(runReviewPhase)
+      .mockResolvedValueOnce(createMergedReview({
+        criticalCount: 1,
+        findings: [{ file: 'src/a.ts', severity: 'critical', category: 'bug', description: 'NPE' }],
+      }))
+      .mockResolvedValueOnce(createMergedReview())
+
+    await executeDag(
+      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
+    )
+
+    // Only 1 TDD call (wave 1 with pending task), not on wave 2 (converging)
+    expect(vi.mocked(runTddForTasks)).toHaveBeenCalledTimes(1)
   })
 
   it('handles agent retry on retryable error codes', async () => {
@@ -596,7 +699,7 @@ describe('executeDag', () => {
     const tasks = [createTask('TASK-1')]
 
     const result = await executeDag(
-      ctx, registry, tasks, createTechStack(), 'spec', [], undefined, createMockLogger(), createGitState()
+      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
     )
 
     expect(driver.invoke).toHaveBeenCalledTimes(2) // 1 fail + 1 success (code), plus review agents

@@ -48,7 +48,6 @@ if (isDirectExecution) {
   const { createStateManager } = await import('./core/state-manager.js')
   const { createDriverRegistry } = await import('./drivers/driver-registry.js')
   const { runPlanPhase } = await import('./phases/plan/plan-phase.js')
-  const { runTddPhase } = await import('./phases/tdd/tdd-phase.js')
   const { runCodePhase } = await import('./phases/code/code-phase.js')
   const { runDocsPhase } = await import('./phases/docs/docs-phase.js')
 
@@ -88,7 +87,7 @@ if (isDirectExecution) {
         state.acquireLock()
 
         // Build session context
-        const ctx = {
+        const ctx: import('./core/types.js').SessionContext = {
           sessionId,
           config: resolvedConfig,
           emitter,
@@ -133,6 +132,14 @@ if (isDirectExecution) {
 
         const signal = controller.signal
 
+        // Derive a unique worktree branch per spec file so parallel specs
+        // never collide even when they share the same session name.
+        const specSlug = path.basename(specPath, path.extname(specPath))
+        const worktreeBranch = `swarm/${sessionId}/${specSlug}`
+
+        let exitCode = 1
+        let worktreeCreated = false
+
         try {
           // Read spec file
           const specContent = fs.readFileSync(specPath, 'utf-8')
@@ -170,9 +177,11 @@ if (isDirectExecution) {
 
           // Create worktree for isolation (before TDD)
           const { createWorktree } = await import('./git/git-operations.js')
-          const { worktreePath } = await createWorktree(sessionId, projectDir)
+          const { worktreePath } = await createWorktree(sessionId, projectDir, worktreeBranch)
+          worktreeCreated = true
           ctx.projectDir = worktreePath
           ctx.specPath = path.join(worktreePath, path.relative(projectDir, specPath))
+          ctx.worktreeBranch = worktreeBranch
 
           // Persist worktree info in state
           const wtLoadResult = state.load()
@@ -184,15 +193,11 @@ if (isDirectExecution) {
             state.save(s)
           }
 
-          // Phase 2: TDD
-          const tddResult = await runTddPhase(ctx, registry, planResult, signal)
-          savePhaseResult('tdd', tddResult)
-
-          // Phase 3: Code
-          const codeResult = await runCodePhase(ctx, registry, planResult, tddResult, signal)
+          // Phase 2: Code (TDD runs per-wave inside the DAG executor)
+          const codeResult = await runCodePhase(ctx, registry, planResult, signal)
           savePhaseResult('code', codeResult)
 
-          // Phase 4: Docs
+          // Phase 3: Docs
           await runDocsPhase(ctx, registry, signal)
 
           // Final push — code commit + docs commit may still be local-only.
@@ -221,7 +226,7 @@ if (isDirectExecution) {
             data: { success: codeResult.success, durationMs: Date.now() - Date.parse(swarmState.startedAt) },
           })
 
-          process.exit(codeResult.success ? 0 : 1)
+          exitCode = codeResult.success ? 0 : 1
         } catch (err) {
           emitter.emit({
             type: 'session:error',
@@ -230,20 +235,31 @@ if (isDirectExecution) {
             data: { reason: (err as Error).message },
           })
           process.stderr.write(`Error: ${(err as Error).message}\n`)
-          process.exit(1)
+          exitCode = 1
         } finally {
-          // Clean up worktree — runs on both success and failure paths
-          try {
-            const { removeWorktree } = await import('./git/git-operations.js')
-            await removeWorktree(sessionId, projectDir)
-          } catch (err) {
-            process.stderr.write(`WARNING: Worktree cleanup failed: ${(err as Error).message}\n`)
+          // Clean up worktree — MUST complete before process.exit().
+          // Timeout prevents hanging forever on stuck git/wt processes.
+          if (worktreeCreated) {
+            const CLEANUP_TIMEOUT_MS = 15_000
+            try {
+              const { removeWorktree } = await import('./git/git-operations.js')
+              await Promise.race([
+                removeWorktree(worktreeBranch, projectDir),
+                new Promise<never>((_, reject) =>
+                  setTimeout(() => reject(new Error('Worktree cleanup timed out')), CLEANUP_TIMEOUT_MS)
+                ),
+              ])
+            } catch (err) {
+              process.stderr.write(`WARNING: Worktree cleanup failed: ${(err as Error).message}\n`)
+            }
           }
 
           process.off('SIGINT', onSignal)
           process.off('SIGTERM', onSignal)
           state.releaseLock()
         }
+
+        process.exit(exitCode)
       } catch (err) {
         process.stderr.write(`Error: ${(err as Error).message}\n`)
         process.exit(1)

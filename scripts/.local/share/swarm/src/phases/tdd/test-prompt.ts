@@ -85,7 +85,7 @@ export function buildTestPrompt(
   lines.push('## Functional Behavior')
   lines.push('- If the spec describes user-facing features (navigation, forms, interactions), tests must verify the BEHAVIOR works — not just that markup exists')
   lines.push('- For links: verify both the link AND its target exist (e.g., an anchor `href="#X"` is useless without a matching `id="X"`)')
-  lines.push('- For components that compose into pages: verify the composition works (imports resolve, slots/props are passed)')
+  lines.push('- For components that compose into pages: verify the composition works by reading source files and asserting on imports, slots, and props — NEVER by running a build')
   lines.push('- For external resources: verify URLs are well-formed and use HTTPS')
   lines.push('')
   lines.push('IMPORTANT: Tests must verify BEHAVIOR, not just structure.')
@@ -124,6 +124,7 @@ export function buildTestPrompt(
   lines.push('- Don\'t duplicate assertions across tests')
   lines.push('- Don\'t mock the module under test')
   lines.push('- Don\'t write overly specific assertions that break on irrelevant changes')
+  lines.push('- NEVER run build commands (pnpm build, npm run build, etc.) inside tests — builds are slow, couple tests to the entire project, and belong in CI, not in the test suite. To verify build output, read source files and assert on their content instead.')
   lines.push('')
 
   // Mock strategy

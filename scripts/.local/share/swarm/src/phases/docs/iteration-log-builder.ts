@@ -1,8 +1,7 @@
 // === Iteration Log Builder (Spec 5 — FR-5) ===
 
-import type { SwarmEvent, AgentRole } from '../../core/types.js'
-import type { CodePhaseResult, IterationLogEntry, AgentInvocationRecord } from '../phase-results.js'
-import type { TestResult } from '../tdd/test-runner.js'
+import type { SwarmEvent, AgentRole, TokenUsage } from '../../core/types.js'
+import type { CodePhaseResult, IterationLogEntry, AgentInvocationRecord, TestResult } from '../phase-results.js'
 
 // === API ===
 
@@ -32,24 +31,28 @@ export function buildIterationLog(
   for (const [iterationIndex, groupEvents] of iterationGroups) {
     // Correlate agent:invoke with agent:result by role
     const invokesByRole = new Map<AgentRole, { model: string }>()
-    const resultsByRole = new Map<AgentRole, { durationMs: number }>()
+    const resultsByRole = new Map<AgentRole, { durationMs: number; tokenUsage?: TokenUsage }>()
 
     for (const event of groupEvents) {
       if (event.type === 'agent:invoke') {
         invokesByRole.set(event.data.role, { model: event.data.model })
       } else if (event.type === 'agent:result') {
-        resultsByRole.set(event.data.role, { durationMs: event.data.durationMs })
+        resultsByRole.set(event.data.role, { durationMs: event.data.durationMs, tokenUsage: event.data.tokenUsage })
       }
     }
 
     const agentsInvoked: AgentInvocationRecord[] = []
     for (const [role, invoke] of invokesByRole) {
       const result = resultsByRole.get(role)
-      agentsInvoked.push({
+      const record: AgentInvocationRecord = {
         role,
         model: invoke.model,
         durationMs: result?.durationMs ?? 0,
-      })
+      }
+      if (result?.tokenUsage) {
+        record.tokenUsage = result.tokenUsage
+      }
+      agentsInvoked.push(record)
     }
 
     // Extract test results
@@ -91,11 +94,8 @@ export function buildIterationLog(
     // Derive specItem from codeResult
     const iterState = codeResult.iterations.find(it => it.iteration === iterationIndex)
     let specItem = `Iteration ${iterationIndex}`
-    if (codeResult.batches.length > 0) {
-      const firstBatch = codeResult.batches[0]!
-      if (firstBatch.tasks.length > 0) {
-        specItem = firstBatch.tasks[0]!.title
-      }
+    if (codeResult.taskCompletions && codeResult.taskCompletions.length > 0) {
+      specItem = codeResult.taskCompletions[0]!.title
     }
 
     // If iteration exists in codeResult, use the task mapping
@@ -134,7 +134,12 @@ export function renderIterationLog(entries: IterationLogEntry[]): string {
       lines.push('### Agents')
       lines.push('')
       for (const agent of entry.agentsInvoked) {
-        lines.push(`- **${agent.role}** (${agent.model}): ${agent.durationMs}ms`)
+        let line = `- **${agent.role}** (${agent.model}): ${agent.durationMs}ms`
+        if (agent.tokenUsage) {
+          const t = agent.tokenUsage
+          line += ` — ${t.input.toLocaleString()} in / ${t.output.toLocaleString()} out / ${t.cacheCreation.toLocaleString()} cache_w / ${t.cacheRead.toLocaleString()} cache_r`
+        }
+        lines.push(line)
       }
       lines.push('')
     }

@@ -136,7 +136,7 @@ describe('resolveSwarmConfig — precedence (FR-4)', () => {
   })
 
   it('fills missing base roles with defaults after resolution', () => {
-    // Only plan and code are defined — remaining 5 should get defaults
+    // Only plan and code are defined — remaining 6 should get defaults
     writeProjectConfig(PARTIAL_TOML)
 
     const result = resolveSwarmConfig(tmpDir)
@@ -155,6 +155,10 @@ describe('resolveSwarmConfig — precedence (FR-4)', () => {
       backend: 'claude',
       model: 'claude-opus-4-6',
     })
+    expect(result.config.models.agents.consistency).toEqual({
+      backend: 'claude',
+      model: 'claude-opus-4-6',
+    })
     expect(result.config.models.agents.merge).toEqual({
       backend: 'claude',
       model: 'claude-opus-4-6',
@@ -169,7 +173,7 @@ describe('resolveSwarmConfig — precedence (FR-4)', () => {
     })
   })
 
-  it('guarantees all 7 base AgentRole keys are present after resolution', () => {
+  it('guarantees all 8 base AgentRole keys are present after resolution', () => {
     writeProjectConfig(PARTIAL_TOML)
 
     const result = resolveSwarmConfig(tmpDir)
@@ -327,6 +331,64 @@ describe('resolveSwarmConfig — model name validation (SC-7)', () => {
 })
 
 // ---------------------------------------------------------------------------
+// Agent field parsing
+// ---------------------------------------------------------------------------
+
+describe('resolveSwarmConfig — agent field', () => {
+  it('parses agent field from TOML assignments', () => {
+    const toml = buildTomlContent({
+      plan: { backend: 'claude', model: 'opus', agent: 'task-planner' },
+      test: { backend: 'claude', model: 'opus' },
+      code: { backend: 'claude', model: 'opus' },
+      review: { backend: 'claude', model: 'opus' },
+      security: { backend: 'claude', model: 'opus' },
+      consistency: { backend: 'claude', model: 'opus' },
+      merge: { backend: 'claude', model: 'opus' },
+      docs: { backend: 'claude', model: 'opus' },
+    })
+    writeProjectConfig(toml)
+
+    const result = resolveSwarmConfig(tmpDir)
+
+    expect(result.config.models.agents.plan.agent).toBe('task-planner')
+    expect(result.config.models.agents.test.agent).toBeUndefined()
+  })
+
+  it('rejects agent names with invalid characters', () => {
+    const toml = buildTomlContent({
+      plan: { backend: 'claude', model: 'opus', agent: 'bad agent!' },
+    })
+    writeProjectConfig(toml)
+
+    try {
+      resolveSwarmConfig(tmpDir)
+      expect.unreachable('should have thrown')
+    } catch (err) {
+      expect((err as Error).message).not.toBe('Not implemented')
+    }
+  })
+
+  it('preserves agent in tagged overrides', () => {
+    const toml = buildTomlContent({
+      plan: { backend: 'claude', model: 'opus' },
+      test: { backend: 'claude', model: 'opus' },
+      code: { backend: 'claude', model: 'opus' },
+      review: { backend: 'claude', model: 'opus' },
+      security: { backend: 'claude', model: 'opus' },
+      consistency: { backend: 'claude', model: 'opus' },
+      merge: { backend: 'claude', model: 'opus' },
+      docs: { backend: 'claude', model: 'opus' },
+      'code-frontend': { backend: 'opencode', model: 'gemini', agent: 'frontend-coder' },
+    })
+    writeProjectConfig(toml)
+
+    const result = resolveSwarmConfig(tmpDir)
+
+    expect(result.config.models.tagged['code-frontend']!.agent).toBe('frontend-coder')
+  })
+})
+
+// ---------------------------------------------------------------------------
 // SC-8: Config path validation
 // ---------------------------------------------------------------------------
 
@@ -366,6 +428,7 @@ describe('getModelAssignment', () => {
         code: createModelAssignment({ backend: 'opencode', model: 'codex' }),
         review: createModelAssignment({ backend: 'claude', model: 'opus' }),
         security: createModelAssignment({ backend: 'claude', model: 'opus' }),
+        consistency: createModelAssignment({ backend: 'claude', model: 'opus' }),
         merge: createModelAssignment({ backend: 'claude', model: 'opus' }),
         docs: createModelAssignment({ backend: 'claude', model: 'opus' }),
       },
@@ -423,5 +486,73 @@ describe('getModelAssignment', () => {
     } catch (err) {
       expect((err as Error).message).not.toBe('Not implemented')
     }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// [convergence] config parsing
+// ---------------------------------------------------------------------------
+
+describe('resolveSwarmConfig — convergence config', () => {
+  it('applies default convergence values when [convergence] section is absent', () => {
+    writeProjectConfig(FULL_TOML)
+
+    const result = resolveSwarmConfig(tmpDir)
+
+    expect(result.config.convergence).toEqual({
+      maxIterations: 6,
+    })
+  })
+
+  it('parses explicit [convergence] values from TOML', () => {
+    const toml = `[convergence]
+maxIterations = 10
+
+${FULL_TOML}`
+    writeProjectConfig(toml)
+
+    const result = resolveSwarmConfig(tmpDir)
+
+    expect(result.config.convergence).toEqual({
+      maxIterations: 10,
+    })
+  })
+
+  it('fills missing convergence fields with defaults', () => {
+    const toml = `[convergence]
+maxIterations = 8
+
+${FULL_TOML}`
+    writeProjectConfig(toml)
+
+    const result = resolveSwarmConfig(tmpDir)
+
+    expect(result.config.convergence).toEqual({
+      maxIterations: 8,
+    })
+  })
+
+  it('includes convergence in built-in defaults when no config file exists', () => {
+    const emptyDir = fs.mkdtempSync(path.join(os.tmpdir(), 'swarm-conv-'))
+
+    try {
+      const result = resolveSwarmConfig(emptyDir)
+
+      expect(result.config.convergence).toEqual({
+        maxIterations: 6,
+      })
+    } finally {
+      fs.rmSync(emptyDir, { recursive: true, force: true })
+    }
+  })
+
+  it('throws on invalid convergence values', () => {
+    const toml = `[convergence]
+maxIterations = 0
+
+${FULL_TOML}`
+    writeProjectConfig(toml)
+
+    expect(() => resolveSwarmConfig(tmpDir)).toThrow()
   })
 })

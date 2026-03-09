@@ -207,6 +207,44 @@ describe('checkAll() — availability', () => {
 })
 
 // ---------------------------------------------------------------------------
+// getDriver — agent field passthrough
+// ---------------------------------------------------------------------------
+
+describe('getDriver() — agent field passthrough', () => {
+  it('returns agent from ModelAssignment in DriverResolution', () => {
+    const config = createSwarmConfig({
+      models: {
+        agents: {
+          plan: { backend: 'claude', model: 'opus', agent: 'task-planner' },
+          test: { backend: 'claude', model: 'opus' },
+          code: { backend: 'claude', model: 'opus' },
+          review: { backend: 'claude', model: 'opus' },
+          security: { backend: 'claude', model: 'opus' },
+          consistency: { backend: 'claude', model: 'opus' },
+          merge: { backend: 'claude', model: 'opus' },
+          docs: { backend: 'claude', model: 'opus' },
+        },
+        tagged: {},
+      },
+    })
+    const registry = createDriverRegistry(config, emitter)
+
+    const resolution = registry.getDriver('plan')
+
+    expect(resolution.agent).toBe('task-planner')
+  })
+
+  it('returns undefined agent when not set in ModelAssignment', () => {
+    const config = createSwarmConfig()
+    const registry = createDriverRegistry(config, emitter)
+
+    const resolution = registry.getDriver('plan')
+
+    expect(resolution.agent).toBeUndefined()
+  })
+})
+
+// ---------------------------------------------------------------------------
 // All backend names mapped
 // ---------------------------------------------------------------------------
 

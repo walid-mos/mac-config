@@ -1,15 +1,10 @@
-import type { AgentRole, ModelId } from '../core/types.js'
+import type { AgentRole, ModelId, TokenUsage } from '../core/types.js'
+
+export type { TokenUsage }
 
 // === Backend ===
 
 export type BackendName = 'claude' | 'opencode'
-
-// === Token Usage ===
-
-export interface TokenUsage {
-  input: number
-  output: number
-}
 
 // === Agent Request ===
 
@@ -24,6 +19,8 @@ export interface AgentRequest {
   contextFiles?: string[]
   attachUrl?: string
   signal?: AbortSignal
+  sessionId?: string  // UUID for --session-id (first invocation — saves session for future resume)
+  resume?: string     // UUID for --resume (subsequent invocations — resumes existing session)
 }
 
 // === Agent Result ===
@@ -38,6 +35,7 @@ export type AgentResult =
       backend: BackendName
       durationMs: number
       tokenUsage?: TokenUsage
+      sessionId?: string  // Echoed back for caller tracking
     }
   | {
       success: false
@@ -48,6 +46,7 @@ export type AgentResult =
       model: ModelId
       backend: BackendName
       durationMs: number
+      tokenUsage?: TokenUsage
     }
 
 // === Driver Availability ===
@@ -69,6 +68,7 @@ export interface Driver {
 export interface DriverResolution {
   driver: Driver
   model: ModelId
+  agent?: string
 }
 
 // === Driver Registry ===

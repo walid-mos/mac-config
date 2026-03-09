@@ -266,6 +266,7 @@ export function createOpenCodeDriver(emitter: SwarmEventEmitter): Driver {
       let proc: childProcess.ChildProcess
       try {
         proc = childProcess.spawn('opencode', args, {
+          cwd: request.projectDir,
           detached: true,
           stdio: ['pipe', 'pipe', 'pipe'],
         })
@@ -406,16 +407,20 @@ export function createOpenCodeDriver(emitter: SwarmEventEmitter): Driver {
         }
 
         if (exitCode !== 0 && exitCode !== null) {
+          const stderrSnippet = stderrBuf.trim().slice(0, 500)
+          const reason = stderrSnippet
+            ? `Process exited with code ${exitCode}: ${stderrSnippet}`
+            : `Process exited with code ${exitCode}`
           emitter.emit({
             type: 'agent:error',
             timestamp: new Date().toISOString(),
             sessionId: 'driver' as SessionId,
-            data: { role: request.role, reason: `Process exited with code ${exitCode}` },
+            data: { role: request.role, reason },
           })
           doResolve({
             success: false,
             errorCode: 'crash',
-            error: `Process exited with code ${exitCode}`,
+            error: reason,
             rawOutput: truncate(stdoutBuf, MAX_RAW_OUTPUT),
             stderr: truncate(stderrBuf, MAX_STDERR),
             model,

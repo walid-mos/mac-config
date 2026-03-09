@@ -1,8 +1,10 @@
 import * as childProcess from 'node:child_process'
 import * as fs from 'node:fs'
-import type { SessionId, SwarmEventEmitter } from '../core/types.js'
+import * as os from 'node:os'
+import * as path from 'node:path'
+import type { SessionId, SwarmEventEmitter, TokenUsage } from '../core/types.js'
 import type { Driver, AgentRequest, AgentResult, DriverAvailability } from './driver.js'
-import { parseStructuredOutput } from './output-parser.js'
+import { extractStreamResult } from './output-parser.js'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -10,9 +12,12 @@ import { parseStructuredOutput } from './output-parser.js'
 
 const MODEL_RE = /^[a-zA-Z0-9._\/-]{1,64}$/
 const AGENT_NAME_RE = /^[a-zA-Z0-9_-]{1,64}$/
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const MIN_TIMEOUT = 10_000
 const MAX_TIMEOUT = 3_600_000
-const DEFAULT_TIMEOUT = 600_000
+const DEFAULT_IDLE_TIMEOUT = 300_000   // 5 min without output once working = frozen
+const MODEL_INFERENCE_TIMEOUT = 600_000 // 10 min while waiting for model response (no streaming during generation)
+const API_WAIT_TIMEOUT = 600_000       // 10 min to get first assistant response from API
 const MAX_RAW_OUTPUT = 1024 * 1024  // 1MB
 const MAX_STDERR = 64 * 1024        // 64KB
 const KILL_GRACE_MS = 5_000
@@ -85,6 +90,18 @@ function validateCommonInputs(
     }
   }
 
+  if (request.sessionId !== undefined && request.resume !== undefined) {
+    return 'sessionId and resume are mutually exclusive — set one or neither'
+  }
+
+  if (request.sessionId !== undefined && !UUID_RE.test(request.sessionId)) {
+    return `Invalid sessionId: must be a UUID, got "${request.sessionId}"`
+  }
+
+  if (request.resume !== undefined && !UUID_RE.test(request.resume)) {
+    return `Invalid resume: must be a UUID, got "${request.resume}"`
+  }
+
   return null
 }
 
@@ -132,13 +149,22 @@ export function createClaudeDriver(emitter: SwarmEventEmitter): Driver {
     // Build command args
     const args: string[] = [
       '-p',
-      '--output-format', 'json',
+      '--output-format', 'stream-json',
       '--verbose',
       '--permission-mode', 'bypassPermissions',
-      '--no-session-persistence',
-      '--cwd', request.projectDir,
+      '--disable-slash-commands',
       '--model', String(request.model),
     ]
+
+    // Session persistence: --resume and --session-id require session to be saved,
+    // so they skip --no-session-persistence. Default (no session fields) disables persistence.
+    if (request.resume) {
+      args.push('--resume', request.resume)
+    } else if (request.sessionId) {
+      args.push('--session-id', request.sessionId)
+    } else {
+      args.push('--no-session-persistence')
+    }
 
     if (request.agent) {
       args.push('--agent', request.agent)
@@ -163,9 +189,22 @@ export function createClaudeDriver(emitter: SwarmEventEmitter): Driver {
     })
 
     return new Promise<AgentResult>((resolve) => {
+      let totalInput = 0
+      let totalOutput = 0
+      let totalCacheCreation = 0
+      let totalCacheRead = 0
+
+      const buildTokenUsage = (): TokenUsage => ({
+        input: totalInput,
+        output: totalOutput,
+        cacheCreation: totalCacheCreation,
+        cacheRead: totalCacheRead,
+      })
+
       let proc: childProcess.ChildProcess
       try {
         proc = childProcess.spawn('claude', args, {
+          cwd: request.projectDir,
           detached: true,
           stdio: ['pipe', 'pipe', 'pipe'],
           env,
@@ -191,6 +230,16 @@ export function createClaudeDriver(emitter: SwarmEventEmitter): Driver {
         return
       }
 
+      // Open log file for raw NDJSON stream
+      const logDir = process.env.SWARM_DEBUG_DIR ?? os.tmpdir()
+      const logPath = path.join(logDir, `swarm-agent-${request.role}-${proc.pid}.ndjson`)
+      let logFd: number | undefined
+      try {
+        logFd = fs.openSync(logPath, 'w', 0o600)
+      } catch {
+        // Non-critical — proceed without logging
+      }
+
       // Pipe prompt via stdin
       const promptContent = request.schema
         ? request.prompt + JSON_DIRECTIVE
@@ -201,24 +250,29 @@ export function createClaudeDriver(emitter: SwarmEventEmitter): Driver {
       // Collect stdout/stderr
       let stdoutBuf = ''
       let stderrBuf = ''
+      let lineBuf = ''
+      let resultText: string | undefined
       let killStarted = false
       let errorCode: 'timeout' | 'aborted' | 'crash' = 'crash'
       let killTimer: ReturnType<typeof setTimeout> | undefined
-      let timeoutTimer: ReturnType<typeof setTimeout> | undefined
+      let idleTimer: ReturnType<typeof setTimeout> | undefined
       let resolved = false
 
       const doResolve = (result: AgentResult): void => {
         if (resolved) return
         resolved = true
-        if (timeoutTimer) clearTimeout(timeoutTimer)
+        if (idleTimer) clearTimeout(idleTimer)
         if (killTimer) clearTimeout(killTimer)
         if (request.signal) {
-          // Remove the abort listener to avoid leaks
           try {
             request.signal.removeEventListener('abort', onAbort)
           } catch {
             // Ignore if already removed
           }
+        }
+        // Close log file
+        if (logFd !== undefined) {
+          try { fs.closeSync(logFd) } catch { /* best-effort */ }
         }
         resolve(result)
       }
@@ -243,11 +297,31 @@ export function createClaudeDriver(emitter: SwarmEventEmitter): Driver {
         }
       }
 
-      // Timeout handling
-      const timeout = request.timeout ?? DEFAULT_TIMEOUT
-      timeoutTimer = setTimeout(() => {
-        startKillSequence('timeout')
-      }, timeout)
+      // Three-phase timeout:
+      // Phase 1 (API wait): waiting for first assistant response from API
+      // Phase 2 (model inference): waiting for model to generate next response (no stdout during generation)
+      // Phase 3 (idle): tool is executing or agent is between turns
+      const idleTimeout = request.timeout ?? DEFAULT_IDLE_TIMEOUT
+      let agentWorking = false  // flips true on first assistant event
+      let awaitingModelResponse = false // true after tool_result, false after assistant event
+
+      const resetIdleTimer = (): void => {
+        if (killStarted) return
+        if (idleTimer) clearTimeout(idleTimer)
+        let timeout: number
+        if (!agentWorking) {
+          timeout = API_WAIT_TIMEOUT
+        } else if (awaitingModelResponse) {
+          timeout = MODEL_INFERENCE_TIMEOUT
+        } else {
+          timeout = idleTimeout
+        }
+        idleTimer = setTimeout(() => {
+          startKillSequence('timeout')
+        }, timeout)
+      }
+
+      resetIdleTimer()
 
       // AbortSignal handling
       const onAbort = (): void => {
@@ -258,21 +332,90 @@ export function createClaudeDriver(emitter: SwarmEventEmitter): Driver {
         request.signal.addEventListener('abort', onAbort, { once: true })
       }
 
+      // Process NDJSON lines from stdout
+      const processLine = (line: string): void => {
+        // Write to log file
+        if (logFd !== undefined) {
+          try { fs.writeSync(logFd, line + '\n') } catch { /* best-effort */ }
+        }
+
+        try {
+          const event = JSON.parse(line)
+
+          // Flip to working state once agent starts producing work
+          if (!agentWorking && (event.type === 'assistant' || event.type === 'result')) {
+            agentWorking = true
+          }
+
+          // Track model inference state:
+          // After a tool_result (user event), the model is generating its next response — use generous timeout
+          // After an assistant event, a tool is executing or we're between turns — use idle timeout
+          if (event.type === 'user') {
+            awaitingModelResponse = true
+          } else if (event.type === 'assistant' || event.type === 'result') {
+            awaitingModelResponse = false
+          }
+
+          // Accumulate token usage from assistant events
+          if (event.type === 'assistant' && event.message?.usage) {
+            const usage = event.message.usage
+            totalInput += usage.input_tokens ?? 0
+            totalOutput += usage.output_tokens ?? 0
+            totalCacheCreation += usage.cache_creation_input_tokens ?? 0
+            totalCacheRead += usage.cache_read_input_tokens ?? 0
+          }
+
+          // Extract final result
+          if (event.type === 'result' && event.result !== undefined) {
+            resultText = typeof event.result === 'string'
+              ? event.result
+              : JSON.stringify(event.result)
+          }
+
+          // Emit activity for tool_use (real-time agent observability)
+          if (event.type === 'assistant' && event.message?.type === 'tool_use') {
+            emitter.emit({
+              type: 'agent:activity',
+              timestamp: new Date().toISOString(),
+              sessionId: 'driver' as SessionId,
+              data: { role: request.role, tool: event.message.name ?? 'unknown' },
+            })
+          }
+        } catch {
+          // Not valid JSON — skip
+        }
+      }
+
       proc.stdout!.on('data', (chunk: Buffer) => {
-        stdoutBuf += chunk.toString()
+        const data = chunk.toString()
+        stdoutBuf += data
+        lineBuf += data
+
+        // Process complete NDJSON lines
+        let newlineIdx: number
+        while ((newlineIdx = lineBuf.indexOf('\n')) !== -1) {
+          const line = lineBuf.slice(0, newlineIdx).trim()
+          lineBuf = lineBuf.slice(newlineIdx + 1)
+          if (!line) continue
+          processLine(line)
+          resetIdleTimer()
+        }
       })
 
       proc.stderr!.on('data', (chunk: Buffer) => {
         stderrBuf += chunk.toString()
+        // stderr activity also counts as heartbeat
+        resetIdleTimer()
       })
 
       proc.on('error', (err: Error) => {
         const durationMs = Date.now() - startTime
+        const tokenUsage = buildTokenUsage()
         emitter.emit({
           type: 'agent:error',
           timestamp: new Date().toISOString(),
           sessionId: 'driver' as SessionId,
-          data: { role: request.role, reason: err.message },
+          data: { role: request.role, reason: err.message, tokenUsage },
         })
         doResolve({
           success: false,
@@ -283,61 +426,81 @@ export function createClaudeDriver(emitter: SwarmEventEmitter): Driver {
           model,
           backend,
           durationMs,
+          tokenUsage,
         })
       })
 
       proc.on('close', (exitCode: number | null) => {
         const durationMs = Date.now() - startTime
 
+        // Process any remaining buffered line
+        const remaining = lineBuf.trim()
+        if (remaining) {
+          processLine(remaining)
+        }
+
         // If kill was started, use the kill error code
         if (killStarted) {
+          const stderrSnippet = stderrBuf.trim().slice(0, 500)
+          const reason = stderrSnippet
+            ? `Process ${errorCode} after ${durationMs}ms — stderr: ${stderrSnippet}`
+            : `Process ${errorCode} after ${durationMs}ms`
+          const tokenUsage = buildTokenUsage()
           emitter.emit({
             type: 'agent:error',
             timestamp: new Date().toISOString(),
             sessionId: 'driver' as SessionId,
-            data: { role: request.role, reason: `Process ${errorCode}` },
+            data: { role: request.role, reason, tokenUsage },
           })
           doResolve({
             success: false,
             errorCode,
-            error: `Process ${errorCode} after ${durationMs}ms`,
+            error: reason,
             rawOutput: truncate(stdoutBuf, MAX_RAW_OUTPUT),
             stderr: truncate(stderrBuf, MAX_STDERR),
             model,
             backend,
             durationMs,
+            tokenUsage,
           })
           return
         }
 
         // Non-zero exit without kill = crash
         if (exitCode !== 0 && exitCode !== null) {
+          const stderrSnippet = stderrBuf.trim().slice(0, 500)
+          const reason = stderrSnippet
+            ? `Process exited with code ${exitCode}: ${stderrSnippet}`
+            : `Process exited with code ${exitCode}`
+          const tokenUsage = buildTokenUsage()
           emitter.emit({
             type: 'agent:error',
             timestamp: new Date().toISOString(),
             sessionId: 'driver' as SessionId,
-            data: { role: request.role, reason: `Process exited with code ${exitCode}` },
+            data: { role: request.role, reason, tokenUsage },
           })
           doResolve({
             success: false,
             errorCode: 'crash',
-            error: `Process exited with code ${exitCode}`,
+            error: reason,
             rawOutput: truncate(stdoutBuf, MAX_RAW_OUTPUT),
             stderr: truncate(stderrBuf, MAX_STDERR),
             model,
             backend,
             durationMs,
+            tokenUsage,
           })
           return
         }
 
         // Empty output
         if (stdoutBuf.trim() === '') {
+          const tokenUsage = buildTokenUsage()
           emitter.emit({
             type: 'agent:error',
             timestamp: new Date().toISOString(),
             sessionId: 'driver' as SessionId,
-            data: { role: request.role, reason: 'Empty output from backend' },
+            data: { role: request.role, reason: 'Empty output from backend', tokenUsage },
           })
           doResolve({
             success: false,
@@ -348,45 +511,59 @@ export function createClaudeDriver(emitter: SwarmEventEmitter): Driver {
             model,
             backend,
             durationMs,
+            tokenUsage,
           })
           return
         }
 
-        // Parse output
-        const parsed = parseStructuredOutput(stdoutBuf)
+        // Use result extracted from stream, or fallback to scanning the raw NDJSON
+        if (!resultText) {
+          const fallback = extractStreamResult(stdoutBuf)
+          if (fallback.ok) {
+            resultText = fallback.output
+          }
+        }
 
-        if (parsed.ok) {
+        const tokenUsage = buildTokenUsage()
+        if (resultText !== undefined && resultText.trim() !== '') {
           emitter.emit({
             type: 'agent:result',
             timestamp: new Date().toISOString(),
             sessionId: 'driver' as SessionId,
-            data: { role: request.role, durationMs },
+            data: { role: request.role, durationMs, tokenUsage },
           })
-          doResolve({
+          const successResult: AgentResult = {
             success: true,
-            output: parsed.output,
+            output: resultText,
             rawOutput: truncate(stdoutBuf, MAX_RAW_OUTPUT),
             stderr: truncate(stderrBuf, MAX_STDERR),
             model,
             backend,
             durationMs,
-          })
+            tokenUsage,
+          }
+          const echoSessionId = request.sessionId ?? request.resume
+          if (echoSessionId) {
+            successResult.sessionId = echoSessionId
+          }
+          doResolve(successResult)
         } else {
           emitter.emit({
             type: 'agent:error',
             timestamp: new Date().toISOString(),
             sessionId: 'driver' as SessionId,
-            data: { role: request.role, reason: 'Failed to parse output' },
+            data: { role: request.role, reason: 'No result event in stream output', tokenUsage },
           })
           doResolve({
             success: false,
             errorCode: 'invalid_json',
-            error: 'Failed to parse structured output from backend',
+            error: 'No result event found in stream-json output',
             rawOutput: truncate(stdoutBuf, MAX_RAW_OUTPUT),
             stderr: truncate(stderrBuf, MAX_STDERR),
             model,
             backend,
             durationMs,
+            tokenUsage,
           })
         }
       })

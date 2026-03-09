@@ -46,11 +46,15 @@ export function createSwarmConfig(
         code: defaultAssignment,
         review: defaultAssignment,
         security: defaultAssignment,
+        consistency: defaultAssignment,
         merge: defaultAssignment,
         docs: defaultAssignment,
       },
       tagged: {},
       ...overrides.models,
+    },
+    convergence: overrides.convergence ?? {
+      maxIterations: 6,
     },
   }
 }
@@ -165,17 +169,21 @@ export function createPhaseError(
 // TOML content builders
 // ---------------------------------------------------------------------------
 
-export function buildTomlContent(models: Record<string, { backend: string; model: string }>): string {
+export function buildTomlContent(models: Record<string, { backend: string; model: string; agent?: string }>): string {
   const lines = ['[models]']
   for (const [key, value] of Object.entries(models)) {
+    const agentPart = value.agent ? `, agent = "${value.agent}"` : ''
     if (key.includes('-')) {
       // Tag-suffixed keys use section syntax
       lines.push('')
       lines.push(`[models.${key}]`)
       lines.push(`backend = "${value.backend}"`)
       lines.push(`model   = "${value.model}"`)
+      if (value.agent) {
+        lines.push(`agent   = "${value.agent}"`)
+      }
     } else {
-      lines.push(`${key} = { backend = "${value.backend}", model = "${value.model}" }`)
+      lines.push(`${key} = { backend = "${value.backend}", model = "${value.model}"${agentPart} }`)
     }
   }
   return lines.join('\n') + '\n'
@@ -187,6 +195,7 @@ export const FULL_TOML = buildTomlContent({
   code: { backend: 'opencode', model: 'codex' },
   review: { backend: 'claude', model: 'opus' },
   security: { backend: 'opencode', model: 'gpt-5.3' },
+  consistency: { backend: 'claude', model: 'opus' },
   merge: { backend: 'claude', model: 'opus' },
   docs: { backend: 'opencode', model: 'kimi-k2.5' },
 })
@@ -197,6 +206,7 @@ export const TOML_WITH_TAGS = buildTomlContent({
   code: { backend: 'opencode', model: 'codex' },
   review: { backend: 'claude', model: 'opus' },
   security: { backend: 'claude', model: 'opus' },
+  consistency: { backend: 'claude', model: 'opus' },
   merge: { backend: 'claude', model: 'opus' },
   docs: { backend: 'claude', model: 'opus' },
   'code-frontend': { backend: 'opencode', model: 'gemini' },
@@ -210,7 +220,7 @@ export const PARTIAL_TOML = buildTomlContent({
 
 // All base roles guaranteed by spec
 export const ALL_AGENT_ROLES: readonly AgentRole[] = [
-  'plan', 'test', 'code', 'review', 'security', 'merge', 'docs',
+  'plan', 'test', 'code', 'review', 'security', 'consistency', 'merge', 'docs',
 ] as const
 
 // ---------------------------------------------------------------------------
@@ -260,6 +270,10 @@ export interface MockChildProcess extends EventEmitter {
   kill: (signal?: NodeJS.Signals | number) => boolean
   /** Helper: simulate stdout data + close + exit */
   simulateOutput: (stdout: string, exitCode?: number) => void
+  /** Helper: simulate a single NDJSON line on stdout (no close) */
+  simulateStreamLine: (event: Record<string, unknown>) => void
+  /** Helper: simulate stream-json output (NDJSON lines) + close + exit */
+  simulateStreamOutput: (result: string, exitCode?: number) => void
   /** Helper: simulate stderr data */
   simulateStderr: (data: string) => void
   /** Helper: simulate exit with code */
@@ -286,6 +300,18 @@ export function createMockChildProcess(pid = 12345): MockChildProcess {
 
   emitter.simulateOutput = (stdout: string, exitCode = 0) => {
     stdoutStream.write(stdout)
+    stdoutStream.end()
+    stderrStream.end()
+    emitter.emit('close', exitCode, null)
+  }
+
+  emitter.simulateStreamLine = (event: Record<string, unknown>) => {
+    stdoutStream.write(JSON.stringify(event) + '\n')
+  }
+
+  emitter.simulateStreamOutput = (result: string, exitCode = 0) => {
+    stdoutStream.write(JSON.stringify({ type: 'system', subtype: 'init' }) + '\n')
+    stdoutStream.write(JSON.stringify({ type: 'result', subtype: 'success', result }) + '\n')
     stdoutStream.end()
     stderrStream.end()
     emitter.emit('close', exitCode, null)
@@ -323,6 +349,7 @@ export function createMixedBackendConfig(): SwarmConfig {
         code: { backend: 'opencode', model: 'openai/gpt-5.3-codex' },
         review: { backend: 'claude', model: 'opus' },
         security: { backend: 'opencode', model: 'gpt-5.3' },
+        consistency: { backend: 'claude', model: 'opus' },
         merge: { backend: 'claude', model: 'opus' },
         docs: { backend: 'opencode', model: 'moonshot/kimi-k2.5' },
       },

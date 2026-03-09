@@ -2,10 +2,10 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import * as os from 'node:os'
 import { parse as parseToml } from 'smol-toml'
-import type { SwarmConfig, AgentRole, ModelAssignment, ResolvedConfig, ConvergenceConfig } from '../core/types.js'
+import type { SwarmConfig, AgentRole, ModelAssignment, ResolvedConfig } from '../core/types.js'
 import { AGENT_ROLES } from '../core/types.js'
 import { ConfigValidationError } from '../core/errors.js'
-import { ModelAssignmentSchema, ConvergenceConfigSchema } from '../core/validation.js'
+import { ModelAssignmentSchema } from '../core/validation.js'
 import { resolveModel } from './model-registry.js'
 
 // ---------------------------------------------------------------------------
@@ -17,10 +17,6 @@ const TAG_OVERRIDE_RE = /^(?:code|test|plan|review|security|consistency|merge|do
 const AGENT_ROLE_SET = new Set<string>(AGENT_ROLES)
 
 const DEFAULT_ASSIGNMENT: ModelAssignment = { backend: 'claude', model: resolveModel('opus') }
-
-const DEFAULT_CONVERGENCE: ConvergenceConfig = {
-  maxIterations: 6,
-}
 
 // ---------------------------------------------------------------------------
 // resolveSwarmConfig
@@ -106,9 +102,6 @@ function parseAndBuildConfig(filePath: string): ResolvedConfig {
     )
   }
 
-  // Parse [convergence] section
-  const convergence = parseConvergence(parsed['convergence'], filePath)
-
   const models = (parsed['models'] ?? {}) as Record<string, unknown>
   const agents: Partial<Record<AgentRole, ModelAssignment>> = {}
   const tagged: Record<string, ModelAssignment> = {}
@@ -147,7 +140,7 @@ function parseAndBuildConfig(filePath: string): ResolvedConfig {
   const filledAgents = fillDefaults(agents)
 
   return {
-    config: { models: { agents: filledAgents, tagged }, convergence },
+    config: { models: { agents: filledAgents, tagged } },
     resolvedFrom: filePath,
   }
 }
@@ -157,29 +150,7 @@ function buildDefaultConfig(): SwarmConfig {
   for (const role of AGENT_ROLES) {
     agents[role] = { ...DEFAULT_ASSIGNMENT }
   }
-  return { models: { agents, tagged: {} }, convergence: { ...DEFAULT_CONVERGENCE } }
-}
-
-function parseConvergence(
-  raw: unknown,
-  filePath: string
-): ConvergenceConfig {
-  if (raw === undefined || raw === null) {
-    return { ...DEFAULT_CONVERGENCE }
-  }
-
-  const merged = { ...DEFAULT_CONVERGENCE, ...(raw as Record<string, unknown>) }
-  const result = ConvergenceConfigSchema.safeParse(merged)
-
-  if (!result.success) {
-    throw new ConfigValidationError(
-      `Invalid [convergence] config: ${result.error.issues.map(i => i.message).join(', ')}`,
-      filePath,
-      result.error.issues.map(i => i.message)
-    )
-  }
-
-  return result.data
+  return { models: { agents, tagged: {} } }
 }
 
 function fillDefaults(

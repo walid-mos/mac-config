@@ -132,10 +132,7 @@ if (isDirectExecution) {
 
         const signal = controller.signal
 
-        // Derive a unique worktree branch per spec file so parallel specs
-        // never collide even when they share the same session name.
-        const specSlug = path.basename(specPath, path.extname(specPath))
-        const worktreeBranch = `swarm/${sessionId}/${specSlug}`
+        const worktreeBranch = `swarm/${sessionId}`
 
         let exitCode = 1
         let worktreeCreated = false

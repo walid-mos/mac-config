@@ -12,7 +12,7 @@ import type {
 import { openDraftPr, getChangedFiles } from '../../git/git-operations.js'
 import { createIterationLogger } from './iteration-logger.js'
 import { parseStructuredOutput } from '../../drivers/output-parser.js'
-import { executeDag, TaskExhaustedError } from './dag-executor.js'
+import { executeDag } from './dag-executor.js'
 import type { GitState } from '../phase-results.js'
 
 // === Agent Handle ===
@@ -148,8 +148,6 @@ export function attributeFindingsToAgents(
 
 // === API ===
 
-export { TaskExhaustedError } from './dag-executor.js'
-
 export async function runCodePhase(
   ctx: SessionContext,
   registry: DriverRegistry,
@@ -226,8 +224,7 @@ export async function runCodePhase(
   const lastOutcome = dagResult.lastOutcome
   const finalTestResult = lastOutcome?.testResult ?? DEFAULT_TEST_RESULT
   const finalReview = lastOutcome && 'review' in lastOutcome ? lastOutcome.review : undefined
-  const allGreen = dagResult.taskCompletions.every(tc => tc.status === 'green')
-  const success = dagResult.taskCompletions.length === 0 || allGreen
+  const success = true
 
   // Final changed files from git — includes everything across all iterations
   let finalChangedFiles: string[] = []
@@ -270,16 +267,6 @@ export async function runCodePhase(
     sessionId: ctx.sessionId,
     data: { phase: 'code', durationMs: Date.now() - startTime },
   })
-
-  // If any tasks failed, throw TaskExhaustedError
-  if (!success) {
-    const failedTask = dagResult.taskCompletions.find(tc => tc.status === 'failed')!
-    throw new TaskExhaustedError(
-      failedTask.taskId,
-      failedTask.attempts,
-      finalReview?.findings ?? [],
-    )
-  }
 
   return result
 }

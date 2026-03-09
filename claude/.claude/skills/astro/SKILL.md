@@ -162,6 +162,67 @@ export default defineConfig({
 | `process.env.SECRET` | Yes (runtime) | Fragile (Vite may rewrite) |
 | `import.meta.env.PUBLIC_X` | Public only | Legacy — prefer `astro:env/client` |
 
+## External Scripts & `is:inline`
+
+In Astro, `<script>` tags are processed by Vite by default — they get bundled, hoisted, and treated as ES modules. This is **NOT** what you want for external CDN scripts.
+
+### The CORS problem
+
+When Vite processes a `<script src="https://cdn.example.com/lib.js">` tag:
+1. Vite's dev server sends a fetch with `Origin: http://localhost:4321`
+2. Many CDNs (including `cdn.tailwindcss.com`) return a **302 redirect** (e.g., to a versioned URL)
+3. The redirect response lacks `Access-Control-Allow-Origin` headers
+4. **Browser blocks the script** → CORS error, nothing works
+
+```
+[Error] Cross-origin redirection to https://cdn.tailwindcss.com/3.4.17
+denied by Cross-Origin Resource Sharing policy:
+Origin http://localhost:4321 is not allowed by Access-Control-Allow-Origin.
+Status code: 302
+```
+
+### Rules
+
+- **ANY external `<script src="https://...">` MUST have `is:inline`** — this tells Astro to emit the tag verbatim, bypassing Vite entirely:
+  ```astro
+  <!-- WRONG — Vite processes this, CORS breaks -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- CORRECT — emitted as-is, browser loads normally -->
+  <script is:inline src="https://cdn.tailwindcss.com"></script>
+  ```
+- Same applies to external `<link>` stylesheets that Vite might try to process
+- `is:inline` scripts cannot use TypeScript, imports, or Vite features — they are raw browser scripts
+
+### Tailwind CSS setup
+
+**NEVER use the Tailwind Play CDN (`cdn.tailwindcss.com`) for production.** It:
+- Ships ~350 KB of runtime JS
+- Generates styles client-side (no tree-shaking)
+- Is explicitly marked "development only" by Tailwind docs
+- Causes CORS errors in Astro dev without `is:inline`
+
+**Proper setup:**
+```bash
+pnpm astro add tailwind
+```
+This installs `@astrojs/tailwind` + `tailwindcss`, patches `astro.config.mjs`, and generates CSS at build time with full tree-shaking — zero runtime CDN dependency.
+
+**If CDN is required** (e.g., quick prototype, spec explicitly says CDN):
+```astro
+<script is:inline src="https://cdn.tailwindcss.com"></script>
+```
+
+### Review checklist (for code review / security review agents)
+
+When reviewing Astro code, flag as **critical: bug** if:
+- Any `<script src="https://...">` lacks `is:inline` — it WILL break in dev with CORS errors
+- Tailwind Play CDN is used without `is:inline` — page renders unstyled
+
+Flag as **important: security** if:
+- Tailwind Play CDN is used in production (no SRI, runtime JS, supply-chain risk)
+- External CDN scripts lack `crossorigin="anonymous"` (error reporting is opaque)
+
 ## Styling
 
 - Scoped `<style>` blocks in `.astro` files by default

@@ -4,9 +4,8 @@ import { readdirSync } from 'node:fs'
 import type { SessionContext } from '../../core/types.js'
 import type { DriverRegistry, AgentResult } from '../../drivers/driver.js'
 import type { PlanPhaseResult } from '../phase-results.js'
-import { detectTechStack } from '../../detect/tech-stack.js'
 import { buildPlannerPrompt } from './planner-prompt.js'
-import { parseTaskDecomposition } from './task-parser.js'
+import { parseTaskDecomposition, parseTechStack } from './task-parser.js'
 import type { TaskTag } from './task-parser.js'
 
 // === Constants ===
@@ -66,15 +65,12 @@ export async function runPlanPhase(
     data: { phase: 'plan' },
   })
 
-  // Step 1: Detect tech stack
-  const techStack = await detectTechStack(ctx.projectDir)
-
-  // Step 2: Build planner prompt
+  // Step 1: Build planner prompt
   const projectStructure = getProjectStructure(ctx.projectDir)
-  const prompt = buildPlannerPrompt(specItemContent, techStack, projectStructure)
+  const prompt = buildPlannerPrompt(specItemContent, projectStructure)
 
-  // Step 3: Invoke planner agent with retry logic
-  const { driver, model } = registry.getDriver('plan')
+  // Step 2: Invoke planner agent with retry logic
+  const { driver, model, agent } = registry.getDriver('plan')
   let lastError: Error | undefined
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -92,6 +88,7 @@ export async function runPlanPhase(
     const agentResult: AgentResult = await driver.invoke({
       prompt,
       role: 'plan',
+      agent,
       model,
       projectDir: ctx.projectDir,
     })
@@ -133,6 +130,7 @@ export async function runPlanPhase(
 
     try {
       const { tasks } = parseTaskDecomposition(plannerOutput, ctx.projectDir)
+      const techStack = parseTechStack(plannerOutput)
 
       // Compute tags summary
       const tags: Partial<Record<TaskTag, number>> = {}

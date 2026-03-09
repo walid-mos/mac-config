@@ -1,5 +1,7 @@
 // === Task Parser (Spec 3 — FR-1, FR-3, FR-10) ===
 
+import type { TechStack } from '../../detect/tech-stack.js'
+
 // === Types ===
 
 export type TaskTag = 'backend' | 'frontend' | 'fullstack'
@@ -9,7 +11,6 @@ export interface PlannerTask {
   title: string
   description: string
   tag: TaskTag
-  files: string[]
   dependencies: `TASK-${number}`[]
   testHints: string[]
 }
@@ -39,15 +40,6 @@ function validateTag(tag: string): asserts tag is TaskTag {
   }
 }
 
-function validateFilePath(filePath: string): void {
-  if (filePath.startsWith('/')) {
-    throw new Error(`Absolute file path not allowed: ${filePath}`)
-  }
-  if (filePath.includes('..')) {
-    throw new Error(`Path traversal not allowed: ${filePath}`)
-  }
-}
-
 function extractField(lines: string[], prefix: string): string {
   for (const line of lines) {
     const trimmed = line.trim()
@@ -72,15 +64,6 @@ function parseTaskBlock(headerLine: string, bodyLines: string[]): PlannerTask {
   const tagRaw = extractField(bodyLines, 'Tag')
   validateTag(tagRaw)
 
-  const filesRaw = extractField(bodyLines, 'Files')
-  const files = filesRaw
-    ? filesRaw.split(',').map(f => f.trim()).filter(f => f.length > 0)
-    : []
-
-  for (const filePath of files) {
-    validateFilePath(filePath)
-  }
-
   const depsRaw = extractField(bodyLines, 'Dependencies')
   const dependencies: `TASK-${number}`[] = []
   if (depsRaw && depsRaw !== 'none') {
@@ -101,7 +84,6 @@ function parseTaskBlock(headerLine: string, bodyLines: string[]): PlannerTask {
     title,
     description,
     tag: tagRaw,
-    files,
     dependencies,
     testHints,
   }
@@ -154,76 +136,71 @@ function validateDag(tasks: PlannerTask[]): void {
   }
 }
 
-function hasTransitiveDependency(
-  from: string,
-  to: string,
-  adjacency: Map<string, Set<string>>
-): boolean {
-  const visited = new Set<string>()
-  const stack = [from]
-  while (stack.length > 0) {
-    const current = stack.pop()!
-    if (current === to) return true
-    if (visited.has(current)) continue
-    visited.add(current)
-    for (const dep of adjacency.get(current) ?? []) {
-      stack.push(dep)
-    }
-  }
-  return false
-}
-
-function resolveFileOverlaps(tasks: PlannerTask[]): string[] {
-  const warnings: string[] = []
-
-  // Build dependency graph (task -> set of tasks it depends on, directly or transitively)
-  const dependsOn = new Map<string, Set<string>>()
-  for (const task of tasks) {
-    dependsOn.set(task.id, new Set(task.dependencies))
-  }
-
-  // Build file-to-tasks map
-  const fileToTasks = new Map<string, string[]>()
-  for (const task of tasks) {
-    for (const file of task.files) {
-      const existing = fileToTasks.get(file)
-      if (existing) {
-        existing.push(task.id)
-      } else {
-        fileToTasks.set(file, [task.id])
-      }
-    }
-  }
-
-  // Check for overlaps between independent tasks
-  for (const [file, taskIds] of fileToTasks) {
-    if (taskIds.length < 2) continue
-
-    for (let i = 0; i < taskIds.length; i++) {
-      for (let j = i + 1; j < taskIds.length; j++) {
-        const a = taskIds[i]!
-        const b = taskIds[j]!
-
-        const aHasDepOnB = hasTransitiveDependency(a, b, dependsOn)
-        const bHasDepOnA = hasTransitiveDependency(b, a, dependsOn)
-
-        if (!aHasDepOnB && !bHasDepOnA) {
-          // Independent tasks share a file — serialize by adding dependency
-          const taskB = tasks.find(t => t.id === b)!
-          taskB.dependencies.push(a as `TASK-${number}`)
-          dependsOn.get(b)!.add(a)
-          warnings.push(
-            `File overlap detected: "${file}" shared by ${a} and ${b}. Auto-added dependency ${b} -> ${a} to serialize.`
-          )
-        }
-      }
-    }
-  }
-
-  return warnings
-}
-
 // === API ===
+
+export function parseTechStack(plannerOutput: string): TechStack {
+  const lines = plannerOutput.split('\n')
+
+  // Find lines between "## Tech Stack" and next "##" header
+  let inSection = false
+  const sectionLines: string[] = []
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (/^##\s+Tech Stack/i.test(trimmed)) {
+      inSection = true
+      continue
+    }
+    if (inSection && /^##\s/.test(trimmed)) break
+    if (inSection) sectionLines.push(line)
+  }
+
+  const field = (prefix: string): string => extractField(sectionLines, prefix)
+
+  const packageManager = field('Package Manager') || 'npm'
+  const testCommand = field('Test Command') || `${packageManager} test`
+  const buildCommandRaw = field('Build Command')
+  const buildCommand = buildCommandRaw && buildCommandRaw !== 'none' ? buildCommandRaw : null
+
+  const typecheckCommandRaw = field('Typecheck Command')
+  const typecheckCommand = typecheckCommandRaw && typecheckCommandRaw !== 'none' ? typecheckCommandRaw : null
+
+  const lintCommandRaw = field('Lint Command')
+  const lintCommand = lintCommandRaw && lintCommandRaw !== 'none' ? lintCommandRaw : null
+
+  const languagesRaw = field('Languages')
+  const languages = languagesRaw
+    ? languagesRaw.split(',').map(l => l.trim()).filter(l => l.length > 0 && l !== 'none')
+    : []
+
+  const frameworksRaw = field('Frameworks')
+  const frameworks = frameworksRaw
+    ? frameworksRaw.split(',').map(f => f.trim()).filter(f => f.length > 0 && f !== 'none')
+    : []
+
+  const testRunnerRaw = field('Test Runner')
+  const testRunner = testRunnerRaw && testRunnerRaw !== 'none' ? testRunnerRaw : null
+
+  const buildToolRaw = field('Build Tool')
+  const buildTool = buildToolRaw && buildToolRaw !== 'none' ? buildToolRaw : null
+
+  const configFilesRaw = field('Config Files')
+  const configFiles = configFilesRaw
+    ? configFilesRaw.split(',').map(c => c.trim()).filter(c => c.length > 0 && c !== 'none')
+    : []
+
+  return {
+    languages,
+    frameworks,
+    testRunner,
+    packageManager,
+    buildTool,
+    configFiles,
+    testCommand,
+    buildCommand,
+    typecheckCommand,
+    lintCommand,
+  }
+}
 
 export function parseTaskDecomposition(plannerOutput: string, _projectDir: string): ParseTaskResult {
   const lines = plannerOutput.split('\n')
@@ -251,11 +228,8 @@ export function parseTaskDecomposition(plannerOutput: string, _projectDir: strin
     tasks.push(parseTaskBlock(currentHeader, currentBody))
   }
 
-  // Validate DAG before overlap resolution
+  // Validate DAG
   validateDag(tasks)
 
-  // Resolve file overlaps (may mutate dependencies and produce warnings)
-  const warnings = resolveFileOverlaps(tasks)
-
-  return { tasks, warnings }
+  return { tasks, warnings: [] }
 }

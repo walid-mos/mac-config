@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseTaskDecomposition } from '../../../src/phases/plan/task-parser.js'
+import { parseTaskDecomposition, parseTechStack } from '../../../src/phases/plan/task-parser.js'
 import type { ParseTaskResult, PlannerTask, TaskTag } from '../../../src/phases/plan/task-parser.js'
 
 // ---------------------------------------------------------------------------
@@ -12,7 +12,6 @@ function buildPlannerMarkdown(tasks: Array<{
   id: string
   title: string
   tag: string
-  files: string[]
   dependencies: string[]
   description: string
   testHints?: string[]
@@ -21,7 +20,6 @@ function buildPlannerMarkdown(tasks: Array<{
   for (const task of tasks) {
     lines.push(`### ${task.id}: ${task.title}`)
     lines.push(`- **Tag**: ${task.tag}`)
-    lines.push(`- **Files**: ${task.files.join(', ')}`)
     lines.push(`- **Dependencies**: ${task.dependencies.length > 0 ? task.dependencies.join(', ') : 'none'}`)
     lines.push(`- **Description**: ${task.description}`)
     lines.push(`- **Test hints**: ${(task.testHints ?? ['test it']).join(', ')}`)
@@ -34,7 +32,6 @@ function singleTaskMarkdown(overrides: Partial<{
   id: string
   title: string
   tag: string
-  files: string[]
   dependencies: string[]
   description: string
   testHints: string[]
@@ -43,7 +40,6 @@ function singleTaskMarkdown(overrides: Partial<{
     id: overrides.id ?? 'TASK-1',
     title: overrides.title ?? 'Implement feature',
     tag: overrides.tag ?? 'backend',
-    files: overrides.files ?? ['src/feature.ts'],
     dependencies: overrides.dependencies ?? [],
     description: overrides.description ?? 'Implement the feature',
     testHints: overrides.testHints ?? ['test the feature'],
@@ -61,7 +57,6 @@ describe('parseTaskDecomposition — valid parsing', () => {
         id: 'TASK-1',
         title: 'Setup API',
         tag: 'backend',
-        files: ['src/api.ts', 'src/routes.ts'],
         dependencies: [],
         description: 'Set up the API routes',
         testHints: ['test API endpoints'],
@@ -70,7 +65,6 @@ describe('parseTaskDecomposition — valid parsing', () => {
         id: 'TASK-2',
         title: 'Build UI',
         tag: 'frontend',
-        files: ['src/components/App.tsx'],
         dependencies: ['TASK-1'],
         description: 'Build the user interface',
         testHints: ['test component rendering'],
@@ -108,18 +102,10 @@ describe('parseTaskDecomposition — valid parsing', () => {
     expect(result.tasks[0]!.tag).toBe('frontend')
   })
 
-  it('extracts files list', () => {
-    const markdown = singleTaskMarkdown({ files: ['src/a.ts', 'src/b.ts'] })
-
-    const result = parseTaskDecomposition(markdown, PROJECT_DIR)
-
-    expect(result.tasks[0]!.files).toEqual(['src/a.ts', 'src/b.ts'])
-  })
-
   it('extracts dependencies', () => {
     const markdown = buildPlannerMarkdown([
-      { id: 'TASK-1', title: 'A', tag: 'backend', files: ['src/a.ts'], dependencies: [], description: 'A' },
-      { id: 'TASK-2', title: 'B', tag: 'backend', files: ['src/b.ts'], dependencies: ['TASK-1'], description: 'B' },
+      { id: 'TASK-1', title: 'A', tag: 'backend', dependencies: [], description: 'A' },
+      { id: 'TASK-2', title: 'B', tag: 'backend', dependencies: ['TASK-1'], description: 'B' },
     ])
 
     const result = parseTaskDecomposition(markdown, PROJECT_DIR)
@@ -205,38 +191,14 @@ describe('parseTaskDecomposition — ID validation', () => {
 })
 
 // ---------------------------------------------------------------------------
-// File path validation (PT-SC-3)
-// ---------------------------------------------------------------------------
-
-describe('parseTaskDecomposition — file path validation (PT-SC-3)', () => {
-  it('rejects absolute file paths', () => {
-    const markdown = singleTaskMarkdown({ files: ['/etc/passwd'] })
-
-    expect(() => parseTaskDecomposition(markdown, PROJECT_DIR)).toThrow()
-  })
-
-  it('rejects file paths with .. traversal', () => {
-    const markdown = singleTaskMarkdown({ files: ['../../../etc/passwd'] })
-
-    expect(() => parseTaskDecomposition(markdown, PROJECT_DIR)).toThrow()
-  })
-
-  it('rejects file paths with embedded .. traversal', () => {
-    const markdown = singleTaskMarkdown({ files: ['src/../../etc/passwd'] })
-
-    expect(() => parseTaskDecomposition(markdown, PROJECT_DIR)).toThrow()
-  })
-})
-
-// ---------------------------------------------------------------------------
 // DAG validation (cycle detection)
 // ---------------------------------------------------------------------------
 
 describe('parseTaskDecomposition — DAG validation', () => {
   it('detects circular dependencies and throws', () => {
     const markdown = buildPlannerMarkdown([
-      { id: 'TASK-1', title: 'A', tag: 'backend', files: ['src/a.ts'], dependencies: ['TASK-2'], description: 'A' },
-      { id: 'TASK-2', title: 'B', tag: 'backend', files: ['src/b.ts'], dependencies: ['TASK-1'], description: 'B' },
+      { id: 'TASK-1', title: 'A', tag: 'backend', dependencies: ['TASK-2'], description: 'A' },
+      { id: 'TASK-2', title: 'B', tag: 'backend', dependencies: ['TASK-1'], description: 'B' },
     ])
 
     expect(() => parseTaskDecomposition(markdown, PROJECT_DIR)).toThrow(/circular|cycle/i)
@@ -244,9 +206,9 @@ describe('parseTaskDecomposition — DAG validation', () => {
 
   it('reports cycle-participating task IDs in the error message', () => {
     const markdown = buildPlannerMarkdown([
-      { id: 'TASK-1', title: 'A', tag: 'backend', files: ['src/a.ts'], dependencies: ['TASK-3'], description: 'A' },
-      { id: 'TASK-2', title: 'B', tag: 'backend', files: ['src/b.ts'], dependencies: ['TASK-1'], description: 'B' },
-      { id: 'TASK-3', title: 'C', tag: 'backend', files: ['src/c.ts'], dependencies: ['TASK-2'], description: 'C' },
+      { id: 'TASK-1', title: 'A', tag: 'backend', dependencies: ['TASK-3'], description: 'A' },
+      { id: 'TASK-2', title: 'B', tag: 'backend', dependencies: ['TASK-1'], description: 'B' },
+      { id: 'TASK-3', title: 'C', tag: 'backend', dependencies: ['TASK-2'], description: 'C' },
     ])
 
     try {
@@ -260,46 +222,12 @@ describe('parseTaskDecomposition — DAG validation', () => {
 
   it('detects 3-node cycle', () => {
     const markdown = buildPlannerMarkdown([
-      { id: 'TASK-1', title: 'A', tag: 'backend', files: ['src/a.ts'], dependencies: ['TASK-3'], description: 'A' },
-      { id: 'TASK-2', title: 'B', tag: 'backend', files: ['src/b.ts'], dependencies: ['TASK-1'], description: 'B' },
-      { id: 'TASK-3', title: 'C', tag: 'backend', files: ['src/c.ts'], dependencies: ['TASK-2'], description: 'C' },
+      { id: 'TASK-1', title: 'A', tag: 'backend', dependencies: ['TASK-3'], description: 'A' },
+      { id: 'TASK-2', title: 'B', tag: 'backend', dependencies: ['TASK-1'], description: 'B' },
+      { id: 'TASK-3', title: 'C', tag: 'backend', dependencies: ['TASK-2'], description: 'C' },
     ])
 
     expect(() => parseTaskDecomposition(markdown, PROJECT_DIR)).toThrow()
-  })
-})
-
-// ---------------------------------------------------------------------------
-// Non-overlapping file validation for parallel tasks
-// ---------------------------------------------------------------------------
-
-describe('parseTaskDecomposition — file overlap validation', () => {
-  it('auto-adds dependency edge when file overlap detected for parallel tasks', () => {
-    const markdown = buildPlannerMarkdown([
-      { id: 'TASK-1', title: 'A', tag: 'backend', files: ['src/shared.ts'], dependencies: [], description: 'A' },
-      { id: 'TASK-2', title: 'B', tag: 'backend', files: ['src/shared.ts'], dependencies: [], description: 'B' },
-    ])
-
-    const result = parseTaskDecomposition(markdown, PROJECT_DIR)
-
-    // One of the tasks should have gained a dependency on the other
-    const task1Deps = result.tasks.find(t => t.id === 'TASK-1')!.dependencies
-    const task2Deps = result.tasks.find(t => t.id === 'TASK-2')!.dependencies
-    const hasSerializedDependency = task1Deps.includes('TASK-2' as `TASK-${number}`) ||
-      task2Deps.includes('TASK-1' as `TASK-${number}`)
-    expect(hasSerializedDependency).toBe(true)
-  })
-
-  it('records self-healing actions in warnings[]', () => {
-    const markdown = buildPlannerMarkdown([
-      { id: 'TASK-1', title: 'A', tag: 'backend', files: ['src/shared.ts'], dependencies: [], description: 'A' },
-      { id: 'TASK-2', title: 'B', tag: 'backend', files: ['src/shared.ts'], dependencies: [], description: 'B' },
-    ])
-
-    const result = parseTaskDecomposition(markdown, PROJECT_DIR)
-
-    expect(result.warnings.length).toBeGreaterThan(0)
-    expect(result.warnings.some(w => w.includes('src/shared.ts') || w.includes('overlap'))).toBe(true)
   })
 })
 
@@ -326,9 +254,9 @@ describe('parseTaskDecomposition — edge cases', () => {
 
   it('handles tasks with multiple dependencies', () => {
     const markdown = buildPlannerMarkdown([
-      { id: 'TASK-1', title: 'A', tag: 'backend', files: ['src/a.ts'], dependencies: [], description: 'A' },
-      { id: 'TASK-2', title: 'B', tag: 'backend', files: ['src/b.ts'], dependencies: [], description: 'B' },
-      { id: 'TASK-3', title: 'C', tag: 'fullstack', files: ['src/c.ts'], dependencies: ['TASK-1', 'TASK-2'], description: 'C' },
+      { id: 'TASK-1', title: 'A', tag: 'backend', dependencies: [], description: 'A' },
+      { id: 'TASK-2', title: 'B', tag: 'backend', dependencies: [], description: 'B' },
+      { id: 'TASK-3', title: 'C', tag: 'fullstack', dependencies: ['TASK-1', 'TASK-2'], description: 'C' },
     ])
 
     const result = parseTaskDecomposition(markdown, PROJECT_DIR)
@@ -336,13 +264,244 @@ describe('parseTaskDecomposition — edge cases', () => {
     expect(result.tasks[2]!.dependencies).toEqual(['TASK-1', 'TASK-2'])
   })
 
-  it('handles empty files list', () => {
-    const markdown = singleTaskMarkdown({ files: [] })
+})
 
-    // Empty files list could be valid (task might only describe behavior)
-    // or throw depending on implementation. The test validates behavior exists.
-    const result = parseTaskDecomposition(markdown, PROJECT_DIR)
+// ---------------------------------------------------------------------------
+// parseTechStack
+// ---------------------------------------------------------------------------
 
-    expect(result.tasks[0]!.files).toEqual([])
+describe('parseTechStack — valid tech stack section', () => {
+  it('parses a complete ## Tech Stack section', () => {
+    const input = `## Tech Stack
+- **Package Manager**: pnpm
+- **Test Command**: pnpm exec vitest run
+- **Build Command**: pnpm run build
+- **Languages**: typescript, javascript
+- **Frameworks**: react, express
+- **Test Runner**: vitest
+- **Build Tool**: vite
+- **Config Files**: tsconfig.json, vitest.config.ts
+
+## Task Decomposition
+
+### TASK-1: Feature
+- **Tag**: backend
+`
+
+    const result = parseTechStack(input)
+
+    expect(result.packageManager).toBe('pnpm')
+    expect(result.testCommand).toBe('pnpm exec vitest run')
+    expect(result.buildCommand).toBe('pnpm run build')
+    expect(result.languages).toEqual(['typescript', 'javascript'])
+    expect(result.frameworks).toEqual(['react', 'express'])
+    expect(result.testRunner).toBe('vitest')
+    expect(result.buildTool).toBe('vite')
+    expect(result.configFiles).toEqual(['tsconfig.json', 'vitest.config.ts'])
+  })
+})
+
+describe('parseTechStack — missing fields use defaults', () => {
+  it('defaults packageManager to npm', () => {
+    const input = `## Tech Stack
+
+## Task Decomposition
+`
+    const result = parseTechStack(input)
+
+    expect(result.packageManager).toBe('npm')
+  })
+
+  it('defaults testCommand to "<packageManager> test"', () => {
+    const input = `## Tech Stack
+- **Package Manager**: yarn
+
+## Task Decomposition
+`
+    const result = parseTechStack(input)
+
+    expect(result.testCommand).toBe('yarn test')
+  })
+
+  it('defaults buildCommand to null', () => {
+    const input = `## Tech Stack
+
+## Task Decomposition
+`
+    const result = parseTechStack(input)
+
+    expect(result.buildCommand).toBeNull()
+  })
+
+  it('defaults languages to empty array', () => {
+    const input = `## Tech Stack
+
+## Task Decomposition
+`
+    const result = parseTechStack(input)
+
+    expect(result.languages).toEqual([])
+  })
+
+  it('defaults frameworks to empty array', () => {
+    const input = `## Tech Stack
+
+## Task Decomposition
+`
+    const result = parseTechStack(input)
+
+    expect(result.frameworks).toEqual([])
+  })
+
+  it('defaults testRunner to null', () => {
+    const input = `## Tech Stack
+
+## Task Decomposition
+`
+    const result = parseTechStack(input)
+
+    expect(result.testRunner).toBeNull()
+  })
+
+  it('defaults buildTool to null', () => {
+    const input = `## Tech Stack
+
+## Task Decomposition
+`
+    const result = parseTechStack(input)
+
+    expect(result.buildTool).toBeNull()
+  })
+
+  it('defaults configFiles to empty array', () => {
+    const input = `## Tech Stack
+
+## Task Decomposition
+`
+    const result = parseTechStack(input)
+
+    expect(result.configFiles).toEqual([])
+  })
+})
+
+describe('parseTechStack — no tech stack section', () => {
+  it('returns all defaults when no ## Tech Stack header exists', () => {
+    const input = `## Task Decomposition
+
+### TASK-1: Feature
+- **Tag**: backend
+`
+
+    const result = parseTechStack(input)
+
+    expect(result.packageManager).toBe('npm')
+    expect(result.testCommand).toBe('npm test')
+    expect(result.buildCommand).toBeNull()
+    expect(result.languages).toEqual([])
+    expect(result.frameworks).toEqual([])
+    expect(result.testRunner).toBeNull()
+    expect(result.buildTool).toBeNull()
+    expect(result.configFiles).toEqual([])
+  })
+})
+
+describe('parseTechStack — typecheck and lint commands', () => {
+  it('parses typecheckCommand from Tech Stack section', () => {
+    const input = `## Tech Stack
+- **Package Manager**: pnpm
+- **Test Command**: pnpm test
+- **Build Command**: none
+- **Typecheck Command**: pnpm exec tsc --noEmit
+- **Lint Command**: none
+
+## Task Decomposition
+`
+
+    const result = parseTechStack(input)
+
+    expect(result.typecheckCommand).toBe('pnpm exec tsc --noEmit')
+    expect(result.lintCommand).toBeNull()
+  })
+
+  it('parses lintCommand from Tech Stack section', () => {
+    const input = `## Tech Stack
+- **Package Manager**: pnpm
+- **Test Command**: pnpm test
+- **Typecheck Command**: none
+- **Lint Command**: pnpm exec eslint .
+
+## Task Decomposition
+`
+
+    const result = parseTechStack(input)
+
+    expect(result.typecheckCommand).toBeNull()
+    expect(result.lintCommand).toBe('pnpm exec eslint .')
+  })
+
+  it('defaults typecheckCommand and lintCommand to null when absent', () => {
+    const input = `## Tech Stack
+- **Package Manager**: pnpm
+
+## Task Decomposition
+`
+
+    const result = parseTechStack(input)
+
+    expect(result.typecheckCommand).toBeNull()
+    expect(result.lintCommand).toBeNull()
+  })
+
+  it('treats "none" as null for typecheck and lint commands', () => {
+    const input = `## Tech Stack
+- **Typecheck Command**: none
+- **Lint Command**: none
+
+## Task Decomposition
+`
+
+    const result = parseTechStack(input)
+
+    expect(result.typecheckCommand).toBeNull()
+    expect(result.lintCommand).toBeNull()
+  })
+})
+
+describe('parseTechStack — partial fields', () => {
+  it('parses a section with only some fields present', () => {
+    const input = `## Tech Stack
+- **Package Manager**: bun
+- **Test Runner**: jest
+
+## Task Decomposition
+`
+
+    const result = parseTechStack(input)
+
+    expect(result.packageManager).toBe('bun')
+    expect(result.testRunner).toBe('jest')
+    expect(result.testCommand).toBe('bun test')
+    expect(result.buildCommand).toBeNull()
+    expect(result.languages).toEqual([])
+  })
+
+  it('treats "none" as null/empty for nullable fields', () => {
+    const input = `## Tech Stack
+- **Package Manager**: pnpm
+- **Test Command**: pnpm test
+- **Build Command**: none
+- **Frameworks**: none
+- **Test Runner**: none
+- **Build Tool**: none
+
+## Task Decomposition
+`
+
+    const result = parseTechStack(input)
+
+    expect(result.buildCommand).toBeNull()
+    expect(result.frameworks).toEqual([])
+    expect(result.testRunner).toBeNull()
+    expect(result.buildTool).toBeNull()
   })
 })

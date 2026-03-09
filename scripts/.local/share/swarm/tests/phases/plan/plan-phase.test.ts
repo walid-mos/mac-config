@@ -13,21 +13,17 @@ import {
 // Mock internal dependencies
 // ---------------------------------------------------------------------------
 
-vi.mock('../../../src/detect/tech-stack.js', () => ({
-  detectTechStack: vi.fn(),
-}))
-
 vi.mock('../../../src/phases/plan/planner-prompt.js', () => ({
   buildPlannerPrompt: vi.fn(),
 }))
 
 vi.mock('../../../src/phases/plan/task-parser.js', () => ({
   parseTaskDecomposition: vi.fn(),
+  parseTechStack: vi.fn(),
 }))
 
-import { detectTechStack } from '../../../src/detect/tech-stack.js'
 import { buildPlannerPrompt } from '../../../src/phases/plan/planner-prompt.js'
-import { parseTaskDecomposition } from '../../../src/phases/plan/task-parser.js'
+import { parseTaskDecomposition, parseTechStack } from '../../../src/phases/plan/task-parser.js'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -98,7 +94,17 @@ function createSessionContext(overrides: Partial<SessionContext> = {}): SessionC
   }
 }
 
-const VALID_PLANNER_OUTPUT = `## Task Decomposition
+const VALID_PLANNER_OUTPUT = `## Tech Stack
+- **Package Manager**: pnpm
+- **Test Command**: pnpm exec vitest run
+- **Build Command**: none
+- **Languages**: typescript
+- **Frameworks**: none
+- **Test Runner**: vitest
+- **Build Tool**: none
+- **Config Files**: tsconfig.json
+
+## Task Decomposition
 
 ### TASK-1: Setup API
 - **Tag**: backend
@@ -111,11 +117,14 @@ const VALID_PLANNER_OUTPUT = `## Task Decomposition
 const VALID_TECH_STACK = {
   languages: ['typescript'],
   frameworks: [],
-  testRunner: 'vitest' as const,
-  packageManager: 'pnpm' as const,
+  testRunner: 'vitest',
+  packageManager: 'pnpm',
   buildTool: null,
   configFiles: ['tsconfig.json'],
-  testCommand: 'vitest run',
+  testCommand: 'pnpm exec vitest run',
+  buildCommand: null,
+  typecheckCommand: null,
+  lintCommand: null,
 }
 
 const VALID_TASKS = [{
@@ -123,18 +132,17 @@ const VALID_TASKS = [{
   title: 'Setup API',
   description: 'Set up API',
   tag: 'backend' as const,
-  files: ['src/api.ts'],
   dependencies: [] as `TASK-${number}`[],
   testHints: ['test API'],
 }]
 
 beforeEach(() => {
-  vi.mocked(detectTechStack).mockResolvedValue(VALID_TECH_STACK)
   vi.mocked(buildPlannerPrompt).mockReturnValue('planner prompt content')
   vi.mocked(parseTaskDecomposition).mockReturnValue({
     tasks: VALID_TASKS,
     warnings: [],
   })
+  vi.mocked(parseTechStack).mockReturnValue(VALID_TECH_STACK)
 })
 
 afterEach(() => {
@@ -179,16 +187,7 @@ describe('runPlanPhase — event emission', () => {
 // ---------------------------------------------------------------------------
 
 describe('runPlanPhase — internal orchestration', () => {
-  it('calls detectTechStack with ctx.projectDir', async () => {
-    const ctx = createSessionContext({ projectDir: '/my/project' })
-    const registry = createMockDriverRegistry(createSuccessAgentResult(VALID_PLANNER_OUTPUT))
-
-    await runPlanPhase(ctx, registry, 'spec content')
-
-    expect(detectTechStack).toHaveBeenCalledWith('/my/project')
-  })
-
-  it('calls buildPlannerPrompt with spec content, tech stack, and project structure', async () => {
+  it('calls buildPlannerPrompt with spec content and project structure', async () => {
     const ctx = createSessionContext()
     const registry = createMockDriverRegistry(createSuccessAgentResult(VALID_PLANNER_OUTPUT))
 
@@ -196,7 +195,6 @@ describe('runPlanPhase — internal orchestration', () => {
 
     expect(buildPlannerPrompt).toHaveBeenCalledWith(
       'my spec content',
-      VALID_TECH_STACK,
       expect.any(Array)
     )
   })
@@ -220,6 +218,15 @@ describe('runPlanPhase — internal orchestration', () => {
       VALID_PLANNER_OUTPUT,
       ctx.projectDir
     )
+  })
+
+  it('calls parseTechStack with planner output', async () => {
+    const ctx = createSessionContext()
+    const registry = createMockDriverRegistry(createSuccessAgentResult(VALID_PLANNER_OUTPUT))
+
+    await runPlanPhase(ctx, registry, 'spec content')
+
+    expect(parseTechStack).toHaveBeenCalledWith(VALID_PLANNER_OUTPUT)
   })
 })
 
@@ -248,8 +255,8 @@ describe('runPlanPhase — return value', () => {
     vi.mocked(parseTaskDecomposition).mockReturnValue({
       tasks: [
         { ...VALID_TASKS[0]!, tag: 'backend' },
-        { ...VALID_TASKS[0]!, id: 'TASK-2' as `TASK-${number}`, tag: 'backend', files: ['src/b.ts'] },
-        { ...VALID_TASKS[0]!, id: 'TASK-3' as `TASK-${number}`, tag: 'frontend', files: ['src/c.ts'] },
+        { ...VALID_TASKS[0]!, id: 'TASK-2' as `TASK-${number}`, tag: 'backend' },
+        { ...VALID_TASKS[0]!, id: 'TASK-3' as `TASK-${number}`, tag: 'frontend' },
       ],
       warnings: [],
     })
@@ -286,7 +293,6 @@ describe('runPlanPhase — output truncation', () => {
 describe('runPlanPhase — retry behavior', () => {
   it('retries planner once on structural validation failure', async () => {
     const ctx = createSessionContext()
-    const emitter = ctx.emitter as ReturnType<typeof createMockEmitter>
 
     // First call to parseTaskDecomposition throws, second succeeds
     vi.mocked(parseTaskDecomposition)

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Default target: packages/council/dist/cli.js
+COUNCIL_HOME="${COUNCIL_HOME:-$(dirname "$(dirname "$(realpath "$0")")")/share/packages/council}"
+exec node "${COUNCIL_HOME}/dist/cli.js" "$@"

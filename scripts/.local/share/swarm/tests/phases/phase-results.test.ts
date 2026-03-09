@@ -7,6 +7,7 @@ import {
   deliveryReportInputSchema,
   iterationLogEntrySchema,
   docsPhaseResultSchema,
+  agentInvocationRecordSchema,
 } from '../../src/phases/phase-results.js'
 import type { PlanPhaseResult, TddPhaseResult, CodePhaseResult, DocsPhaseResult } from '../../src/phases/phase-results.js'
 import { createSwarmState } from '../__test-utils__/factories.js'
@@ -24,7 +25,6 @@ function createValidPlanPhaseResult(): PlanPhaseResult {
         title: 'Implement feature',
         description: 'Feature implementation',
         tag: 'backend',
-        files: ['src/feature.ts'],
         dependencies: [],
         testHints: ['test feature behavior'],
       },
@@ -36,7 +36,10 @@ function createValidPlanPhaseResult(): PlanPhaseResult {
       packageManager: 'pnpm',
       buildTool: 'vite',
       configFiles: ['tsconfig.json'],
-      testCommand: 'vitest run',
+      testCommand: 'pnpm exec vitest run',
+      buildCommand: null,
+      typecheckCommand: null,
+      lintCommand: null,
     },
     taskCount: 1,
     tags: { backend: 1 },
@@ -46,13 +49,9 @@ function createValidPlanPhaseResult(): PlanPhaseResult {
 function createValidTddPhaseResult(): TddPhaseResult {
   return {
     testFiles: ['tests/feature.test.ts'],
-    redVerification: {
-      totalTests: 5,
-      passingTests: 0,
-      failingTests: 5,
-      durationMs: 300,
-      syntaxErrors: [],
+    agentReport: {
       testFiles: ['tests/feature.test.ts'],
+      testResult: { totalTests: 5, passingTests: 0, failingTests: 5, durationMs: 300 },
       isRed: true,
     },
   }
@@ -139,7 +138,6 @@ describe('readPlanPhaseResult', () => {
     expect(task).toHaveProperty('title')
     expect(task).toHaveProperty('description')
     expect(task).toHaveProperty('tag')
-    expect(task).toHaveProperty('files')
     expect(task).toHaveProperty('dependencies')
     expect(task).toHaveProperty('testHints')
   })
@@ -168,7 +166,7 @@ describe('readTddPhaseResult', () => {
 
     expect(result).not.toBeNull()
     expect(result!.testFiles).toEqual(tddResult.testFiles)
-    expect(result!.redVerification.isRed).toBe(true)
+    expect(result!.agentReport.isRed).toBe(true)
   })
 
   it('throws on structurally invalid data', () => {
@@ -179,7 +177,7 @@ describe('readTddPhaseResult', () => {
     expect(() => readTddPhaseResult(state)).toThrow()
   })
 
-  it('validates TddPhaseResult has testFiles and redVerification', () => {
+  it('validates TddPhaseResult has testFiles and agentReport', () => {
     const tddResult = createValidTddPhaseResult()
     const state = createSwarmState({
       phaseResults: { tdd: tddResult },
@@ -188,10 +186,10 @@ describe('readTddPhaseResult', () => {
     const result = readTddPhaseResult(state)
 
     expect(result).toHaveProperty('testFiles')
-    expect(result).toHaveProperty('redVerification')
+    expect(result).toHaveProperty('agentReport')
   })
 
-  it('validates RedVerification shape in TddPhaseResult', () => {
+  it('validates TddAgentOutput shape in TddPhaseResult', () => {
     const tddResult = createValidTddPhaseResult()
     const state = createSwarmState({
       phaseResults: { tdd: tddResult },
@@ -199,14 +197,13 @@ describe('readTddPhaseResult', () => {
 
     const result = readTddPhaseResult(state)
 
-    const rv = result!.redVerification
-    expect(rv).toHaveProperty('totalTests')
-    expect(rv).toHaveProperty('passingTests')
-    expect(rv).toHaveProperty('failingTests')
-    expect(rv).toHaveProperty('durationMs')
-    expect(rv).toHaveProperty('syntaxErrors')
-    expect(rv).toHaveProperty('testFiles')
-    expect(rv).toHaveProperty('isRed')
+    const report = result!.agentReport
+    expect(report).toHaveProperty('testFiles')
+    expect(report).toHaveProperty('testResult')
+    expect(report).toHaveProperty('isRed')
+    expect(report.testResult).toHaveProperty('totalTests')
+    expect(report.testResult).toHaveProperty('passingTests')
+    expect(report.testResult).toHaveProperty('failingTests')
   })
 })
 
@@ -216,9 +213,9 @@ describe('readTddPhaseResult', () => {
 
 function createValidCodePhaseResult(): CodePhaseResult {
   return {
-    batches: [
+    waves: [
       {
-        batchIndex: 0,
+        waveIndex: 0,
         tasks: [
           {
             id: 'TASK-1' as `TASK-${number}`,
@@ -281,7 +278,7 @@ describe('readCodePhaseResult', () => {
 
     expect(result).not.toBeNull()
     expect(result!.success).toBe(true)
-    expect(result!.batches).toHaveLength(1)
+    expect(result!.waves).toHaveLength(1)
     expect(result!.iterations).toHaveLength(1)
   })
 
@@ -484,5 +481,83 @@ describe('Spec 5 Zod schemas', () => {
   it('docsPhaseResultSchema rejects missing required fields', () => {
     const result = docsPhaseResultSchema.safeParse({ success: true })
     expect(result.success).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// spec-compliance category support
+// ---------------------------------------------------------------------------
+
+describe('agentInvocationRecordSchema — consistency role', () => {
+  it('accepts consistency as a valid role', () => {
+    const valid = { role: 'consistency', model: 'opus', durationMs: 3000 }
+    const result = agentInvocationRecordSchema.safeParse(valid)
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts all 8 agent roles', () => {
+    const roles = ['plan', 'test', 'code', 'review', 'security', 'consistency', 'merge', 'docs']
+    for (const role of roles) {
+      const result = agentInvocationRecordSchema.safeParse({ role, model: 'opus', durationMs: 1000 })
+      expect(result.success).toBe(true)
+    }
+  })
+})
+
+describe('agentInvocationRecordSchema — tokenUsage', () => {
+  it('accepts a record with tokenUsage', () => {
+    const valid = {
+      role: 'code',
+      model: 'opus',
+      durationMs: 5000,
+      tokenUsage: { input: 1200, output: 400, cacheCreation: 500, cacheRead: 8000 },
+    }
+    const result = agentInvocationRecordSchema.safeParse(valid)
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts a record without tokenUsage (backward compat)', () => {
+    const valid = { role: 'code', model: 'opus', durationMs: 5000 }
+    const result = agentInvocationRecordSchema.safeParse(valid)
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects tokenUsage with missing fields', () => {
+    const invalid = {
+      role: 'code',
+      model: 'opus',
+      durationMs: 5000,
+      tokenUsage: { input: 100 },
+    }
+    const result = agentInvocationRecordSchema.safeParse(invalid)
+    expect(result.success).toBe(false)
+  })
+})
+
+describe('ReviewCategory — spec-compliance', () => {
+  it('accepts spec-compliance as a valid ReviewFinding category in CodePhaseResult', () => {
+    const codeResult: CodePhaseResult = {
+      ...createValidCodePhaseResult(),
+      finalReview: {
+        findings: [{
+          file: 'src/nav.ts',
+          line: 5,
+          severity: 'critical',
+          category: 'spec-compliance',
+          description: 'Missing anchor target for nav link',
+        }],
+        criticalCount: 1,
+        importantCount: 0,
+        suggestionCount: 0,
+      },
+    }
+    const state = createSwarmState({
+      phaseResults: { code: codeResult },
+    })
+
+    const result = readCodePhaseResult(state)
+
+    expect(result).not.toBeNull()
+    expect(result!.finalReview!.findings[0]!.category).toBe('spec-compliance')
   })
 })

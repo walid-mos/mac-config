@@ -28,11 +28,20 @@ export function createSessionId(raw: string): SessionId {
   return raw as SessionId
 }
 
+// === Token Usage ===
+
+export interface TokenUsage {
+  input: number
+  output: number
+  cacheCreation: number
+  cacheRead: number
+}
+
 // === Domain Unions ===
 
-export type AgentRole = 'plan' | 'test' | 'code' | 'review' | 'security' | 'merge' | 'docs'
+export type AgentRole = 'plan' | 'test' | 'code' | 'review' | 'security' | 'consistency' | 'merge' | 'docs'
 
-export const AGENT_ROLES: readonly AgentRole[] = ['plan', 'test', 'code', 'review', 'security', 'merge', 'docs'] as const
+export const AGENT_ROLES: readonly AgentRole[] = ['plan', 'test', 'code', 'review', 'security', 'consistency', 'merge', 'docs'] as const
 
 export type ConfigRoleKey = AgentRole | `code-${string}`
 
@@ -52,6 +61,11 @@ export const PHASES: readonly Phase[] = ['init', 'plan', 'tdd', 'code', 'review'
 export interface ModelAssignment {
   backend: 'claude' | 'opencode'
   model: string
+  agent?: string
+}
+
+export interface ConvergenceConfig {
+  maxIterations: number
 }
 
 export interface SwarmConfig {
@@ -59,6 +73,7 @@ export interface SwarmConfig {
     agents: Record<AgentRole, ModelAssignment>
     tagged: Record<string, ModelAssignment>
   }
+  convergence?: ConvergenceConfig
 }
 
 export interface ResolvedConfig {
@@ -71,8 +86,9 @@ export interface ResolvedConfig {
 export type SwarmEventType =
   | 'session:start' | 'session:end' | 'session:error'
   | 'phase:start' | 'phase:end' | 'phase:error'
-  | 'agent:invoke' | 'agent:result' | 'agent:error'
+  | 'agent:invoke' | 'agent:result' | 'agent:error' | 'agent:activity'
   | 'test:red' | 'test:green' | 'test:fail'
+  | 'build:success' | 'build:fail'
   | 'iteration:start' | 'iteration:end'
   | 'review:findings'
   | 'commit'
@@ -106,12 +122,17 @@ export interface AgentInvokeEvent extends BaseEvent {
 
 export interface AgentResultEvent extends BaseEvent {
   type: 'agent:result'
-  data: { role: AgentRole; durationMs: number }
+  data: { role: AgentRole; durationMs: number; tokenUsage?: TokenUsage }
 }
 
 export interface AgentErrorEvent extends BaseEvent {
   type: 'agent:error'
-  data: { role: AgentRole; reason: string }
+  data: { role: AgentRole; reason: string; tokenUsage?: TokenUsage }
+}
+
+export interface AgentActivityEvent extends BaseEvent {
+  type: 'agent:activity'
+  data: { role: AgentRole; tool: string }
 }
 
 export interface SessionStartEvent extends BaseEvent {
@@ -144,14 +165,24 @@ export interface TestFailEvent extends BaseEvent {
   data: { totalTests: number; failingTests: number; reason: string }
 }
 
+export interface BuildSuccessEvent extends BaseEvent {
+  type: 'build:success'
+  data: { durationMs: number }
+}
+
+export interface BuildFailEvent extends BaseEvent {
+  type: 'build:fail'
+  data: { output: string; durationMs: number }
+}
+
 export interface IterationStartEvent extends BaseEvent {
   type: 'iteration:start'
-  data: { iteration: number; batchCount: number }
+  data: { iteration: number; waveIndex: number; taskCount: number; taskIds?: string[] }
 }
 
 export interface IterationEndEvent extends BaseEvent {
   type: 'iteration:end'
-  data: { iteration: number; success: boolean }
+  data: { iteration: number; success: boolean; reason?: 'review-findings' }
 }
 
 export interface ReviewFindingsEvent extends BaseEvent {
@@ -171,9 +202,10 @@ export interface FileChangedEvent extends BaseEvent {
 
 export type SwarmEvent =
   | PhaseStartEvent | PhaseEndEvent | PhaseErrorEvent
-  | AgentInvokeEvent | AgentResultEvent | AgentErrorEvent
+  | AgentInvokeEvent | AgentResultEvent | AgentErrorEvent | AgentActivityEvent
   | SessionStartEvent | SessionEndEvent | SessionErrorEvent
   | TestRedEvent | TestGreenEvent | TestFailEvent
+  | BuildSuccessEvent | BuildFailEvent
   | IterationStartEvent | IterationEndEvent
   | ReviewFindingsEvent
   | CommitEvent
@@ -192,6 +224,7 @@ export interface SwarmState {
   sessionId: SessionId
   specPath: string
   projectDir: string
+  worktreePath?: string
   config: SwarmConfig
   currentPhase: Phase
   currentIteration: number

@@ -1,11 +1,40 @@
 // === Phase Result Accessors (Spec 3 — FR-8, Spec 4, Spec 5) ===
 
 import { z } from 'zod'
-import type { SwarmState, SessionId, AgentRole } from '../core/types.js'
+import type { SwarmState, SessionId, AgentRole, TokenUsage } from '../core/types.js'
 import type { TechStack } from '../detect/tech-stack.js'
 import type { PlannerTask, TaskTag } from './plan/task-parser.js'
-import type { RedVerification } from './tdd/red-verification.js'
-import type { TestResult } from './tdd/test-runner.js'
+
+// === Shared Result Types (formerly in test-runner.ts / build-runner.ts) ===
+
+export interface TestResult {
+  totalTests: number
+  passingTests: number
+  failingTests: number
+  durationMs: number
+}
+
+export interface BuildResult {
+  success: boolean
+  error?: string | null
+  output?: string
+  durationMs?: number
+}
+
+// === Agent Output Types ===
+
+export interface TddAgentOutput {
+  testFiles: string[]
+  testResult: TestResult
+  isRed: boolean
+}
+
+export interface CodeAgentOutput {
+  filesChanged: string[]
+  testResult: TestResult
+  buildResult: BuildResult | null
+  summary: string
+}
 
 // === Spec 3 Types ===
 
@@ -19,13 +48,13 @@ export interface PlanPhaseResult {
 
 export interface TddPhaseResult {
   testFiles: string[]
-  redVerification: RedVerification
+  agentReport: TddAgentOutput
 }
 
 // === Spec 4 Types ===
 
-export interface TaskBatch {
-  batchIndex: number
+export interface TaskWave {
+  waveIndex: number
   tasks: PlannerTask[]
 }
 
@@ -46,11 +75,11 @@ export type CodeAgentOutput =
       sanityErrors: [string, ...string[]]
     }
 
-export type ReviewCategory = 'bug' | 'security' | 'quality' | 'performance' | 'dry-violation' | 'dead-code'
+export type ReviewCategory = 'bug' | 'security' | 'quality' | 'performance' | 'dry-violation' | 'dead-code' | 'spec-compliance'
 
 export interface ReviewFinding {
   file: string
-  line?: number
+  line?: number | null
   severity: 'critical' | 'important' | 'suggestion'
   category: ReviewCategory
   description: string
@@ -66,7 +95,7 @@ export interface MergedReview {
 
 export type IterationOutcome =
   | { status: 'green'; testResult: TestResult; review: MergedReview }
-  | { status: 'needs-iteration'; testResult: TestResult; review: MergedReview; reason: 'tests-failing' | 'review-findings' }
+  | { status: 'needs-iteration'; testResult: TestResult; review: MergedReview; reason: 'review-findings' }
   | { status: 'max-iterations'; testResult: TestResult; review?: MergedReview }
   | { status: 'timeout'; testResult?: TestResult; review?: MergedReview }
 
@@ -85,6 +114,7 @@ export interface CommitRecord {
 
 export interface GitState {
   branch: string
+  worktreePath?: string
   prNumber?: number
   prUrl?: string
   commits: CommitRecord[]
@@ -100,8 +130,16 @@ export interface StagingCheckResult {
   blocked: string[]
 }
 
+export interface TaskCompletionRecord {
+  taskId: string
+  title: string
+  status: 'green' | 'failed'
+  attempts: number
+  commitHash?: string
+}
+
 export interface CodePhaseResult {
-  batches: TaskBatch[]
+  waves: TaskWave[]
   iterations: IterationState[]
   finalTestResult: TestResult
   finalReview?: MergedReview
@@ -109,6 +147,7 @@ export interface CodePhaseResult {
   changedFiles: string[]
   success: boolean
   codePhaseTimeoutMs?: number
+  taskCompletions?: TaskCompletionRecord[]
 }
 
 // === Zod Schemas ===
@@ -116,11 +155,14 @@ export interface CodePhaseResult {
 const techStackSchema = z.object({
   languages: z.array(z.string()),
   frameworks: z.array(z.string()),
-  testRunner: z.union([z.literal('vitest'), z.literal('jest'), z.literal('playwright'), z.null()]),
-  packageManager: z.union([z.literal('pnpm'), z.literal('npm'), z.literal('yarn'), z.literal('bun')]),
-  buildTool: z.union([z.literal('vite'), z.literal('webpack'), z.literal('turbopack'), z.null()]),
+  testRunner: z.string().nullable(),
+  packageManager: z.string(),
+  buildTool: z.string().nullable(),
   configFiles: z.array(z.string()),
   testCommand: z.string(),
+  buildCommand: z.string().nullable(),
+  typecheckCommand: z.string().nullable(),
+  lintCommand: z.string().nullable(),
 })
 
 const plannerTaskSchema = z.object({
@@ -128,7 +170,6 @@ const plannerTaskSchema = z.object({
   title: z.string(),
   description: z.string(),
   tag: z.union([z.literal('backend'), z.literal('frontend'), z.literal('fullstack')]),
-  files: z.array(z.string()),
   dependencies: z.array(z.string().regex(/^TASK-\d+$/)),
   testHints: z.array(z.string()),
 })
@@ -141,19 +182,20 @@ const planPhaseResultSchema = z.object({
   tags: z.record(z.number()),
 })
 
-const redVerificationSchema = z.object({
-  totalTests: z.number(),
-  passingTests: z.number(),
-  failingTests: z.number(),
-  durationMs: z.number(),
-  syntaxErrors: z.array(z.string()),
+const tddAgentOutputSchema = z.object({
   testFiles: z.array(z.string()),
+  testResult: z.object({
+    totalTests: z.number(),
+    passingTests: z.number(),
+    failingTests: z.number(),
+    durationMs: z.number().optional().default(0),
+  }),
   isRed: z.boolean(),
 })
 
 const tddPhaseResultSchema = z.object({
   testFiles: z.array(z.string()),
-  redVerification: redVerificationSchema,
+  agentReport: tddAgentOutputSchema,
 })
 
 // Spec 4 Zod Schemas
@@ -162,16 +204,17 @@ const testResultSchema = z.object({
   totalTests: z.number(),
   passingTests: z.number(),
   failingTests: z.number(),
-  durationMs: z.number(),
+  durationMs: z.number().optional().default(0),
 })
 
 const reviewFindingSchema = z.object({
   file: z.string(),
-  line: z.number().optional(),
+  line: z.number().nullish(),
   severity: z.union([z.literal('critical'), z.literal('important'), z.literal('suggestion')]),
   category: z.union([
     z.literal('bug'), z.literal('security'), z.literal('quality'),
     z.literal('performance'), z.literal('dry-violation'), z.literal('dead-code'),
+    z.literal('spec-compliance'),
   ]),
   description: z.string(),
   suggestedFix: z.string().optional(),
@@ -186,7 +229,7 @@ const mergedReviewSchema = z.object({
 
 const iterationOutcomeSchema = z.discriminatedUnion('status', [
   z.object({ status: z.literal('green'), testResult: testResultSchema, review: mergedReviewSchema }),
-  z.object({ status: z.literal('needs-iteration'), testResult: testResultSchema, review: mergedReviewSchema, reason: z.union([z.literal('tests-failing'), z.literal('review-findings')]) }),
+  z.object({ status: z.literal('needs-iteration'), testResult: testResultSchema, review: mergedReviewSchema, reason: z.literal('review-findings') }),
   z.object({ status: z.literal('max-iterations'), testResult: testResultSchema, review: mergedReviewSchema.optional() }),
   z.object({ status: z.literal('timeout'), testResult: testResultSchema.optional(), review: mergedReviewSchema.optional() }),
 ])
@@ -197,8 +240,8 @@ const iterationStateSchema = z.object({
   changedFiles: z.array(z.string()),
 })
 
-const taskBatchSchema = z.object({
-  batchIndex: z.number(),
+const taskWaveSchema = z.object({
+  waveIndex: z.number(),
   tasks: z.array(plannerTaskSchema),
 })
 
@@ -211,13 +254,22 @@ const commitRecordSchema = z.object({
 
 const gitStateSchema = z.object({
   branch: z.string(),
+  worktreePath: z.string().optional(),
   prNumber: z.number().optional(),
   prUrl: z.string().optional(),
   commits: z.array(commitRecordSchema),
 })
 
+const taskCompletionRecordSchema = z.object({
+  taskId: z.string(),
+  title: z.string(),
+  status: z.union([z.literal('green'), z.literal('failed')]),
+  attempts: z.number(),
+  commitHash: z.string().optional(),
+})
+
 const codePhaseResultSchema = z.object({
-  batches: z.array(taskBatchSchema),
+  waves: z.array(taskWaveSchema),
   iterations: z.array(iterationStateSchema),
   finalTestResult: testResultSchema,
   finalReview: mergedReviewSchema.optional(),
@@ -225,6 +277,7 @@ const codePhaseResultSchema = z.object({
   changedFiles: z.array(z.string()),
   success: z.boolean(),
   codePhaseTimeoutMs: z.number().optional(),
+  taskCompletions: z.array(taskCompletionRecordSchema).optional(),
 })
 
 // === API ===
@@ -290,6 +343,7 @@ export interface AgentInvocationRecord {
   role: AgentRole
   model: string
   durationMs: number
+  tokenUsage?: TokenUsage
 }
 
 export interface IterationLogEntry {
@@ -313,13 +367,22 @@ export interface DocsPhaseResult {
 
 // Spec 5 Zod Schemas
 
+const tokenUsageSchema = z.object({
+  input: z.number(),
+  output: z.number(),
+  cacheCreation: z.number(),
+  cacheRead: z.number(),
+})
+
 const agentInvocationRecordSchema = z.object({
   role: z.union([
     z.literal('plan'), z.literal('test'), z.literal('code'),
-    z.literal('review'), z.literal('security'), z.literal('merge'), z.literal('docs'),
+    z.literal('review'), z.literal('security'), z.literal('consistency'),
+    z.literal('merge'), z.literal('docs'),
   ]),
   model: z.string(),
   durationMs: z.number(),
+  tokenUsage: tokenUsageSchema.optional(),
 })
 
 const reviewFindingSummarySchema = z.object({
@@ -327,6 +390,7 @@ const reviewFindingSummarySchema = z.object({
   category: z.union([
     z.literal('bug'), z.literal('security'), z.literal('quality'),
     z.literal('performance'), z.literal('dry-violation'), z.literal('dead-code'),
+    z.literal('spec-compliance'),
   ]),
   description: z.string(),
   resolved: z.boolean(),

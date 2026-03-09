@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { executeDag, TaskExhaustedError } from '../../../src/phases/code/dag-executor.js'
+import { executeDag } from '../../../src/phases/code/dag-executor.js'
 import type { TaskNode } from '../../../src/phases/code/dag-executor.js'
 import type {
-  ReviewFinding,
   MergedReview,
   TestResult,
   GitState,
@@ -338,104 +337,6 @@ describe('executeDag', () => {
     expect(wave2.data.taskIds).toContain('TASK-3')
   })
 
-  it('marks task as failed when it exhausts maxIterations', async () => {
-    const { runReviewPhase } = await import('../../../src/phases/code/review-merge.js')
-    const { getChangedFiles, commitSpecItem } = await import('../../../src/git/git-operations.js')
-    const { parseStructuredOutput } = await import('../../../src/drivers/output-parser.js')
-
-    // Use maxIterations=2 for fast test
-    ctx = createSessionContext({
-      config: {
-        config: createSwarmConfig({ convergence: { maxIterations: 2 } }),
-        resolvedFrom: 'test',
-      },
-    })
-
-    const tasks = [createTask('TASK-1')]
-
-    vi.mocked(parseStructuredOutput).mockReturnValue({
-      ok: true,
-      output: JSON.stringify({
-        filesChanged: ['src/a.ts'],
-        testResult: { totalTests: 1, passingTests: 1, failingTests: 0, durationMs: 100 },
-        buildResult: null,
-        summary: 'done',
-      }),
-      raw: '',
-    })
-    vi.mocked(getChangedFiles).mockResolvedValue(['src/a.ts'])
-
-    // Always return findings — task never converges
-    vi.mocked(runReviewPhase).mockResolvedValue(createMergedReview({
-      criticalCount: 1,
-      findings: [{ file: 'src/a.ts', severity: 'critical', category: 'bug', description: 'persistent bug' }],
-    }))
-
-    const result = await executeDag(
-      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
-    )
-
-    expect(result.taskCompletions).toHaveLength(1)
-    expect(result.taskCompletions[0]!.status).toBe('failed')
-    expect(result.taskCompletions[0]!.attempts).toBe(2)
-
-    // Safety commit should have been attempted
-    expect(commitSpecItem).toHaveBeenCalledWith(
-      '/tmp/project',
-      ['src/a.ts'],
-      expect.stringMatching(/^wip\(swarm\):/)
-    )
-  })
-
-  it('propagates failure to transitive dependents', async () => {
-    const { runReviewPhase } = await import('../../../src/phases/code/review-merge.js')
-    const { getChangedFiles } = await import('../../../src/git/git-operations.js')
-    const { parseStructuredOutput } = await import('../../../src/drivers/output-parser.js')
-
-    ctx = createSessionContext({
-      config: {
-        config: createSwarmConfig({ convergence: { maxIterations: 1 } }),
-        resolvedFrom: 'test',
-      },
-    })
-
-    const tasks = [
-      createTask('TASK-1'),
-      createTask('TASK-2', { dependencies: ['TASK-1'] }),
-      createTask('TASK-3', { dependencies: ['TASK-2'] }),
-    ]
-
-    vi.mocked(parseStructuredOutput).mockReturnValue({
-      ok: true,
-      output: JSON.stringify({
-        filesChanged: ['src/a.ts'],
-        testResult: { totalTests: 1, passingTests: 1, failingTests: 0, durationMs: 100 },
-        buildResult: null,
-        summary: 'done',
-      }),
-      raw: '',
-    })
-    vi.mocked(getChangedFiles).mockResolvedValue(['src/a.ts'])
-
-    // TASK-1 fails with findings
-    vi.mocked(runReviewPhase).mockResolvedValue(createMergedReview({
-      criticalCount: 1,
-      findings: [{ file: 'src/a.ts', severity: 'critical', category: 'bug', description: 'bug' }],
-    }))
-
-    const result = await executeDag(
-      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
-    )
-
-    // TASK-1 failed, TASK-2 and TASK-3 should be failed due to dependency propagation
-    expect(result.taskCompletions).toHaveLength(3)
-    expect(result.taskCompletions.find(tc => tc.taskId === 'TASK-1')!.status).toBe('failed')
-    expect(result.taskCompletions.find(tc => tc.taskId === 'TASK-2')!.status).toBe('failed')
-    expect(result.taskCompletions.find(tc => tc.taskId === 'TASK-3')!.status).toBe('failed')
-    // Only 1 wave (TASK-1 ran, failed, TASK-2 and TASK-3 never started)
-    expect(result.iterations).toHaveLength(1)
-  })
-
   it('propagates abort signal', async () => {
     const controller = new AbortController()
     controller.abort()
@@ -536,12 +437,7 @@ describe('executeDag', () => {
     const { parseStructuredOutput } = await import('../../../src/drivers/output-parser.js')
     const { buildFindingFixPrompt } = await import('../../../src/phases/code/code-agent-prompt.js')
 
-    ctx = createSessionContext({
-      config: {
-        config: createSwarmConfig({ convergence: { maxIterations: 10 } }),
-        resolvedFrom: 'test',
-      },
-    })
+    ctx = createSessionContext()
 
     const tasks = [createTask('TASK-1')]
 
@@ -707,23 +603,3 @@ describe('executeDag', () => {
   })
 })
 
-// ---------------------------------------------------------------------------
-// TaskExhaustedError
-// ---------------------------------------------------------------------------
-
-describe('TaskExhaustedError', () => {
-  it('contains taskId, attempts, and lastFindings', () => {
-    const findings: ReviewFinding[] = [
-      { file: 'a.ts', severity: 'critical', category: 'bug', description: 'NPE' },
-    ]
-    const err = new TaskExhaustedError('TASK-1', 5, findings)
-
-    expect(err).toBeInstanceOf(Error)
-    expect(err.name).toBe('TaskExhaustedError')
-    expect(err.taskId).toBe('TASK-1')
-    expect(err.attempts).toBe(5)
-    expect(err.lastFindings).toBe(findings)
-    expect(err.message).toContain('TASK-1')
-    expect(err.message).toContain('5 attempts')
-  })
-})

@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { runCodePhase, attributeFindingsToAgents } from '../../../src/phases/code/code-phase.js'
-import { TaskExhaustedError } from '../../../src/phases/code/dag-executor.js'
 import type { AgentHandle } from '../../../src/phases/code/code-phase.js'
 import type {
   PlanPhaseResult,
@@ -265,65 +264,6 @@ describe('runCodePhase', () => {
     expect(result.iterations.length).toBe(1)
   })
 
-  it('throws TaskExhaustedError when a task fails all retries', async () => {
-    const { runReviewPhase } = await import('../../../src/phases/code/review-merge.js')
-    const { getChangedFiles } = await import('../../../src/git/git-operations.js')
-    const { parseStructuredOutput } = await import('../../../src/drivers/output-parser.js')
-
-    vi.mocked(parseStructuredOutput).mockReturnValue({
-      ok: true,
-      output: JSON.stringify({
-        filesChanged: ['a.ts'],
-        testResult: { totalTests: 1, passingTests: 1, failingTests: 0, durationMs: 100 },
-        buildResult: null,
-        summary: 'done',
-      }),
-      raw: '',
-    })
-    vi.mocked(getChangedFiles).mockResolvedValue(['a.ts'])
-    vi.mocked(runReviewPhase).mockResolvedValue(createMergedReview({
-      criticalCount: 1,
-      findings: [{ file: 'a.ts', severity: 'critical', category: 'bug', description: 'x' }],
-    }))
-
-    await expect(
-      runCodePhase(ctx, registry, createPlanResult())
-    ).rejects.toThrow(TaskExhaustedError)
-  })
-
-  it('TaskExhaustedError contains taskId, attempts, and lastFindings', async () => {
-    const { runReviewPhase } = await import('../../../src/phases/code/review-merge.js')
-    const { getChangedFiles } = await import('../../../src/git/git-operations.js')
-    const { parseStructuredOutput } = await import('../../../src/drivers/output-parser.js')
-
-    vi.mocked(parseStructuredOutput).mockReturnValue({
-      ok: true,
-      output: JSON.stringify({
-        filesChanged: ['a.ts'],
-        testResult: { totalTests: 1, passingTests: 1, failingTests: 0, durationMs: 100 },
-        buildResult: null,
-        summary: 'done',
-      }),
-      raw: '',
-    })
-    vi.mocked(getChangedFiles).mockResolvedValue(['a.ts'])
-    vi.mocked(runReviewPhase).mockResolvedValue(createMergedReview({
-      criticalCount: 1,
-      findings: [{ file: 'a.ts', severity: 'critical', category: 'bug', description: 'NPE' }],
-    }))
-
-    try {
-      await runCodePhase(ctx, registry, createPlanResult())
-      expect.unreachable('Should have thrown')
-    } catch (err) {
-      expect(err).toBeInstanceOf(TaskExhaustedError)
-      const taskErr = err as TaskExhaustedError
-      expect(taskErr.taskId).toBe('TASK-1')
-      expect(taskErr.attempts).toBeGreaterThan(0)
-      expect(taskErr.lastFindings.length).toBeGreaterThan(0)
-    }
-  })
-
   it('emits phase:start and phase:end events', async () => {
     const emitter = createMockEmitter()
     ctx = createSessionContext({ emitter })
@@ -358,38 +298,6 @@ describe('runCodePhase', () => {
     const result = await runCodePhase(ctx, registry, createPlanResult())
 
     expect(result.success).toBe(true)
-  })
-
-  it('creates wip commit on failure to preserve work', async () => {
-    const { runReviewPhase } = await import('../../../src/phases/code/review-merge.js')
-    const { commitSpecItem, getChangedFiles } = await import('../../../src/git/git-operations.js')
-    const { parseStructuredOutput } = await import('../../../src/drivers/output-parser.js')
-
-    vi.mocked(parseStructuredOutput).mockReturnValue({
-      ok: true,
-      output: JSON.stringify({
-        filesChanged: ['src/task-1.ts'],
-        testResult: { totalTests: 1, passingTests: 1, failingTests: 0, durationMs: 100 },
-        buildResult: null,
-        summary: 'done',
-      }),
-      raw: '',
-    })
-    vi.mocked(getChangedFiles).mockResolvedValue(['src/task-1.ts'])
-    vi.mocked(runReviewPhase).mockResolvedValue(createMergedReview({
-      criticalCount: 1,
-      findings: [{ file: 'src/task-1.ts', severity: 'critical', category: 'bug', description: 'x' }],
-    }))
-    vi.mocked(commitSpecItem).mockResolvedValue('wip-hash')
-
-    await expect(
-      runCodePhase(ctx, registry, createPlanResult())
-    ).rejects.toThrow(TaskExhaustedError)
-
-    // Safety commit should have been made with wip prefix
-    const commitCalls = vi.mocked(commitSpecItem).mock.calls
-    const wipCommit = commitCalls.find(c => (c[2] as string).startsWith('wip(swarm):'))
-    expect(wipCommit).toBeDefined()
   })
 
   it('commits per task with functional titles in message (no task IDs)', async () => {

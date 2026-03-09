@@ -33,12 +33,11 @@ import {
 
 // === Constants ===
 
-const DEFAULT_MAX_ITERATIONS = 30
 const MAX_RETRIES = 2
 
 // === Types ===
 
-export type TaskStatus = 'pending' | 'running' | 'converging' | 'green' | 'failed'
+export type TaskStatus = 'pending' | 'running' | 'converging' | 'green'
 
 export interface TaskNode {
   taskId: string
@@ -48,7 +47,6 @@ export interface TaskNode {
   lastFindings?: ReviewFinding[]
   attempts: number
   commitHash?: string
-  failReason?: string
   decisionLogEntries: string[]
   seenSignatures: Set<string>
 }
@@ -61,38 +59,7 @@ export interface DagExecutorResult {
 
 // === Errors ===
 
-export class TaskExhaustedError extends Error {
-  constructor(
-    public readonly taskId: string,
-    public readonly attempts: number,
-    public readonly lastFindings: ReviewFinding[],
-  ) {
-    super(`Task ${taskId} failed after ${attempts} attempts — convergence not reached`)
-    this.name = 'TaskExhaustedError'
-  }
-}
-
 // === Helpers ===
-
-function propagateFailure(
-  failedTaskId: string,
-  nodes: Map<string, TaskNode>,
-  dependents: Map<string, string[]>,
-): void {
-  const queue = [failedTaskId]
-  while (queue.length > 0) {
-    const current = queue.shift()!
-    for (const depId of dependents.get(current) ?? []) {
-      const depNode = nodes.get(depId)
-      if (!depNode) continue
-      if (depNode.status === 'failed' || depNode.status === 'green') continue
-      depNode.status = 'failed'
-      depNode.handle.status = 'closed'
-      depNode.failReason = `dependency ${failedTaskId} failed`
-      queue.push(depId)
-    }
-  }
-}
 
 async function spawnFreshAgent(
   node: TaskNode,
@@ -263,9 +230,6 @@ export async function executeDag(
     return { taskCompletions: [], iterations: [] }
   }
 
-  const convergence = ctx.config.config.convergence
-  const maxIterations = convergence?.maxIterations ?? DEFAULT_MAX_ITERATIONS
-
   const { dependents, taskMap } = buildDependencyGraph(tasks)
 
   // Initialize task nodes with mutable remaining-dependency counts
@@ -423,7 +387,6 @@ export async function executeDag(
 
     // 9. Per-task decision
     const greenNodes: TaskNode[] = []
-    const failedNodes: TaskNode[] = []
 
     for (const node of wave) {
       node.attempts++
@@ -439,15 +402,6 @@ export async function executeDag(
         for (const depId of dependents.get(node.taskId) ?? []) {
           remainingDeps.set(depId, (remainingDeps.get(depId) ?? 1) - 1)
         }
-      } else if (node.attempts >= maxIterations) {
-        node.status = 'failed'
-        node.handle.status = 'closed'
-        node.failReason = `Exhausted ${maxIterations} iterations`
-        node.lastFindings = deduplicated
-        failedNodes.push(node)
-
-        // Propagate failure to transitive dependents
-        propagateFailure(node.taskId, nodes, dependents)
       } else {
         node.status = 'converging'
 
@@ -465,7 +419,7 @@ export async function executeDag(
       logger.logIterationSummary(waveIndex, node.attempts - 1, {
         waveIndex,
         attempt: node.attempts - 1,
-        status: node.status === 'green' ? 'green' : node.status === 'failed' ? 'exhausted' : 'needs-iteration',
+        status: node.status === 'green' ? 'green' : 'needs-iteration',
         reason: node.status === 'converging' ? 'review-findings' : undefined,
         criticalCount: review.criticalCount,
         testResult: agentTestResult,
@@ -495,29 +449,6 @@ export async function executeDag(
       }
     }
 
-    // Safety commit failed tasks
-    for (const node of failedNodes) {
-      const taskFiles = node.handle.filesChanged.filter(f => uncommittedFiles.has(f))
-      if (taskFiles.length === 0) continue
-
-      try {
-        const msg = `wip(swarm): ${node.task.title}`
-        const hash = await commitSpecItem(ctx.projectDir, taskFiles, msg)
-        node.commitHash = hash
-        gitState.commits.push({ hash, message: msg, specItem: node.task.title, iteration: iterations.length - 1 })
-        for (const f of taskFiles) uncommittedFiles.delete(f)
-
-        ctx.emitter.emit({
-          type: 'commit',
-          timestamp: new Date().toISOString(),
-          sessionId: ctx.sessionId,
-          data: { hash, message: msg, filesChanged: taskFiles.length },
-        })
-      } catch (err) {
-        process.stderr.write(`Warning: safety commit failed for ${node.taskId}: ${(err as Error).message}\n`)
-      }
-    }
-
     waveIndex++
   }
 
@@ -527,7 +458,7 @@ export async function executeDag(
     taskCompletions.push({
       taskId: node.taskId,
       title: node.task.title,
-      status: node.status === 'green' ? 'green' : 'failed',
+      status: 'green',
       attempts: node.attempts,
       commitHash: node.commitHash,
     })

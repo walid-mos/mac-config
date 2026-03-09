@@ -53,9 +53,6 @@ export function createSwarmConfig(
       tagged: {},
       ...overrides.models,
     },
-    convergence: overrides.convergence ?? {
-      maxIterations: 6,
-    },
   }
 }
 

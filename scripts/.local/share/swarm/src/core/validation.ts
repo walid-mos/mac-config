@@ -26,14 +26,6 @@ const AGENT_ROLES = ['plan', 'test', 'code', 'review', 'security', 'consistency'
 const AgentRoleSchema = z.enum(AGENT_ROLES)
 
 // ---------------------------------------------------------------------------
-// ConvergenceConfig schema
-// ---------------------------------------------------------------------------
-
-export const ConvergenceConfigSchema = z.object({
-  maxIterations: z.number().int().min(1).max(20),
-})
-
-// ---------------------------------------------------------------------------
 // SwarmConfig schema
 // ---------------------------------------------------------------------------
 
@@ -42,7 +34,6 @@ export const SwarmConfigSchema = z.object({
     agents: z.record(AgentRoleSchema, ModelAssignmentSchema),
     tagged: z.record(z.string(), ModelAssignmentSchema),
   }),
-  convergence: ConvergenceConfigSchema.optional(),
 })
 
 // ---------------------------------------------------------------------------

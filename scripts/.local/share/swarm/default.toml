@@ -1,6 +1,3 @@
-[convergence]
-maxIterations    = 10
-
 [models]
 plan     = { backend = "claude", model = "opus", agent = "task-planner" }
 test     = { backend = "claude", model = "opus", agent = "test-writer" }

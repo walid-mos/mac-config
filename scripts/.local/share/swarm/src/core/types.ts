@@ -64,16 +64,11 @@ export interface ModelAssignment {
   agent?: string
 }
 
-export interface ConvergenceConfig {
-  maxIterations: number
-}
-
 export interface SwarmConfig {
   models: {
     agents: Record<AgentRole, ModelAssignment>
     tagged: Record<string, ModelAssignment>
   }
-  convergence?: ConvergenceConfig
 }
 
 export interface ResolvedConfig {
@@ -291,7 +286,7 @@ export interface SessionContext {
   specPath: string
   projectDir: string
   dryRun: boolean
-  /** Git branch used for this session's worktree (e.g. swarm/blog/02-contact-page). */
+  /** Git branch used for this session's worktree (e.g. swarm/blog). */
   worktreeBranch?: string
 }
 

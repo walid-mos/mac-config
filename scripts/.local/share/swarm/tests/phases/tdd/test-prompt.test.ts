@@ -16,6 +16,9 @@ function createTechStack(overrides: Partial<TechStack> = {}): TechStack {
     buildTool: 'vite',
     configFiles: ['tsconfig.json', 'vitest.config.ts'],
     testCommand: 'vitest run',
+    buildCommand: null,
+    typecheckCommand: null,
+    lintCommand: null,
     ...overrides,
   }
 }
@@ -26,7 +29,6 @@ function createPlannerTask(overrides: Partial<PlannerTask> = {}): PlannerTask {
     title: 'Implement auth service',
     description: 'Create authentication service with login and logout',
     tag: 'backend',
-    files: ['src/auth/service.ts'],
     dependencies: [],
     testHints: ['test login returns token', 'test logout invalidates session'],
     ...overrides,
@@ -149,5 +151,123 @@ describe('buildTestPrompt — content', () => {
     )
 
     expect(result).toMatch(/test file|file|location|directory|path/i)
+  })
+
+  it('includes edge case coverage requirements', () => {
+    const result = buildTestPrompt(
+      PLANNER_OUTPUT,
+      [createPlannerTask()],
+      createTechStack(),
+      TEST_CONVENTIONS
+    )
+
+    expect(result).toMatch(/edge case/i)
+    expect(result).toMatch(/null|undefined|empty/i)
+    expect(result).toMatch(/boundary/i)
+  })
+
+  it('includes security testing requirements', () => {
+    const result = buildTestPrompt(
+      PLANNER_OUTPUT,
+      [createPlannerTask()],
+      createTechStack(),
+      TEST_CONVENTIONS
+    )
+
+    expect(result).toMatch(/security/i)
+    expect(result).toMatch(/injection|xss|traversal/i)
+  })
+
+  it('includes mock strategy guidance', () => {
+    const result = buildTestPrompt(
+      PLANNER_OUTPUT,
+      [createPlannerTask()],
+      createTechStack(),
+      TEST_CONVENTIONS
+    )
+
+    expect(result).toMatch(/mock strategy/i)
+    expect(result).toMatch(/external services/i)
+  })
+
+  it('requires minimum test count per task', () => {
+    const result = buildTestPrompt(
+      PLANNER_OUTPUT,
+      [createPlannerTask()],
+      createTechStack(),
+      TEST_CONVENTIONS
+    )
+
+    expect(result).toMatch(/minimum.*3.*test/i)
+  })
+
+  it('includes functional behavior testing guidance', () => {
+    const result = buildTestPrompt(
+      PLANNER_OUTPUT,
+      [createPlannerTask()],
+      createTechStack(),
+      TEST_CONVENTIONS
+    )
+
+    expect(result).toContain('Functional Behavior')
+    expect(result).toMatch(/behavior/i)
+    expect(result).toContain('href="#')
+    expect(result).toContain('id=')
+  })
+
+  it('includes constraints about verifying behavior not just structure', () => {
+    const result = buildTestPrompt(
+      PLANNER_OUTPUT,
+      [createPlannerTask()],
+      createTechStack(),
+      TEST_CONVENTIONS
+    )
+
+    expect(result).toMatch(/MUST verify.*WORKS/i)
+    expect(result).toMatch(/BOTH sides of the link/i)
+    expect(result).toMatch(/false confidence/i)
+  })
+
+  it('includes execution section with test command', () => {
+    const result = buildTestPrompt(
+      PLANNER_OUTPUT,
+      [createPlannerTask()],
+      createTechStack({ testCommand: 'pnpm exec vitest run' }),
+      TEST_CONVENTIONS
+    )
+
+    expect(result).toContain('# Execution')
+    expect(result).toContain('pnpm exec vitest run')
+    expect(result).toMatch(/MUST fail.*red/i)
+  })
+
+  it('includes structured JSON output section', () => {
+    const result = buildTestPrompt(
+      PLANNER_OUTPUT,
+      [createPlannerTask()],
+      createTechStack(),
+      TEST_CONVENTIONS
+    )
+
+    expect(result).toContain('# Output')
+    expect(result).toContain('```json')
+    expect(result).toContain('testFiles')
+    expect(result).toContain('testResult')
+    expect(result).toContain('isRed')
+  })
+
+  it('requires functional naming for describe blocks and test names', () => {
+    const result = buildTestPrompt(
+      PLANNER_OUTPUT,
+      [createPlannerTask()],
+      createTechStack(),
+      TEST_CONVENTIONS
+    )
+
+    expect(result).toContain('Naming Convention')
+    expect(result).toMatch(/functional.*user-facing/i)
+    expect(result).toContain('NEVER use technical file names')
+    expect(result).toContain("describe('Base page layout')")
+    expect(result).toContain("describe('Features showcase')")
   })
 })

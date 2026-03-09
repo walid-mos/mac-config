@@ -2,52 +2,15 @@
 
 import type { SessionContext } from '../../core/types.js'
 import type { DriverRegistry, AgentResult } from '../../drivers/driver.js'
-import type { PlanPhaseResult, TddPhaseResult } from '../phase-results.js'
+import type { PlanPhaseResult, TddPhaseResult, TddAgentOutput } from '../phase-results.js'
 import { buildTestPrompt } from './test-prompt.js'
-import { verifyRed } from './red-verification.js'
+import { parseStructuredOutput } from '../../drivers/output-parser.js'
 
 // === Constants ===
 
 const MAX_RETRIES = 2
-const MAX_ERROR_BYTES = 4096 // 4KB
 
 // === Helpers ===
-
-function extractTestFilePaths(output: string, projectDir: string): string[] {
-  const paths: string[] = []
-  const lines = output.split('\n')
-
-  for (const line of lines) {
-    // Match patterns like "- tests/feature.test.ts" or "- /abs/path/tests/feature.test.ts"
-    const match = /^-\s+(.+\.(?:test|spec)\.\w+)\s*$/i.exec(line.trim())
-    if (!match) continue
-
-    let filePath = match[1]!.trim()
-
-    // Skip files outside projectDir
-    if (filePath.startsWith('/')) {
-      // Check if it's under projectDir
-      if (filePath.startsWith(projectDir + '/')) {
-        filePath = filePath.slice(projectDir.length + 1)
-      } else {
-        continue // Skip files outside projectDir boundary
-      }
-    }
-
-    // Reject path traversal
-    if (filePath.includes('..')) continue
-
-    paths.push(filePath)
-  }
-
-  return paths.length > 0 ? paths : ['tests/feature.test.ts']
-}
-
-function sanitizeErrorOutput(errors: string[]): string {
-  const combined = errors.join('\n')
-  if (combined.length <= MAX_ERROR_BYTES) return combined
-  return combined.slice(0, MAX_ERROR_BYTES) + '\n...(truncated)'
-}
 
 function isRetryableErrorCode(code: string): boolean {
   return code === 'timeout' || code === 'crash' || code === 'empty_output' || code === 'invalid_json'
@@ -55,6 +18,34 @@ function isRetryableErrorCode(code: string): boolean {
 
 function isImmediateFailErrorCode(code: string): boolean {
   return code === 'aborted' || code === 'spawn_error'
+}
+
+function extractTddAgentOutput(output: string): TddAgentOutput | null {
+  const parsed = parseStructuredOutput(output)
+  if (!parsed.ok) return null
+
+  try {
+    const json = JSON.parse(parsed.output) as Partial<TddAgentOutput>
+    if (!json.testFiles || !Array.isArray(json.testFiles)) return null
+    return {
+      testFiles: json.testFiles,
+      testResult: {
+        totalTests: json.testResult?.totalTests ?? 0,
+        passingTests: json.testResult?.passingTests ?? 0,
+        failingTests: json.testResult?.failingTests ?? 0,
+        durationMs: json.testResult?.durationMs ?? 0,
+      },
+      isRed: json.isRed ?? false,
+    }
+  } catch {
+    return null
+  }
+}
+
+const DEFAULT_AGENT_OUTPUT: TddAgentOutput = {
+  testFiles: ['tests/feature.test.ts'],
+  testResult: { totalTests: 0, passingTests: 0, failingTests: 0, durationMs: 0 },
+  isRed: false,
 }
 
 // === API ===
@@ -94,10 +85,9 @@ export async function runTddPhase(
   const prompt = buildTestPrompt(plan.plannerOutput, plan.tasks, plan.techStack, testConventions)
 
   // Get driver
-  const { driver, model } = registry.getDriver('test')
+  const { driver, model, agent } = registry.getDriver('test')
 
   let currentPrompt = prompt
-  let lastError: Error | undefined
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     // Check abort before each attempt
@@ -114,6 +104,7 @@ export async function runTddPhase(
     const agentResult: AgentResult = await driver.invoke({
       prompt: currentPrompt,
       role: 'test',
+      agent,
       model,
       projectDir: ctx.projectDir,
     })
@@ -131,11 +122,14 @@ export async function runTddPhase(
       }
 
       if (isRetryableErrorCode(agentResult.errorCode) && attempt < MAX_RETRIES) {
+        const reason = agentResult.errorCode === 'timeout' && agentResult.stderr
+          ? `${agentResult.errorCode}: ${agentResult.error} — stderr: ${agentResult.stderr.slice(0, 300)}`
+          : `${agentResult.errorCode}: ${agentResult.error}`
         ctx.emitter.emit({
           type: 'agent:error',
           timestamp: new Date().toISOString(),
           sessionId: ctx.sessionId,
-          data: { role: 'test', reason: `${agentResult.errorCode}: ${agentResult.error}` },
+          data: { role: 'test', reason },
         })
         continue
       }
@@ -150,33 +144,59 @@ export async function runTddPhase(
       throw new Error(`TDD phase failed after ${attempt + 1} attempts: ${agentResult.errorCode}`)
     }
 
-    // Agent succeeded — extract test file paths and verify RED
-    const testFiles = extractTestFilePaths(agentResult.output, ctx.projectDir)
-    const redResult = await verifyRed(ctx.projectDir, plan.techStack, testFiles, signal)
+    // Agent succeeded — parse structured JSON output
+    const agentOutput = extractTddAgentOutput(agentResult.output) ?? DEFAULT_AGENT_OUTPUT
 
-    // Check for syntax errors — retry if present
-    if (redResult.syntaxErrors.length > 0 && attempt < MAX_RETRIES) {
-      const sanitized = sanitizeErrorOutput(redResult.syntaxErrors)
-      currentPrompt = `${prompt}\n\n# Previous Attempt Failed — Syntax Errors\n\nThe tests you wrote had syntax errors. Please fix them:\n\n${sanitized}`
+    // Check for zero tests — retry if possible
+    if (agentOutput.testResult.totalTests === 0) {
+      if (attempt < MAX_RETRIES) {
+        currentPrompt = `${prompt}\n\n# Previous Attempt Failed — Zero Tests\n\nYour previous attempt produced zero compilable tests. Please produce compilable, failing test files. Remember to run the tests and include the JSON output block.`
+        ctx.emitter.emit({
+          type: 'agent:error',
+          timestamp: new Date().toISOString(),
+          sessionId: ctx.sessionId,
+          data: { role: 'test', reason: 'Zero tests produced' },
+        })
+        continue
+      }
+      // Final attempt — emit test:fail warning and return
+      ctx.emitter.emit({
+        type: 'test:fail',
+        timestamp: new Date().toISOString(),
+        sessionId: ctx.sessionId,
+        data: { totalTests: 0, failingTests: 0, reason: 'Test agent produced zero tests' },
+      })
+      ctx.emitter.emit({
+        type: 'phase:end',
+        timestamp: new Date().toISOString(),
+        sessionId: ctx.sessionId,
+        data: { phase: 'tdd', durationMs: Date.now() - startTime },
+      })
+      return { testFiles: agentOutput.testFiles, agentReport: agentOutput }
+    }
+
+    // Check isRed — retry if tests pass (not red)
+    if (!agentOutput.isRed && attempt < MAX_RETRIES) {
+      currentPrompt = `${prompt}\n\n# Previous Attempt Failed — Tests Not Red\n\nYour tests passed without implementation. Tests that pass before implementation are useless. Rewrite tests that properly fail.`
       ctx.emitter.emit({
         type: 'agent:error',
         timestamp: new Date().toISOString(),
         sessionId: ctx.sessionId,
-        data: { role: 'test', reason: `Syntax errors in tests: ${redResult.syntaxErrors.length}` },
+        data: { role: 'test', reason: 'Tests not red — passed without implementation' },
       })
       continue
     }
 
     // Emit appropriate test event
-    if (redResult.isRed) {
+    if (agentOutput.isRed) {
       ctx.emitter.emit({
         type: 'test:red',
         timestamp: new Date().toISOString(),
         sessionId: ctx.sessionId,
         data: {
-          totalTests: redResult.totalTests,
-          passingTests: redResult.passingTests,
-          failingTests: redResult.failingTests,
+          totalTests: agentOutput.testResult.totalTests,
+          passingTests: agentOutput.testResult.passingTests,
+          failingTests: agentOutput.testResult.failingTests,
         },
       })
     } else {
@@ -185,8 +205,8 @@ export async function runTddPhase(
         timestamp: new Date().toISOString(),
         sessionId: ctx.sessionId,
         data: {
-          totalTests: redResult.totalTests,
-          passingTests: redResult.passingTests,
+          totalTests: agentOutput.testResult.totalTests,
+          passingTests: agentOutput.testResult.passingTests,
         },
       })
     }
@@ -200,17 +220,17 @@ export async function runTddPhase(
     })
 
     return {
-      testFiles,
-      redVerification: redResult,
+      testFiles: agentOutput.testFiles,
+      agentReport: agentOutput,
     }
   }
 
-  // All retries exhausted
+  // All retries exhausted (shouldn't reach here, but safety net)
   ctx.emitter.emit({
     type: 'phase:error',
     timestamp: new Date().toISOString(),
     sessionId: ctx.sessionId,
-    data: { phase: 'tdd', reason: lastError?.message ?? 'Unknown error' },
+    data: { phase: 'tdd', reason: 'Unknown error' },
   })
-  throw lastError ?? new Error('TDD phase failed')
+  throw new Error('TDD phase failed')
 }

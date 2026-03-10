@@ -1,7 +1,7 @@
 import {
   commitSpecItem,
   markPrReady
-} from "./chunk-ZZ4OW3NJ.js";
+} from "./chunk-4LLHLY2U.js";
 
 // src/phases/docs/docs-phase.ts
 import * as fs from "fs";
@@ -77,7 +77,8 @@ var mergedReviewSchema = z.object({
   findings: z.array(reviewFindingSchema),
   criticalCount: z.number(),
   importantCount: z.number(),
-  suggestionCount: z.number()
+  suggestionCount: z.number(),
+  convergenceRecommendation: z.union([z.literal("continue"), z.literal("converged")]).optional()
 });
 var iterationOutcomeSchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("green"), testResult: testResultSchema, review: mergedReviewSchema }),
@@ -90,8 +91,8 @@ var iterationStateSchema = z.object({
   outcome: iterationOutcomeSchema,
   changedFiles: z.array(z.string())
 });
-var taskBatchSchema = z.object({
-  batchIndex: z.number(),
+var taskWaveSchema = z.object({
+  waveIndex: z.number(),
   tasks: z.array(plannerTaskSchema)
 });
 var commitRecordSchema = z.object({
@@ -115,7 +116,7 @@ var taskCompletionRecordSchema = z.object({
   commitHash: z.string().optional()
 });
 var codePhaseResultSchema = z.object({
-  batches: z.array(taskBatchSchema),
+  waves: z.array(taskWaveSchema),
   iterations: z.array(iterationStateSchema),
   finalTestResult: testResultSchema,
   finalReview: mergedReviewSchema.optional(),
@@ -363,11 +364,8 @@ function buildIterationLog(events, codeResult) {
     }
     const iterState = codeResult.iterations.find((it) => it.iteration === iterationIndex);
     let specItem = `Iteration ${iterationIndex}`;
-    if (codeResult.batches.length > 0) {
-      const firstBatch = codeResult.batches[0];
-      if (firstBatch.tasks.length > 0) {
-        specItem = firstBatch.tasks[0].title;
-      }
+    if (codeResult.taskCompletions && codeResult.taskCompletions.length > 0) {
+      specItem = codeResult.taskCompletions[0].title;
     }
     if (iterState) {
       const commit = codeResult.gitState.commits.find((c) => c.iteration === iterationIndex);

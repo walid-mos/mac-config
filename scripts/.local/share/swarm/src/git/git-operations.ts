@@ -209,6 +209,8 @@ const IGNORED_PATH_PREFIXES = [
   '.pnpm-store',
   '.git/',
   '.git',
+  '.swarm/',
+  '.swarm',
 ]
 
 export async function getChangedFiles(projectDir: string): Promise<string[]> {

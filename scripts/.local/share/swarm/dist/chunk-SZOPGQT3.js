@@ -2,9 +2,8 @@ import {
   AGENT_ROLES
 } from "./chunk-BP3VSFNG.js";
 import {
-  ConvergenceConfigSchema,
   ModelAssignmentSchema
-} from "./chunk-EARZ4AXN.js";
+} from "./chunk-7OZYOMGU.js";
 
 // src/config/config-resolver.ts
 import * as fs from "fs";
@@ -38,9 +37,6 @@ var TAG_RE = /^[a-zA-Z0-9_-]{1,32}$/;
 var TAG_OVERRIDE_RE = /^(?:code|test|plan|review|security|consistency|merge|docs)-[a-zA-Z0-9_-]{1,32}$/;
 var AGENT_ROLE_SET = new Set(AGENT_ROLES);
 var DEFAULT_ASSIGNMENT = { backend: "claude", model: resolveModel("opus") };
-var DEFAULT_CONVERGENCE = {
-  maxIterations: 6
-};
 function resolveSwarmConfig(projectDir, explicitPath) {
   if (explicitPath !== void 0) {
     if (!explicitPath.endsWith(".toml")) {
@@ -100,7 +96,6 @@ function parseAndBuildConfig(filePath) {
       [err.message]
     );
   }
-  const convergence = parseConvergence(parsed["convergence"], filePath);
   const models = parsed["models"] ?? {};
   const agents = {};
   const tagged = {};
@@ -132,7 +127,7 @@ function parseAndBuildConfig(filePath) {
   }
   const filledAgents = fillDefaults(agents);
   return {
-    config: { models: { agents: filledAgents, tagged }, convergence },
+    config: { models: { agents: filledAgents, tagged } },
     resolvedFrom: filePath
   };
 }
@@ -141,22 +136,7 @@ function buildDefaultConfig() {
   for (const role of AGENT_ROLES) {
     agents[role] = { ...DEFAULT_ASSIGNMENT };
   }
-  return { models: { agents, tagged: {} }, convergence: { ...DEFAULT_CONVERGENCE } };
-}
-function parseConvergence(raw, filePath) {
-  if (raw === void 0 || raw === null) {
-    return { ...DEFAULT_CONVERGENCE };
-  }
-  const merged = { ...DEFAULT_CONVERGENCE, ...raw };
-  const result = ConvergenceConfigSchema.safeParse(merged);
-  if (!result.success) {
-    throw new ConfigValidationError(
-      `Invalid [convergence] config: ${result.error.issues.map((i) => i.message).join(", ")}`,
-      filePath,
-      result.error.issues.map((i) => i.message)
-    );
-  }
-  return result.data;
+  return { models: { agents, tagged: {} } };
 }
 function fillDefaults(partial) {
   const result = {};

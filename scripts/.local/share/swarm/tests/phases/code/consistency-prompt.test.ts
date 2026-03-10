@@ -182,4 +182,25 @@ index abc1234..def5678 100644
 
     expect(prompt).not.toContain('Previous Iteration Decisions')
   })
+
+  it('includes iteration awareness section at iteration >= 2', () => {
+    const prompt = buildConsistencyPrompt(diff, changedFiles, specContext, createTestResult(), undefined, '', 2)
+
+    expect(prompt).toContain('Iteration Awareness')
+    expect(prompt).toContain('review iteration 2')
+    expect(prompt).toContain('Severity is INTRINSIC')
+    expect(prompt).toContain('.swarm/')
+  })
+
+  it('omits iteration awareness section at iteration < 2', () => {
+    const prompt = buildConsistencyPrompt(diff, changedFiles, specContext, createTestResult(), undefined, '', 1)
+
+    expect(prompt).not.toContain('Iteration Awareness')
+  })
+
+  it('omits iteration awareness section at iteration 0 (default)', () => {
+    const prompt = buildConsistencyPrompt(diff, changedFiles, specContext, createTestResult())
+
+    expect(prompt).not.toContain('Iteration Awareness')
+  })
 })

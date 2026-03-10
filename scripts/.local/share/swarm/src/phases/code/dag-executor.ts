@@ -350,7 +350,7 @@ export async function executeDag(
     )
 
     const review = await runReviewPhase(
-      ctx, registry, allChangedFiles, specItemContext, agentTestResult, signal, globalDecisionLog
+      ctx, registry, allChangedFiles, specItemContext, agentTestResult, signal, globalDecisionLog, waveIndex, iterations
     )
 
     // Log review
@@ -377,9 +377,19 @@ export async function executeDag(
     })
 
     // 8. Attribute blocking findings to wave tasks
-    const blockingFindings = review.findings.filter(
+    let blockingFindings = review.findings.filter(
       f => f.severity === 'critical' || f.severity === 'important'
     )
+
+    if (review.convergenceRecommendation === 'converged') {
+      const demoted = blockingFindings.filter(f => f.severity === 'important')
+      if (demoted.length > 0) {
+        process.stderr.write(
+          `[convergence] Merge agent recommends converged — demoting ${demoted.length} important finding(s)\n`
+        )
+      }
+      blockingFindings = blockingFindings.filter(f => f.severity === 'critical')
+    }
     const attribution = attributeFindingsToAgents(blockingFindings, waveHandles)
 
     // Track which files are still uncommitted for per-task commits

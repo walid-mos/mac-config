@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { runCodePhase, attributeFindingsToAgents } from '../../../src/phases/code/code-phase.js'
+import { runCodePhase, attributeFindingsToAgents, deduplicateFindings, matchesSeenFinding } from '../../../src/phases/code/code-phase.js'
 import type { AgentHandle } from '../../../src/phases/code/code-phase.js'
 import type {
   PlanPhaseResult,
@@ -462,5 +462,127 @@ describe('attributeFindingsToAgents', () => {
     // TASK-2 gets only the unmatched broadcast
     expect(attribution.get('TASK-2')).toHaveLength(1)
     expect(attribution.get('TASK-2')![0]!.description).toBe('F-unmatched')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// matchesSeenFinding (fuzzy dedup)
+// ---------------------------------------------------------------------------
+
+describe('matchesSeenFinding', () => {
+  it('returns true for exact match', () => {
+    const seen = new Set(['src/a.ts:10:bug'])
+    const finding: ReviewFinding = { file: 'src/a.ts', line: 10, severity: 'critical', category: 'bug', description: 'NPE' }
+
+    expect(matchesSeenFinding(finding, seen)).toBe(true)
+  })
+
+  it('returns true for ±5 line fuzzy match', () => {
+    const seen = new Set(['src/a.ts:10:bug'])
+    const finding: ReviewFinding = { file: 'src/a.ts', line: 13, severity: 'critical', category: 'bug', description: 'NPE shifted' }
+
+    expect(matchesSeenFinding(finding, seen)).toBe(true)
+  })
+
+  it('returns false for >5 line distance', () => {
+    const seen = new Set(['src/a.ts:10:bug'])
+    const finding: ReviewFinding = { file: 'src/a.ts', line: 16, severity: 'critical', category: 'bug', description: 'NPE far' }
+
+    expect(matchesSeenFinding(finding, seen)).toBe(false)
+  })
+
+  it('returns false for same file different category', () => {
+    const seen = new Set(['src/a.ts:10:bug'])
+    const finding: ReviewFinding = { file: 'src/a.ts', line: 10, severity: 'critical', category: 'security', description: 'XSS' }
+
+    expect(matchesSeenFinding(finding, seen)).toBe(false)
+  })
+
+  it('returns false for different file same line and category', () => {
+    const seen = new Set(['src/a.ts:10:bug'])
+    const finding: ReviewFinding = { file: 'src/b.ts', line: 10, severity: 'critical', category: 'bug', description: 'NPE' }
+
+    expect(matchesSeenFinding(finding, seen)).toBe(false)
+  })
+
+  it('returns false for null line (no fuzzy match possible)', () => {
+    const seen = new Set(['src/a.ts:10:bug'])
+    const finding: ReviewFinding = { file: 'src/a.ts', line: null, severity: 'critical', category: 'bug', description: 'NPE' }
+
+    expect(matchesSeenFinding(finding, seen)).toBe(false)
+  })
+
+  it('handles line 0 in seen set (exact match for null line)', () => {
+    const seen = new Set(['src/a.ts:0:bug'])
+    const finding: ReviewFinding = { file: 'src/a.ts', severity: 'critical', category: 'bug', description: 'NPE' }
+
+    expect(matchesSeenFinding(finding, seen)).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// deduplicateFindings (fuzzy cross-iteration, exact within-batch)
+// ---------------------------------------------------------------------------
+
+describe('deduplicateFindings', () => {
+  it('marks exact cross-iteration match as [RECURRING]', () => {
+    const seen = new Set(['src/a.ts:10:bug'])
+    const findings: ReviewFinding[] = [
+      { file: 'src/a.ts', line: 10, severity: 'critical', category: 'bug', description: 'NPE' },
+    ]
+
+    const result = deduplicateFindings(findings, seen)
+
+    expect(result).toHaveLength(1)
+    expect(result[0]!.description).toMatch(/^\[RECURRING\]/)
+  })
+
+  it('marks fuzzy ±5 line shift as [RECURRING]', () => {
+    const seen = new Set(['src/a.ts:10:bug'])
+    const findings: ReviewFinding[] = [
+      { file: 'src/a.ts', line: 12, severity: 'critical', category: 'bug', description: 'NPE shifted' },
+    ]
+
+    const result = deduplicateFindings(findings, seen)
+
+    expect(result).toHaveLength(1)
+    expect(result[0]!.description).toMatch(/^\[RECURRING\]/)
+  })
+
+  it('marks genuinely new finding as [NEW]', () => {
+    const seen = new Set<string>()
+    const findings: ReviewFinding[] = [
+      { file: 'src/b.ts', line: 5, severity: 'important', category: 'quality', description: 'Dead code' },
+    ]
+
+    const result = deduplicateFindings(findings, seen)
+
+    expect(result).toHaveLength(1)
+    expect(result[0]!.description).toMatch(/^\[NEW\]/)
+  })
+
+  it('within-batch dedup stays exact (does not fuzzy match within same batch)', () => {
+    const seen = new Set<string>()
+    const findings: ReviewFinding[] = [
+      { file: 'src/a.ts', line: 10, severity: 'critical', category: 'bug', description: 'NPE' },
+      { file: 'src/a.ts', line: 12, severity: 'critical', category: 'bug', description: 'NPE shifted' },
+    ]
+
+    const result = deduplicateFindings(findings, seen)
+
+    // Both should appear — within-batch dedup is exact only
+    expect(result).toHaveLength(2)
+  })
+
+  it('exact within-batch dedup removes duplicates', () => {
+    const seen = new Set<string>()
+    const findings: ReviewFinding[] = [
+      { file: 'src/a.ts', line: 10, severity: 'critical', category: 'bug', description: 'NPE' },
+      { file: 'src/a.ts', line: 10, severity: 'critical', category: 'bug', description: 'NPE duplicate' },
+    ]
+
+    const result = deduplicateFindings(findings, seen)
+
+    expect(result).toHaveLength(1)
   })
 })

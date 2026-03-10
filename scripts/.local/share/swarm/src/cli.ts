@@ -79,9 +79,16 @@ if (isDirectExecution) {
         // Resolve config
         const resolvedConfig = resolveSwarmConfig(projectDir, configPath)
 
+        // Runtime directory — project-local, deterministic across execution contexts
+        const runtimeDir = path.join(projectDir, '.swarm', 'run', sessionId)
+        fs.mkdirSync(runtimeDir, { recursive: true })
+
+        // Expose runtime dir so claude-driver writes NDJSON logs here
+        process.env.SWARM_DEBUG_DIR = runtimeDir
+
         // Create emitter + state manager
         const emitter = createEventEmitter(sessionId)
-        const state = createStateManager(sessionId)
+        const state = createStateManager(sessionId, { tmpDir: runtimeDir })
 
         // Acquire lock
         state.acquireLock()
@@ -248,6 +255,20 @@ if (isDirectExecution) {
               ])
             } catch (err) {
               process.stderr.write(`WARNING: Worktree cleanup failed: ${(err as Error).message}\n`)
+            }
+          }
+
+          // Clean up NDJSON debug logs on success (keep on failure for debugging)
+          if (exitCode === 0) {
+            try {
+              const entries = fs.readdirSync(runtimeDir)
+              for (const entry of entries) {
+                if (entry.startsWith('swarm-agent-') && entry.endsWith('.ndjson')) {
+                  fs.unlinkSync(path.join(runtimeDir, entry))
+                }
+              }
+            } catch (err) {
+              process.stderr.write(`WARNING: NDJSON cleanup failed: ${(err as Error).message}\n`)
             }
           }
 

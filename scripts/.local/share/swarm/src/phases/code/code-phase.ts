@@ -39,6 +39,31 @@ export function findingSignature(f: ReviewFinding): string {
   return `${f.file}:${f.line ?? 0}:${f.category}`
 }
 
+const FUZZY_LINE_RANGE = 5
+
+export function matchesSeenFinding(
+  finding: ReviewFinding,
+  seenSignatures: Set<string>
+): boolean {
+  // Exact match first
+  const exactSig = findingSignature(finding)
+  if (seenSignatures.has(exactSig)) return true
+
+  // Fuzzy match: same file:category within ±5 lines
+  const line = finding.line ?? 0
+  if (line === 0) return false
+
+  for (let offset = -FUZZY_LINE_RANGE; offset <= FUZZY_LINE_RANGE; offset++) {
+    if (offset === 0) continue
+    const candidateLine = line + offset
+    if (candidateLine < 1) continue
+    const candidateSig = `${finding.file}:${candidateLine}:${finding.category}`
+    if (seenSignatures.has(candidateSig)) return true
+  }
+
+  return false
+}
+
 export function deduplicateFindings(
   findings: ReviewFinding[],
   seenSignatures: Set<string>
@@ -48,10 +73,12 @@ export function deduplicateFindings(
 
   for (const finding of findings) {
     const sig = findingSignature(finding)
+    // Within-batch dedup stays exact
     if (currentSet.has(sig)) continue
     currentSet.add(sig)
 
-    const isRecurring = seenSignatures.has(sig)
+    // Cross-iteration dedup uses fuzzy matching
+    const isRecurring = matchesSeenFinding(finding, seenSignatures)
     seenSignatures.add(sig)
 
     deduplicated.push({

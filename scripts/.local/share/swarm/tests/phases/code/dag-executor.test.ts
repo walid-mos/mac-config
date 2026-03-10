@@ -601,5 +601,119 @@ describe('executeDag', () => {
     expect(driver.invoke).toHaveBeenCalledTimes(2) // 1 fail + 1 success (code), plus review agents
     expect(result.taskCompletions[0]!.status).toBe('green')
   })
+
+  it('demotes important findings when convergenceRecommendation is converged', async () => {
+    const { runReviewPhase } = await import('../../../src/phases/code/review-merge.js')
+    const { getChangedFiles } = await import('../../../src/git/git-operations.js')
+    const { parseStructuredOutput } = await import('../../../src/drivers/output-parser.js')
+
+    const tasks = [createTask('TASK-1')]
+
+    vi.mocked(parseStructuredOutput).mockReturnValue({
+      ok: true,
+      output: JSON.stringify({
+        filesChanged: ['src/a.ts'],
+        testResult: { totalTests: 1, passingTests: 1, failingTests: 0, durationMs: 100 },
+        buildResult: null,
+        summary: 'done',
+      }),
+      raw: '',
+    })
+    vi.mocked(getChangedFiles).mockResolvedValue(['src/a.ts'])
+
+    // Wave 1: important finding + converged → should go green (important demoted)
+    vi.mocked(runReviewPhase).mockResolvedValueOnce({
+      ...createMergedReview({
+        importantCount: 1,
+        findings: [{ file: 'src/a.ts', severity: 'important', category: 'quality', description: 'Style nit' }],
+      }),
+      convergenceRecommendation: 'converged',
+    })
+
+    const result = await executeDag(
+      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
+    )
+
+    // Should go green in one iteration since important was demoted
+    expect(result.taskCompletions).toHaveLength(1)
+    expect(result.taskCompletions[0]!.status).toBe('green')
+    expect(result.iterations).toHaveLength(1)
+  })
+
+  it('does not demote critical findings even when converged', async () => {
+    const { runReviewPhase } = await import('../../../src/phases/code/review-merge.js')
+    const { getChangedFiles } = await import('../../../src/git/git-operations.js')
+    const { parseStructuredOutput } = await import('../../../src/drivers/output-parser.js')
+
+    const tasks = [createTask('TASK-1')]
+
+    vi.mocked(parseStructuredOutput).mockReturnValue({
+      ok: true,
+      output: JSON.stringify({
+        filesChanged: ['src/a.ts'],
+        testResult: { totalTests: 1, passingTests: 1, failingTests: 0, durationMs: 100 },
+        buildResult: null,
+        summary: 'done',
+      }),
+      raw: '',
+    })
+    vi.mocked(getChangedFiles).mockResolvedValue(['src/a.ts'])
+
+    // Wave 1: critical + converged → critical still blocks
+    vi.mocked(runReviewPhase)
+      .mockResolvedValueOnce({
+        ...createMergedReview({
+          criticalCount: 1,
+          findings: [{ file: 'src/a.ts', severity: 'critical', category: 'bug', description: 'NPE' }],
+        }),
+        convergenceRecommendation: 'converged',
+      })
+      .mockResolvedValueOnce(createMergedReview()) // Wave 2 clean
+
+    const result = await executeDag(
+      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
+    )
+
+    // Should NOT go green in one iteration — critical finding still blocks
+    expect(result.iterations).toHaveLength(2)
+  })
+
+  it('does not demote findings when convergenceRecommendation is continue', async () => {
+    const { runReviewPhase } = await import('../../../src/phases/code/review-merge.js')
+    const { getChangedFiles } = await import('../../../src/git/git-operations.js')
+    const { parseStructuredOutput } = await import('../../../src/drivers/output-parser.js')
+
+    const tasks = [createTask('TASK-1')]
+
+    vi.mocked(parseStructuredOutput).mockReturnValue({
+      ok: true,
+      output: JSON.stringify({
+        filesChanged: ['src/a.ts'],
+        testResult: { totalTests: 1, passingTests: 1, failingTests: 0, durationMs: 100 },
+        buildResult: null,
+        summary: 'done',
+      }),
+      raw: '',
+    })
+    vi.mocked(getChangedFiles).mockResolvedValue(['src/a.ts'])
+
+    // Wave 1: important finding + continue → still blocks
+    vi.mocked(runReviewPhase)
+      .mockResolvedValueOnce({
+        ...createMergedReview({
+          importantCount: 1,
+          findings: [{ file: 'src/a.ts', severity: 'important', category: 'quality', description: 'Real issue' }],
+        }),
+        convergenceRecommendation: 'continue',
+      })
+      .mockResolvedValueOnce(createMergedReview()) // Wave 2 clean
+
+    const result = await executeDag(
+      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
+    )
+
+    // Important finding should still block when continue
+    expect(result.iterations).toHaveLength(2)
+  })
 })
 

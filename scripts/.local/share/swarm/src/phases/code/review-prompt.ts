@@ -40,6 +40,29 @@ function buildIntegrationRules(projectContext?: ProjectContext): string {
   return rules.join('\n')
 }
 
+// === Helpers ===
+
+function buildIterationAwareness(iterationIndex: number): string {
+  return [
+    '# Iteration Awareness',
+    '',
+    `This is review iteration ${iterationIndex}. Previous iterations already identified and addressed multiple findings`,
+    '(see Decision Log above).',
+    '',
+    'Rules for late iterations:',
+    '- Severity is INTRINSIC to the finding. A suggestion on iteration 1 does NOT become important on',
+    '  iteration 5 just because it persists. The severity reflects the IMPACT, not how many times you\'ve',
+    '  seen the codebase.',
+    '- Do NOT re-raise findings from a different angle if the Decision Log shows they were already addressed.',
+    '  "Missing null check" addressed in iteration 2 should not reappear as "potential undefined access" in',
+    '  iteration 5 — that\'s the same issue rephrased.',
+    '- Do NOT flag files under `.swarm/` — those are session artifacts, not project code.',
+    '- If you have zero genuinely new findings, return an empty findings array. That is the CORRECT outcome —',
+    '  it means the code has converged.',
+    '',
+  ].join('\n')
+}
+
 // === API ===
 
 export function buildReviewPrompt(
@@ -47,7 +70,8 @@ export function buildReviewPrompt(
   specItemContext: string,
   testResult: TestResult,
   projectContext?: ProjectContext,
-  decisionLog: string = ''
+  decisionLog: string = '',
+  iterationIndex: number = 0
 ): string {
   const sections: string[] = []
 
@@ -85,6 +109,11 @@ export function buildReviewPrompt(
   // Decision log from previous iterations
   if (decisionLog) {
     sections.push(decisionLog)
+  }
+
+  // Iteration awareness (appended at iteration >= 2)
+  if (iterationIndex >= 2) {
+    sections.push(buildIterationAwareness(iterationIndex))
   }
 
   // DRY enforcement

@@ -91,6 +91,7 @@ export interface MergedReview {
   criticalCount: number
   importantCount: number
   suggestionCount: number
+  convergenceRecommendation?: 'continue' | 'converged'
 }
 
 export type IterationOutcome =
@@ -225,6 +226,7 @@ const mergedReviewSchema = z.object({
   criticalCount: z.number(),
   importantCount: z.number(),
   suggestionCount: z.number(),
+  convergenceRecommendation: z.union([z.literal('continue'), z.literal('converged')]).optional(),
 })
 
 const iterationOutcomeSchema = z.discriminatedUnion('status', [

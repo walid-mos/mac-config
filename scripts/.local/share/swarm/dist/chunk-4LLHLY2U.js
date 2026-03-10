@@ -179,7 +179,9 @@ var IGNORED_PATH_PREFIXES = [
   ".pnpm-store/",
   ".pnpm-store",
   ".git/",
-  ".git"
+  ".git",
+  ".swarm/",
+  ".swarm"
 ];
 async function getChangedFiles(projectDir) {
   const { stdout } = await spawnGit(["status", "--porcelain"], projectDir);

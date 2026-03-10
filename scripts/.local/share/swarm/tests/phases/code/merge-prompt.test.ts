@@ -94,4 +94,48 @@ describe('buildMergePrompt', () => {
     expect(prompt).toContain('"severity"')
     expect(prompt).toContain('"category"')
   })
+
+  it('includes convergence assessment when iterationIndex > 0', () => {
+    const trajectory = 'Wave 0: 3 critical, 2 important, 1 suggestion\nWave 1: 0 critical, 1 important, 2 suggestions'
+    const prompt = buildMergePrompt([codeFindings], 2, '', trajectory)
+
+    expect(prompt).toContain('Convergence Assessment')
+    expect(prompt).toContain('convergenceRecommendation')
+    expect(prompt).toContain('Wave 0: 3 critical')
+    expect(prompt).toContain('"converged"')
+  })
+
+  it('omits convergence assessment when iterationIndex is 0', () => {
+    const prompt = buildMergePrompt([codeFindings], 0)
+
+    expect(prompt).not.toContain('Convergence Assessment')
+    expect(prompt).not.toContain('convergenceRecommendation')
+  })
+
+  it('includes convergenceRecommendation in output format when iterationIndex > 0', () => {
+    const prompt = buildMergePrompt([codeFindings], 1)
+
+    expect(prompt).toContain('convergenceRecommendation')
+  })
+
+  it('omits convergenceRecommendation from output format when iterationIndex is 0', () => {
+    const prompt = buildMergePrompt([codeFindings])
+
+    expect(prompt).not.toContain('convergenceRecommendation')
+  })
+
+  it('includes decision log when provided', () => {
+    const decisionLog = '# Previous Iteration Decisions\n\n- **Iteration 0** | src/a.ts:10 | critical bug: NPE → **Applied fix**: Added guard'
+    const prompt = buildMergePrompt([codeFindings], 1, decisionLog)
+
+    expect(prompt).toContain('Previous Iteration Decisions')
+    expect(prompt).toContain('NPE')
+  })
+
+  it('includes plateau detection guidance', () => {
+    const prompt = buildMergePrompt([codeFindings], 1)
+
+    expect(prompt).toContain('plateau')
+    expect(prompt).toContain('oscillating')
+  })
 })

@@ -3,7 +3,7 @@
 import { spawn } from 'node:child_process'
 import type { SessionContext } from '../../core/types.js'
 import type { DriverRegistry, AgentResult } from '../../drivers/driver.js'
-import type { TestResult, MergedReview, ReviewFinding } from '../phase-results.js'
+import type { TestResult, MergedReview, ReviewFinding, IterationState } from '../phase-results.js'
 import { buildReviewPrompt } from './review-prompt.js'
 import { buildSecurityPrompt } from './security-prompt.js'
 import { buildConsistencyPrompt } from './consistency-prompt.js'
@@ -93,12 +93,13 @@ function parseMergedReview(output: string): MergedReview {
   }
 
   try {
-    const parsed = JSON.parse(cleaned.output) as MergedReview
+    const parsed = JSON.parse(cleaned.output) as MergedReview & { convergenceRecommendation?: string }
     return {
       findings: parsed.findings ?? [],
       criticalCount: parsed.criticalCount ?? 0,
       importantCount: parsed.importantCount ?? 0,
       suggestionCount: parsed.suggestionCount ?? 0,
+      convergenceRecommendation: parsed.convergenceRecommendation === 'converged' ? 'converged' : 'continue',
     }
   } catch (err) {
     process.stderr.write(`WARNING: Failed to parse merged review JSON: ${(err as Error).message}\n`)
@@ -152,6 +153,18 @@ async function invokeWithRetry(
   throw new Error(`${role} review failed: all retries exhausted`)
 }
 
+// === Trajectory ===
+
+export function buildFindingTrajectory(iterations: IterationState[]): string {
+  return iterations
+    .map((iter) => {
+      const review = 'review' in iter.outcome ? iter.outcome.review : undefined
+      if (!review) return `Wave ${iter.iteration}: (no review)`
+      return `Wave ${iter.iteration}: ${review.criticalCount} critical, ${review.importantCount} important, ${review.suggestionCount} suggestion${review.suggestionCount !== 1 ? 's' : ''}`
+    })
+    .join('\n')
+}
+
 // === API ===
 
 export async function runReviewPhase(
@@ -161,7 +174,9 @@ export async function runReviewPhase(
   specItemContext: string,
   testResult: TestResult,
   signal?: AbortSignal,
-  decisionLog: string = ''
+  decisionLog: string = '',
+  iterationIndex: number = 0,
+  iterations: IterationState[] = []
 ): Promise<MergedReview> {
   if (signal?.aborted) {
     throw new Error('Review phase aborted')
@@ -200,9 +215,9 @@ export async function runReviewPhase(
   }
 
   // Build prompts
-  const reviewPrompt = buildReviewPrompt(diff, truncatedSpec, testResult, projectContext, decisionLog)
-  const securityPromptText = buildSecurityPrompt(diff, truncatedSpec, testResult, projectContext, decisionLog)
-  const consistencyPromptText = buildConsistencyPrompt(diff, safeFiles, truncatedSpec, testResult, projectContext, decisionLog)
+  const reviewPrompt = buildReviewPrompt(diff, truncatedSpec, testResult, projectContext, decisionLog, iterationIndex)
+  const securityPromptText = buildSecurityPrompt(diff, truncatedSpec, testResult, projectContext, decisionLog, iterationIndex)
+  const consistencyPromptText = buildConsistencyPrompt(diff, safeFiles, truncatedSpec, testResult, projectContext, decisionLog, iterationIndex)
 
   // Run code + security + consistency review in parallel
   const [codeReviewResult, securityReviewResult, consistencyResult] = await Promise.all([
@@ -221,7 +236,8 @@ export async function runReviewPhase(
   const consistencyFindings = parseReviewFindings(consistencyOutput)
 
   // Build merge prompt and invoke merge agent
-  const mergePrompt = buildMergePrompt([codeFindings, securityFindings, consistencyFindings])
+  const trajectory = buildFindingTrajectory(iterations)
+  const mergePrompt = buildMergePrompt([codeFindings, securityFindings, consistencyFindings], iterationIndex, decisionLog, trajectory)
   const mergeResult = await invokeWithRetry(ctx, registry, 'merge', mergePrompt, signal)
   const mergeOutput = mergeResult.success ? mergeResult.output : ''
 

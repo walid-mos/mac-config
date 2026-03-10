@@ -337,4 +337,24 @@ describe('getChangedFiles', () => {
 
     expect(files).toEqual([])
   })
+
+  it('filters out .swarm/ session artifacts', async () => {
+    const proc = createMockChildProcess()
+    mockSpawn.mockReturnValue(proc as never)
+    setTimeout(() => proc.simulateOutput('?? .swarm/\n?? .swarm/sessions/abc\n M src/app.ts', 0), 0)
+
+    const files = await getChangedFiles('/tmp/project')
+
+    expect(files).toEqual(['src/app.ts'])
+  })
+
+  it('filters out bare .swarm entry', async () => {
+    const proc = createMockChildProcess()
+    mockSpawn.mockReturnValue(proc as never)
+    setTimeout(() => proc.simulateOutput('?? .swarm\n M src/app.ts', 0), 0)
+
+    const files = await getChangedFiles('/tmp/project')
+
+    expect(files).toEqual(['src/app.ts'])
+  })
 })

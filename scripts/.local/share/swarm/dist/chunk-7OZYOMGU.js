@@ -9,15 +9,11 @@ var ModelAssignmentSchema = z.object({
 });
 var AGENT_ROLES = ["plan", "test", "code", "review", "security", "consistency", "merge", "docs"];
 var AgentRoleSchema = z.enum(AGENT_ROLES);
-var ConvergenceConfigSchema = z.object({
-  maxIterations: z.number().int().min(1).max(20)
-});
 var SwarmConfigSchema = z.object({
   models: z.object({
     agents: z.record(AgentRoleSchema, ModelAssignmentSchema),
     tagged: z.record(z.string(), ModelAssignmentSchema)
-  }),
-  convergence: ConvergenceConfigSchema.optional()
+  })
 });
 var PhaseSchema = z.enum(["init", "plan", "tdd", "code", "review", "commit", "docs"]);
 var PhaseErrorSchema = z.object({
@@ -44,6 +40,5 @@ var SwarmStateSchema = z.object({
 
 export {
   ModelAssignmentSchema,
-  ConvergenceConfigSchema,
   SwarmStateSchema
 };

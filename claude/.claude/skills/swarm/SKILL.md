@@ -6,17 +6,17 @@ argument-hint: [task description]
 allowed-tools: Read, Glob, Grep, Write, Edit, Bash, Skill, AskUserQuestion
 ---
 
-# Swarm Skill — Launcher
+# Swarm Skill — Interview → CLI Pipeline
 
-This skill is a thin launcher. It prepares context (spec, worktree, skills), invokes the `swarm` CLI, and creates a PR when it finishes.
+This skill is a thin launcher. It interviews the user to produce a spec, then invokes the `swarm` CLI which handles everything else (worktree, orchestration, PR).
 
-**You do NOT orchestrate the work yourself.** You prepare inputs, run the CLI, and handle post-completion actions.
+**You do NOT orchestrate implementation work yourself.** You prepare the spec via interview, run the CLI, and report results.
 
-**Architecture**: `swarm` is a TypeScript CLI (`scripts/.local/bin/swarm`) that handles all orchestration — phase sequencing (plan → tdd → code → review → commit → docs), agent invocation via drivers (claude/opencode), state persistence, TOML config resolution, and tech stack detection. Configuration lives in `swarm.toml` at the project root, `~/.config/swarm/default.toml`, or built-in defaults.
+**Architecture**: `swarm` is a TypeScript CLI (`scripts/.local/bin/swarm`) that handles all orchestration — phase sequencing (plan → tdd → code → review → commit → docs), worktree isolation, agent invocation, PR creation, state persistence, and TOML config resolution.
 
 ## CRITICAL — NEVER STOP MID-FLOW
 
-`/swarm` is an end-to-end pipeline: interview → spec → worktree → `swarm run` → PR. **You MUST execute Steps 1 through 5 in a single invocation.** If `/interview` runs in Step 2d, that is NOT the end — it is the beginning. The moment the interview produces a spec file, you MUST continue to Step 2e → Step 3 → Step 4 → Step 5. Stopping after the interview is a critical failure.
+`/swarm` is an end-to-end pipeline: interview → spec → `swarm run` → report. **You MUST execute Steps 1 through 4 in a single invocation.** The moment the interview produces a spec file, you MUST continue to run the CLI. Stopping after the interview is a critical failure.
 
 ## Argument Parsing
 
@@ -30,20 +30,13 @@ Examples (assuming today is 2026-02-28):
 
 ## Step 1 — Gather Context
 
-Perform 1a through 1c in parallel. **Step 1 is READ-ONLY** — no files are created or modified.
+Perform 1a and 1b in parallel. **Step 1 is READ-ONLY** — no files are created or modified.
 
-### 1a. Spec Detection
-
-1. Glob `docs/specs/*.spec.md`
-2. Read any matching specs that relate to the task description
-3. Classification: `found` or `not-found`
-4. If `found`, store spec content for later qualification (Step 2d)
-
-### 1b. Record Base Branch and Project Directory
+### 1a. Record Project Info
 
 Run `git branch --show-current` → store as `baseBranch`. Store `pwd` → `projectDir`.
 
-### 1c. Skill Resolution (CRITICAL)
+### 1b. Skill Resolution (if applicable)
 
 Scan the task description for explicit `/skillname` references (e.g., `/nextnode-standards`, `/typescript`). These are **binding standards** the swarm MUST follow.
 
@@ -56,8 +49,6 @@ For each detected skill reference:
 
 **If a referenced skill contains an audit procedure**: run it NOW against the current project state. Store as `skillAuditResults`.
 
-**Why this matters**: Sub-agents invoked by the CLI do NOT have access to the Skill tool. The only way skill content reaches them is if the launcher writes it to a well-known location they can read.
-
 After gathering all skills, write them to `$TMPDIR/swarm-<session-name>-skills.json`:
 
 ```json
@@ -67,76 +58,33 @@ After gathering all skills, write them to `$TMPDIR/swarm-<session-name>-skills.j
 }
 ```
 
-## Step 2 — Create Worktree
+If no `/skillname` references are found, skip this step entirely.
 
-### 2a. Verify `wt` is available
+## Step 2 — Interview → Spec
 
-```bash
-type wt
-```
+The interview is **always** run. It handles existing spec detection internally (deepen vs new vs replace).
 
-If not found, fall back to `git checkout -b feat/<session-name>` and warn the user that parallel swarms won't be isolated.
-
-### 2b. Create the worktree
-
-```bash
-wt new feat/<session-name> -y
-```
-
-### 2c. Record the worktree path
-
-Store `pwd` (after `wt new`) as `worktreePath`.
-
-### 2d. Spec Qualification (in worktree — depends on 1a)
-
-**All file creation happens here, inside the worktree.**
-
-#### Case 1: No spec found
-
-`/interview` is **MANDATORY**:
+### 2a. Invoke `/interview`
 
 ```
 Skill: interview
 Args: <task description>
 ```
 
-Wait for completion. Read the produced spec file → `specPath`.
+The interview skill will:
+1. Check for existing specs at `docs/specs/*.spec.md`
+2. Conduct a deep interactive interview
+3. Write the final spec to `docs/specs/<feature-name>.spec.md`
 
-**CRITICAL: Continue immediately to Step 2e. Do not stop.**
+### 2b. Locate the Spec File
 
-#### Case 2: Spec found
+After the interview completes, find the generated spec:
 
-Assess completeness:
-1. Has Functional Requirements (FR-* items)
-2. Has Acceptance Criteria
-3. No Open Questions
-4. Covers the task scope
+1. Glob `docs/specs/*.spec.md` — sort by modification time (most recent first)
+2. The most recently modified spec is the one just produced → `specPath`
+3. Read `specPath` to verify it has FR-* items and acceptance criteria
 
-**If ALL pass**: use existing path → `specPath`
-
-**If ANY fail**: invoke `/interview` in deepen mode:
-
-```
-Skill: interview
-Args: <task description> — deepening existing spec at <spec path>
-```
-
-Read the updated file → `specPath`
-
-### 2e. Prepare spec files and initial commit
-
-1. `mkdir -p docs/swarm/<session-name>/`
-2. Copy spec to `docs/swarm/<session-name>/spec.md`
-3. Prepend processing banner to the original spec via Edit:
-   ```
-   <!-- PROCESSED BY SWARM: <session-name> — <ISO-8601 timestamp> -->
-   ```
-4. Stage and commit:
-   ```
-   docs(<session-name>): add spec
-
-   Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
-   ```
+**CRITICAL: Continue immediately to Step 3. Do not stop.**
 
 ## Step 3 — Run the Swarm CLI
 
@@ -146,9 +94,23 @@ Read the updated file → `specPath`
 swarm --version
 ```
 
-If not in PATH, try the development path: `<projectDir>/scripts/.local/bin/swarm --version`.
+If not in PATH, try: `<projectDir>/scripts/.local/bin/swarm --version`.
 
-### 3b. Invoke `swarm run`
+### 3b. Commit the spec before running
+
+The spec must be committed so the CLI's worktree has access to it:
+
+```bash
+git add <specPath>
+git commit -m "$(cat <<'EOF'
+docs(<session-name>): add spec for swarm run
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+EOF
+)"
+```
+
+### 3c. Invoke `swarm run`
 
 Run via `Bash(run_in_background: true)`:
 
@@ -156,16 +118,23 @@ Run via `Bash(run_in_background: true)`:
 swarm run \
   --session "<session-name>" \
   --spec "<specPath>" \
-  --project-dir "$(pwd)"
+  --project-dir "<projectDir>"
 ```
 
 Add `--config "<path>"` only if a non-default config path is needed.
 
 Use `Bash(timeout: 600000)` — swarm runs can take up to 10 minutes.
 
-### 3c. Handle exit
+**What the CLI does internally:**
+- Creates a git worktree (`swarm/<session-name>` branch)
+- Runs phases: plan → code (with TDD/review/commit per wave) → docs
+- Opens a draft PR, marks it ready when done
+- Pushes to remote
+- Cleans up the worktree on exit
 
-- **Exit 0 — Success**: all phases completed. Proceed to Step 4.
+### 3d. Handle exit
+
+- **Exit 0 — Success**: proceed to Step 4.
 - **Non-zero — Failure**: read stderr. Present error to user via `AskUserQuestion` with options: retry, abort, or investigate.
 
 To resume after failure:
@@ -173,56 +142,41 @@ To resume after failure:
 ```bash
 swarm resume \
   --session "<session-name>" \
-  --project-dir "$(pwd)"
+  --project-dir "<projectDir>"
 ```
 
-## Step 4 — Validate Results
+## Step 4 — Report Results
 
-1. Read `docs/swarm/<session-name>/delivery-report.md`
-2. Verify every iteration has review, test, and build evidence
-3. **Skill compliance** (if `resolvedSkills` non-empty): re-run the audit from Step 1c against the current state. Every FAIL/MISSING item from the original audit must now be PASS. If not:
-   - Do NOT proceed to Step 5
-   - Re-run with `swarm resume`
-4. Optionally check state at `$TMPDIR/swarm-<session-name>-state.json` for completion details
+### 4a. Read CLI Output
 
-## Step 5 — Pull Request Creation
+The CLI outputs the PR URL and session summary. Parse the output for:
+- PR URL (the CLI creates the PR itself)
+- Session state at `$TMPDIR/swarm-<session-name>-state.json`
 
-### 5a. Push and create PR
+### 4b. Skill Compliance (if applicable)
 
-1. `git push -u origin feat/<session-name>`
-2. Read `docs/swarm/<session-name>/delivery-report.md` for PR body
-3. Create PR:
+If `resolvedSkills` is non-empty: re-run the audit from Step 1b against the current state. Every FAIL/MISSING item from the original audit must now be PASS. If not:
+- Inform the user of remaining failures
+- Suggest running `swarm resume` to fix
 
-```bash
-gh pr create \
-  --title "feat(<session-name>): <short description>" \
-  --body "$(cat docs/swarm/<session-name>/delivery-report.md)" \
-  --base <baseBranch> \
-  --head feat/<session-name>
-```
+### 4c. Present Results
 
-4. Return the PR URL.
-
-### 5b. Worktree Cleanup
-
-If a worktree was created in Step 2:
-
-```bash
-cd <projectDir>
-wt clean feat/<session-name> -y
-```
+Report to the user:
+- PR URL
+- Brief summary of what was implemented
+- Any skill compliance results
 
 ## Edge Cases
 
-- **No changes made**: do not create an empty PR — inform the user
-- **PR creation fails**: show the error, provide the manual command
+- **No changes made**: the CLI won't create a PR — inform the user
 - **Context exhaustion**: the CLI persists state per-phase; `swarm resume` picks up where it left off
+- **Spec already exists**: the interview skill handles this (offers deepen/new/replace options)
 
 ## Constraints
 
-- **`/swarm` ALWAYS executes the full flow** — Steps 1 through 5. NEVER stop after the interview.
-- **The launcher NEVER writes implementation code** — the `swarm` CLI orchestrates agents that do the work.
+- **`/swarm` ALWAYS executes the full flow** — Steps 1 through 4. NEVER stop after the interview.
+- **The launcher NEVER writes implementation code** — the CLI orchestrates agents that do the work.
+- **The launcher NEVER creates worktrees or PRs** — the CLI handles both internally.
 - Never run destructive commands: no `rm -rf`, no `git push --force`, no `git reset --hard`
-- Git operations limited to: branch creation, commit, push, PR creation
 - **NEVER use `sleep` to poll** — the CLI runs synchronously and exits with a status code
 - Never commit secrets or credentials

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { runReviewPhase, verifyMergeIntegrity } from '../../../src/phases/code/review-merge.js'
-import type { ReviewFinding } from '../../../src/phases/phase-results.js'
+import { runReviewPhase, verifyMergeIntegrity, buildFindingTrajectory } from '../../../src/phases/code/review-merge.js'
+import type { ReviewFinding, IterationState, MergedReview } from '../../../src/phases/phase-results.js'
 import type { SessionContext, SessionId } from '../../../src/core/types.js'
 import type { DriverRegistry, Driver, AgentResult } from '../../../src/drivers/driver.js'
 import type { ModelId } from '../../../src/core/types.js'
@@ -320,5 +320,139 @@ describe('verifyMergeIntegrity', () => {
 
     expect(result.restored).toHaveLength(1)
     expect(result.restored[0].file).toBe('hero.astro')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// parseMergedReview — convergenceRecommendation extraction
+// ---------------------------------------------------------------------------
+
+describe('runReviewPhase convergence extraction', () => {
+  let ctx: SessionContext
+  let registry: DriverRegistry
+
+  beforeEach(async () => {
+    vi.clearAllMocks()
+
+    const { readProjectContext } = await import('../../../src/detect/tech-stack.js')
+    vi.mocked(readProjectContext).mockResolvedValue({
+      dependencies: ['react'],
+      devDependencies: ['vitest'],
+      configHighlights: [],
+    })
+
+    ctx = createSessionContext()
+  })
+
+  it('extracts convergenceRecommendation: converged from merge output', async () => {
+    const mergedOutput = JSON.stringify({
+      findings: [],
+      criticalCount: 0,
+      importantCount: 0,
+      suggestionCount: 0,
+      convergenceRecommendation: 'converged',
+    })
+    const driver = createMockDriver(mergedOutput)
+    registry = createMockRegistry(driver)
+
+    const result = await runReviewPhase(ctx, registry, ['src/index.ts'], 'spec', createTestResult())
+
+    expect(result.convergenceRecommendation).toBe('converged')
+  })
+
+  it('defaults convergenceRecommendation to continue when not present', async () => {
+    const mergedOutput = JSON.stringify({
+      findings: [],
+      criticalCount: 0,
+      importantCount: 0,
+      suggestionCount: 0,
+    })
+    const driver = createMockDriver(mergedOutput)
+    registry = createMockRegistry(driver)
+
+    const result = await runReviewPhase(ctx, registry, ['src/index.ts'], 'spec', createTestResult())
+
+    expect(result.convergenceRecommendation).toBe('continue')
+  })
+
+  it('defaults convergenceRecommendation to continue for unknown values', async () => {
+    const mergedOutput = JSON.stringify({
+      findings: [],
+      criticalCount: 0,
+      importantCount: 0,
+      suggestionCount: 0,
+      convergenceRecommendation: 'unknown-value',
+    })
+    const driver = createMockDriver(mergedOutput)
+    registry = createMockRegistry(driver)
+
+    const result = await runReviewPhase(ctx, registry, ['src/index.ts'], 'spec', createTestResult())
+
+    expect(result.convergenceRecommendation).toBe('continue')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// buildFindingTrajectory
+// ---------------------------------------------------------------------------
+
+describe('buildFindingTrajectory', () => {
+  function createMergedReviewForTrajectory(
+    criticalCount: number,
+    importantCount: number,
+    suggestionCount: number
+  ): MergedReview {
+    return {
+      findings: [],
+      criticalCount,
+      importantCount,
+      suggestionCount,
+    }
+  }
+
+  it('produces correct summary for iterations with reviews', () => {
+    const iterations: IterationState[] = [
+      {
+        iteration: 0,
+        outcome: { status: 'needs-iteration', testResult: createTestResult(), review: createMergedReviewForTrajectory(3, 2, 1), reason: 'review-findings' },
+        changedFiles: ['src/a.ts'],
+      },
+      {
+        iteration: 1,
+        outcome: { status: 'needs-iteration', testResult: createTestResult(), review: createMergedReviewForTrajectory(0, 1, 2), reason: 'review-findings' },
+        changedFiles: ['src/a.ts'],
+      },
+      {
+        iteration: 2,
+        outcome: { status: 'green', testResult: createTestResult(), review: createMergedReviewForTrajectory(0, 0, 0) },
+        changedFiles: ['src/a.ts'],
+      },
+    ]
+
+    const trajectory = buildFindingTrajectory(iterations)
+
+    expect(trajectory).toContain('Wave 0: 3 critical, 2 important, 1 suggestion')
+    expect(trajectory).toContain('Wave 1: 0 critical, 1 important, 2 suggestions')
+    expect(trajectory).toContain('Wave 2: 0 critical, 0 important, 0 suggestions')
+  })
+
+  it('handles empty iterations array', () => {
+    const trajectory = buildFindingTrajectory([])
+
+    expect(trajectory).toBe('')
+  })
+
+  it('handles iterations without review (timeout)', () => {
+    const iterations: IterationState[] = [
+      {
+        iteration: 0,
+        outcome: { status: 'timeout' },
+        changedFiles: [],
+      },
+    ]
+
+    const trajectory = buildFindingTrajectory(iterations)
+
+    expect(trajectory).toContain('Wave 0: (no review)')
   })
 })

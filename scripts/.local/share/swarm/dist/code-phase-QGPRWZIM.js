@@ -1,19 +1,95 @@
 import {
+  parseStructuredOutput
+} from "./chunk-ELEMRGRH.js";
+import {
   commitSpecItem,
   getChangedFiles,
   openDraftPr
-} from "./chunk-ZZ4OW3NJ.js";
-import "./chunk-LAECH3RL.js";
-import {
-  parseStructuredOutput
-} from "./chunk-ELEMRGRH.js";
+} from "./chunk-4LLHLY2U.js";
 
-// src/phases/code/code-phase.ts
+// src/phases/code/iteration-logger.ts
+import { mkdirSync, writeFileSync } from "fs";
+import { join } from "path";
+function ensureDir(dir) {
+  mkdirSync(dir, { recursive: true });
+}
+function attemptDir(sessionDir, waveIndex, attempt) {
+  return join(sessionDir, `wave-${waveIndex}`, `attempt-${attempt}`);
+}
+function buildSummaryMarkdown(summary) {
+  const lines = [
+    `# Iteration Summary`,
+    "",
+    `- **Wave:** ${summary.waveIndex}`,
+    `- **Attempt:** ${summary.attempt}`,
+    `- **Status:** ${summary.status}`
+  ];
+  if (summary.reason) {
+    lines.push(`- **Reason:** ${summary.reason}`);
+  }
+  if (summary.criticalCount !== void 0) {
+    lines.push(`- **Critical findings:** ${summary.criticalCount}`);
+  }
+  if (summary.testResult) {
+    lines.push("");
+    lines.push("## Test Results");
+    lines.push(`- Total: ${summary.testResult.totalTests}`);
+    lines.push(`- Passing: ${summary.testResult.passingTests}`);
+    lines.push(`- Failing: ${summary.testResult.failingTests}`);
+    lines.push(`- Duration: ${summary.testResult.durationMs}ms`);
+  }
+  if (summary.buildResult) {
+    lines.push("");
+    lines.push("## Build Results");
+    lines.push(`- Success: ${summary.buildResult.success}`);
+    lines.push(`- Duration: ${summary.buildResult.durationMs}ms`);
+  }
+  lines.push("");
+  return lines.join("\n");
+}
+function createIterationLogger(projectDir, sessionId) {
+  const sessionDir = join(projectDir, ".swarm", "sessions", sessionId);
+  ensureDir(sessionDir);
+  return {
+    sessionDir,
+    logAgentPrompt(waveIndex, attempt, taskId, prompt) {
+      const dir = attemptDir(sessionDir, waveIndex, attempt);
+      ensureDir(dir);
+      writeFileSync(join(dir, `agent-${taskId}-prompt.md`), prompt, "utf-8");
+    },
+    logAgentResult(waveIndex, attempt, taskId, result) {
+      const dir = attemptDir(sessionDir, waveIndex, attempt);
+      ensureDir(dir);
+      writeFileSync(join(dir, `agent-${taskId}.md`), result, "utf-8");
+    },
+    logReview(waveIndex, attempt, review) {
+      const dir = attemptDir(sessionDir, waveIndex, attempt);
+      ensureDir(dir);
+      writeFileSync(join(dir, "merged-review.json"), JSON.stringify(review, null, 2), "utf-8");
+    },
+    logTestResult(waveIndex, attempt, testResult) {
+      const dir = attemptDir(sessionDir, waveIndex, attempt);
+      ensureDir(dir);
+      writeFileSync(join(dir, "test-result.json"), JSON.stringify(testResult, null, 2), "utf-8");
+    },
+    logBuildResult(waveIndex, attempt, buildResult) {
+      const dir = attemptDir(sessionDir, waveIndex, attempt);
+      ensureDir(dir);
+      writeFileSync(join(dir, "build-result.json"), JSON.stringify(buildResult, null, 2), "utf-8");
+    },
+    logIterationSummary(waveIndex, attempt, summary) {
+      const dir = attemptDir(sessionDir, waveIndex, attempt);
+      ensureDir(dir);
+      writeFileSync(join(dir, "summary.md"), buildSummaryMarkdown(summary), "utf-8");
+    }
+  };
+}
+
+// src/phases/code/dag-executor.ts
 import { randomUUID } from "crypto";
 
 // src/phases/plan/task-scheduler.ts
-function buildTaskBatches(tasks, maxBatchSize = 3) {
-  if (tasks.length === 0) return [];
+function buildDependencyGraph(tasks) {
   const taskMap = /* @__PURE__ */ new Map();
   for (const task of tasks) {
     taskMap.set(task.id, task);
@@ -31,32 +107,7 @@ function buildTaskBatches(tasks, maxBatchSize = 3) {
       dependents.get(dep).push(task.id);
     }
   }
-  const batches = [];
-  const resolved = /* @__PURE__ */ new Set();
-  while (true) {
-    const ready = [];
-    for (const task of tasks) {
-      if (resolved.has(task.id)) continue;
-      if (inDegree.get(task.id) === 0) {
-        ready.push(task);
-      }
-    }
-    if (ready.length === 0) break;
-    for (let j = 0; j < ready.length; j += maxBatchSize) {
-      batches.push({ batchIndex: batches.length, tasks: ready.slice(j, j + maxBatchSize) });
-    }
-    for (const task of ready) {
-      resolved.add(task.id);
-      for (const dependent of dependents.get(task.id) ?? []) {
-        inDegree.set(dependent, (inDegree.get(dependent) ?? 1) - 1);
-      }
-    }
-  }
-  if (resolved.size < tasks.length) {
-    const unresolved = tasks.filter((t) => !resolved.has(t.id)).map((t) => t.id);
-    throw new Error(`Circular dependency detected among tasks: ${unresolved.join(", ")}`);
-  }
-  return batches;
+  return { inDegree, dependents, taskMap };
 }
 
 // src/phases/code/review-merge.ts
@@ -95,7 +146,27 @@ function buildIntegrationRules(projectContext) {
   ];
   return rules.join("\n");
 }
-function buildReviewPrompt(diff, specItemContext, testResult, projectContext, decisionLog = "") {
+function buildIterationAwareness(iterationIndex) {
+  return [
+    "# Iteration Awareness",
+    "",
+    `This is review iteration ${iterationIndex}. Previous iterations already identified and addressed multiple findings`,
+    "(see Decision Log above).",
+    "",
+    "Rules for late iterations:",
+    "- Severity is INTRINSIC to the finding. A suggestion on iteration 1 does NOT become important on",
+    "  iteration 5 just because it persists. The severity reflects the IMPACT, not how many times you've",
+    "  seen the codebase.",
+    "- Do NOT re-raise findings from a different angle if the Decision Log shows they were already addressed.",
+    '  "Missing null check" addressed in iteration 2 should not reappear as "potential undefined access" in',
+    "  iteration 5 \u2014 that's the same issue rephrased.",
+    "- Do NOT flag files under `.swarm/` \u2014 those are session artifacts, not project code.",
+    "- If you have zero genuinely new findings, return an empty findings array. That is the CORRECT outcome \u2014",
+    "  it means the code has converged.",
+    ""
+  ].join("\n");
+}
+function buildReviewPrompt(diff, specItemContext, testResult, projectContext, decisionLog = "", iterationIndex = 0) {
   const sections = [];
   sections.push("# Role\n\nYou are a code review agent. Review the following code changes for bugs, quality issues, performance problems, integration conflicts, and adherence to best practices.");
   if (projectContext) {
@@ -131,6 +202,9 @@ ${specItemContext}`);
   if (decisionLog) {
     sections.push(decisionLog);
   }
+  if (iterationIndex >= 2) {
+    sections.push(buildIterationAwareness(iterationIndex));
+  }
   sections.push("# DRY Enforcement\n\nDRY violations with 3 or more repetitions of the same string/pattern are severity `important`, NOT `suggestion`. Repeated class strings, duplicated logic blocks, and copy-pasted constants that appear 3+ times MUST be flagged as `important` with category `dry-violation`. The code agent MUST fix them.");
   sections.push('# Fix Quality\n\nEvery `suggestedFix` MUST be actionable \u2014 include the target file, the specific change, and why.\nBAD:  "Fix the link." / "Add missing element."\nGOOD: Specific file + what to add/change + where in the file.');
   sections.push('# Output Format\n\nIMPORTANT: Output ONLY raw JSON. No markdown fences, no narrative text, no commentary before or after the JSON.\n\nReturn a JSON object with this structure:\n\n{\n  "findings": [\n    {\n      "file": "string",\n      "line": number,\n      "severity": "critical" | "important" | "suggestion",\n      "category": "bug" | "security" | "quality" | "performance" | "dry-violation" | "dead-code" | "spec-compliance",\n      "description": "string",\n      "suggestedFix": "string"\n    }\n  ]\n}\n\nAll string values in JSON must use proper JSON escaping \u2014 newlines as \\n, quotes as \\", backslashes as \\\\. Do NOT put raw newlines inside JSON string values.');
@@ -160,7 +234,27 @@ function buildSecurityIntegrationRules(projectContext) {
   ];
   return rules.join("\n");
 }
-function buildSecurityPrompt(diff, specItemContext, testResult, projectContext, decisionLog = "") {
+function buildIterationAwareness2(iterationIndex) {
+  return [
+    "# Iteration Awareness",
+    "",
+    `This is review iteration ${iterationIndex}. Previous iterations already identified and addressed multiple findings`,
+    "(see Decision Log above).",
+    "",
+    "Rules for late iterations:",
+    "- Severity is INTRINSIC to the finding. A suggestion on iteration 1 does NOT become important on",
+    "  iteration 5 just because it persists. The severity reflects the IMPACT, not how many times you've",
+    "  seen the codebase.",
+    "- Do NOT re-raise findings from a different angle if the Decision Log shows they were already addressed.",
+    '  "Missing null check" addressed in iteration 2 should not reappear as "potential undefined access" in',
+    "  iteration 5 \u2014 that's the same issue rephrased.",
+    "- Do NOT flag files under `.swarm/` \u2014 those are session artifacts, not project code.",
+    "- If you have zero genuinely new findings, return an empty findings array. That is the CORRECT outcome \u2014",
+    "  it means the code has converged.",
+    ""
+  ].join("\n");
+}
+function buildSecurityPrompt(diff, specItemContext, testResult, projectContext, decisionLog = "", iterationIndex = 0) {
   const sections = [];
   sections.push("# Role\n\nYou are a security review agent. Analyze the following code changes with focus on OWASP Top 10 vulnerabilities, injection risks, authentication/authorization issues, XSS, and other security concerns.\n\n## CRITICAL: Be Exhaustive on First Pass\n\nYou MUST find ALL security issues in a SINGLE pass. Do NOT drip-feed findings across iterations. Scan the ENTIRE diff and ALL config files for EVERY possible security concern NOW \u2014 headers, CSP directives, CSRF, XSS, injection, secrets, CORS, auth, transport security, framing, MIME sniffing, ALL of it. If you miss something on this pass and it appears in a later iteration, that is a failure.\n\n## Severity Rules\n\n- `critical`: Exploitable vulnerabilities \u2014 SQL injection, XSS with a working vector, hardcoded secrets in source, auth bypass, command injection. Real bugs that an attacker can exploit TODAY.\n- `important`: Real threat vectors with clear attack surface \u2014 missing CSP, missing CSRF protection on authenticated endpoints, permissive CORS on sensitive routes, missing input validation at system boundaries. Issues that create exploitable conditions even if no exploit exists yet.\n- `suggestion`: Defense-in-depth hardening \u2014 adding HSTS, tightening CSP directives further, removing unsafe-inline when not strictly needed, adding frame-ancestors when X-Frame-Options already covers it, theoretical future risks. These are good security hygiene but NOT blocking.\n\nDo NOT escalate defense-in-depth items to `important`. If the threat requires a chain of hypothetical future changes to become exploitable, it is a `suggestion`. Only flag real, present-day threat vectors as `important` or higher.");
   if (projectContext) {
@@ -196,13 +290,36 @@ ${specItemContext}`);
   if (decisionLog) {
     sections.push(decisionLog);
   }
+  if (iterationIndex >= 2) {
+    sections.push(buildIterationAwareness2(iterationIndex));
+  }
   sections.push('# Fix Quality\n\nEvery `suggestedFix` MUST be actionable \u2014 a code agent must be able to implement it without further research.\n\nA good fix includes: (1) which file to modify, (2) the specific code or config change, (3) any commands to run if needed.\n\nBAD:  "Fix the security issue." / "Add headers." / "Improve configuration."\nGOOD: Specific file path + exact change + reason.\n\nIf you see a security issue but aren\'t sure of the exact fix for this specific framework/toolchain, say what needs to change and WHERE to investigate \u2014 don\'t just name the problem.');
   sections.push('# Output Format\n\nIMPORTANT: Output ONLY raw JSON. No markdown fences, no narrative text, no commentary before or after the JSON.\n\nReturn a JSON object with this structure:\n\n{\n  "findings": [\n    {\n      "file": "string",\n      "line": number,\n      "severity": "critical" | "important" | "suggestion",\n      "category": "bug" | "security" | "quality" | "performance" | "dry-violation" | "dead-code" | "spec-compliance",\n      "description": "string",\n      "suggestedFix": "string"\n    }\n  ]\n}\n\nAll string values in JSON must use proper JSON escaping \u2014 newlines as \\n, quotes as \\", backslashes as \\\\. Do NOT put raw newlines inside JSON string values.');
   return sections.join("\n\n");
 }
 
 // src/phases/code/consistency-prompt.ts
-function buildConsistencyPrompt(diff, changedFiles, specItemContext, testResult, projectContext, decisionLog = "") {
+function buildIterationAwareness3(iterationIndex) {
+  return [
+    "# Iteration Awareness",
+    "",
+    `This is review iteration ${iterationIndex}. Previous iterations already identified and addressed multiple findings`,
+    "(see Decision Log above).",
+    "",
+    "Rules for late iterations:",
+    "- Severity is INTRINSIC to the finding. A suggestion on iteration 1 does NOT become important on",
+    "  iteration 5 just because it persists. The severity reflects the IMPACT, not how many times you've",
+    "  seen the codebase.",
+    "- Do NOT re-raise findings from a different angle if the Decision Log shows they were already addressed.",
+    '  "Missing null check" addressed in iteration 2 should not reappear as "potential undefined access" in',
+    "  iteration 5 \u2014 that's the same issue rephrased.",
+    "- Do NOT flag files under `.swarm/` \u2014 those are session artifacts, not project code.",
+    "- If you have zero genuinely new findings, return an empty findings array. That is the CORRECT outcome \u2014",
+    "  it means the code has converged.",
+    ""
+  ].join("\n");
+}
+function buildConsistencyPrompt(diff, changedFiles, specItemContext, testResult, projectContext, decisionLog = "", iterationIndex = 0) {
   const sections = [];
   sections.push('# Role\n\nYou are a consistency review agent. Analyze cross-component coherence, visual consistency, and holistic integration of the following code changes. Your goal is to catch issues that individual code review and security review miss \u2014 problems that only become visible when looking at multiple components together.\n\n## CRITICAL: Be Exhaustive \u2014 No Whack-a-Mole\n\nWhen you find an inconsistency on ONE element, you MUST immediately check ALL elements of the same type across ALL files in the diff. Report ONE comprehensive finding per category of inconsistency, listing EVERY affected element.\n\nBAD: "Button X in HeroSection.astro lacks focus-visible styles" (without checking the 5 other buttons)\nGOOD: "Focus-visible styles are missing on: HeroSection.astro:12, HeroSection.astro:15, Header.astro:11, Footer.astro:7, Footer.astro:8, ContactForm.astro:76. Only ContactForm.astro:63 has them. Fix: add `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2` to ALL listed elements."\n\nDo NOT report one element per finding. Report one CATEGORY of inconsistency with ALL affected elements listed. If you find `rounded-md` vs `rounded-lg` inconsistency, check EVERY element with a border-radius in the diff and list them all in one finding.\n\nThis is NON-NEGOTIABLE. Partial findings that miss sibling elements are worse than no finding at all \u2014 they cause an endless loop of fix-one-discover-another across iterations.');
   if (projectContext) {
@@ -240,6 +357,9 @@ ${specItemContext}`);
 - Duration: ${testResult.durationMs}ms`);
   if (decisionLog) {
     sections.push(decisionLog);
+  }
+  if (iterationIndex >= 2) {
+    sections.push(buildIterationAwareness3(iterationIndex));
   }
   sections.push("# DRY Enforcement\n\nDRY violations with 3 or more repetitions of the same string/pattern are severity `important`, NOT `suggestion`. Repeated class strings, duplicated logic blocks, and copy-pasted constants that appear 3+ times MUST be flagged as `important` with category `dry-violation`. List ALL occurrences in a single finding.");
   sections.push('# Fix Quality\n\nEvery `suggestedFix` MUST be actionable \u2014 include the target file, the specific change, and why.\nBAD:  "Fix the colors." / "Make it consistent."\nGOOD: Specific file + what to change + where in the file.');
@@ -285,7 +405,7 @@ function buildConsistencyRules() {
 }
 
 // src/phases/code/merge-prompt.ts
-function buildMergePrompt(findingsArrays) {
+function buildMergePrompt(findingsArrays, iterationIndex = 0, decisionLog = "", findingTrajectory = "") {
   const sections = [];
   sections.push("# Role\n\nYou are a review merger agent. Consolidate and deduplicate findings from the code review, security review, and consistency review into a single merged review.");
   const labels = ["Code Review", "Security Review", "Consistency Review"];
@@ -298,13 +418,64 @@ ${JSON.stringify(findings, null, 2)}`);
   }
   sections.push("# Deduplication Instructions\n\n- Identify duplicate findings by matching file + line + category\n- When findings overlap, keep the most severe version\n- Preserve all unique findings from all three reviews\n- Count criticalCount, importantCount, and suggestionCount accurately");
   sections.push('# Finding Enhancement\n\nImprove vague findings during merge:\n- If both reviews flagged the same issue with different detail levels, keep the MORE detailed version\n- If a `suggestedFix` doesn\'t mention a file path or specific change, enhance it using context from both reviews\n- NEVER output a finding whose `suggestedFix` is just "fix the issue" or similarly vague \u2014 always include the target file and what to change');
-  sections.push('# Output Format\n\nIMPORTANT: Output ONLY raw JSON. No markdown fences, no narrative text, no commentary before or after the JSON.\n\nReturn a JSON object with this structure:\n\n{\n  "findings": [\n    {\n      "file": "string",\n      "line": number,\n      "severity": "critical" | "important" | "suggestion",\n      "category": "bug" | "security" | "quality" | "performance" | "dry-violation" | "dead-code",\n      "description": "string",\n      "suggestedFix": "string"\n    }\n  ],\n  "criticalCount": number,\n  "importantCount": number,\n  "suggestionCount": number\n}\n\nAll string values in JSON must use proper JSON escaping \u2014 newlines as \\n, quotes as \\", backslashes as \\\\. Do NOT put raw newlines inside JSON string values.');
+  if (decisionLog) {
+    sections.push(decisionLog);
+  }
+  if (iterationIndex > 0) {
+    const trajectoryBlock = findingTrajectory ? `
+Finding trajectory from previous waves:
+${findingTrajectory}
+` : "";
+    sections.push([
+      "# Convergence Assessment",
+      "",
+      "After merging findings, assess whether another code iteration would be productive.",
+      "",
+      'You MUST output a `convergenceRecommendation` field: "continue" or "converged".',
+      trajectoryBlock,
+      "Decision rules:",
+      '- "continue": remaining critical/important findings describe NEW, actionable issues not previously',
+      "  addressed. The code agent can make meaningful progress.",
+      '- "converged": remaining findings are (a) variations of previously-addressed issues, (b) theoretical',
+      "  edge cases unlikely in practice, (c) stylistic preferences, or (d) only suggestions. Another",
+      "  iteration would produce diminishing returns.",
+      '- If the finding trajectory shows a plateau (same count for 2+ waves), recommend "converged" \u2014 the',
+      "  system is oscillating, not improving.",
+      '- If all remaining blocking findings are marked [RECURRING] in the decision log, recommend "converged".',
+      '- When in doubt, ask: "Would a senior engineer block this PR for these remaining findings?" If no \u2192',
+      '  "converged".'
+    ].join("\n"));
+  }
+  const convergenceField = iterationIndex > 0 ? ',\n  "convergenceRecommendation": "continue" | "converged"' : "";
+  sections.push(`# Output Format
+
+IMPORTANT: Output ONLY raw JSON. No markdown fences, no narrative text, no commentary before or after the JSON.
+
+Return a JSON object with this structure:
+
+{
+  "findings": [
+    {
+      "file": "string",
+      "line": number,
+      "severity": "critical" | "important" | "suggestion",
+      "category": "bug" | "security" | "quality" | "performance" | "dry-violation" | "dead-code",
+      "description": "string",
+      "suggestedFix": "string"
+    }
+  ],
+  "criticalCount": number,
+  "importantCount": number,
+  "suggestionCount": number${convergenceField}
+}
+
+All string values in JSON must use proper JSON escaping \u2014 newlines as \\n, quotes as \\", backslashes as \\\\. Do NOT put raw newlines inside JSON string values.`);
   return sections.join("\n\n");
 }
 
 // src/detect/tech-stack.ts
 import { existsSync, readFileSync } from "fs";
-import { join } from "path";
+import { join as join2 } from "path";
 var CONFIG_HIGHLIGHT_FILES = [
   "vite.config.ts",
   "vite.config.js",
@@ -316,7 +487,7 @@ var CONFIG_HIGHLIGHT_FILES = [
 ];
 var MAX_CONFIG_PREVIEW_BYTES = 2048;
 async function readProjectContext(projectDir) {
-  const packageJsonPath = join(projectDir, "package.json");
+  const packageJsonPath = join2(projectDir, "package.json");
   let dependencies = [];
   let devDependencies = [];
   if (existsSync(packageJsonPath)) {
@@ -332,7 +503,7 @@ async function readProjectContext(projectDir) {
   }
   const configHighlights = [];
   for (const configFile of CONFIG_HIGHLIGHT_FILES) {
-    const configPath = join(projectDir, configFile);
+    const configPath = join2(projectDir, configFile);
     if (!existsSync(configPath)) continue;
     try {
       const raw = readFileSync(configPath, "utf-8");
@@ -431,7 +602,8 @@ function parseMergedReview(output) {
       findings: parsed.findings ?? [],
       criticalCount: parsed.criticalCount ?? 0,
       importantCount: parsed.importantCount ?? 0,
-      suggestionCount: parsed.suggestionCount ?? 0
+      suggestionCount: parsed.suggestionCount ?? 0,
+      convergenceRecommendation: parsed.convergenceRecommendation === "converged" ? "converged" : "continue"
     };
   } catch (err) {
     process.stderr.write(`WARNING: Failed to parse merged review JSON: ${err.message}
@@ -472,7 +644,14 @@ async function invokeWithRetry(ctx, registry, role, prompt, signal) {
   }
   throw new Error(`${role} review failed: all retries exhausted`);
 }
-async function runReviewPhase(ctx, registry, changedFiles, specItemContext, testResult, signal, decisionLog = "") {
+function buildFindingTrajectory(iterations) {
+  return iterations.map((iter) => {
+    const review = "review" in iter.outcome ? iter.outcome.review : void 0;
+    if (!review) return `Wave ${iter.iteration}: (no review)`;
+    return `Wave ${iter.iteration}: ${review.criticalCount} critical, ${review.importantCount} important, ${review.suggestionCount} suggestion${review.suggestionCount !== 1 ? "s" : ""}`;
+  }).join("\n");
+}
+async function runReviewPhase(ctx, registry, changedFiles, specItemContext, testResult, signal, decisionLog = "", iterationIndex = 0, iterations = []) {
   if (signal?.aborted) {
     throw new Error("Review phase aborted");
   }
@@ -502,9 +681,9 @@ async function runReviewPhase(ctx, registry, changedFiles, specItemContext, test
     process.stderr.write(`WARNING: readProjectContext failed: ${err.message}
 `);
   }
-  const reviewPrompt = buildReviewPrompt(diff, truncatedSpec, testResult, projectContext, decisionLog);
-  const securityPromptText = buildSecurityPrompt(diff, truncatedSpec, testResult, projectContext, decisionLog);
-  const consistencyPromptText = buildConsistencyPrompt(diff, safeFiles, truncatedSpec, testResult, projectContext, decisionLog);
+  const reviewPrompt = buildReviewPrompt(diff, truncatedSpec, testResult, projectContext, decisionLog, iterationIndex);
+  const securityPromptText = buildSecurityPrompt(diff, truncatedSpec, testResult, projectContext, decisionLog, iterationIndex);
+  const consistencyPromptText = buildConsistencyPrompt(diff, safeFiles, truncatedSpec, testResult, projectContext, decisionLog, iterationIndex);
   const [codeReviewResult, securityReviewResult, consistencyResult] = await Promise.all([
     invokeWithRetry(ctx, registry, "review", reviewPrompt, signal),
     invokeWithRetry(ctx, registry, "security", securityPromptText, signal),
@@ -516,7 +695,8 @@ async function runReviewPhase(ctx, registry, changedFiles, specItemContext, test
   const codeFindings = parseReviewFindings(codeOutput);
   const securityFindings = parseReviewFindings(secOutput);
   const consistencyFindings = parseReviewFindings(consistencyOutput);
-  const mergePrompt = buildMergePrompt([codeFindings, securityFindings, consistencyFindings]);
+  const trajectory = buildFindingTrajectory(iterations);
+  const mergePrompt = buildMergePrompt([codeFindings, securityFindings, consistencyFindings], iterationIndex, decisionLog, trajectory);
   const mergeResult = await invokeWithRetry(ctx, registry, "merge", mergePrompt, signal);
   const mergeOutput = mergeResult.success ? mergeResult.output : "";
   let merged = parseMergedReview(mergeOutput);
@@ -687,114 +867,656 @@ ${lines.join("\n")}`);
   return sections.join("\n\n");
 }
 
-// src/phases/code/iteration-logger.ts
-import { mkdirSync, writeFileSync } from "fs";
-import { join as join2 } from "path";
-function ensureDir(dir) {
-  mkdirSync(dir, { recursive: true });
-}
-function attemptDir(sessionDir, batchIndex, attempt) {
-  return join2(sessionDir, `batch-${batchIndex}`, `attempt-${attempt}`);
-}
-function buildSummaryMarkdown(summary) {
-  const lines = [
-    `# Iteration Summary`,
-    "",
-    `- **Batch:** ${summary.batchIndex}`,
-    `- **Attempt:** ${summary.attempt}`,
-    `- **Status:** ${summary.status}`
-  ];
-  if (summary.reason) {
-    lines.push(`- **Reason:** ${summary.reason}`);
-  }
-  if (summary.criticalCount !== void 0) {
-    lines.push(`- **Critical findings:** ${summary.criticalCount}`);
-  }
-  if (summary.testResult) {
+// src/phases/tdd/test-prompt.ts
+function buildTestPrompt(plannerOutput, tasks, techStack, testConventions) {
+  const lines = [];
+  lines.push("# Role");
+  lines.push("");
+  lines.push("You are a TDD test engineer. Your single purpose is to write **failing tests** (RED phase) that define expected behavior for each task. Tests must be syntactically valid, compile successfully, and **fail for the right reason** \u2014 they fail because the implementation does not exist yet, not because the test is broken.");
+  lines.push("");
+  lines.push("# Tech Stack");
+  lines.push("");
+  lines.push(`- **Test Runner**: ${techStack.testRunner ?? "not detected"}`);
+  lines.push(`- **Languages**: ${techStack.languages.join(", ") || "none"}`);
+  lines.push(`- **Frameworks**: ${techStack.frameworks.join(", ") || "none"}`);
+  lines.push(`- **Test Command**: ${techStack.testCommand}`);
+  lines.push("");
+  lines.push("# Planner Output");
+  lines.push("");
+  lines.push(plannerOutput.trim());
+  lines.push("");
+  lines.push("# Tasks to Test");
+  lines.push("");
+  for (const task of tasks) {
+    lines.push(`## ${task.id}: ${task.title}`);
+    lines.push(`- **Tag**: ${task.tag}`);
+    lines.push(`- **Description**: ${task.description}`);
+    lines.push(`- **Test hints**: ${task.testHints.join(", ")}`);
     lines.push("");
-    lines.push("## Test Results");
-    lines.push(`- Total: ${summary.testResult.totalTests}`);
-    lines.push(`- Passing: ${summary.testResult.passingTests}`);
-    lines.push(`- Failing: ${summary.testResult.failingTests}`);
-    lines.push(`- Duration: ${summary.testResult.durationMs}ms`);
   }
-  if (summary.buildResult) {
-    lines.push("");
-    lines.push("## Build Results");
-    lines.push(`- Success: ${summary.buildResult.success}`);
-    lines.push(`- Duration: ${summary.buildResult.durationMs}ms`);
+  lines.push("# Testing Conventions");
+  lines.push("");
+  for (const convention of testConventions) {
+    lines.push(`- ${convention}`);
   }
   lines.push("");
+  lines.push("# What to Test");
+  lines.push("");
+  lines.push("For each task, test the following behaviors:");
+  lines.push("");
+  lines.push("## Happy Path");
+  lines.push("- Expected inputs produce expected outputs");
+  lines.push("- Core business logic behaves correctly");
+  lines.push("- Return types and shapes are correct");
+  lines.push("");
+  lines.push("## Edge Cases");
+  lines.push("- Empty inputs (null, undefined, empty string, empty array, empty object)");
+  lines.push("- Boundary values (min, max, zero, negative, overflow)");
+  lines.push("- Single-element vs multi-element collections");
+  lines.push("- Unicode / special characters in string inputs");
+  lines.push("");
+  lines.push("## Error Handling");
+  lines.push("- Invalid inputs throw or return appropriate errors");
+  lines.push("- Missing required parameters are rejected");
+  lines.push("- Malformed data is handled gracefully");
+  lines.push("- Async operations that fail are caught and propagated");
+  lines.push("");
+  lines.push("## Security");
+  lines.push("- Input validation rejects injection attempts (SQL, XSS, command injection)");
+  lines.push("- Authentication/authorization checks are enforced");
+  lines.push("- Sensitive data is not leaked in error messages or logs");
+  lines.push("- Path traversal attempts are blocked");
+  lines.push("- Rate limiting / resource limits are enforced where applicable");
+  lines.push("");
+  lines.push("## Functional Behavior");
+  lines.push("- If the spec describes user-facing features (navigation, forms, interactions), tests must verify the BEHAVIOR works \u2014 not just that markup exists");
+  lines.push('- For links: verify both the link AND its target exist (e.g., an anchor `href="#X"` is useless without a matching `id="X"`)');
+  lines.push("- For components that compose into pages: verify the composition works by reading source files and asserting on imports, slots, and props \u2014 NEVER by running a build");
+  lines.push("- For external resources: verify URLs are well-formed and use HTTPS");
+  lines.push("");
+  lines.push("IMPORTANT: Tests must verify BEHAVIOR, not just structure.");
+  lines.push("- BAD:  `expect(content).toContain('href=\"#features\"')`  \u2014 only checks string presence");
+  lines.push('- GOOD: also verify `id="features"` exists on the target element');
+  lines.push("- BAD:  `expect(existsSync('Component.astro')).toBe(true)` \u2014 only checks file exists");
+  lines.push("- GOOD: read the file and verify it contains the spec-required content/structure");
+  lines.push("");
+  lines.push("# Test Writing Guidelines");
+  lines.push("");
+  lines.push("## Naming Convention \u2014 MANDATORY");
+  lines.push("");
+  lines.push("`describe` blocks and `it` names MUST use functional, user-facing language. NEVER use technical file names, component names, or task IDs.");
+  lines.push("- BAD:  `describe('BaseLayout.astro')`, `it('creates Header component')`");
+  lines.push("- GOOD: `describe('Base page layout')`, `it('includes site metadata and viewport settings')`");
+  lines.push("- BAD:  `describe('TASK-1')`, `it('renders FeaturesSection')`");
+  lines.push("- GOOD: `describe('Features showcase')`, `it('displays feature cards with icons and descriptions')`");
+  lines.push("");
+  lines.push("## DO");
+  lines.push("- Test public API / exported functions only");
+  lines.push('- Test behavior: "given X input, expect Y output"');
+  lines.push('- Test error conditions: "given invalid input, expect specific error"');
+  lines.push("- Use descriptive `describe` blocks that read like documentation");
+  lines.push("- Use factory functions or builders for test data");
+  lines.push("- Mock external dependencies (DB, HTTP, file system) at module boundaries");
+  lines.push("- Keep each test focused on one behavior");
+  lines.push("- Use clear test names: `it('returns empty array when no items match filter')`");
+  lines.push("");
+  lines.push("## DON'T");
+  lines.push("- Don't test private/internal functions directly");
+  lines.push("- Don't use snapshot tests");
+  lines.push("- Don't test framework internals");
+  lines.push("- Don't write tests that depend on execution order");
+  lines.push("- Don't duplicate assertions across tests");
+  lines.push("- Don't mock the module under test");
+  lines.push("- Don't write overly specific assertions that break on irrelevant changes");
+  lines.push("- NEVER run build commands (pnpm build, npm run build, etc.) inside tests \u2014 builds are slow, couple tests to the entire project, and belong in CI, not in the test suite. To verify build output, read source files and assert on their content instead.");
+  lines.push("");
+  lines.push("## Mock Strategy");
+  lines.push("- **External services**: Always mock (DB, HTTP, file system, third-party APIs)");
+  lines.push("- **Internal modules**: Mock only at architectural boundaries (e.g., mock the repository when testing the service)");
+  lines.push("- **Utilities**: Don't mock pure utility functions \u2014 use them directly");
+  lines.push("");
+  lines.push("# Constraints");
+  lines.push("");
+  lines.push("1. All tests MUST fail in the RED phase \u2014 they fail because implementation doesn't exist, not because the test is broken.");
+  lines.push("2. Tests MUST be syntactically valid \u2014 they must compile and be parseable by the test runner.");
+  lines.push("3. Write one test file per task. Follow project directory conventions.");
+  lines.push("4. Use describe/it/expect patterns appropriate for the test runner.");
+  lines.push("5. Test file paths must be relative to the project root.");
+  lines.push("6. Minimum 3 tests per task: happy path + edge case + error case.");
+  lines.push("7. NEVER write implementation code \u2014 tests only.");
+  lines.push("8. Tests MUST verify that the implementation WORKS, not just that files exist or strings are present. If the spec describes linked elements (nav \u2192 sections, form \u2192 endpoint, button \u2192 action), test BOTH sides of the link.");
+  lines.push('9. NEVER write a test that passes when implementation is broken. If a test checks `href="#X"` exists, it MUST also check that an element with `id="X"` exists \u2014 otherwise the test gives false confidence.');
+  lines.push("10. NEVER write tests that pass before implementation \u2014 if a test passes, it tests nothing useful.");
+  lines.push("");
+  lines.push("# Execution");
+  lines.push("");
+  lines.push("After writing tests, run them to verify they fail (red phase):");
+  lines.push(`- Command: ${techStack.testCommand}`);
+  lines.push("- Tests MUST fail (red) since no implementation exists yet");
+  lines.push("- If tests pass, they are wrong \u2014 tests that pass without implementation are useless");
+  lines.push("");
+  lines.push("# Output");
+  lines.push("");
+  lines.push("After running tests, output a JSON block:");
+  lines.push("```json");
+  lines.push('{ "testFiles": ["path/to/test.ts"], "testResult": { "totalTests": 0, "passingTests": 0, "failingTests": 0 }, "isRed": true }');
+  lines.push("```");
   return lines.join("\n");
 }
-function createIterationLogger(projectDir, sessionId) {
-  const sessionDir = join2(projectDir, ".swarm", "sessions", sessionId);
-  ensureDir(sessionDir);
-  return {
-    sessionDir,
-    logAgentPrompt(batchIndex, attempt, taskId, prompt) {
-      const dir = attemptDir(sessionDir, batchIndex, attempt);
-      ensureDir(dir);
-      writeFileSync(join2(dir, `agent-${taskId}-prompt.md`), prompt, "utf-8");
-    },
-    logAgentResult(batchIndex, attempt, taskId, result) {
-      const dir = attemptDir(sessionDir, batchIndex, attempt);
-      ensureDir(dir);
-      writeFileSync(join2(dir, `agent-${taskId}.md`), result, "utf-8");
-    },
-    logReview(batchIndex, attempt, review) {
-      const dir = attemptDir(sessionDir, batchIndex, attempt);
-      ensureDir(dir);
-      writeFileSync(join2(dir, "merged-review.json"), JSON.stringify(review, null, 2), "utf-8");
-    },
-    logTestResult(batchIndex, attempt, testResult) {
-      const dir = attemptDir(sessionDir, batchIndex, attempt);
-      ensureDir(dir);
-      writeFileSync(join2(dir, "test-result.json"), JSON.stringify(testResult, null, 2), "utf-8");
-    },
-    logBuildResult(batchIndex, attempt, buildResult) {
-      const dir = attemptDir(sessionDir, batchIndex, attempt);
-      ensureDir(dir);
-      writeFileSync(join2(dir, "build-result.json"), JSON.stringify(buildResult, null, 2), "utf-8");
-    },
-    logIterationSummary(batchIndex, attempt, summary) {
-      const dir = attemptDir(sessionDir, batchIndex, attempt);
-      ensureDir(dir);
-      writeFileSync(join2(dir, "summary.md"), buildSummaryMarkdown(summary), "utf-8");
-    }
-  };
-}
 
-// src/phases/code/code-phase.ts
-import { readdirSync as readdirSync2 } from "fs";
-var DEFAULT_MAX_ITERATIONS = 30;
+// src/phases/tdd/tdd-phase.ts
 var MAX_RETRIES2 = 2;
-var BatchExhaustedError = class extends Error {
-  constructor(batchIndex, attempts, lastFindings) {
-    super(`Batch ${batchIndex} failed after ${attempts} attempts \u2014 convergence not reached`);
-    this.batchIndex = batchIndex;
-    this.attempts = attempts;
-    this.lastFindings = lastFindings;
-    this.name = "BatchExhaustedError";
-  }
-};
 function isRetryableErrorCode2(code) {
   return code === "timeout" || code === "crash" || code === "empty_output" || code === "invalid_json";
 }
 function isImmediateFailErrorCode2(code) {
   return code === "aborted" || code === "spawn_error";
 }
+function extractTddAgentOutput(output) {
+  const parsed = parseStructuredOutput(output);
+  if (!parsed.ok) return null;
+  try {
+    const json = JSON.parse(parsed.output);
+    if (!json.testFiles || !Array.isArray(json.testFiles)) return null;
+    return {
+      testFiles: json.testFiles,
+      testResult: {
+        totalTests: json.testResult?.totalTests ?? 0,
+        passingTests: json.testResult?.passingTests ?? 0,
+        failingTests: json.testResult?.failingTests ?? 0,
+        durationMs: json.testResult?.durationMs ?? 0
+      },
+      isRed: json.isRed ?? false
+    };
+  } catch {
+    return null;
+  }
+}
+var DEFAULT_AGENT_OUTPUT = {
+  testFiles: ["tests/feature.test.ts"],
+  testResult: { totalTests: 0, passingTests: 0, failingTests: 0, durationMs: 0 },
+  isRed: false
+};
+async function runTddForTasks(ctx, registry, plannerOutput, tasks, techStack, signal) {
+  if (signal?.aborted) {
+    throw new Error("TDD aborted");
+  }
+  const testConventions = [
+    "tests/**/*.test.ts",
+    `Use ${techStack.testRunner ?? "default"} test runner`
+  ];
+  const prompt = buildTestPrompt(plannerOutput, tasks, techStack, testConventions);
+  const { driver, model, agent } = registry.getDriver("test");
+  let currentPrompt = prompt;
+  for (let attempt = 0; attempt <= MAX_RETRIES2; attempt++) {
+    if (signal?.aborted) {
+      throw new Error("TDD aborted");
+    }
+    const agentResult = await driver.invoke({
+      prompt: currentPrompt,
+      role: "test",
+      agent,
+      model,
+      projectDir: ctx.projectDir
+    });
+    if (!agentResult.success) {
+      if (isImmediateFailErrorCode2(agentResult.errorCode)) {
+        ctx.emitter.emit({
+          type: "phase:error",
+          timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+          sessionId: ctx.sessionId,
+          data: { phase: "tdd", reason: `${agentResult.errorCode}: ${agentResult.error}` }
+        });
+        throw new Error(`TDD failed: ${agentResult.errorCode}: ${agentResult.error}`);
+      }
+      if (isRetryableErrorCode2(agentResult.errorCode) && attempt < MAX_RETRIES2) {
+        const reason = agentResult.errorCode === "timeout" && agentResult.stderr ? `${agentResult.errorCode}: ${agentResult.error} \u2014 stderr: ${agentResult.stderr.slice(0, 300)}` : `${agentResult.errorCode}: ${agentResult.error}`;
+        ctx.emitter.emit({
+          type: "agent:error",
+          timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+          sessionId: ctx.sessionId,
+          data: { role: "test", reason }
+        });
+        continue;
+      }
+      ctx.emitter.emit({
+        type: "phase:error",
+        timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+        sessionId: ctx.sessionId,
+        data: { phase: "tdd", reason: `All retries exhausted: ${agentResult.errorCode}` }
+      });
+      throw new Error(`TDD failed after ${attempt + 1} attempts: ${agentResult.errorCode}`);
+    }
+    const agentOutput = extractTddAgentOutput(agentResult.output) ?? DEFAULT_AGENT_OUTPUT;
+    if (agentOutput.testResult.totalTests === 0) {
+      if (attempt < MAX_RETRIES2) {
+        currentPrompt = `${prompt}
+
+# Previous Attempt Failed \u2014 Zero Tests
+
+Your previous attempt produced zero compilable tests. Please produce compilable, failing test files. Remember to run the tests and include the JSON output block.`;
+        ctx.emitter.emit({
+          type: "agent:error",
+          timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+          sessionId: ctx.sessionId,
+          data: { role: "test", reason: "Zero tests produced" }
+        });
+        continue;
+      }
+      ctx.emitter.emit({
+        type: "test:fail",
+        timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+        sessionId: ctx.sessionId,
+        data: { totalTests: 0, failingTests: 0, reason: "Test agent produced zero tests" }
+      });
+      return { testFiles: agentOutput.testFiles, agentReport: agentOutput };
+    }
+    if (!agentOutput.isRed && attempt < MAX_RETRIES2) {
+      currentPrompt = `${prompt}
+
+# Previous Attempt Failed \u2014 Tests Not Red
+
+Your tests passed without implementation. Tests that pass before implementation are useless. Rewrite tests that properly fail.`;
+      ctx.emitter.emit({
+        type: "agent:error",
+        timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+        sessionId: ctx.sessionId,
+        data: { role: "test", reason: "Tests not red \u2014 passed without implementation" }
+      });
+      continue;
+    }
+    if (agentOutput.isRed) {
+      ctx.emitter.emit({
+        type: "test:red",
+        timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+        sessionId: ctx.sessionId,
+        data: {
+          totalTests: agentOutput.testResult.totalTests,
+          passingTests: agentOutput.testResult.passingTests,
+          failingTests: agentOutput.testResult.failingTests
+        }
+      });
+    } else {
+      ctx.emitter.emit({
+        type: "test:green",
+        timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+        sessionId: ctx.sessionId,
+        data: {
+          totalTests: agentOutput.testResult.totalTests,
+          passingTests: agentOutput.testResult.passingTests
+        }
+      });
+    }
+    return {
+      testFiles: agentOutput.testFiles,
+      agentReport: agentOutput
+    };
+  }
+  ctx.emitter.emit({
+    type: "phase:error",
+    timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+    sessionId: ctx.sessionId,
+    data: { phase: "tdd", reason: "Unknown error" }
+  });
+  throw new Error("TDD failed");
+}
+
+// src/phases/code/dag-executor.ts
+var MAX_RETRIES3 = 2;
+async function spawnFreshAgent(node, ctx, registry, techStack, testFiles, decisionLog, signal) {
+  const { driver, model, agent } = registry.getDriver("code", node.task.tag);
+  const prompt = buildCodeAgentPrompt(node.task, testFiles, techStack, void 0, decisionLog);
+  for (let attempt = 0; attempt <= MAX_RETRIES3; attempt++) {
+    if (signal?.aborted) throw new Error("DAG execution aborted");
+    const result = await driver.invoke({
+      prompt,
+      role: "code",
+      agent,
+      model,
+      projectDir: ctx.projectDir,
+      signal,
+      sessionId: node.handle.sessionId
+    });
+    if (result.success) {
+      const output = extractCodeAgentOutput(result.output);
+      if (output) {
+        for (const f of output.filesChanged) {
+          if (!node.handle.filesChanged.includes(f)) {
+            node.handle.filesChanged.push(f);
+          }
+        }
+      }
+      return output;
+    }
+    if (isImmediateFailErrorCode3(result.errorCode)) {
+      throw new Error(`Code agent failed: ${result.errorCode}: ${result.error}`);
+    }
+    if (isRetryableErrorCode3(result.errorCode) && attempt < MAX_RETRIES3) {
+      ctx.emitter.emit({
+        type: "agent:error",
+        timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+        sessionId: ctx.sessionId,
+        data: { role: "code", reason: `${result.errorCode}: ${result.error}` }
+      });
+      continue;
+    }
+    throw new Error(`Code agent failed after ${attempt + 1} attempts: ${result.errorCode}`);
+  }
+  return null;
+}
+async function resumeAgentWithFindings(node, ctx, registry, techStack, testFiles, decisionLog, signal) {
+  const { driver, model, agent } = registry.getDriver("code", node.task.tag);
+  const findings = node.lastFindings ?? [];
+  const prompt = buildFindingFixPrompt(findings, decisionLog);
+  for (let attempt = 0; attempt <= MAX_RETRIES3; attempt++) {
+    if (signal?.aborted) throw new Error("DAG execution aborted");
+    const isFirstAttempt = attempt === 0;
+    const result = await driver.invoke({
+      prompt,
+      role: "code",
+      agent,
+      model,
+      projectDir: ctx.projectDir,
+      signal,
+      ...isFirstAttempt ? { resume: node.handle.sessionId } : {}
+    });
+    if (result.success) {
+      const output = extractCodeAgentOutput(result.output);
+      if (output) {
+        for (const f of output.filesChanged) {
+          if (!node.handle.filesChanged.includes(f)) {
+            node.handle.filesChanged.push(f);
+          }
+        }
+      }
+      return output;
+    }
+    if (isFirstAttempt && isRetryableErrorCode3(result.errorCode)) {
+      ctx.emitter.emit({
+        type: "agent:error",
+        timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+        sessionId: ctx.sessionId,
+        data: { role: "code", reason: `Resume failed (${result.errorCode}), falling back to fresh invocation` }
+      });
+      const fullPrompt = buildCodeAgentPrompt(node.task, testFiles, techStack, findings, decisionLog);
+      const fallbackResult = await driver.invoke({
+        prompt: fullPrompt,
+        role: "code",
+        agent,
+        model,
+        projectDir: ctx.projectDir,
+        signal
+      });
+      if (fallbackResult.success) {
+        const output = extractCodeAgentOutput(fallbackResult.output);
+        if (output) {
+          for (const f of output.filesChanged) {
+            if (!node.handle.filesChanged.includes(f)) {
+              node.handle.filesChanged.push(f);
+            }
+          }
+        }
+        return output;
+      }
+      if (isImmediateFailErrorCode3(fallbackResult.errorCode)) {
+        throw new Error(`Code agent failed: ${fallbackResult.errorCode}: ${fallbackResult.error}`);
+      }
+      continue;
+    }
+    if (isImmediateFailErrorCode3(result.errorCode)) {
+      throw new Error(`Code agent failed: ${result.errorCode}: ${result.error}`);
+    }
+    if (isRetryableErrorCode3(result.errorCode) && attempt < MAX_RETRIES3) {
+      ctx.emitter.emit({
+        type: "agent:error",
+        timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+        sessionId: ctx.sessionId,
+        data: { role: "code", reason: `${result.errorCode}: ${result.error}` }
+      });
+      continue;
+    }
+    throw new Error(`Code agent failed after ${attempt + 1} attempts: ${result.errorCode}`);
+  }
+  return null;
+}
+async function executeDag(ctx, registry, tasks, techStack, specItemContext, plannerOutput, signal, logger, gitState) {
+  if (tasks.length === 0) {
+    return { taskCompletions: [], iterations: [] };
+  }
+  const { dependents, taskMap } = buildDependencyGraph(tasks);
+  const nodes = /* @__PURE__ */ new Map();
+  const remainingDeps = /* @__PURE__ */ new Map();
+  for (const task of tasks) {
+    const validDeps = task.dependencies.filter((d) => taskMap.has(d));
+    remainingDeps.set(task.id, validDeps.length);
+    nodes.set(task.id, {
+      taskId: task.id,
+      task,
+      status: "pending",
+      handle: {
+        taskId: task.id,
+        sessionId: randomUUID(),
+        task,
+        filesChanged: [],
+        status: "active"
+      },
+      attempts: 0,
+      decisionLogEntries: [],
+      seenSignatures: /* @__PURE__ */ new Set()
+    });
+  }
+  const iterations = [];
+  let lastOutcome;
+  let waveIndex = 0;
+  const accumulatedTestFiles = [];
+  while (true) {
+    if (signal?.aborted) throw new Error("DAG execution aborted");
+    const ready = [];
+    for (const node of nodes.values()) {
+      if (node.status === "pending" && (remainingDeps.get(node.taskId) ?? 0) === 0) {
+        ready.push(node);
+      }
+    }
+    const fixable = [];
+    for (const node of nodes.values()) {
+      if (node.status === "converging" && node.lastFindings && node.lastFindings.length > 0) {
+        fixable.push(node);
+      }
+    }
+    if (ready.length === 0 && fixable.length === 0) break;
+    const wave = [...ready, ...fixable];
+    const waveHandles = wave.map((n) => n.handle);
+    ctx.emitter.emit({
+      type: "iteration:start",
+      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+      sessionId: ctx.sessionId,
+      data: {
+        iteration: waveIndex,
+        waveIndex,
+        taskCount: wave.length,
+        taskIds: wave.map((n) => n.taskId)
+      }
+    });
+    const pendingInWave = wave.filter((n) => n.status === "pending");
+    if (pendingInWave.length > 0) {
+      try {
+        const tddResult = await runTddForTasks(
+          ctx,
+          registry,
+          plannerOutput,
+          pendingInWave.map((n) => n.task),
+          techStack,
+          signal
+        );
+        for (const f of tddResult.testFiles) {
+          if (!accumulatedTestFiles.includes(f)) {
+            accumulatedTestFiles.push(f);
+          }
+        }
+      } catch (err) {
+        process.stderr.write(`Warning: TDD for wave ${waveIndex} failed: ${err.message}
+`);
+      }
+    }
+    let agentTestResult = DEFAULT_TEST_RESULT;
+    const agentOutputs = await Promise.all(
+      wave.map(async (node) => {
+        const decisionLog = buildDecisionLogSection(node.decisionLogEntries);
+        if (node.status === "pending") {
+          node.status = "running";
+          return spawnFreshAgent(node, ctx, registry, techStack, accumulatedTestFiles, decisionLog, signal);
+        }
+        return resumeAgentWithFindings(node, ctx, registry, techStack, accumulatedTestFiles, decisionLog, signal);
+      })
+    );
+    for (const output of agentOutputs) {
+      if (output?.testResult && output.testResult.totalTests > agentTestResult.totalTests) {
+        agentTestResult = output.testResult;
+      }
+    }
+    const allChangedFiles = await getChangedFiles(ctx.projectDir);
+    const globalDecisionLog = buildDecisionLogSection(
+      [...nodes.values()].flatMap((n) => n.decisionLogEntries)
+    );
+    const review = await runReviewPhase(
+      ctx,
+      registry,
+      allChangedFiles,
+      specItemContext,
+      agentTestResult,
+      signal,
+      globalDecisionLog,
+      waveIndex,
+      iterations
+    );
+    logger.logReview(waveIndex, 0, review);
+    if (agentTestResult.totalTests > 0) {
+      logger.logTestResult(waveIndex, 0, agentTestResult);
+    }
+    const reviewFailing = review.criticalCount + review.importantCount > 0;
+    const success = !reviewFailing;
+    const outcome = success ? { status: "green", testResult: agentTestResult, review } : { status: "needs-iteration", testResult: agentTestResult, review, reason: "review-findings" };
+    iterations.push({ iteration: iterations.length, outcome, changedFiles: allChangedFiles });
+    lastOutcome = outcome;
+    ctx.emitter.emit({
+      type: "iteration:end",
+      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+      sessionId: ctx.sessionId,
+      data: { iteration: waveIndex, success, reason: success ? void 0 : "review-findings" }
+    });
+    let blockingFindings = review.findings.filter(
+      (f) => f.severity === "critical" || f.severity === "important"
+    );
+    if (review.convergenceRecommendation === "converged") {
+      const demoted = blockingFindings.filter((f) => f.severity === "important");
+      if (demoted.length > 0) {
+        process.stderr.write(
+          `[convergence] Merge agent recommends converged \u2014 demoting ${demoted.length} important finding(s)
+`
+        );
+      }
+      blockingFindings = blockingFindings.filter((f) => f.severity === "critical");
+    }
+    const attribution = attributeFindingsToAgents(blockingFindings, waveHandles);
+    const uncommittedFiles = new Set(allChangedFiles);
+    const greenNodes = [];
+    for (const node of wave) {
+      node.attempts++;
+      const taskFindings = attribution.get(node.taskId) ?? [];
+      const deduplicated = deduplicateFindings(taskFindings, node.seenSignatures);
+      if (deduplicated.length === 0) {
+        node.status = "green";
+        node.handle.status = "green";
+        greenNodes.push(node);
+        for (const depId of dependents.get(node.taskId) ?? []) {
+          remainingDeps.set(depId, (remainingDeps.get(depId) ?? 1) - 1);
+        }
+      } else {
+        node.status = "converging";
+        if (node.lastFindings && node.lastFindings.length > 0) {
+          for (const f of node.lastFindings) {
+            node.decisionLogEntries.push(buildDecisionEntry(node.attempts - 1, f));
+          }
+        }
+        node.lastFindings = deduplicated;
+      }
+      logger.logIterationSummary(waveIndex, node.attempts - 1, {
+        waveIndex,
+        attempt: node.attempts - 1,
+        status: node.status === "green" ? "green" : "needs-iteration",
+        reason: node.status === "converging" ? "review-findings" : void 0,
+        criticalCount: review.criticalCount,
+        testResult: agentTestResult
+      });
+    }
+    for (const node of greenNodes) {
+      const taskFiles = node.handle.filesChanged.filter((f) => uncommittedFiles.has(f));
+      if (taskFiles.length === 0) continue;
+      try {
+        const msg = `feat(swarm): ${node.task.title}`;
+        const hash = await commitSpecItem(ctx.projectDir, taskFiles, msg);
+        node.commitHash = hash;
+        gitState.commits.push({ hash, message: msg, specItem: node.task.title, iteration: iterations.length - 1 });
+        for (const f of taskFiles) uncommittedFiles.delete(f);
+        ctx.emitter.emit({
+          type: "commit",
+          timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+          sessionId: ctx.sessionId,
+          data: { hash, message: msg, filesChanged: taskFiles.length }
+        });
+      } catch (err) {
+        process.stderr.write(`Warning: commit failed for ${node.taskId}: ${err.message}
+`);
+      }
+    }
+    waveIndex++;
+  }
+  const taskCompletions = [];
+  for (const node of nodes.values()) {
+    taskCompletions.push({
+      taskId: node.taskId,
+      title: node.task.title,
+      status: "green",
+      attempts: node.attempts,
+      commitHash: node.commitHash
+    });
+  }
+  return { taskCompletions, iterations, lastOutcome };
+}
+
+// src/phases/code/code-phase.ts
+function isRetryableErrorCode3(code) {
+  return code === "timeout" || code === "crash" || code === "empty_output" || code === "invalid_json";
+}
+function isImmediateFailErrorCode3(code) {
+  return code === "aborted" || code === "spawn_error";
+}
 function findingSignature(f) {
   return `${f.file}:${f.line ?? 0}:${f.category}`;
 }
+var FUZZY_LINE_RANGE = 5;
+function matchesSeenFinding(finding, seenSignatures) {
+  const exactSig = findingSignature(finding);
+  if (seenSignatures.has(exactSig)) return true;
+  const line = finding.line ?? 0;
+  if (line === 0) return false;
+  for (let offset = -FUZZY_LINE_RANGE; offset <= FUZZY_LINE_RANGE; offset++) {
+    if (offset === 0) continue;
+    const candidateLine = line + offset;
+    if (candidateLine < 1) continue;
+    const candidateSig = `${finding.file}:${candidateLine}:${finding.category}`;
+    if (seenSignatures.has(candidateSig)) return true;
+  }
+  return false;
+}
 function deduplicateFindings(findings, seenSignatures) {
   const deduplicated = [];
-  const currentBatch = /* @__PURE__ */ new Set();
+  const currentSet = /* @__PURE__ */ new Set();
   for (const finding of findings) {
     const sig = findingSignature(finding);
-    if (currentBatch.has(sig)) continue;
-    currentBatch.add(sig);
-    const isRecurring = seenSignatures.has(sig);
+    if (currentSet.has(sig)) continue;
+    currentSet.add(sig);
+    const isRecurring = matchesSeenFinding(finding, seenSignatures);
     seenSignatures.add(sig);
     deduplicated.push({
       ...finding,
@@ -840,7 +1562,6 @@ function buildDecisionLogSection(entries) {
     ""
   ].join("\n");
 }
-var MAX_PLANNER_OUTPUT_BYTES = 256 * 1024;
 function attributeFindingsToAgents(findings, handles) {
   const attribution = /* @__PURE__ */ new Map();
   const unmatched = [];
@@ -870,7 +1591,7 @@ function attributeFindingsToAgents(findings, handles) {
   }
   return attribution;
 }
-async function runCodePhase(ctx, registry, plan, tdd, signal) {
+async function runCodePhase(ctx, registry, plan, signal) {
   const startTime = Date.now();
   if (signal?.aborted) {
     ctx.emitter.emit({
@@ -887,10 +1608,9 @@ async function runCodePhase(ctx, registry, plan, tdd, signal) {
     sessionId: ctx.sessionId,
     data: { phase: "code" }
   });
-  const batches = buildTaskBatches(plan.tasks);
   if (ctx.dryRun) {
     const result2 = {
-      batches,
+      waves: [],
       iterations: [],
       finalTestResult: DEFAULT_TEST_RESULT,
       gitState: { branch: "", commits: [] },
@@ -905,7 +1625,7 @@ async function runCodePhase(ctx, registry, plan, tdd, signal) {
     });
     return result2;
   }
-  const gitState = { branch: `swarm/${ctx.sessionId}`, commits: [] };
+  const gitState = { branch: ctx.worktreeBranch ?? `swarm/${ctx.sessionId}`, commits: [] };
   try {
     if (gitState.branch) {
       const { prNumber, prUrl } = await openDraftPr(gitState.branch, ctx.sessionId, ctx.projectDir);
@@ -918,165 +1638,21 @@ async function runCodePhase(ctx, registry, plan, tdd, signal) {
   }
   const logger = createIterationLogger(ctx.projectDir, ctx.sessionId);
   const specItemContext = plan.plannerOutput.slice(0, 4096);
-  const testFiles = tdd.testFiles;
-  const iterations = [];
-  let lastOutcome;
-  let previousFindings;
-  const decisionLogEntries = [];
-  const convergence = ctx.config.config.convergence;
-  const maxIterations = convergence?.maxIterations ?? DEFAULT_MAX_ITERATIONS;
-  for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
-    const batch = batches[batchIdx];
-    let batchGreen = false;
-    const seenSignatures = /* @__PURE__ */ new Set();
-    const agentHandles = batch.tasks.map((task) => ({
-      taskId: task.id,
-      sessionId: randomUUID(),
-      task,
-      filesChanged: [],
-      status: "active"
-    }));
-    for (let attempt = 0; attempt < maxIterations; attempt++) {
-      if (signal?.aborted) break;
-      const decisionLog = buildDecisionLogSection(decisionLogEntries);
-      let outcome;
-      if (attempt === 0) {
-        outcome = await runIteration(
-          ctx,
-          registry,
-          [batch],
-          plan.techStack,
-          specItemContext,
-          previousFindings,
-          signal,
-          testFiles,
-          attempt,
-          decisionLog,
-          agentHandles
-        );
-      } else if (previousFindings && previousFindings.length > 0) {
-        const attribution = attributeFindingsToAgents(previousFindings, agentHandles);
-        for (const handle of agentHandles) {
-          if (handle.status === "active" && !attribution.has(handle.taskId)) {
-            handle.status = "green";
-          }
-        }
-        const activeHandles = agentHandles.filter((h) => h.status === "active");
-        if (activeHandles.length === 0) {
-          outcome = await runReviewIteration(
-            ctx,
-            registry,
-            specItemContext,
-            DEFAULT_TEST_RESULT,
-            signal,
-            attempt,
-            decisionLog
-          );
-        } else {
-          outcome = await runFindingFixIteration(
-            ctx,
-            registry,
-            activeHandles,
-            attribution,
-            plan.techStack,
-            specItemContext,
-            signal,
-            testFiles,
-            attempt,
-            decisionLog
-          );
-        }
-      } else {
-        outcome = await runIteration(
-          ctx,
-          registry,
-          [batch],
-          plan.techStack,
-          specItemContext,
-          previousFindings,
-          signal,
-          testFiles,
-          attempt,
-          decisionLog,
-          agentHandles
-        );
-      }
-      iterations.push({ iteration: iterations.length, outcome, changedFiles: [] });
-      lastOutcome = outcome;
-      const review = "review" in outcome ? outcome.review : void 0;
-      if (review) logger.logReview(batchIdx, attempt, review);
-      if (outcome.testResult) logger.logTestResult(batchIdx, attempt, outcome.testResult);
-      logger.logIterationSummary(batchIdx, attempt, {
-        batchIndex: batchIdx,
-        attempt,
-        status: outcome.status === "green" ? "green" : "needs-iteration",
-        reason: outcome.status === "needs-iteration" ? outcome.reason : void 0,
-        criticalCount: review?.criticalCount,
-        testResult: outcome.testResult
-      });
-      if (outcome.status === "green") {
-        try {
-          const changedFiles = await getChangedFiles(ctx.projectDir);
-          if (changedFiles.length > 0) {
-            const commitSummary = batch.tasks.map((t) => t.title).join(", ");
-            const msg = `feat(swarm): ${commitSummary}`;
-            const hash = await commitSpecItem(ctx.projectDir, changedFiles, msg);
-            gitState.commits.push({ hash, message: msg, specItem: commitSummary, iteration: iterations.length - 1 });
-            ctx.emitter.emit({
-              type: "commit",
-              timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-              sessionId: ctx.sessionId,
-              data: { hash, message: msg, filesChanged: changedFiles.length }
-            });
-          }
-        } catch (err) {
-          process.stderr.write(`Warning: commit failed: ${err.message}
-`);
-        }
-        batchGreen = true;
-        previousFindings = void 0;
-        break;
-      }
-      if (outcome.status === "needs-iteration") {
-        if (previousFindings && previousFindings.length > 0) {
-          for (const f of previousFindings) {
-            decisionLogEntries.push(buildDecisionEntry(attempt - 1, f));
-          }
-        }
-        const blockingFindings = outcome.review.findings.filter(
-          (f) => f.severity === "critical" || f.severity === "important"
-        );
-        previousFindings = deduplicateFindings(blockingFindings, seenSignatures);
-        continue;
-      }
-      break;
-    }
-    if (!batchGreen) {
-      try {
-        const changedFiles = await getChangedFiles(ctx.projectDir);
-        if (changedFiles.length > 0) {
-          const commitSummary = batch.tasks.map((t) => t.title).join(", ");
-          const msg = `wip(swarm): ${commitSummary}`;
-          const hash = await commitSpecItem(ctx.projectDir, changedFiles, msg);
-          gitState.commits.push({ hash, message: msg, specItem: commitSummary, iteration: iterations.length - 1 });
-          ctx.emitter.emit({
-            type: "commit",
-            timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-            sessionId: ctx.sessionId,
-            data: { hash, message: msg, filesChanged: changedFiles.length }
-          });
-        }
-      } catch (err) {
-        process.stderr.write(`Warning: safety commit failed: ${err.message}
-`);
-      }
-      const lastFindings = previousFindings ?? [];
-      throw new BatchExhaustedError(batchIdx, iterations.length, lastFindings);
-    }
-  }
+  const dagResult = await executeDag(
+    ctx,
+    registry,
+    plan.tasks,
+    plan.techStack,
+    specItemContext,
+    plan.plannerOutput,
+    signal,
+    logger,
+    gitState
+  );
+  const lastOutcome = dagResult.lastOutcome;
   const finalTestResult = lastOutcome?.testResult ?? DEFAULT_TEST_RESULT;
   const finalReview = lastOutcome && "review" in lastOutcome ? lastOutcome.review : void 0;
-  const success = lastOutcome?.status === "green";
+  const success = true;
   let finalChangedFiles = [];
   try {
     finalChangedFiles = await getChangedFiles(ctx.projectDir);
@@ -1085,13 +1661,14 @@ async function runCodePhase(ctx, registry, plan, tdd, signal) {
 `);
   }
   const result = {
-    batches,
-    iterations,
+    waves: [],
+    iterations: dagResult.iterations,
     finalTestResult,
     finalReview,
     gitState,
     changedFiles: finalChangedFiles,
-    success
+    success,
+    taskCompletions: dagResult.taskCompletions
   };
   try {
     const loadResult = ctx.state.load();
@@ -1115,253 +1692,16 @@ async function runCodePhase(ctx, registry, plan, tdd, signal) {
   });
   return result;
 }
-async function runReviewIteration(ctx, registry, specItemContext, testResult, signal, iterationIndex, decisionLog) {
-  ctx.emitter.emit({
-    type: "iteration:start",
-    timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-    sessionId: ctx.sessionId,
-    data: { iteration: iterationIndex, batchIndex: 0, taskCount: 0 }
-  });
-  const allChangedFiles = await getChangedFiles(ctx.projectDir);
-  const review = await runReviewPhase(
-    ctx,
-    registry,
-    allChangedFiles,
-    specItemContext,
-    testResult,
-    signal,
-    decisionLog
-  );
-  const reviewFailing = review.criticalCount + review.importantCount > 0;
-  const success = !reviewFailing;
-  const reason = !success ? "review-findings" : void 0;
-  ctx.emitter.emit({
-    type: "iteration:end",
-    timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-    sessionId: ctx.sessionId,
-    data: { iteration: iterationIndex, success, reason }
-  });
-  if (success) {
-    return { status: "green", testResult, review };
-  }
-  return { status: "needs-iteration", testResult, review, reason: "review-findings" };
-}
-async function runFindingFixIteration(ctx, registry, activeHandles, attribution, techStack, specItemContext, signal, testFiles, iterationIndex, decisionLog) {
-  if (signal?.aborted) {
-    throw new Error("Iteration aborted");
-  }
-  ctx.emitter.emit({
-    type: "iteration:start",
-    timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-    sessionId: ctx.sessionId,
-    data: { iteration: iterationIndex, batchIndex: 0, taskCount: activeHandles.length }
-  });
-  let agentTestResult = DEFAULT_TEST_RESULT;
-  const agentOutputs = await Promise.all(
-    activeHandles.map(async (handle) => {
-      const findings = attribution.get(handle.taskId) ?? [];
-      const { driver, model, agent } = registry.getDriver("code", handle.task.tag);
-      const prompt = buildFindingFixPrompt(findings, decisionLog);
-      for (let attempt = 0; attempt <= MAX_RETRIES2; attempt++) {
-        if (signal?.aborted) throw new Error("Iteration aborted");
-        const isFirstAttempt = attempt === 0;
-        const result = await driver.invoke({
-          prompt,
-          role: "code",
-          agent,
-          model,
-          projectDir: ctx.projectDir,
-          signal,
-          ...isFirstAttempt ? { resume: handle.sessionId } : {}
-        });
-        if (result.success) {
-          const output = extractCodeAgentOutput(result.output);
-          if (output) {
-            for (const f of output.filesChanged) {
-              if (!handle.filesChanged.includes(f)) {
-                handle.filesChanged.push(f);
-              }
-            }
-          }
-          return output;
-        }
-        if (isFirstAttempt && isRetryableErrorCode2(result.errorCode)) {
-          ctx.emitter.emit({
-            type: "agent:error",
-            timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-            sessionId: ctx.sessionId,
-            data: { role: "code", reason: `Resume failed (${result.errorCode}), falling back to fresh invocation` }
-          });
-          const fullPrompt = buildCodeAgentPrompt(handle.task, testFiles ?? [], techStack, findings, decisionLog);
-          const fallbackResult = await driver.invoke({
-            prompt: fullPrompt,
-            role: "code",
-            agent,
-            model,
-            projectDir: ctx.projectDir,
-            signal
-          });
-          if (fallbackResult.success) {
-            const output = extractCodeAgentOutput(fallbackResult.output);
-            if (output) {
-              for (const f of output.filesChanged) {
-                if (!handle.filesChanged.includes(f)) {
-                  handle.filesChanged.push(f);
-                }
-              }
-            }
-            return output;
-          }
-          if (isImmediateFailErrorCode2(fallbackResult.errorCode)) {
-            throw new Error(`Code agent failed: ${fallbackResult.errorCode}: ${fallbackResult.error}`);
-          }
-          continue;
-        }
-        if (isImmediateFailErrorCode2(result.errorCode)) {
-          throw new Error(`Code agent failed: ${result.errorCode}: ${result.error}`);
-        }
-        if (isRetryableErrorCode2(result.errorCode) && attempt < MAX_RETRIES2) {
-          ctx.emitter.emit({
-            type: "agent:error",
-            timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-            sessionId: ctx.sessionId,
-            data: { role: "code", reason: `${result.errorCode}: ${result.error}` }
-          });
-          continue;
-        }
-        throw new Error(`Code agent failed after ${attempt + 1} attempts: ${result.errorCode}`);
-      }
-      return null;
-    })
-  );
-  for (const output of agentOutputs) {
-    if (output?.testResult && output.testResult.totalTests > agentTestResult.totalTests) {
-      agentTestResult = output.testResult;
-    }
-  }
-  const allChangedFiles = await getChangedFiles(ctx.projectDir);
-  const review = await runReviewPhase(
-    ctx,
-    registry,
-    allChangedFiles,
-    specItemContext,
-    agentTestResult,
-    signal,
-    decisionLog
-  );
-  const reviewFailing = review.criticalCount + review.importantCount > 0;
-  const success = !reviewFailing;
-  const reason = !success ? "review-findings" : void 0;
-  ctx.emitter.emit({
-    type: "iteration:end",
-    timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-    sessionId: ctx.sessionId,
-    data: { iteration: iterationIndex, success, reason }
-  });
-  if (success) {
-    return { status: "green", testResult: agentTestResult, review };
-  }
-  return { status: "needs-iteration", testResult: agentTestResult, review, reason: "review-findings" };
-}
-async function runIteration(ctx, registry, batches, techStack, specItemContext, previousFindings, signal, testFiles, iterationIndex = 0, decisionLog = "", agentHandles) {
-  if (signal?.aborted) {
-    throw new Error("Iteration aborted");
-  }
-  const taskCount = batches.reduce((sum, b) => sum + b.tasks.length, 0);
-  ctx.emitter.emit({
-    type: "iteration:start",
-    timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-    sessionId: ctx.sessionId,
-    data: { iteration: iterationIndex, batchIndex: batches[0]?.batchIndex ?? 0, taskCount }
-  });
-  let agentTestResult = DEFAULT_TEST_RESULT;
-  const handleMap = /* @__PURE__ */ new Map();
-  if (agentHandles) {
-    for (const h of agentHandles) {
-      handleMap.set(h.taskId, h);
-    }
-  }
-  for (const batch of batches) {
-    if (signal?.aborted) {
-      throw new Error("Iteration aborted");
-    }
-    const agentOutputs = await Promise.all(
-      batch.tasks.map(async (task) => {
-        const { driver, model, agent } = registry.getDriver("code", task.tag);
-        const prompt = buildCodeAgentPrompt(task, testFiles ?? [], techStack, previousFindings, decisionLog);
-        const handle = handleMap.get(task.id);
-        for (let attempt = 0; attempt <= MAX_RETRIES2; attempt++) {
-          if (signal?.aborted) throw new Error("Iteration aborted");
-          const result = await driver.invoke({
-            prompt,
-            role: "code",
-            agent,
-            model,
-            projectDir: ctx.projectDir,
-            signal,
-            ...handle ? { sessionId: handle.sessionId } : {}
-          });
-          if (result.success) {
-            const output = extractCodeAgentOutput(result.output);
-            if (handle && output) {
-              for (const f of output.filesChanged) {
-                if (!handle.filesChanged.includes(f)) {
-                  handle.filesChanged.push(f);
-                }
-              }
-            }
-            return output;
-          }
-          if (isImmediateFailErrorCode2(result.errorCode)) {
-            throw new Error(`Code agent failed: ${result.errorCode}: ${result.error}`);
-          }
-          if (isRetryableErrorCode2(result.errorCode) && attempt < MAX_RETRIES2) {
-            ctx.emitter.emit({
-              type: "agent:error",
-              timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-              sessionId: ctx.sessionId,
-              data: { role: "code", reason: `${result.errorCode}: ${result.error}` }
-            });
-            continue;
-          }
-          throw new Error(`Code agent failed after ${attempt + 1} attempts: ${result.errorCode}`);
-        }
-        return null;
-      })
-    );
-    for (const output of agentOutputs) {
-      if (output?.testResult && output.testResult.totalTests > agentTestResult.totalTests) {
-        agentTestResult = output.testResult;
-      }
-    }
-  }
-  const allChangedFiles = await getChangedFiles(ctx.projectDir);
-  const review = await runReviewPhase(
-    ctx,
-    registry,
-    allChangedFiles,
-    specItemContext,
-    agentTestResult,
-    signal,
-    decisionLog
-  );
-  const reviewFailing = review.criticalCount + review.importantCount > 0;
-  const success = !reviewFailing;
-  const reason = !success ? "review-findings" : void 0;
-  ctx.emitter.emit({
-    type: "iteration:end",
-    timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-    sessionId: ctx.sessionId,
-    data: { iteration: iterationIndex, success, reason }
-  });
-  if (success) {
-    return { status: "green", testResult: agentTestResult, review };
-  }
-  return { status: "needs-iteration", testResult: agentTestResult, review, reason: "review-findings" };
-}
 export {
-  BatchExhaustedError,
+  DEFAULT_TEST_RESULT,
   attributeFindingsToAgents,
-  runCodePhase,
-  runIteration
+  buildDecisionEntry,
+  buildDecisionLogSection,
+  deduplicateFindings,
+  extractCodeAgentOutput,
+  findingSignature,
+  isImmediateFailErrorCode3 as isImmediateFailErrorCode,
+  isRetryableErrorCode3 as isRetryableErrorCode,
+  matchesSeenFinding,
+  runCodePhase
 };

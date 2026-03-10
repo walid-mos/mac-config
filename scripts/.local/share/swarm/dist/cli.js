@@ -29,13 +29,13 @@ var isDirectExecution = process.argv[1] && (process.argv[1].endsWith("cli.js") |
 if (isDirectExecution) {
   const { Command } = await import("commander");
   const { createSessionId } = await import("./types-4HMPQH6G.js");
-  const { resolveSwarmConfig } = await import("./config-resolver-5ZKRUSDF.js");
+  const { resolveSwarmConfig } = await import("./config-resolver-4MRGIVDP.js");
   const { createEventEmitter } = await import("./event-emitter-EY2OHEMR.js");
-  const { createStateManager } = await import("./state-manager-7T54546C.js");
-  const { createDriverRegistry } = await import("./driver-registry-ENT3H3OR.js");
+  const { createStateManager } = await import("./state-manager-SW6EK2LR.js");
+  const { createDriverRegistry } = await import("./driver-registry-7TEKPYYV.js");
   const { runPlanPhase } = await import("./plan-phase-2U4R7EOX.js");
-  const { runCodePhase } = await import("./code-phase-I52ZSWMA.js");
-  const { runDocsPhase } = await import("./docs-phase-C5JLT5KX.js");
+  const { runCodePhase } = await import("./code-phase-QGPRWZIM.js");
+  const { runDocsPhase } = await import("./docs-phase-ZBVEWYDW.js");
   const program = new Command().name("swarm").description("AI agent orchestrator for autonomous software development").version("0.1.0");
   program.command("run").description("Execute a swarm session").requiredOption("--session <name>", "Session identifier").requiredOption("--spec <path>", "Path to the spec file").requiredOption("--project-dir <path>", "Target project directory").option("--config <path>", "Explicit config file path").option("--dry-run", "Validate config and print plan without running").action(async (options) => {
     try {
@@ -47,8 +47,11 @@ if (isDirectExecution) {
       validateProjectDir(projectDir);
       validateSpecContainment(specPath, projectDir);
       const resolvedConfig = resolveSwarmConfig(projectDir, configPath);
+      const runtimeDir = path.join(projectDir, ".swarm", "run", sessionId);
+      fs.mkdirSync(runtimeDir, { recursive: true });
+      process.env.SWARM_DEBUG_DIR = runtimeDir;
       const emitter = createEventEmitter(sessionId);
-      const state = createStateManager(sessionId);
+      const state = createStateManager(sessionId, { tmpDir: runtimeDir });
       state.acquireLock();
       const ctx = {
         sessionId,
@@ -89,8 +92,7 @@ if (isDirectExecution) {
         data: { specPath, projectDir }
       });
       const signal = controller.signal;
-      const specSlug = path.basename(specPath, path.extname(specPath));
-      const worktreeBranch = `swarm/${sessionId}/${specSlug}`;
+      const worktreeBranch = `swarm/${sessionId}`;
       let exitCode = 1;
       let worktreeCreated = false;
       try {
@@ -119,7 +121,7 @@ if (isDirectExecution) {
           });
           return;
         }
-        const { createWorktree } = await import("./git-operations-E43JI3IJ.js");
+        const { createWorktree } = await import("./git-operations-VEKNCA2Y.js");
         const { worktreePath } = await createWorktree(sessionId, projectDir, worktreeBranch);
         worktreeCreated = true;
         ctx.projectDir = worktreePath;
@@ -175,7 +177,7 @@ if (isDirectExecution) {
         if (worktreeCreated) {
           const CLEANUP_TIMEOUT_MS = 15e3;
           try {
-            const { removeWorktree } = await import("./git-operations-E43JI3IJ.js");
+            const { removeWorktree } = await import("./git-operations-VEKNCA2Y.js");
             await Promise.race([
               removeWorktree(worktreeBranch, projectDir),
               new Promise(
@@ -184,6 +186,19 @@ if (isDirectExecution) {
             ]);
           } catch (err) {
             process.stderr.write(`WARNING: Worktree cleanup failed: ${err.message}
+`);
+          }
+        }
+        if (exitCode === 0) {
+          try {
+            const entries = fs.readdirSync(runtimeDir);
+            for (const entry of entries) {
+              if (entry.startsWith("swarm-agent-") && entry.endsWith(".ndjson")) {
+                fs.unlinkSync(path.join(runtimeDir, entry));
+              }
+            }
+          } catch (err) {
+            process.stderr.write(`WARNING: NDJSON cleanup failed: ${err.message}
 `);
           }
         }

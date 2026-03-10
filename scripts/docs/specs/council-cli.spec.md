@@ -4,7 +4,7 @@
 
 Build a `council` CLI that replaces the existing `/council` skill, following the same architecture as the `swarm` CLI. The council CLI spawns 5 core sages + conditional sages in parallel, runs deliberation rounds (min 3, max 5) with convergence checking, synthesizes feedback via a dedicated LLM agent, and outputs a refined document with a deliberation log.
 
-This spec also covers extracting shared code from `swarm` into a `@nns/common` package and restructuring the project into a pnpm monorepo workspace.
+This spec also covers extracting shared code from `swarm` into a `@nns/common` package within the existing monorepo workspace.
 
 ## Context
 
@@ -15,17 +15,24 @@ The current `/council` skill is implemented entirely within a Claude skill file 
 - No TOML-based configuration
 - Cannot reuse the driver abstraction (claude/opencode backends)
 
-The `swarm` CLI (`scripts/.local/share/swarm/`) already solves all of these problems for code implementation workflows. Council needs the same infrastructure for document deliberation workflows.
+The `swarm` CLI (`scripts/.local/share/packages/swarm/`) already solves all of these problems for code implementation workflows. Council needs the same infrastructure for document deliberation workflows.
+
+### Already Completed (branch `swarm/council`)
+
+The monorepo workspace has been scaffolded:
+- `.local/share/pnpm-workspace.yaml` with `packages: [packages/*]`
+- Root `package.json` (`@nns/root`), `tsconfig.base.json`, `tsconfig.json`
+- Swarm source moved from `.local/share/swarm/` to `.local/share/packages/swarm/`
+- `.local/bin/swarm` binary updated to point to `packages/swarm/dist/cli.js`
 
 ## Functional Requirements
 
-### Monorepo Restructure
+### Monorepo Completion
 
 - **FR-1**: Extract shared code from `swarm` into a `@nns/common` workspace package at `.local/share/packages/common/`. Shared modules: drivers (claude, opencode, registry), output-parser, event-emitter, state-manager, config-resolver, model-registry, types, errors, validation, tech-stack detection.
-- **FR-2**: Restructure `.local/share/` into a pnpm monorepo workspace with `packages/{common,swarm,council}` and a root `pnpm-workspace.yaml`.
-- **FR-3**: Move the existing swarm source to `.local/share/packages/swarm/` and update all imports to use `@nns/common` instead of local paths.
-- **FR-4**: Maintain separate binaries: `.local/bin/swarm` and `.local/bin/council`, each pointing to their respective package's `dist/cli.js`.
-- **FR-5**: Swarm must remain fully functional after the restructure — all existing tests pass, the binary works identically.
+- **FR-3**: Update all swarm imports to use `@nns/common` instead of local relative paths.
+- **FR-4**: Create `.local/bin/council` binary pointing to `packages/council/dist/cli.js`.
+- **FR-5**: Swarm must remain fully functional after the extraction — all existing tests pass, the binary works identically.
 
 ### Council CLI Core
 

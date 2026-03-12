@@ -1,11 +1,20 @@
 // === Security Review Prompt Builder (Spec 4 — FR-6) ===
 
 import type { TestResult } from '../phase-results.js'
-import type { ProjectContext } from '../../detect/tech-stack.js'
+
+// === Types ===
+
+export interface SecurityPromptOpts {
+  changedFiles: string[]
+  specPath: string
+  testResult: TestResult
+  decisionLogPath?: string
+  iterationIndex: number
+}
 
 // === Helpers ===
 
-function buildSecurityIntegrationRules(projectContext?: ProjectContext): string {
+function buildSecurityIntegrationRules(): string {
   const rules: string[] = [
     '# Supply Chain & Integration Security',
     '',
@@ -53,57 +62,58 @@ function buildIterationAwareness(iterationIndex: number): string {
   ].join('\n')
 }
 
+function buildFileReferenceInstructions(opts: SecurityPromptOpts): string {
+  const lines: string[] = [
+    '# How to Access Content',
+    '',
+    '## Git Diff',
+    'Run the following command to see all changes:',
+    '```',
+    `git diff HEAD -- ${opts.changedFiles.join(' ')}`,
+    '```',
+    '',
+    '## Spec',
+    `Read the spec file at: \`${opts.specPath}\``,
+    '',
+    '## Project Context',
+    'Read `package.json` for dependencies (attack surface). Check config files (tsconfig.json, vite.config.ts, astro.config.mjs, etc.) for security misconfigurations.',
+    '',
+  ]
+
+  if (opts.decisionLogPath) {
+    lines.push(
+      '## Decision Log',
+      `Read the decision log at: \`${opts.decisionLogPath}\``,
+      '',
+    )
+  }
+
+  return lines.join('\n')
+}
+
 // === API ===
 
-export function buildSecurityPrompt(
-  diff: string,
-  specItemContext: string,
-  testResult: TestResult,
-  projectContext?: ProjectContext,
-  decisionLog: string = '',
-  iterationIndex: number = 0
-): string {
+export function buildSecurityPrompt(opts: SecurityPromptOpts): string {
   const sections: string[] = []
 
   // Role
   sections.push('# Role\n\nYou are a security review agent. Analyze the following code changes with focus on OWASP Top 10 vulnerabilities, injection risks, authentication/authorization issues, XSS, and other security concerns.\n\n## CRITICAL: Be Exhaustive on First Pass\n\nYou MUST find ALL security issues in a SINGLE pass. Do NOT drip-feed findings across iterations. Scan the ENTIRE diff and ALL config files for EVERY possible security concern NOW — headers, CSP directives, CSRF, XSS, injection, secrets, CORS, auth, transport security, framing, MIME sniffing, ALL of it. If you miss something on this pass and it appears in a later iteration, that is a failure.\n\n## Severity Rules\n\n- `critical`: Exploitable vulnerabilities — SQL injection, XSS with a working vector, hardcoded secrets in source, auth bypass, command injection. Real bugs that an attacker can exploit TODAY.\n- `important`: Real threat vectors with clear attack surface — missing CSP, missing CSRF protection on authenticated endpoints, permissive CORS on sensitive routes, missing input validation at system boundaries. Issues that create exploitable conditions even if no exploit exists yet.\n- `suggestion`: Defense-in-depth hardening — adding HSTS, tightening CSP directives further, removing unsafe-inline when not strictly needed, adding frame-ancestors when X-Frame-Options already covers it, theoretical future risks. These are good security hygiene but NOT blocking.\n\nDo NOT escalate defense-in-depth items to `important`. If the threat requires a chain of hypothetical future changes to become exploitable, it is a `suggestion`. Only flag real, present-day threat vectors as `important` or higher.')
 
-  // Project context (if available) — security-focused framing
-  if (projectContext) {
-    const ctxLines: string[] = ['# Project Context — Security Surface']
-    if (projectContext.dependencies.length > 0) {
-      ctxLines.push(`\n**Dependencies (attack surface):** ${projectContext.dependencies.join(', ')}`)
-    }
-    if (projectContext.devDependencies.length > 0) {
-      ctxLines.push(`**Dev Dependencies:** ${projectContext.devDependencies.join(', ')}`)
-    }
-    if (projectContext.configHighlights.length > 0) {
-      ctxLines.push('\n## Config Files (check for security misconfigurations)\n')
-      ctxLines.push(projectContext.configHighlights.join('\n\n'))
-    }
-    sections.push(ctxLines.join('\n'))
-  }
+  // File reference instructions (replaces inlined diff, spec, project context, decision log)
+  sections.push(buildFileReferenceInstructions(opts))
+
+  // Changed files list
+  sections.push(`# Changed Files\n\n${opts.changedFiles.map(f => `- ${f}`).join('\n')}`)
 
   // Supply chain & integration security rules
-  sections.push(buildSecurityIntegrationRules(projectContext))
-
-  // Git diff
-  sections.push(`# Git Diff\n\n\`\`\`diff\n${diff}\n\`\`\``)
-
-  // Spec context
-  sections.push(`# Spec Context\n\n${specItemContext}`)
+  sections.push(buildSecurityIntegrationRules())
 
   // Test results
-  sections.push(`# Test Results\n\n- Total: ${testResult.totalTests}\n- Passing: ${testResult.passingTests}\n- Failing: ${testResult.failingTests}\n- Duration: ${testResult.durationMs}ms`)
-
-  // Decision log from previous iterations
-  if (decisionLog) {
-    sections.push(decisionLog)
-  }
+  sections.push(`# Test Results\n\n- Total: ${opts.testResult.totalTests}\n- Passing: ${opts.testResult.passingTests}\n- Failing: ${opts.testResult.failingTests}\n- Duration: ${opts.testResult.durationMs}ms`)
 
   // Iteration awareness (appended at iteration >= 2)
-  if (iterationIndex >= 2) {
-    sections.push(buildIterationAwareness(iterationIndex))
+  if (opts.iterationIndex >= 2) {
+    sections.push(buildIterationAwareness(opts.iterationIndex))
   }
 
   // Fix quality

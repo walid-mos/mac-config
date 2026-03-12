@@ -34,7 +34,7 @@ if (isDirectExecution) {
   const { createStateManager } = await import("./state-manager-SW6EK2LR.js");
   const { createDriverRegistry } = await import("./driver-registry-7TEKPYYV.js");
   const { runPlanPhase } = await import("./plan-phase-2U4R7EOX.js");
-  const { runCodePhase } = await import("./code-phase-QGPRWZIM.js");
+  const { runCodePhase } = await import("./code-phase-MB6NL5UB.js");
   const { runDocsPhase } = await import("./docs-phase-ZBVEWYDW.js");
   const program = new Command().name("swarm").description("AI agent orchestrator for autonomous software development").version("0.1.0");
   program.command("run").description("Execute a swarm session").requiredOption("--session <name>", "Session identifier").requiredOption("--spec <path>", "Path to the spec file").requiredOption("--project-dir <path>", "Target project directory").option("--config <path>", "Explicit config file path").option("--dry-run", "Validate config and print plan without running").action(async (options) => {

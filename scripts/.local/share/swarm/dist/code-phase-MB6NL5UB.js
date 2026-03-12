@@ -112,9 +112,11 @@ function buildDependencyGraph(tasks) {
 
 // src/phases/code/review-merge.ts
 import { spawn } from "child_process";
+import { mkdirSync as mkdirSync2, writeFileSync as writeFileSync2 } from "fs";
+import { join as join2, dirname } from "path";
 
 // src/phases/code/review-prompt.ts
-function buildIntegrationRules(projectContext) {
+function buildIntegrationRules() {
   const rules = [
     "# Integration & Build Compatibility Review",
     "",
@@ -166,44 +168,48 @@ function buildIterationAwareness(iterationIndex) {
     ""
   ].join("\n");
 }
-function buildReviewPrompt(diff, specItemContext, testResult, projectContext, decisionLog = "", iterationIndex = 0) {
+function buildFileReferenceInstructions(opts) {
+  const lines = [
+    "# How to Access Content",
+    "",
+    "## Git Diff",
+    "Run the following command to see all changes:",
+    "```",
+    `git diff HEAD -- ${opts.changedFiles.join(" ")}`,
+    "```",
+    "",
+    "## Spec",
+    `Read the spec file at: \`${opts.specPath}\``,
+    "",
+    "## Project Context",
+    "Read `package.json` for dependencies. Check config files (tsconfig.json, vite.config.ts, astro.config.mjs, etc.) for build setup.",
+    ""
+  ];
+  if (opts.decisionLogPath) {
+    lines.push(
+      "## Decision Log",
+      `Read the decision log at: \`${opts.decisionLogPath}\``,
+      ""
+    );
+  }
+  return lines.join("\n");
+}
+function buildReviewPrompt(opts) {
   const sections = [];
   sections.push("# Role\n\nYou are a code review agent. Review the following code changes for bugs, quality issues, performance problems, integration conflicts, and adherence to best practices.");
-  if (projectContext) {
-    const ctxLines = ["# Project Context"];
-    if (projectContext.dependencies.length > 0) {
-      ctxLines.push(`
-**Dependencies:** ${projectContext.dependencies.join(", ")}`);
-    }
-    if (projectContext.devDependencies.length > 0) {
-      ctxLines.push(`**Dev Dependencies:** ${projectContext.devDependencies.join(", ")}`);
-    }
-    if (projectContext.configHighlights.length > 0) {
-      ctxLines.push("\n## Config Files\n");
-      ctxLines.push(projectContext.configHighlights.join("\n\n"));
-    }
-    sections.push(ctxLines.join("\n"));
-  }
-  sections.push(buildIntegrationRules(projectContext));
-  sections.push(`# Git Diff
+  sections.push(buildFileReferenceInstructions(opts));
+  sections.push(`# Changed Files
 
-\`\`\`diff
-${diff}
-\`\`\``);
-  sections.push(`# Spec Context
-
-${specItemContext}`);
+${opts.changedFiles.map((f) => `- ${f}`).join("\n")}`);
+  sections.push(buildIntegrationRules());
   sections.push(`# Test Results
 
-- Total: ${testResult.totalTests}
-- Passing: ${testResult.passingTests}
-- Failing: ${testResult.failingTests}
-- Duration: ${testResult.durationMs}ms`);
-  if (decisionLog) {
-    sections.push(decisionLog);
-  }
-  if (iterationIndex >= 2) {
-    sections.push(buildIterationAwareness(iterationIndex));
+- Total: ${opts.testResult.totalTests}
+- Passing: ${opts.testResult.passingTests}
+- Failing: ${opts.testResult.failingTests}
+- Duration: ${opts.testResult.durationMs}ms`);
+  if (opts.iterationIndex >= 2) {
+    sections.push(buildIterationAwareness(opts.iterationIndex));
   }
   sections.push("# DRY Enforcement\n\nDRY violations with 3 or more repetitions of the same string/pattern are severity `important`, NOT `suggestion`. Repeated class strings, duplicated logic blocks, and copy-pasted constants that appear 3+ times MUST be flagged as `important` with category `dry-violation`. The code agent MUST fix them.");
   sections.push('# Fix Quality\n\nEvery `suggestedFix` MUST be actionable \u2014 include the target file, the specific change, and why.\nBAD:  "Fix the link." / "Add missing element."\nGOOD: Specific file + what to add/change + where in the file.');
@@ -212,7 +218,7 @@ ${specItemContext}`);
 }
 
 // src/phases/code/security-prompt.ts
-function buildSecurityIntegrationRules(projectContext) {
+function buildSecurityIntegrationRules() {
   const rules = [
     "# Supply Chain & Integration Security",
     "",
@@ -254,44 +260,48 @@ function buildIterationAwareness2(iterationIndex) {
     ""
   ].join("\n");
 }
-function buildSecurityPrompt(diff, specItemContext, testResult, projectContext, decisionLog = "", iterationIndex = 0) {
+function buildFileReferenceInstructions2(opts) {
+  const lines = [
+    "# How to Access Content",
+    "",
+    "## Git Diff",
+    "Run the following command to see all changes:",
+    "```",
+    `git diff HEAD -- ${opts.changedFiles.join(" ")}`,
+    "```",
+    "",
+    "## Spec",
+    `Read the spec file at: \`${opts.specPath}\``,
+    "",
+    "## Project Context",
+    "Read `package.json` for dependencies (attack surface). Check config files (tsconfig.json, vite.config.ts, astro.config.mjs, etc.) for security misconfigurations.",
+    ""
+  ];
+  if (opts.decisionLogPath) {
+    lines.push(
+      "## Decision Log",
+      `Read the decision log at: \`${opts.decisionLogPath}\``,
+      ""
+    );
+  }
+  return lines.join("\n");
+}
+function buildSecurityPrompt(opts) {
   const sections = [];
   sections.push("# Role\n\nYou are a security review agent. Analyze the following code changes with focus on OWASP Top 10 vulnerabilities, injection risks, authentication/authorization issues, XSS, and other security concerns.\n\n## CRITICAL: Be Exhaustive on First Pass\n\nYou MUST find ALL security issues in a SINGLE pass. Do NOT drip-feed findings across iterations. Scan the ENTIRE diff and ALL config files for EVERY possible security concern NOW \u2014 headers, CSP directives, CSRF, XSS, injection, secrets, CORS, auth, transport security, framing, MIME sniffing, ALL of it. If you miss something on this pass and it appears in a later iteration, that is a failure.\n\n## Severity Rules\n\n- `critical`: Exploitable vulnerabilities \u2014 SQL injection, XSS with a working vector, hardcoded secrets in source, auth bypass, command injection. Real bugs that an attacker can exploit TODAY.\n- `important`: Real threat vectors with clear attack surface \u2014 missing CSP, missing CSRF protection on authenticated endpoints, permissive CORS on sensitive routes, missing input validation at system boundaries. Issues that create exploitable conditions even if no exploit exists yet.\n- `suggestion`: Defense-in-depth hardening \u2014 adding HSTS, tightening CSP directives further, removing unsafe-inline when not strictly needed, adding frame-ancestors when X-Frame-Options already covers it, theoretical future risks. These are good security hygiene but NOT blocking.\n\nDo NOT escalate defense-in-depth items to `important`. If the threat requires a chain of hypothetical future changes to become exploitable, it is a `suggestion`. Only flag real, present-day threat vectors as `important` or higher.");
-  if (projectContext) {
-    const ctxLines = ["# Project Context \u2014 Security Surface"];
-    if (projectContext.dependencies.length > 0) {
-      ctxLines.push(`
-**Dependencies (attack surface):** ${projectContext.dependencies.join(", ")}`);
-    }
-    if (projectContext.devDependencies.length > 0) {
-      ctxLines.push(`**Dev Dependencies:** ${projectContext.devDependencies.join(", ")}`);
-    }
-    if (projectContext.configHighlights.length > 0) {
-      ctxLines.push("\n## Config Files (check for security misconfigurations)\n");
-      ctxLines.push(projectContext.configHighlights.join("\n\n"));
-    }
-    sections.push(ctxLines.join("\n"));
-  }
-  sections.push(buildSecurityIntegrationRules(projectContext));
-  sections.push(`# Git Diff
+  sections.push(buildFileReferenceInstructions2(opts));
+  sections.push(`# Changed Files
 
-\`\`\`diff
-${diff}
-\`\`\``);
-  sections.push(`# Spec Context
-
-${specItemContext}`);
+${opts.changedFiles.map((f) => `- ${f}`).join("\n")}`);
+  sections.push(buildSecurityIntegrationRules());
   sections.push(`# Test Results
 
-- Total: ${testResult.totalTests}
-- Passing: ${testResult.passingTests}
-- Failing: ${testResult.failingTests}
-- Duration: ${testResult.durationMs}ms`);
-  if (decisionLog) {
-    sections.push(decisionLog);
-  }
-  if (iterationIndex >= 2) {
-    sections.push(buildIterationAwareness2(iterationIndex));
+- Total: ${opts.testResult.totalTests}
+- Passing: ${opts.testResult.passingTests}
+- Failing: ${opts.testResult.failingTests}
+- Duration: ${opts.testResult.durationMs}ms`);
+  if (opts.iterationIndex >= 2) {
+    sections.push(buildIterationAwareness2(opts.iterationIndex));
   }
   sections.push('# Fix Quality\n\nEvery `suggestedFix` MUST be actionable \u2014 a code agent must be able to implement it without further research.\n\nA good fix includes: (1) which file to modify, (2) the specific code or config change, (3) any commands to run if needed.\n\nBAD:  "Fix the security issue." / "Add headers." / "Improve configuration."\nGOOD: Specific file path + exact change + reason.\n\nIf you see a security issue but aren\'t sure of the exact fix for this specific framework/toolchain, say what needs to change and WHERE to investigate \u2014 don\'t just name the problem.');
   sections.push('# Output Format\n\nIMPORTANT: Output ONLY raw JSON. No markdown fences, no narrative text, no commentary before or after the JSON.\n\nReturn a JSON object with this structure:\n\n{\n  "findings": [\n    {\n      "file": "string",\n      "line": number,\n      "severity": "critical" | "important" | "suggestion",\n      "category": "bug" | "security" | "quality" | "performance" | "dry-violation" | "dead-code" | "spec-compliance",\n      "description": "string",\n      "suggestedFix": "string"\n    }\n  ]\n}\n\nAll string values in JSON must use proper JSON escaping \u2014 newlines as \\n, quotes as \\", backslashes as \\\\. Do NOT put raw newlines inside JSON string values.');
@@ -319,47 +329,48 @@ function buildIterationAwareness3(iterationIndex) {
     ""
   ].join("\n");
 }
-function buildConsistencyPrompt(diff, changedFiles, specItemContext, testResult, projectContext, decisionLog = "", iterationIndex = 0) {
+function buildFileReferenceInstructions3(opts) {
+  const lines = [
+    "# How to Access Content",
+    "",
+    "## Git Diff",
+    "Run the following command to see all changes:",
+    "```",
+    `git diff HEAD -- ${opts.changedFiles.join(" ")}`,
+    "```",
+    "",
+    "## Spec",
+    `Read the spec file at: \`${opts.specPath}\``,
+    "",
+    "## Project Context",
+    "Read `package.json` for dependencies. Check config files (tsconfig.json, vite.config.ts, astro.config.mjs, etc.) for build setup.",
+    ""
+  ];
+  if (opts.decisionLogPath) {
+    lines.push(
+      "## Decision Log",
+      `Read the decision log at: \`${opts.decisionLogPath}\``,
+      ""
+    );
+  }
+  return lines.join("\n");
+}
+function buildConsistencyPrompt(opts) {
   const sections = [];
   sections.push('# Role\n\nYou are a consistency review agent. Analyze cross-component coherence, visual consistency, and holistic integration of the following code changes. Your goal is to catch issues that individual code review and security review miss \u2014 problems that only become visible when looking at multiple components together.\n\n## CRITICAL: Be Exhaustive \u2014 No Whack-a-Mole\n\nWhen you find an inconsistency on ONE element, you MUST immediately check ALL elements of the same type across ALL files in the diff. Report ONE comprehensive finding per category of inconsistency, listing EVERY affected element.\n\nBAD: "Button X in HeroSection.astro lacks focus-visible styles" (without checking the 5 other buttons)\nGOOD: "Focus-visible styles are missing on: HeroSection.astro:12, HeroSection.astro:15, Header.astro:11, Footer.astro:7, Footer.astro:8, ContactForm.astro:76. Only ContactForm.astro:63 has them. Fix: add `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2` to ALL listed elements."\n\nDo NOT report one element per finding. Report one CATEGORY of inconsistency with ALL affected elements listed. If you find `rounded-md` vs `rounded-lg` inconsistency, check EVERY element with a border-radius in the diff and list them all in one finding.\n\nThis is NON-NEGOTIABLE. Partial findings that miss sibling elements are worse than no finding at all \u2014 they cause an endless loop of fix-one-discover-another across iterations.');
-  if (projectContext) {
-    const ctxLines = ["# Project Context"];
-    if (projectContext.dependencies.length > 0) {
-      ctxLines.push(`
-**Dependencies:** ${projectContext.dependencies.join(", ")}`);
-    }
-    if (projectContext.devDependencies.length > 0) {
-      ctxLines.push(`**Dev Dependencies:** ${projectContext.devDependencies.join(", ")}`);
-    }
-    if (projectContext.configHighlights.length > 0) {
-      ctxLines.push("\n## Config Files\n");
-      ctxLines.push(projectContext.configHighlights.join("\n\n"));
-    }
-    sections.push(ctxLines.join("\n"));
-  }
+  sections.push(buildFileReferenceInstructions3(opts));
   sections.push(`# Changed Files
 
-${changedFiles.map((f) => `- ${f}`).join("\n")}`);
+${opts.changedFiles.map((f) => `- ${f}`).join("\n")}`);
   sections.push(buildConsistencyRules());
-  sections.push(`# Git Diff
-
-\`\`\`diff
-${diff}
-\`\`\``);
-  sections.push(`# Spec Context
-
-${specItemContext}`);
   sections.push(`# Test Results
 
-- Total: ${testResult.totalTests}
-- Passing: ${testResult.passingTests}
-- Failing: ${testResult.failingTests}
-- Duration: ${testResult.durationMs}ms`);
-  if (decisionLog) {
-    sections.push(decisionLog);
-  }
-  if (iterationIndex >= 2) {
-    sections.push(buildIterationAwareness3(iterationIndex));
+- Total: ${opts.testResult.totalTests}
+- Passing: ${opts.testResult.passingTests}
+- Failing: ${opts.testResult.failingTests}
+- Duration: ${opts.testResult.durationMs}ms`);
+  if (opts.iterationIndex >= 2) {
+    sections.push(buildIterationAwareness3(opts.iterationIndex));
   }
   sections.push("# DRY Enforcement\n\nDRY violations with 3 or more repetitions of the same string/pattern are severity `important`, NOT `suggestion`. Repeated class strings, duplicated logic blocks, and copy-pasted constants that appear 3+ times MUST be flagged as `important` with category `dry-violation`. List ALL occurrences in a single finding.");
   sections.push('# Fix Quality\n\nEvery `suggestedFix` MUST be actionable \u2014 include the target file, the specific change, and why.\nBAD:  "Fix the colors." / "Make it consistent."\nGOOD: Specific file + what to change + where in the file.');
@@ -473,61 +484,10 @@ All string values in JSON must use proper JSON escaping \u2014 newlines as \\n, 
   return sections.join("\n\n");
 }
 
-// src/detect/tech-stack.ts
-import { existsSync, readFileSync } from "fs";
-import { join as join2 } from "path";
-var CONFIG_HIGHLIGHT_FILES = [
-  "vite.config.ts",
-  "vite.config.js",
-  "astro.config.mjs",
-  "astro.config.ts",
-  "tailwind.config.js",
-  "tailwind.config.ts",
-  "tsconfig.json"
-];
-var MAX_CONFIG_PREVIEW_BYTES = 2048;
-async function readProjectContext(projectDir) {
-  const packageJsonPath = join2(projectDir, "package.json");
-  let dependencies = [];
-  let devDependencies = [];
-  if (existsSync(packageJsonPath)) {
-    try {
-      const raw = readFileSync(packageJsonPath, "utf-8");
-      const parsed = JSON.parse(raw);
-      dependencies = Object.keys(parsed.dependencies ?? {});
-      devDependencies = Object.keys(parsed.devDependencies ?? {});
-    } catch (err) {
-      process.stderr.write(`WARNING: Failed to read package.json in readProjectContext: ${err.message}
-`);
-    }
-  }
-  const configHighlights = [];
-  for (const configFile of CONFIG_HIGHLIGHT_FILES) {
-    const configPath = join2(projectDir, configFile);
-    if (!existsSync(configPath)) continue;
-    try {
-      const raw = readFileSync(configPath, "utf-8");
-      const preview = raw.length > MAX_CONFIG_PREVIEW_BYTES ? raw.slice(0, MAX_CONFIG_PREVIEW_BYTES) + "\n...(truncated)" : raw;
-      configHighlights.push(`### ${configFile}
-\`\`\`
-${preview}
-\`\`\``);
-    } catch (err) {
-      process.stderr.write(`WARNING: Failed to read config file ${configFile}: ${err.message}
-`);
-    }
-  }
-  return {
-    dependencies,
-    devDependencies,
-    configHighlights
-  };
-}
-
 // src/phases/code/review-merge.ts
-var MAX_SPEC_CONTEXT_BYTES = 4096;
 var MAX_RETRIES = 2;
 var SENSITIVE_PATTERNS = [/^\.env($|\.)/, /\.pem$/, /\.key$/];
+var DECISION_LOG_RELATIVE = ".swarm/review-decision-log.md";
 function isRetryableErrorCode(code) {
   return code === "timeout" || code === "crash" || code === "empty_output" || code === "invalid_json";
 }
@@ -539,10 +499,6 @@ function filterSensitiveFiles(files) {
     const basename = f.split("/").pop() ?? f;
     return !SENSITIVE_PATTERNS.some((p) => p.test(basename));
   });
-}
-function truncateSpec(spec) {
-  if (Buffer.byteLength(spec, "utf-8") <= MAX_SPEC_CONTEXT_BYTES) return spec;
-  return Buffer.from(spec, "utf-8").subarray(0, MAX_SPEC_CONTEXT_BYTES).toString("utf-8");
 }
 function spawnGit(args, cwd) {
   return new Promise((resolve, reject) => {
@@ -566,6 +522,13 @@ function spawnGit(args, cwd) {
       reject(new Error(`git spawn error: ${err.message}`));
     });
   });
+}
+function writeDecisionLog(projectDir, decisionLog) {
+  if (!decisionLog) return void 0;
+  const logPath = join2(projectDir, DECISION_LOG_RELATIVE);
+  mkdirSync2(dirname(logPath), { recursive: true });
+  writeFileSync2(logPath, decisionLog, "utf-8");
+  return logPath;
 }
 function parseReviewFindings(output) {
   const cleaned = parseStructuredOutput(output);
@@ -651,13 +614,11 @@ function buildFindingTrajectory(iterations) {
     return `Wave ${iter.iteration}: ${review.criticalCount} critical, ${review.importantCount} important, ${review.suggestionCount} suggestion${review.suggestionCount !== 1 ? "s" : ""}`;
   }).join("\n");
 }
-async function runReviewPhase(ctx, registry, changedFiles, specItemContext, testResult, signal, decisionLog = "", iterationIndex = 0, iterations = []) {
+async function runReviewPhase(ctx, registry, changedFiles, testResult, signal, decisionLog = "", iterationIndex = 0, iterations = []) {
   if (signal?.aborted) {
     throw new Error("Review phase aborted");
   }
   const safeFiles = filterSensitiveFiles(changedFiles);
-  const truncatedSpec = truncateSpec(specItemContext);
-  let diff = "";
   if (safeFiles.length > 0) {
     try {
       await spawnGit(["add", "-N", "--", ...safeFiles], ctx.projectDir);
@@ -665,25 +626,18 @@ async function runReviewPhase(ctx, registry, changedFiles, specItemContext, test
       process.stderr.write(`WARNING: git add -N failed: ${err.message}
 `);
     }
-    try {
-      const result = await spawnGit(["diff", "HEAD", "--", ...safeFiles], ctx.projectDir);
-      diff = result.stdout;
-    } catch (err) {
-      process.stderr.write(`WARNING: git diff failed, review will run on empty diff: ${err.message}
-`);
-      diff = "(diff unavailable)";
-    }
   }
-  let projectContext;
-  try {
-    projectContext = await readProjectContext(ctx.projectDir);
-  } catch (err) {
-    process.stderr.write(`WARNING: readProjectContext failed: ${err.message}
-`);
-  }
-  const reviewPrompt = buildReviewPrompt(diff, truncatedSpec, testResult, projectContext, decisionLog, iterationIndex);
-  const securityPromptText = buildSecurityPrompt(diff, truncatedSpec, testResult, projectContext, decisionLog, iterationIndex);
-  const consistencyPromptText = buildConsistencyPrompt(diff, safeFiles, truncatedSpec, testResult, projectContext, decisionLog, iterationIndex);
+  const decisionLogPath = writeDecisionLog(ctx.projectDir, decisionLog);
+  const promptOpts = {
+    changedFiles: safeFiles,
+    specPath: ctx.specPath,
+    testResult,
+    decisionLogPath,
+    iterationIndex
+  };
+  const reviewPrompt = buildReviewPrompt(promptOpts);
+  const securityPromptText = buildSecurityPrompt(promptOpts);
+  const consistencyPromptText = buildConsistencyPrompt(promptOpts);
   const [codeReviewResult, securityReviewResult, consistencyResult] = await Promise.all([
     invokeWithRetry(ctx, registry, "review", reviewPrompt, signal),
     invokeWithRetry(ctx, registry, "security", securityPromptText, signal),
@@ -1279,7 +1233,7 @@ async function resumeAgentWithFindings(node, ctx, registry, techStack, testFiles
   }
   return null;
 }
-async function executeDag(ctx, registry, tasks, techStack, specItemContext, plannerOutput, signal, logger, gitState) {
+async function executeDag(ctx, registry, tasks, techStack, plannerOutput, signal, logger, gitState) {
   if (tasks.length === 0) {
     return { taskCompletions: [], iterations: [] };
   }
@@ -1382,7 +1336,6 @@ async function executeDag(ctx, registry, tasks, techStack, specItemContext, plan
       ctx,
       registry,
       allChangedFiles,
-      specItemContext,
       agentTestResult,
       signal,
       globalDecisionLog,
@@ -1637,13 +1590,11 @@ async function runCodePhase(ctx, registry, plan, signal) {
 `);
   }
   const logger = createIterationLogger(ctx.projectDir, ctx.sessionId);
-  const specItemContext = plan.plannerOutput.slice(0, 4096);
   const dagResult = await executeDag(
     ctx,
     registry,
     plan.tasks,
     plan.techStack,
-    specItemContext,
     plan.plannerOutput,
     signal,
     logger,

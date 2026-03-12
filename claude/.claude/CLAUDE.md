@@ -89,6 +89,8 @@
 
 - **NEVER think migration / legacy / deprecated** — when writing new code, changing code, or designing solutions, NEVER waste time on: backward compatibility shims, migration paths, deprecation warnings, legacy support, fallback for "old" consumers, re-exports of renamed symbols, or any form of "what about existing usage?" thinking. Write the correct code NOW. Delete the old code. Move on. The ONLY exception is when the user EXPLICITLY asks you to handle existing/legacy concerns (e.g., "make sure the old API still works", "add a migration step"). If the user didn't say it, it doesn't exist. All agents, no exceptions.
 
+- **NEVER run build or start commands** — Do NOT run `docker build`, `nn up`, `pnpm build`, `npm run dev`, or any build/start commands. These are resource-intensive operations that the user should control. Instead, inform the user what commands would be needed and ask them to run them. Only exception: when the user EXPLICITLY asks you to run these commands.
+
 # MCP Context Optimization
 
 - **GitHub MCP**: Always set `minimal_output: true` unless full details are explicitly needed. Use `per_page: 5` max. Prefer `search_*` tools over `list_*` for targeted queries. For read-only browsing (list PRs, check status, view issues), prefer `gh` CLI via Bash (~200 tokens) over MCP tools (10k+ tokens JSON).

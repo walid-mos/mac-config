@@ -220,7 +220,6 @@ export async function executeDag(
   registry: DriverRegistry,
   tasks: PlannerTask[],
   techStack: TechStack,
-  specItemContext: string,
   plannerOutput: string,
   signal: AbortSignal | undefined,
   logger: IterationLogger,
@@ -350,7 +349,7 @@ export async function executeDag(
     )
 
     const review = await runReviewPhase(
-      ctx, registry, allChangedFiles, specItemContext, agentTestResult, signal, globalDecisionLog, waveIndex, iterations
+      ctx, registry, allChangedFiles, agentTestResult, signal, globalDecisionLog, waveIndex, iterations
     )
 
     // Log review

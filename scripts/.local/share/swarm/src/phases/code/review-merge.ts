@@ -1,6 +1,8 @@
 // === Review & Merge Orchestration (Spec 4 — FR-6, FR-7) ===
 
 import { spawn } from 'node:child_process'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { join, dirname } from 'node:path'
 import type { SessionContext } from '../../core/types.js'
 import type { DriverRegistry, AgentResult } from '../../drivers/driver.js'
 import type { TestResult, MergedReview, ReviewFinding, IterationState } from '../phase-results.js'
@@ -8,14 +10,13 @@ import { buildReviewPrompt } from './review-prompt.js'
 import { buildSecurityPrompt } from './security-prompt.js'
 import { buildConsistencyPrompt } from './consistency-prompt.js'
 import { buildMergePrompt } from './merge-prompt.js'
-import { readProjectContext, type ProjectContext } from '../../detect/tech-stack.js'
 import { parseStructuredOutput } from '../../drivers/output-parser.js'
 
 // === Constants ===
 
-const MAX_SPEC_CONTEXT_BYTES = 4096 // 4KB
 const MAX_RETRIES = 2
 const SENSITIVE_PATTERNS = [/^\.env($|\.)/, /\.pem$/, /\.key$/]
+const DECISION_LOG_RELATIVE = '.swarm/review-decision-log.md'
 
 
 // === Helpers ===
@@ -33,11 +34,6 @@ function filterSensitiveFiles(files: string[]): string[] {
     const basename = f.split('/').pop() ?? f
     return !SENSITIVE_PATTERNS.some(p => p.test(basename))
   })
-}
-
-function truncateSpec(spec: string): string {
-  if (Buffer.byteLength(spec, 'utf-8') <= MAX_SPEC_CONTEXT_BYTES) return spec
-  return Buffer.from(spec, 'utf-8').subarray(0, MAX_SPEC_CONTEXT_BYTES).toString('utf-8')
 }
 
 function spawnGit(
@@ -62,6 +58,14 @@ function spawnGit(
       reject(new Error(`git spawn error: ${err.message}`))
     })
   })
+}
+
+function writeDecisionLog(projectDir: string, decisionLog: string): string | undefined {
+  if (!decisionLog) return undefined
+  const logPath = join(projectDir, DECISION_LOG_RELATIVE)
+  mkdirSync(dirname(logPath), { recursive: true })
+  writeFileSync(logPath, decisionLog, 'utf-8')
+  return logPath
 }
 
 function parseReviewFindings(output: string): ReviewFinding[] {
@@ -171,7 +175,6 @@ export async function runReviewPhase(
   ctx: SessionContext,
   registry: DriverRegistry,
   changedFiles: string[],
-  specItemContext: string,
   testResult: TestResult,
   signal?: AbortSignal,
   decisionLog: string = '',
@@ -185,39 +188,29 @@ export async function runReviewPhase(
   // Filter sensitive files
   const safeFiles = filterSensitiveFiles(changedFiles)
 
-  // Truncate spec context
-  const truncatedSpec = truncateSpec(specItemContext)
-
-  // Get git diff — intent-to-add new files first so they appear in the diff.
-  // Without this, new untracked files created by code agents are invisible to git diff HEAD.
-  let diff = ''
+  // Intent-to-add new files so agents' `git diff HEAD` sees them
   if (safeFiles.length > 0) {
     try {
       await spawnGit(['add', '-N', '--', ...safeFiles], ctx.projectDir)
     } catch (err) {
       process.stderr.write(`WARNING: git add -N failed: ${(err as Error).message}\n`)
     }
-    try {
-      const result = await spawnGit(['diff', 'HEAD', '--', ...safeFiles], ctx.projectDir)
-      diff = result.stdout
-    } catch (err) {
-      process.stderr.write(`WARNING: git diff failed, review will run on empty diff: ${(err as Error).message}\n`)
-      diff = '(diff unavailable)'
-    }
   }
 
-  // Read project context (non-fatal)
-  let projectContext: ProjectContext | undefined
-  try {
-    projectContext = await readProjectContext(ctx.projectDir)
-  } catch (err) {
-    process.stderr.write(`WARNING: readProjectContext failed: ${(err as Error).message}\n`)
-  }
+  // Write decision log to file (if non-empty) so agents can read it
+  const decisionLogPath = writeDecisionLog(ctx.projectDir, decisionLog)
 
-  // Build prompts
-  const reviewPrompt = buildReviewPrompt(diff, truncatedSpec, testResult, projectContext, decisionLog, iterationIndex)
-  const securityPromptText = buildSecurityPrompt(diff, truncatedSpec, testResult, projectContext, decisionLog, iterationIndex)
-  const consistencyPromptText = buildConsistencyPrompt(diff, safeFiles, truncatedSpec, testResult, projectContext, decisionLog, iterationIndex)
+  // Build prompts — agents read diff, spec, and project context themselves
+  const promptOpts = {
+    changedFiles: safeFiles,
+    specPath: ctx.specPath,
+    testResult,
+    decisionLogPath,
+    iterationIndex,
+  }
+  const reviewPrompt = buildReviewPrompt(promptOpts)
+  const securityPromptText = buildSecurityPrompt(promptOpts)
+  const consistencyPromptText = buildConsistencyPrompt(promptOpts)
 
   // Run code + security + consistency review in parallel
   const [codeReviewResult, securityReviewResult, consistencyResult] = await Promise.all([

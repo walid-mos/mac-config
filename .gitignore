@@ -38,3 +38,6 @@ node_modules/
 
 # pnpm store
 .pnpm-store/
+
+# Swarm run files (logs/dist)
+.swarm/

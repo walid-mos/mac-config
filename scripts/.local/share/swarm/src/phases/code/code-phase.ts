@@ -239,13 +239,10 @@ export async function runCodePhase(
   // Create iteration logger
   const logger = createIterationLogger(ctx.projectDir, ctx.sessionId)
 
-  // Spec context for review
-  const specItemContext = plan.plannerOutput.slice(0, 4096)
-
   // Execute DAG (wave-based scheduling — TDD runs per-wave inside)
   const dagResult = await executeDag(
     ctx, registry, plan.tasks, plan.techStack,
-    specItemContext, plan.plannerOutput, signal, logger, gitState
+    plan.plannerOutput, signal, logger, gitState
   )
 
   const lastOutcome = dagResult.lastOutcome

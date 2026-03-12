@@ -11,17 +11,14 @@ vi.mock('node:child_process', () => ({
   spawn: vi.fn().mockImplementation(() => {
     const { createMockChildProcess } = require('../../__test-utils__/factories.js')
     const proc = createMockChildProcess()
-    setTimeout(() => proc.simulateOutput('diff output', 0), 0)
+    setTimeout(() => proc.simulateOutput('', 0), 0)
     return proc
   }),
 }))
 
-vi.mock('../../../src/detect/tech-stack.js', () => ({
-  readProjectContext: vi.fn().mockResolvedValue({
-    dependencies: ['react'],
-    devDependencies: ['vitest'],
-    configHighlights: [],
-  }),
+vi.mock('node:fs', () => ({
+  mkdirSync: vi.fn(),
+  writeFileSync: vi.fn(),
 }))
 
 
@@ -104,14 +101,6 @@ describe('runReviewPhase', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
 
-    // Re-setup readProjectContext mock
-    const { readProjectContext } = await import('../../../src/detect/tech-stack.js')
-    vi.mocked(readProjectContext).mockResolvedValue({
-      dependencies: ['react'],
-      devDependencies: ['vitest'],
-      configHighlights: [],
-    })
-
     const mergedOutput = JSON.stringify({
       findings: [],
       criticalCount: 0,
@@ -125,7 +114,7 @@ describe('runReviewPhase', () => {
 
   it('runs code review, security review, and consistency review in parallel', async () => {
     const changedFiles = ['src/index.ts']
-    const result = await runReviewPhase(ctx, registry, changedFiles, 'spec', createTestResult())
+    const result = await runReviewPhase(ctx, registry, changedFiles, createTestResult())
 
     // getDriver called for review, security, consistency, and merge roles
     expect(registry.getDriver).toHaveBeenCalledWith('review')
@@ -136,7 +125,7 @@ describe('runReviewPhase', () => {
   })
 
   it('invokes merge agent after reviews', async () => {
-    const result = await runReviewPhase(ctx, registry, ['src/index.ts'], 'spec', createTestResult())
+    const result = await runReviewPhase(ctx, registry, ['src/index.ts'], createTestResult())
 
     // 4 invocations: review + security + consistency (parallel) + merge
     expect(mockDriver.invoke).toHaveBeenCalledTimes(4)
@@ -147,26 +136,18 @@ describe('runReviewPhase', () => {
     const emitter = createMockEmitter()
     ctx = createSessionContext({ emitter })
 
-    await runReviewPhase(ctx, registry, ['src/index.ts'], 'spec', createTestResult())
+    await runReviewPhase(ctx, registry, ['src/index.ts'], createTestResult())
 
     const findingsEvents = emitter.getEvents({ type: 'review:findings' })
     expect(findingsEvents.length).toBe(1)
   })
 
-  it('filters sensitive files from diff (DL-SC-5: .env*, *.pem, *.key)', async () => {
+  it('filters sensitive files from review (DL-SC-5: .env*, *.pem, *.key)', async () => {
     const changedFiles = ['src/index.ts', '.env.local', 'certs/server.pem', 'keys/private.key']
 
-    const result = await runReviewPhase(ctx, registry, changedFiles, 'spec', createTestResult())
+    const result = await runReviewPhase(ctx, registry, changedFiles, createTestResult())
 
     // Should still succeed — sensitive files are filtered out
-    expect(result).toBeDefined()
-  })
-
-  it('truncates specItemContext to 4KB', async () => {
-    const longSpec = 'x'.repeat(8192) // 8KB
-
-    const result = await runReviewPhase(ctx, registry, ['src/index.ts'], longSpec, createTestResult())
-
     expect(result).toBeDefined()
   })
 
@@ -175,25 +156,39 @@ describe('runReviewPhase', () => {
     controller.abort()
 
     await expect(
-      runReviewPhase(ctx, registry, ['src/index.ts'], 'spec', createTestResult(), controller.signal)
+      runReviewPhase(ctx, registry, ['src/index.ts'], createTestResult(), controller.signal)
     ).rejects.toThrow('aborted')
   })
 
-  it('reads project context and passes to prompts', async () => {
-    const { readProjectContext } = await import('../../../src/detect/tech-stack.js')
+  it('writes decision log to file when provided', async () => {
+    const { writeFileSync, mkdirSync } = await import('node:fs')
 
-    await runReviewPhase(ctx, registry, ['src/index.ts'], 'spec', createTestResult())
+    await runReviewPhase(ctx, registry, ['src/index.ts'], createTestResult(), undefined, '# Decision Log\n- entry 1')
 
-    expect(readProjectContext).toHaveBeenCalledWith(ctx.projectDir)
+    expect(mkdirSync).toHaveBeenCalled()
+    expect(writeFileSync).toHaveBeenCalledWith(
+      '/tmp/project/.swarm/review-decision-log.md',
+      '# Decision Log\n- entry 1',
+      'utf-8'
+    )
   })
 
-  it('continues if readProjectContext throws', async () => {
-    const { readProjectContext } = await import('../../../src/detect/tech-stack.js')
-    vi.mocked(readProjectContext).mockRejectedValueOnce(new Error('ENOENT'))
+  it('does not write decision log file when empty', async () => {
+    const { writeFileSync } = await import('node:fs')
 
-    const result = await runReviewPhase(ctx, registry, ['src/index.ts'], 'spec', createTestResult())
+    await runReviewPhase(ctx, registry, ['src/index.ts'], createTestResult(), undefined, '')
 
-    expect(result).toBeDefined()
+    expect(writeFileSync).not.toHaveBeenCalled()
+  })
+
+  it('passes specPath from ctx to prompt builders', async () => {
+    ctx = createSessionContext({ specPath: '/custom/spec.md' })
+
+    await runReviewPhase(ctx, registry, ['src/index.ts'], createTestResult())
+
+    // Verify the driver was invoked with a prompt containing the spec path
+    const invokeCall = vi.mocked(mockDriver.invoke).mock.calls[0]
+    expect(invokeCall![0].prompt).toContain('/custom/spec.md')
   })
 
   it('handles markdown-fenced JSON from agents (fence-strip)', async () => {
@@ -211,7 +206,7 @@ describe('runReviewPhase', () => {
     }
     registry = createMockRegistry(fencedDriver)
 
-    const result = await runReviewPhase(ctx, registry, ['src/app.ts'], 'spec', createTestResult())
+    const result = await runReviewPhase(ctx, registry, ['src/app.ts'], createTestResult())
 
     expect(result.importantCount).toBe(1)
     expect(result.findings).toHaveLength(1)
@@ -246,7 +241,7 @@ describe('runReviewPhase', () => {
       .mockResolvedValueOnce(successResult) // review attempt 2 (pass)
       .mockResolvedValueOnce(successResult) // merge
 
-    const result = await runReviewPhase(ctx, registry, ['src/index.ts'], 'spec', createTestResult())
+    const result = await runReviewPhase(ctx, registry, ['src/index.ts'], createTestResult())
 
     expect(result).toBeDefined()
   })
@@ -333,14 +328,6 @@ describe('runReviewPhase convergence extraction', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks()
-
-    const { readProjectContext } = await import('../../../src/detect/tech-stack.js')
-    vi.mocked(readProjectContext).mockResolvedValue({
-      dependencies: ['react'],
-      devDependencies: ['vitest'],
-      configHighlights: [],
-    })
-
     ctx = createSessionContext()
   })
 
@@ -355,7 +342,7 @@ describe('runReviewPhase convergence extraction', () => {
     const driver = createMockDriver(mergedOutput)
     registry = createMockRegistry(driver)
 
-    const result = await runReviewPhase(ctx, registry, ['src/index.ts'], 'spec', createTestResult())
+    const result = await runReviewPhase(ctx, registry, ['src/index.ts'], createTestResult())
 
     expect(result.convergenceRecommendation).toBe('converged')
   })
@@ -370,7 +357,7 @@ describe('runReviewPhase convergence extraction', () => {
     const driver = createMockDriver(mergedOutput)
     registry = createMockRegistry(driver)
 
-    const result = await runReviewPhase(ctx, registry, ['src/index.ts'], 'spec', createTestResult())
+    const result = await runReviewPhase(ctx, registry, ['src/index.ts'], createTestResult())
 
     expect(result.convergenceRecommendation).toBe('continue')
   })
@@ -386,7 +373,7 @@ describe('runReviewPhase convergence extraction', () => {
     const driver = createMockDriver(mergedOutput)
     registry = createMockRegistry(driver)
 
-    const result = await runReviewPhase(ctx, registry, ['src/index.ts'], 'spec', createTestResult())
+    const result = await runReviewPhase(ctx, registry, ['src/index.ts'], createTestResult())
 
     expect(result.convergenceRecommendation).toBe('continue')
   })

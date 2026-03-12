@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { buildReviewPrompt } from '../../../src/phases/code/review-prompt.js'
+import type { ReviewPromptOpts } from '../../../src/phases/code/review-prompt.js'
 import type { TestResult } from '../../../src/phases/phase-results.js'
-import type { ProjectContext } from '../../../src/detect/tech-stack.js'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -17,118 +17,100 @@ function createTestResult(overrides: Partial<TestResult> = {}): TestResult {
   }
 }
 
+function createOpts(overrides: Partial<ReviewPromptOpts> = {}): ReviewPromptOpts {
+  return {
+    changedFiles: ['src/index.ts'],
+    specPath: '/tmp/project/spec.md',
+    testResult: createTestResult(),
+    iterationIndex: 0,
+    ...overrides,
+  }
+}
+
 // ---------------------------------------------------------------------------
 // buildReviewPrompt
 // ---------------------------------------------------------------------------
 
 describe('buildReviewPrompt', () => {
-  const diff = `diff --git a/src/index.ts b/src/index.ts
-index abc1234..def5678 100644
---- a/src/index.ts
-+++ b/src/index.ts
-@@ -1,3 +1,5 @@
-+import { auth } from './auth'
-+
- export function main() {
--  console.log('hello')
-+  auth.init()
- }`
-  const specContext = '## Feature: User authentication\nImplement JWT-based auth.'
-
   it('includes role as code reviewer', () => {
-    const prompt = buildReviewPrompt(diff, specContext, createTestResult())
+    const prompt = buildReviewPrompt(createOpts())
 
     expect(prompt.toLowerCase()).toContain('review')
   })
 
-  it('includes git diff', () => {
-    const prompt = buildReviewPrompt(diff, specContext, createTestResult())
+  it('includes file reference instructions with git diff command', () => {
+    const prompt = buildReviewPrompt(createOpts({ changedFiles: ['src/index.ts', 'src/auth.ts'] }))
 
-    expect(prompt).toContain('src/index.ts')
-    expect(prompt).toContain('auth.init()')
+    expect(prompt).toContain('git diff HEAD -- src/index.ts src/auth.ts')
   })
 
-  it('includes spec context', () => {
-    const prompt = buildReviewPrompt(diff, specContext, createTestResult())
+  it('includes spec path reference', () => {
+    const prompt = buildReviewPrompt(createOpts({ specPath: '/tmp/project/spec.md' }))
 
-    expect(prompt).toContain('User authentication')
+    expect(prompt).toContain('/tmp/project/spec.md')
+  })
+
+  it('includes changed files list', () => {
+    const prompt = buildReviewPrompt(createOpts({ changedFiles: ['src/index.ts'] }))
+
+    expect(prompt).toContain('src/index.ts')
+    expect(prompt).toContain('Changed Files')
   })
 
   it('includes test result summary', () => {
     const testResult = createTestResult({ totalTests: 20, passingTests: 18, failingTests: 2 })
 
-    const prompt = buildReviewPrompt(diff, specContext, testResult)
+    const prompt = buildReviewPrompt(createOpts({ testResult }))
 
     expect(prompt).toContain('20')
     expect(prompt).toContain('18')
   })
 
   it('includes output format (ReviewFinding structure)', () => {
-    const prompt = buildReviewPrompt(diff, specContext, createTestResult())
+    const prompt = buildReviewPrompt(createOpts())
 
     expect(prompt).toContain('severity')
     expect(prompt).toContain('category')
   })
 
   it('returns non-empty string', () => {
-    const prompt = buildReviewPrompt(diff, specContext, createTestResult())
+    const prompt = buildReviewPrompt(createOpts())
 
     expect(prompt.length).toBeGreaterThan(0)
     expect(typeof prompt).toBe('string')
   })
 
-  it('includes project context when provided', () => {
-    const projectContext: ProjectContext = {
-      dependencies: ['react', 'express'],
-      devDependencies: ['vitest', 'typescript'],
-      configHighlights: ['### tsconfig.json\n```\n{"strict": true}\n```'],
-    }
+  it('instructs agent to read package.json for project context', () => {
+    const prompt = buildReviewPrompt(createOpts())
 
-    const prompt = buildReviewPrompt(diff, specContext, createTestResult(), projectContext)
-
+    expect(prompt).toContain('package.json')
     expect(prompt).toContain('Project Context')
-    expect(prompt).toContain('react')
-    expect(prompt).toContain('express')
-    expect(prompt).toContain('vitest')
-    expect(prompt).toContain('tsconfig.json')
   })
 
-  it('works without project context (backward compat)', () => {
-    const prompt = buildReviewPrompt(diff, specContext, createTestResult())
+  it('does not inline diff content (only references git diff command)', () => {
+    const prompt = buildReviewPrompt(createOpts())
 
-    expect(prompt).not.toContain('Project Context')
-    expect(prompt.length).toBeGreaterThan(0)
-  })
-
-  it('handles empty project context gracefully', () => {
-    const emptyCtx: ProjectContext = {
-      dependencies: [],
-      devDependencies: [],
-      configHighlights: [],
-    }
-
-    const prompt = buildReviewPrompt(diff, specContext, createTestResult(), emptyCtx)
-
-    expect(prompt).toContain('Project Context')
-    expect(prompt.length).toBeGreaterThan(0)
+    // Should contain the git diff command instruction, not raw diff content
+    expect(prompt).toContain('git diff HEAD')
+    expect(prompt).not.toContain('```diff')
   })
 
   it('includes integration & build compatibility rules', () => {
-    const prompt = buildReviewPrompt(diff, specContext, createTestResult())
+    const prompt = buildReviewPrompt(createOpts())
 
     expect(prompt).toContain('Integration & Build Compatibility')
     expect(prompt).toContain('External Resources')
   })
 
   it('includes dependency integrity checks', () => {
-    const prompt = buildReviewPrompt(diff, specContext, createTestResult())
+    const prompt = buildReviewPrompt(createOpts())
 
     expect(prompt).toContain('Dependency Integrity')
     expect(prompt).toContain('package.json')
   })
 
   it('includes spec compliance section', () => {
-    const prompt = buildReviewPrompt(diff, specContext, createTestResult())
+    const prompt = buildReviewPrompt(createOpts())
 
     expect(prompt).toContain('Spec Compliance')
     expect(prompt).toContain('spec-compliance')
@@ -136,7 +118,7 @@ index abc1234..def5678 100644
   })
 
   it('includes fix quality requirements', () => {
-    const prompt = buildReviewPrompt(diff, specContext, createTestResult())
+    const prompt = buildReviewPrompt(createOpts())
 
     expect(prompt).toContain('Fix Quality')
     expect(prompt).toMatch(/actionable/i)
@@ -144,26 +126,26 @@ index abc1234..def5678 100644
   })
 
   it('includes spec-compliance in output format categories', () => {
-    const prompt = buildReviewPrompt(diff, specContext, createTestResult())
+    const prompt = buildReviewPrompt(createOpts())
 
     expect(prompt).toContain('spec-compliance')
   })
 
   it('instructs raw JSON output without markdown fences', () => {
-    const prompt = buildReviewPrompt(diff, specContext, createTestResult())
+    const prompt = buildReviewPrompt(createOpts())
 
     expect(prompt).toContain('ONLY raw JSON')
     expect(prompt).toContain('No markdown fences')
   })
 
   it('instructs proper JSON escaping for string values', () => {
-    const prompt = buildReviewPrompt(diff, specContext, createTestResult())
+    const prompt = buildReviewPrompt(createOpts())
 
     expect(prompt).toContain('JSON escaping')
   })
 
   it('includes DRY enforcement section', () => {
-    const prompt = buildReviewPrompt(diff, specContext, createTestResult())
+    const prompt = buildReviewPrompt(createOpts())
 
     expect(prompt).toContain('DRY Enforcement')
     expect(prompt).toContain('important')
@@ -171,23 +153,23 @@ index abc1234..def5678 100644
     expect(prompt).toMatch(/3.*repetitions|3\+/i)
   })
 
-  it('includes decision log when provided', () => {
-    const decisionLog = '# Previous Iteration Decisions\n\n- **Iteration 0** | src/auth.ts:15 | critical bug: Null check → **Applied fix**: Added guard'
+  it('includes decision log path when provided', () => {
+    const prompt = buildReviewPrompt(createOpts({
+      decisionLogPath: '/tmp/project/.swarm/review-decision-log.md',
+    }))
 
-    const prompt = buildReviewPrompt(diff, specContext, createTestResult(), undefined, decisionLog)
-
-    expect(prompt).toContain('Previous Iteration Decisions')
-    expect(prompt).toContain('Null check')
+    expect(prompt).toContain('Decision Log')
+    expect(prompt).toContain('/tmp/project/.swarm/review-decision-log.md')
   })
 
-  it('omits decision log when empty', () => {
-    const prompt = buildReviewPrompt(diff, specContext, createTestResult(), undefined, '')
+  it('omits decision log section when no path', () => {
+    const prompt = buildReviewPrompt(createOpts())
 
-    expect(prompt).not.toContain('Previous Iteration Decisions')
+    expect(prompt).not.toContain('Decision Log')
   })
 
   it('includes iteration awareness section at iteration >= 2', () => {
-    const prompt = buildReviewPrompt(diff, specContext, createTestResult(), undefined, '', 3)
+    const prompt = buildReviewPrompt(createOpts({ iterationIndex: 3 }))
 
     expect(prompt).toContain('Iteration Awareness')
     expect(prompt).toContain('review iteration 3')
@@ -196,13 +178,13 @@ index abc1234..def5678 100644
   })
 
   it('omits iteration awareness section at iteration < 2', () => {
-    const prompt = buildReviewPrompt(diff, specContext, createTestResult(), undefined, '', 1)
+    const prompt = buildReviewPrompt(createOpts({ iterationIndex: 1 }))
 
     expect(prompt).not.toContain('Iteration Awareness')
   })
 
   it('omits iteration awareness section at iteration 0 (default)', () => {
-    const prompt = buildReviewPrompt(diff, specContext, createTestResult())
+    const prompt = buildReviewPrompt(createOpts())
 
     expect(prompt).not.toContain('Iteration Awareness')
   })

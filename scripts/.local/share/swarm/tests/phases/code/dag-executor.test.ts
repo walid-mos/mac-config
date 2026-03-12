@@ -190,7 +190,7 @@ describe('executeDag', () => {
 
   it('returns immediately for empty task list', async () => {
     const result = await executeDag(
-      ctx, registry, [], createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
+      ctx, registry, [], createTechStack(), 'planner output', undefined, createMockLogger(), createGitState()
     )
 
     expect(result.taskCompletions).toEqual([])
@@ -202,7 +202,7 @@ describe('executeDag', () => {
     const tasks = [createTask('TASK-1')]
 
     const result = await executeDag(
-      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
+      ctx, registry, tasks, createTechStack(), 'planner output', undefined, createMockLogger(), createGitState()
     )
 
     expect(result.taskCompletions).toHaveLength(1)
@@ -219,7 +219,7 @@ describe('executeDag', () => {
     ]
 
     const result = await executeDag(
-      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
+      ctx, registry, tasks, createTechStack(), 'planner output', undefined, createMockLogger(), createGitState()
     )
 
     expect(result.taskCompletions).toHaveLength(3)
@@ -240,7 +240,7 @@ describe('executeDag', () => {
     ctx = createSessionContext({ emitter })
 
     const result = await executeDag(
-      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
+      ctx, registry, tasks, createTechStack(), 'planner output', undefined, createMockLogger(), createGitState()
     )
 
     expect(result.taskCompletions).toHaveLength(4)
@@ -267,7 +267,7 @@ describe('executeDag', () => {
     ctx = createSessionContext({ emitter })
 
     const result = await executeDag(
-      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
+      ctx, registry, tasks, createTechStack(), 'planner output', undefined, createMockLogger(), createGitState()
     )
 
     expect(result.taskCompletions).toHaveLength(3)
@@ -323,7 +323,7 @@ describe('executeDag', () => {
     ctx = createSessionContext({ emitter })
 
     const result = await executeDag(
-      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
+      ctx, registry, tasks, createTechStack(), 'planner output', undefined, createMockLogger(), createGitState()
     )
 
     expect(result.taskCompletions).toHaveLength(3)
@@ -343,7 +343,7 @@ describe('executeDag', () => {
 
     await expect(
       executeDag(
-        ctx, registry, [createTask('TASK-1')], createTechStack(), 'spec',
+        ctx, registry, [createTask('TASK-1')], createTechStack(),
         'planner output', controller.signal, createMockLogger(), createGitState()
       )
     ).rejects.toThrow('aborted')
@@ -370,7 +370,7 @@ describe('executeDag', () => {
     const gitState = createGitState()
 
     await executeDag(
-      ctx, registry, tasks, createTechStack(), 'spec', [], undefined, createMockLogger(), gitState
+      ctx, registry, tasks, createTechStack(), [], undefined, createMockLogger(), gitState
     )
 
     expect(commitSpecItem).toHaveBeenCalledWith(
@@ -390,7 +390,7 @@ describe('executeDag', () => {
     const tasks = [createTask('TASK-1'), createTask('TASK-2')]
 
     await executeDag(
-      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
+      ctx, registry, tasks, createTechStack(), 'planner output', undefined, createMockLogger(), createGitState()
     )
 
     const starts = emitter.getEvents({ type: 'iteration:start' })
@@ -423,7 +423,7 @@ describe('executeDag', () => {
     ctx = createSessionContext({ emitter })
 
     await executeDag(
-      ctx, registry, [createTask('TASK-1')], createTechStack(), 'spec',
+      ctx, registry, [createTask('TASK-1')], createTechStack(),
       [], undefined, createMockLogger(), createGitState()
     )
 
@@ -462,7 +462,7 @@ describe('executeDag', () => {
       .mockResolvedValueOnce(createMergedReview()) // green
 
     await executeDag(
-      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
+      ctx, registry, tasks, createTechStack(), 'planner output', undefined, createMockLogger(), createGitState()
     )
 
     // buildFindingFixPrompt should be called with decision log on second iteration
@@ -474,7 +474,7 @@ describe('executeDag', () => {
     const tasks = [createTask('TASK-1', { tag: 'frontend' })]
 
     await executeDag(
-      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
+      ctx, registry, tasks, createTechStack(), 'planner output', undefined, createMockLogger(), createGitState()
     )
 
     expect(registry.getDriver).toHaveBeenCalledWith('code', 'frontend')
@@ -489,7 +489,7 @@ describe('executeDag', () => {
     ]
 
     await executeDag(
-      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
+      ctx, registry, tasks, createTechStack(), 'planner output', undefined, createMockLogger(), createGitState()
     )
 
     // Wave 1: TASK-1, Wave 2: TASK-2
@@ -527,7 +527,7 @@ describe('executeDag', () => {
     ]
 
     await executeDag(
-      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
+      ctx, registry, tasks, createTechStack(), 'planner output', undefined, createMockLogger(), createGitState()
     )
 
     // Wave 2 code agents should receive both wave 1 and wave 2 test files
@@ -568,7 +568,7 @@ describe('executeDag', () => {
       .mockResolvedValueOnce(createMergedReview())
 
     await executeDag(
-      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
+      ctx, registry, tasks, createTechStack(), 'planner output', undefined, createMockLogger(), createGitState()
     )
 
     // Only 1 TDD call (wave 1 with pending task), not on wave 2 (converging)
@@ -595,7 +595,7 @@ describe('executeDag', () => {
     const tasks = [createTask('TASK-1')]
 
     const result = await executeDag(
-      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
+      ctx, registry, tasks, createTechStack(), 'planner output', undefined, createMockLogger(), createGitState()
     )
 
     expect(driver.invoke).toHaveBeenCalledTimes(2) // 1 fail + 1 success (code), plus review agents
@@ -631,7 +631,7 @@ describe('executeDag', () => {
     })
 
     const result = await executeDag(
-      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
+      ctx, registry, tasks, createTechStack(), 'planner output', undefined, createMockLogger(), createGitState()
     )
 
     // Should go green in one iteration since important was demoted
@@ -671,7 +671,7 @@ describe('executeDag', () => {
       .mockResolvedValueOnce(createMergedReview()) // Wave 2 clean
 
     const result = await executeDag(
-      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
+      ctx, registry, tasks, createTechStack(), 'planner output', undefined, createMockLogger(), createGitState()
     )
 
     // Should NOT go green in one iteration — critical finding still blocks
@@ -709,11 +709,10 @@ describe('executeDag', () => {
       .mockResolvedValueOnce(createMergedReview()) // Wave 2 clean
 
     const result = await executeDag(
-      ctx, registry, tasks, createTechStack(), 'spec', 'planner output', undefined, createMockLogger(), createGitState()
+      ctx, registry, tasks, createTechStack(), 'planner output', undefined, createMockLogger(), createGitState()
     )
 
     // Important finding should still block when continue
     expect(result.iterations).toHaveLength(2)
   })
 })
-

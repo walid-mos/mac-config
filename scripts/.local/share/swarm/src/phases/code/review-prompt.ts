@@ -1,11 +1,20 @@
 // === Review Prompt Builder (Spec 4 — FR-6) ===
 
 import type { TestResult } from '../phase-results.js'
-import type { ProjectContext } from '../../detect/tech-stack.js'
+
+// === Types ===
+
+export interface ReviewPromptOpts {
+  changedFiles: string[]
+  specPath: string
+  testResult: TestResult
+  decisionLogPath?: string
+  iterationIndex: number
+}
 
 // === Helpers ===
 
-function buildIntegrationRules(projectContext?: ProjectContext): string {
+function buildIntegrationRules(): string {
   const rules: string[] = [
     '# Integration & Build Compatibility Review',
     '',
@@ -63,57 +72,58 @@ function buildIterationAwareness(iterationIndex: number): string {
   ].join('\n')
 }
 
+function buildFileReferenceInstructions(opts: ReviewPromptOpts): string {
+  const lines: string[] = [
+    '# How to Access Content',
+    '',
+    '## Git Diff',
+    'Run the following command to see all changes:',
+    '```',
+    `git diff HEAD -- ${opts.changedFiles.join(' ')}`,
+    '```',
+    '',
+    '## Spec',
+    `Read the spec file at: \`${opts.specPath}\``,
+    '',
+    '## Project Context',
+    'Read `package.json` for dependencies. Check config files (tsconfig.json, vite.config.ts, astro.config.mjs, etc.) for build setup.',
+    '',
+  ]
+
+  if (opts.decisionLogPath) {
+    lines.push(
+      '## Decision Log',
+      `Read the decision log at: \`${opts.decisionLogPath}\``,
+      '',
+    )
+  }
+
+  return lines.join('\n')
+}
+
 // === API ===
 
-export function buildReviewPrompt(
-  diff: string,
-  specItemContext: string,
-  testResult: TestResult,
-  projectContext?: ProjectContext,
-  decisionLog: string = '',
-  iterationIndex: number = 0
-): string {
+export function buildReviewPrompt(opts: ReviewPromptOpts): string {
   const sections: string[] = []
 
   // Role
   sections.push('# Role\n\nYou are a code review agent. Review the following code changes for bugs, quality issues, performance problems, integration conflicts, and adherence to best practices.')
 
-  // Project context (if available)
-  if (projectContext) {
-    const ctxLines: string[] = ['# Project Context']
-    if (projectContext.dependencies.length > 0) {
-      ctxLines.push(`\n**Dependencies:** ${projectContext.dependencies.join(', ')}`)
-    }
-    if (projectContext.devDependencies.length > 0) {
-      ctxLines.push(`**Dev Dependencies:** ${projectContext.devDependencies.join(', ')}`)
-    }
-    if (projectContext.configHighlights.length > 0) {
-      ctxLines.push('\n## Config Files\n')
-      ctxLines.push(projectContext.configHighlights.join('\n\n'))
-    }
-    sections.push(ctxLines.join('\n'))
-  }
+  // File reference instructions (replaces inlined diff, spec, project context, decision log)
+  sections.push(buildFileReferenceInstructions(opts))
+
+  // Changed files list
+  sections.push(`# Changed Files\n\n${opts.changedFiles.map(f => `- ${f}`).join('\n')}`)
 
   // Integration & build compatibility rules
-  sections.push(buildIntegrationRules(projectContext))
-
-  // Git diff
-  sections.push(`# Git Diff\n\n\`\`\`diff\n${diff}\n\`\`\``)
-
-  // Spec context
-  sections.push(`# Spec Context\n\n${specItemContext}`)
+  sections.push(buildIntegrationRules())
 
   // Test results
-  sections.push(`# Test Results\n\n- Total: ${testResult.totalTests}\n- Passing: ${testResult.passingTests}\n- Failing: ${testResult.failingTests}\n- Duration: ${testResult.durationMs}ms`)
-
-  // Decision log from previous iterations
-  if (decisionLog) {
-    sections.push(decisionLog)
-  }
+  sections.push(`# Test Results\n\n- Total: ${opts.testResult.totalTests}\n- Passing: ${opts.testResult.passingTests}\n- Failing: ${opts.testResult.failingTests}\n- Duration: ${opts.testResult.durationMs}ms`)
 
   // Iteration awareness (appended at iteration >= 2)
-  if (iterationIndex >= 2) {
-    sections.push(buildIterationAwareness(iterationIndex))
+  if (opts.iterationIndex >= 2) {
+    sections.push(buildIterationAwareness(opts.iterationIndex))
   }
 
   // DRY enforcement

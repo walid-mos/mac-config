@@ -140,6 +140,7 @@ function createCodeResult(overrides: Partial<CodePhaseResult> = {}): CodePhaseRe
     },
     changedFiles: ['src/feature.ts'],
     success: true,
+    terminalStatus: 'green',
     ...overrides,
   }
 }
@@ -259,6 +260,30 @@ describe('buildDeliveryReportInput', () => {
     const allFindings = result.specItems.flatMap(si => si.reviewFindings)
     expect(allFindings.length).toBeGreaterThan(0)
     expect(allFindings.some(f => f.severity === 'critical')).toBe(true)
+  })
+
+  it('keeps last reviewed findings visible for max-iterations outcomes', () => {
+    const finding = createFinding({ description: 'Still failing after retries' })
+    const code = createCodeResult({
+      success: false,
+      terminalStatus: 'max-iterations',
+      iterations: [
+        {
+          iteration: 1,
+          outcome: {
+            status: 'max-iterations',
+            testResult: createTestResult({ passingTests: 8, failingTests: 2 }),
+            review: createMergedReview({ findings: [finding], criticalCount: 1 }),
+          },
+          changedFiles: ['src/feature.ts'],
+        },
+      ],
+    })
+
+    const result = buildDeliveryReportInput(createSessionContext(), createPlanResult(), null, code)
+
+    expect(result.specItems[0]!.success).toBe(false)
+    expect(result.specItems[0]!.reviewFindings[0]!.description).toContain('Still failing after retries')
   })
 })
 

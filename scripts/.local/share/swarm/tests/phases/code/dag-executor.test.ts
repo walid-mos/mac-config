@@ -202,6 +202,7 @@ describe('executeDag', () => {
 
     expect(result.taskCompletions).toEqual([])
     expect(result.iterations).toEqual([])
+    expect(result.terminalStatus).toBe('green')
     expect(result.lastOutcome).toBeUndefined()
   })
 
@@ -216,6 +217,7 @@ describe('executeDag', () => {
     expect(result.taskCompletions[0]!.status).toBe('green')
     expect(result.taskCompletions[0]!.taskId).toBe('TASK-1')
     expect(result.iterations).toHaveLength(1)
+    expect(result.terminalStatus).toBe('green')
   })
 
   it('executes linear chain A→B→C in 3 waves', async () => {
@@ -607,6 +609,74 @@ describe('executeDag', () => {
 
     expect(driver.invoke).toHaveBeenCalledTimes(2) // 1 fail + 1 success (code), plus review agents
     expect(result.taskCompletions[0]!.status).toBe('green')
+  })
+
+  it('stops with max-iterations when findings never converge', async () => {
+    const { runReviewPhase } = await import('../../../src/phases/code/review-merge.js')
+    const { getChangedFiles } = await import('../../../src/git/git-operations.js')
+    const { parseStructuredOutput } = await import('../../../src/drivers/output-parser.js')
+
+    vi.mocked(parseStructuredOutput).mockReturnValue({
+      ok: true,
+      output: JSON.stringify({
+        filesChanged: ['src/a.ts'],
+        testResult: { totalTests: 1, passingTests: 1, failingTests: 0, durationMs: 100 },
+        buildResult: null,
+        summary: 'done',
+      }),
+      raw: '',
+    })
+    vi.mocked(getChangedFiles).mockResolvedValue(['src/a.ts'])
+    vi.mocked(runReviewPhase).mockResolvedValue(createMergedReview({
+      criticalCount: 1,
+      findings: [{ file: 'src/a.ts', severity: 'critical', category: 'bug', description: 'Still broken' }],
+    }))
+
+    const result = await executeDag(
+      ctx, registry, [createTask('TASK-1')], createTechStack(), 'planner output', undefined, createMockLogger(), createGitState()
+    )
+
+    expect(result.terminalStatus).toBe('max-iterations')
+    expect(result.lastOutcome?.status).toBe('max-iterations')
+    expect(result.taskCompletions[0]!.status).toBe('max-iterations')
+    expect(result.iterations).toHaveLength(3)
+  })
+
+  it('records failed terminal status when agent execution hard-fails', async () => {
+    const driver = createMockDriver()
+    const failResult: AgentResult = {
+      success: false,
+      errorCode: 'spawn_error',
+      error: 'driver crashed',
+      rawOutput: '',
+      stderr: '',
+      model: 'opus' as ModelId,
+      backend: 'claude' as const,
+      durationMs: 100,
+    }
+    vi.mocked(driver.invoke).mockResolvedValue(failResult)
+    registry = createMockRegistry(driver)
+
+    const result = await executeDag(
+      ctx, registry, [createTask('TASK-1')], createTechStack(), 'planner output', undefined, createMockLogger(), createGitState()
+    )
+
+    expect(result.terminalStatus).toBe('failed')
+    expect(result.lastOutcome?.status).toBe('failed')
+    expect(result.taskCompletions[0]!.status).toBe('failed')
+  })
+
+  it('records timeout terminal status when the phase signal times out', async () => {
+    const controller = new AbortController()
+    controller.abort(new Error('code-phase-timeout'))
+
+    const result = await executeDag(
+      ctx, registry, [createTask('TASK-1')], createTechStack(), 'planner output', controller.signal, createMockLogger(), createGitState()
+    )
+
+    expect(result.terminalStatus).toBe('timeout')
+    expect(result.lastOutcome?.status).toBe('timeout')
+    expect(result.taskCompletions[0]!.status).toBe('timeout')
   })
 
   it('demotes important findings when convergenceRecommendation is converged', async () => {

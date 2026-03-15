@@ -1,7 +1,7 @@
 // === Phase Result Accessors (Spec 3 — FR-8, Spec 4, Spec 5) ===
 
 import { z } from 'zod'
-import type { SwarmState, SessionId, AgentRole, TokenUsage } from '../core/types.js'
+import type { SwarmState, SessionId, AgentRole, TokenUsage, RuntimeTerminalStatus } from '../core/types.js'
 import type { TechStack } from '../detect/tech-stack.js'
 import type { PlannerTask, TaskTag } from './plan/task-parser.js'
 
@@ -97,6 +97,7 @@ export interface MergedReview {
 export type IterationOutcome =
   | { status: 'green'; testResult: TestResult; review: MergedReview }
   | { status: 'needs-iteration'; testResult: TestResult; review: MergedReview; reason: 'review-findings' }
+  | { status: 'failed'; testResult: TestResult; review?: MergedReview; reason: string }
   | { status: 'max-iterations'; testResult: TestResult; review?: MergedReview }
   | { status: 'timeout'; testResult?: TestResult; review?: MergedReview }
 
@@ -134,7 +135,7 @@ export interface StagingCheckResult {
 export interface TaskCompletionRecord {
   taskId: string
   title: string
-  status: 'green' | 'failed'
+  status: RuntimeTerminalStatus
   attempts: number
   commitHash?: string
 }
@@ -147,6 +148,7 @@ export interface CodePhaseResult {
   gitState: GitState
   changedFiles: string[]
   success: boolean
+  terminalStatus: RuntimeTerminalStatus
   codePhaseTimeoutMs?: number
   taskCompletions?: TaskCompletionRecord[]
 }
@@ -232,6 +234,7 @@ const mergedReviewSchema = z.object({
 const iterationOutcomeSchema = z.discriminatedUnion('status', [
   z.object({ status: z.literal('green'), testResult: testResultSchema, review: mergedReviewSchema }),
   z.object({ status: z.literal('needs-iteration'), testResult: testResultSchema, review: mergedReviewSchema, reason: z.literal('review-findings') }),
+  z.object({ status: z.literal('failed'), testResult: testResultSchema, review: mergedReviewSchema.optional(), reason: z.string() }),
   z.object({ status: z.literal('max-iterations'), testResult: testResultSchema, review: mergedReviewSchema.optional() }),
   z.object({ status: z.literal('timeout'), testResult: testResultSchema.optional(), review: mergedReviewSchema.optional() }),
 ])
@@ -265,7 +268,12 @@ const gitStateSchema = z.object({
 const taskCompletionRecordSchema = z.object({
   taskId: z.string(),
   title: z.string(),
-  status: z.union([z.literal('green'), z.literal('failed')]),
+  status: z.union([
+    z.literal('green'),
+    z.literal('failed'),
+    z.literal('max-iterations'),
+    z.literal('timeout'),
+  ]),
   attempts: z.number(),
   commitHash: z.string().optional(),
 })
@@ -278,6 +286,12 @@ const codePhaseResultSchema = z.object({
   gitState: gitStateSchema,
   changedFiles: z.array(z.string()),
   success: z.boolean(),
+  terminalStatus: z.union([
+    z.literal('green'),
+    z.literal('failed'),
+    z.literal('max-iterations'),
+    z.literal('timeout'),
+  ]),
   codePhaseTimeoutMs: z.number().optional(),
   taskCompletions: z.array(taskCompletionRecordSchema).optional(),
 })

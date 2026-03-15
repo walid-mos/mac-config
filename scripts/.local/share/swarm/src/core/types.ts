@@ -56,6 +56,12 @@ export type Phase =
 
 export const PHASES: readonly Phase[] = ['init', 'plan', 'tdd', 'code', 'review', 'commit', 'docs'] as const
 
+export type RuntimeTerminalStatus = 'green' | 'failed' | 'max-iterations' | 'timeout'
+
+export type IterationEventStatus = 'green' | 'needs-iteration' | 'failed' | 'max-iterations' | 'timeout'
+
+export const CODE_PHASE_TIMEOUT_SIGNAL_REASON = 'code-phase-timeout'
+
 // === Config ===
 
 export interface ModelAssignment {
@@ -177,7 +183,12 @@ export interface IterationStartEvent extends BaseEvent {
 
 export interface IterationEndEvent extends BaseEvent {
   type: 'iteration:end'
-  data: { iteration: number; success: boolean; reason?: 'review-findings' }
+  data: {
+    iteration: number
+    success: boolean
+    status: IterationEventStatus
+    reason?: 'review-findings' | 'failed' | 'max-iterations' | 'timeout'
+  }
 }
 
 export interface ReviewFindingsEvent extends BaseEvent {

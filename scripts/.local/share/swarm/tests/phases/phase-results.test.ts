@@ -252,6 +252,7 @@ function createValidCodePhaseResult(): CodePhaseResult {
     },
     changedFiles: ['src/feature.ts'],
     success: true,
+    terminalStatus: 'green',
   }
 }
 
@@ -278,6 +279,7 @@ describe('readCodePhaseResult', () => {
 
     expect(result).not.toBeNull()
     expect(result!.success).toBe(true)
+    expect(result!.terminalStatus).toBe('green')
     expect(result!.waves).toHaveLength(1)
     expect(result!.iterations).toHaveLength(1)
   })
@@ -334,6 +336,33 @@ describe('readCodePhaseResult', () => {
     expect(review).toHaveProperty('criticalCount')
     expect(review).toHaveProperty('importantCount')
     expect(review).toHaveProperty('suggestionCount')
+  })
+
+  it('accepts truthful terminal statuses for failed runs', () => {
+    const codeResult = createValidCodePhaseResult()
+    codeResult.success = false
+    codeResult.terminalStatus = 'max-iterations'
+    codeResult.taskCompletions = [
+      { taskId: 'TASK-1', title: 'Implement feature', status: 'max-iterations', attempts: 3 },
+    ]
+    codeResult.iterations = [
+      {
+        iteration: 1,
+        outcome: {
+          status: 'max-iterations',
+          testResult: { totalTests: 5, passingTests: 4, failingTests: 1, durationMs: 1200 },
+        },
+        changedFiles: ['src/feature.ts'],
+      },
+    ]
+    const state = createSwarmState({
+      phaseResults: { code: codeResult },
+    })
+
+    const result = readCodePhaseResult(state)
+
+    expect(result?.terminalStatus).toBe('max-iterations')
+    expect(result?.taskCompletions?.[0]?.status).toBe('max-iterations')
   })
 })
 

@@ -23,7 +23,7 @@ function findingKey(f: { file: string; category: string; description: string }):
 }
 
 function hasReview(outcome: IterationState['outcome']): boolean {
-  return outcome.status === 'green' || outcome.status === 'needs-iteration'
+  return 'review' in outcome && outcome.review !== undefined
 }
 
 // === API ===

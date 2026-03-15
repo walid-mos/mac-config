@@ -9,8 +9,8 @@ import type { MergedReview, ReviewFinding, TestResult, BuildResult } from '../ph
 export interface IterationSummary {
   waveIndex: number
   attempt: number
-  status: 'green' | 'needs-iteration' | 'exhausted'
-  reason?: 'review-findings'
+  status: 'green' | 'needs-iteration' | 'failed' | 'max-iterations' | 'timeout'
+  reason?: 'review-findings' | 'failed' | 'max-iterations' | 'timeout' | 'tests-failing'
   criticalCount?: number
   testResult?: TestResult
   buildResult?: BuildResult

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { runCodePhase, attributeFindingsToAgents, deduplicateFindings, matchesSeenFinding } from '../../../src/phases/code/code-phase.js'
+import { runCodePhase, attributeFindingsToAgents, deduplicateFindings, matchesSeenFinding, CODE_PHASE_TIMEOUT_MS } from '../../../src/phases/code/code-phase.js'
 import type { AgentHandle } from '../../../src/phases/code/code-phase.js'
 import type {
   PlanPhaseResult,
@@ -268,6 +268,7 @@ describe('runCodePhase', () => {
     const result = await runCodePhase(ctx, registry, plan)
 
     expect(result.success).toBe(true)
+    expect(result.terminalStatus).toBe('green')
     expect(result.iterations.length).toBe(1)
   })
 
@@ -358,7 +359,7 @@ describe('runCodePhase', () => {
 
   it('enforces phase-level timeout (FR-18)', async () => {
     const result = await runCodePhase(ctx, registry, createPlanResult())
-    expect(result).toBeDefined()
+    expect(result.codePhaseTimeoutMs).toBe(CODE_PHASE_TIMEOUT_MS)
   })
 
   it('returns taskCompletions in result', async () => {
@@ -372,6 +373,38 @@ describe('runCodePhase', () => {
     expect(result.taskCompletions!.length).toBe(1)
     expect(result.taskCompletions![0]!.taskId).toBe('TASK-1')
     expect(result.taskCompletions![0]!.status).toBe('green')
+  })
+
+  it('propagates max-iterations from the DAG result', async () => {
+    const dagExecutor = await import('../../../src/phases/code/dag-executor.js')
+    vi.spyOn(dagExecutor, 'executeDag').mockResolvedValue({
+      iterations: [{ iteration: 0, outcome: { status: 'max-iterations', testResult: { totalTests: 1, passingTests: 0, failingTests: 1, durationMs: 10 } }, changedFiles: ['src/a.ts'] }],
+      taskCompletions: [{ taskId: 'TASK-1', title: 'Task TASK-1', status: 'max-iterations', attempts: 3 }],
+      terminalStatus: 'max-iterations',
+      lastOutcome: { status: 'max-iterations', testResult: { totalTests: 1, passingTests: 0, failingTests: 1, durationMs: 10 } },
+    })
+
+    const result = await runCodePhase(ctx, registry, createPlanResult())
+
+    expect(result.success).toBe(false)
+    expect(result.terminalStatus).toBe('max-iterations')
+    expect(result.taskCompletions?.[0]?.status).toBe('max-iterations')
+  })
+
+  it('propagates timeout from the DAG result', async () => {
+    const dagExecutor = await import('../../../src/phases/code/dag-executor.js')
+    vi.spyOn(dagExecutor, 'executeDag').mockResolvedValue({
+      iterations: [{ iteration: 0, outcome: { status: 'timeout' }, changedFiles: [] }],
+      taskCompletions: [{ taskId: 'TASK-1', title: 'Task TASK-1', status: 'timeout', attempts: 1 }],
+      terminalStatus: 'timeout',
+      lastOutcome: { status: 'timeout' },
+    })
+
+    const result = await runCodePhase(ctx, registry, createPlanResult())
+
+    expect(result.success).toBe(false)
+    expect(result.terminalStatus).toBe('timeout')
+    expect(result.taskCompletions?.[0]?.status).toBe('timeout')
   })
 })
 

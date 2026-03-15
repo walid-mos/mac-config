@@ -1,7 +1,7 @@
 // === Code Agent Output Parser (Spec 4 — FR-4) ===
 
 import { z } from 'zod'
-import type { CodeAgentOutput } from '../phase-results.js'
+import type { TaskCodeAgentOutput } from '../phase-results.js'
 
 // === Schemas ===
 
@@ -28,7 +28,7 @@ const codeAgentOutputSchema = z.union([completedSchema, failedBlockedSchema])
 
 // === API ===
 
-export function parseCodeAgentOutput(raw: string): CodeAgentOutput {
+export function parseCodeAgentOutput(raw: string): TaskCodeAgentOutput {
   if (!raw || raw.trim() === '') {
     throw new Error('Empty input')
   }
@@ -42,5 +42,5 @@ export function parseCodeAgentOutput(raw: string): CodeAgentOutput {
 
   const result = codeAgentOutputSchema.parse(parsed)
 
-  return result as unknown as CodeAgentOutput
+  return result as TaskCodeAgentOutput
 }

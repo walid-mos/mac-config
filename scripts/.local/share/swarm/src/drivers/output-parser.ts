@@ -12,10 +12,12 @@ export function extractStreamResult(ndjson: string): ParseResult {
   const lines = ndjson.split('\n')
   // Scan from end — result event is always last
   for (let i = lines.length - 1; i >= 0; i--) {
-    const line = lines[i].trim()
-    if (!line) continue
+    const line = lines[i]
+    if (line === undefined) continue
+    const trimmedLine = line.trim()
+    if (!trimmedLine) continue
     try {
-      const event = JSON.parse(line)
+      const event = JSON.parse(trimmedLine)
       if (event.type === 'result' && event.result !== undefined) {
         const output = typeof event.result === 'string'
           ? event.result
@@ -137,7 +139,6 @@ function tryDirect(raw: string): ParseResult | null {
 // Fence regexes: handle \r\n, optional trailing whitespace on fence lines, and end-of-string
 const FENCE_OPEN = /`{3,}(?:json)?\s*(?:\r?\n|$)/
 const FENCE_CLOSE_LAZY = /\r?\n\s*`{3,}\s*(?:\r?\n|$)/
-const FENCE_CLOSE_GREEDY = /\r?\n\s*`{3,}\s*(?:\r?\n|[\s\S]*$)/
 
 function tryFenceStrip(raw: string): ParseResult | null {
   const openMatch = FENCE_OPEN.exec(raw)

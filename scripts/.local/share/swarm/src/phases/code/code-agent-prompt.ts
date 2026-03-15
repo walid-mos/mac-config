@@ -2,7 +2,8 @@
 
 import type { TechStack } from '../../detect/tech-stack.js'
 import type { PlannerTask } from '../plan/task-parser.js'
-import type { ReviewFinding, ReviewCategory } from '../phase-results.js'
+import type { ReviewFinding } from '../phase-results.js'
+import { buildStructuredJsonOutputSection, renderTechStackSection } from './agent-prompt-shared.js'
 
 // === Constants ===
 
@@ -54,7 +55,7 @@ export function buildCodeAgentPrompt(
   }
 
   // Tech stack
-  sections.push(`# Tech Stack\n\n- Languages: ${techStack.languages.join(', ')}\n- Frameworks: ${techStack.frameworks.join(', ')}\n- Test runner: ${techStack.testRunner ?? 'none'}\n- Package manager: ${techStack.packageManager}\n- Build tool: ${techStack.buildTool ?? 'none'}\n- Test command: ${techStack.testCommand}${techStack.buildCommand ? `\n- Build command: ${techStack.buildCommand}` : ''}${techStack.typecheckCommand ? `\n- Typecheck command: ${techStack.typecheckCommand}` : ''}${techStack.lintCommand ? `\n- Lint command: ${techStack.lintCommand}` : ''}`)
+  sections.push(renderTechStackSection(techStack))
 
   // Previous findings (iteration 2+)
   if (previousFindings && previousFindings.length > 0) {
@@ -96,7 +97,7 @@ export function buildCodeAgentPrompt(
     executionLines.push('', '## Lint Execution', `- Run: ${techStack.lintCommand}`, '- If lint errors appear, fix your code and re-run until clean', '- Do NOT disable lint rules — fix the underlying issue')
   }
 
-  executionLines.push('', '## Output', 'When done, output this JSON block:', '```json', '{ "filesChanged": ["path/to/file.ts"], "testResult": { "totalTests": 0, "passingTests": 0, "failingTests": 0 }, "buildResult": { "success": true, "error": null }, "summary": "Brief description of changes" }', '```')
+  executionLines.push('', buildStructuredJsonOutputSection('## Output\nWhen done, output this JSON block:', '{ "filesChanged": ["path/to/file.ts"], "testResult": { "totalTests": 0, "passingTests": 0, "failingTests": 0 }, "buildResult": { "success": true, "error": null }, "summary": "Brief description of changes" }'))
 
   sections.push(executionLines.join('\n'))
 
@@ -153,7 +154,7 @@ export function buildFindingFixPrompt(
     sections.push(decisionLog)
   }
 
-  sections.push('## Output\n```json\n{ "filesChanged": [...], "testResult": {...}, "buildResult": {...}, "summary": "..." }\n```')
+  sections.push(buildStructuredJsonOutputSection('## Output', '{ "filesChanged": [...], "testResult": {...}, "buildResult": {...}, "summary": "..." }'))
 
   return sections.join('\n\n')
 }

@@ -2,6 +2,7 @@
 
 import type { TechStack } from '../../detect/tech-stack.js'
 import type { PlannerTask } from '../plan/task-parser.js'
+import { buildStructuredJsonOutputSection, renderTechStackSection } from '../code/agent-prompt-shared.js'
 
 // === API ===
 
@@ -39,13 +40,7 @@ export function buildTestPrompt(
   lines.push('You are a TDD test engineer. Your single purpose is to write **failing tests** (RED phase) that define expected behavior for each task. Tests must be syntactically valid, compile successfully, and **fail for the right reason** — they fail because the implementation does not exist yet, not because the test is broken.')
   lines.push('')
 
-  // Tech stack info
-  lines.push('# Tech Stack')
-  lines.push('')
-  lines.push(`- **Test Runner**: ${techStack.testRunner ?? 'not detected'}`)
-  lines.push(`- **Languages**: ${techStack.languages.join(', ') || 'none'}`)
-  lines.push(`- **Frameworks**: ${techStack.frameworks.join(', ') || 'none'}`)
-  lines.push(`- **Test Command**: ${techStack.testCommand}`)
+  lines.push(renderTechStackSection(techStack))
   lines.push('')
 
   // Planner output
@@ -179,12 +174,7 @@ export function buildTestPrompt(
   lines.push('')
 
   // Structured output section
-  lines.push('# Output')
-  lines.push('')
-  lines.push('After running tests, output a JSON block:')
-  lines.push('```json')
-  lines.push('{ "testFiles": ["path/to/test.ts"], "testResult": { "totalTests": 0, "passingTests": 0, "failingTests": 0 }, "isRed": true }')
-  lines.push('```')
+  lines.push(buildStructuredJsonOutputSection('# Output\nAfter running tests, output a JSON block:', '{ "testFiles": ["path/to/test.ts"], "testResult": { "totalTests": 0, "passingTests": 0, "failingTests": 0 }, "isRed": true }'))
 
   return lines.join('\n')
 }

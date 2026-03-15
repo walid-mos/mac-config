@@ -3,22 +3,13 @@
 import type { SessionContext } from '../../core/types.js'
 import type { DriverRegistry, AgentResult } from '../../drivers/driver.js'
 import type { PlanPhaseResult, TddPhaseResult, TddAgentOutput } from '../phase-results.js'
+import { isImmediateFailErrorCode, isRetryableErrorCode } from '../retryable-agent.js'
 import { buildTestPrompt } from './test-prompt.js'
 import { parseStructuredOutput } from '../../drivers/output-parser.js'
 
 // === Constants ===
 
 const MAX_RETRIES = 2
-
-// === Helpers ===
-
-function isRetryableErrorCode(code: string): boolean {
-  return code === 'timeout' || code === 'crash' || code === 'empty_output' || code === 'invalid_json'
-}
-
-function isImmediateFailErrorCode(code: string): boolean {
-  return code === 'aborted' || code === 'spawn_error'
-}
 
 function extractTddAgentOutput(output: string): TddAgentOutput | null {
   const parsed = parseStructuredOutput(output)
@@ -71,9 +62,7 @@ export async function runTddForTasks(
   ]
   const prompt = buildTestPrompt(plannerOutput, tasks, techStack, testConventions)
 
-  // Get driver
   const { driver, model, agent } = registry.getDriver('test')
-
   let currentPrompt = prompt
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -91,7 +80,6 @@ export async function runTddForTasks(
       swarmSessionId: ctx.sessionId,
     })
 
-    // Handle agent failure
     if (!agentResult.success) {
       if (isImmediateFailErrorCode(agentResult.errorCode)) {
         ctx.emitter.emit({
@@ -116,7 +104,6 @@ export async function runTddForTasks(
         continue
       }
 
-      // All retries exhausted
       ctx.emitter.emit({
         type: 'phase:error',
         timestamp: new Date().toISOString(),

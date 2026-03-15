@@ -152,17 +152,17 @@ export const buildIterationLogArtifact = (
     sessionId,
     generatedAt,
     entries: buildIterationLog(events, codeResult),
-  })
+  }) as IterationLogArtifact
 }
 
 export const renderIterationLog = (input: IterationLogArtifact | IterationLogEntry[]): string => {
   const artifact = Array.isArray(input)
     ? iterationLogArtifactSchema.parse({
       schemaVersion: 2,
-      sessionId: 'unknown-session',
+      sessionId: 'unknown-session' as SessionId,
       generatedAt: new Date(0).toISOString(),
       entries: input,
-    })
+    }) as IterationLogArtifact
     : input
 
   if (artifact.entries.length === 0) {

@@ -103,7 +103,7 @@ export const buildDeliveryReportInput = (
     totalDuration,
     startedAt,
     completedAt,
-  })
+  }) as DeliveryReportInput
 }
 
 export const classifyFindingResolutions = (
@@ -130,11 +130,17 @@ export const classifyFindingResolutions = (
       continue
     }
 
-    const nextFindingKeys = next
-      ? new Set(next.outcome.review.findings.map((finding) => findingKey(finding)))
+    const nextReview = next && 'review' in next.outcome ? next.outcome.review : undefined
+    const currentReview = 'review' in current.outcome ? current.outcome.review : undefined
+    if (!currentReview) {
+      continue
+    }
+
+    const nextFindingKeys = nextReview
+      ? new Set(nextReview.findings.map((finding) => findingKey(finding)))
       : undefined
 
-    for (const finding of current.outcome.review.findings) {
+    for (const finding of currentReview.findings) {
       const key = findingKey(finding)
       if (findingsByKey.has(key)) {
         continue

@@ -4,6 +4,7 @@ import { readdirSync } from 'node:fs'
 import type { SessionContext } from '../../core/types.js'
 import type { DriverRegistry, AgentResult } from '../../drivers/driver.js'
 import type { PlanPhaseResult } from '../phase-results.js'
+import { isImmediateFailErrorCode, isRetryableErrorCode } from '../retryable-agent.js'
 import { buildPlannerPrompt } from './planner-prompt.js'
 import { parseTaskDecomposition, parseTechStack } from './task-parser.js'
 import type { TaskTag } from './task-parser.js'
@@ -11,7 +12,6 @@ import type { TaskTag } from './task-parser.js'
 // === Constants ===
 
 const MAX_PLANNER_OUTPUT_BYTES = 256 * 1024 // 256KB
-const MAX_RETRIES = 2
 
 // === Helpers ===
 
@@ -26,14 +26,6 @@ function getProjectStructure(projectDir: string): string[] {
 function truncateOutput(output: string): string {
   if (output.length <= MAX_PLANNER_OUTPUT_BYTES) return output
   return output.slice(0, MAX_PLANNER_OUTPUT_BYTES)
-}
-
-function isRetryableErrorCode(code: string): boolean {
-  return code === 'timeout' || code === 'crash' || code === 'empty_output' || code === 'invalid_json'
-}
-
-function isImmediateFailErrorCode(code: string): boolean {
-  return code === 'aborted' || code === 'spawn_error'
 }
 
 // === API ===
@@ -73,7 +65,7 @@ export async function runPlanPhase(
   const { driver, model, agent } = registry.getDriver('plan')
   let lastError: Error | undefined
 
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+  for (let attempt = 0; attempt <= 2; attempt++) {
     // Check abort before each attempt
     if (signal?.aborted) {
       ctx.emitter.emit({
@@ -94,7 +86,6 @@ export async function runPlanPhase(
       swarmSessionId: ctx.sessionId,
     })
 
-    // Handle agent failure
     if (!agentResult.success) {
       if (isImmediateFailErrorCode(agentResult.errorCode)) {
         ctx.emitter.emit({
@@ -106,7 +97,7 @@ export async function runPlanPhase(
         throw new Error(`Plan phase failed: ${agentResult.errorCode}: ${agentResult.error}`)
       }
 
-      if (isRetryableErrorCode(agentResult.errorCode) && attempt < MAX_RETRIES) {
+      if (isRetryableErrorCode(agentResult.errorCode) && attempt < 2) {
         ctx.emitter.emit({
           type: 'agent:error',
           timestamp: new Date().toISOString(),
@@ -116,7 +107,6 @@ export async function runPlanPhase(
         continue
       }
 
-      // All retries exhausted
       ctx.emitter.emit({
         type: 'phase:error',
         timestamp: new Date().toISOString(),
@@ -159,7 +149,7 @@ export async function runPlanPhase(
     } catch (parseError) {
       lastError = parseError instanceof Error ? parseError : new Error(String(parseError))
 
-      if (attempt < MAX_RETRIES) {
+      if (attempt < 2) {
         // Structural validation failure — retry
         ctx.emitter.emit({
           type: 'agent:error',

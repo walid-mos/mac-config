@@ -5,11 +5,14 @@ import type { SessionContext, SessionId } from '../../../src/core/types.js'
 import type { DriverRegistry, Driver, AgentResult } from '../../../src/drivers/driver.js'
 import type { ModelId } from '../../../src/core/types.js'
 import type { TestResult } from '../../../src/phases/phase-results.js'
-import { createMockEmitter, createSwarmConfig } from '../../__test-utils__/factories.js'
+import {
+  createMockChildProcess,
+  createMockEmitter,
+  createSwarmConfig,
+} from '../../__test-utils__/factories.js'
 
 vi.mock('node:child_process', () => ({
   spawn: vi.fn().mockImplementation(() => {
-    const { createMockChildProcess } = require('../../__test-utils__/factories.js')
     const proc = createMockChildProcess()
     setTimeout(() => proc.simulateOutput('', 0), 0)
     return proc

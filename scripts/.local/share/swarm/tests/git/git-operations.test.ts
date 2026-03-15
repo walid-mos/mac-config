@@ -7,6 +7,8 @@ import {
   commitSpecItem,
   markPrReady,
   getChangedFiles,
+  getUntrackedFiles,
+  intentToAddFiles,
 } from '../../src/git/git-operations.js'
 import type { SessionId } from '../../src/core/types.js'
 import { createMockChildProcess } from '../__test-utils__/factories.js'
@@ -356,5 +358,69 @@ describe('getChangedFiles', () => {
     const files = await getChangedFiles('/tmp/project')
 
     expect(files).toEqual(['src/app.ts'])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// getUntrackedFiles
+// ---------------------------------------------------------------------------
+
+describe('getUntrackedFiles', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('returns only untracked files', async () => {
+    const proc = createMockChildProcess()
+    mockSpawn.mockReturnValue(proc as never)
+    setTimeout(() => proc.simulateOutput('?? src/new-file.ts\n M src/app.ts\n?? tests/new.test.ts', 0), 0)
+
+    const files = await getUntrackedFiles('/tmp/project')
+
+    expect(files).toEqual(['src/new-file.ts', 'tests/new.test.ts'])
+  })
+
+  it('filters to candidate files when provided', async () => {
+    const proc = createMockChildProcess()
+    mockSpawn.mockReturnValue(proc as never)
+    setTimeout(() => proc.simulateOutput('?? src/new-file.ts\n?? tests/new.test.ts', 0), 0)
+
+    const files = await getUntrackedFiles('/tmp/project', ['tests/new.test.ts'])
+
+    expect(files).toEqual(['tests/new.test.ts'])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// intentToAddFiles
+// ---------------------------------------------------------------------------
+
+describe('intentToAddFiles', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('intent-adds only untracked files', async () => {
+    const statusProc = createMockChildProcess()
+    const addProc = createMockChildProcess()
+    mockSpawn
+      .mockReturnValueOnce(statusProc as never)
+      .mockReturnValueOnce(addProc as never)
+    setTimeout(() => statusProc.simulateOutput('?? src/new-file.ts\n M src/existing.ts', 0), 0)
+    setTimeout(() => addProc.simulateOutput('', 0), 5)
+
+    await intentToAddFiles('/tmp/project', ['src/new-file.ts', 'src/existing.ts'])
+
+    expect(mockSpawn).toHaveBeenCalledWith('git', ['add', '-N', '--', 'src/new-file.ts'], { cwd: '/tmp/project' })
+  })
+
+  it('skips git add when no candidate file is untracked', async () => {
+    const statusProc = createMockChildProcess()
+    mockSpawn.mockReturnValue(statusProc as never)
+    setTimeout(() => statusProc.simulateOutput(' M src/existing.ts', 0), 0)
+
+    await intentToAddFiles('/tmp/project', ['src/existing.ts'])
+
+    expect(mockSpawn).toHaveBeenCalledTimes(1)
   })
 })

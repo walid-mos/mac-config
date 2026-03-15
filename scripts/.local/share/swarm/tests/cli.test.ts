@@ -117,7 +117,7 @@ describe('CLI — spec path containment (FR-7, SC-4)', () => {
     const outsideSpec = path.join(tmpDir, 'outside-spec.md')
     fs.writeFileSync(outsideSpec, '# Outside', 'utf-8')
 
-    expect(() => validateSpecContainment(outsideSpec, projectDir)).toThrow(/not under project directory/)
+    expect(() => validateSpecContainment(outsideSpec, projectDir)).toThrow(/not under project directory/i)
   })
 
   it('symlink-based escape is caught by realpathSync canonicalization', () => {
@@ -128,7 +128,7 @@ describe('CLI — spec path containment (FR-7, SC-4)', () => {
     const symlinkPath = path.join(projectDir, 'escape.md')
     fs.symlinkSync(outsideFile, symlinkPath)
 
-    expect(() => validateSpecContainment(symlinkPath, projectDir)).toThrow(/not under project directory/)
+    expect(() => validateSpecContainment(symlinkPath, projectDir)).toThrow(/not under project directory/i)
   })
 })
 
@@ -141,19 +141,19 @@ describe('CLI — spec path containment (FR-7, SC-4)', () => {
 
 describe('CLI — system root rejection (FR-7, SC-4)', () => {
   it('rejects project-dir = "/" as system root', () => {
-    expect(() => validateProjectDir('/')).toThrow(/system root/)
+    expect(() => validateProjectDir('/')).toThrow(/system root/i)
   })
 
   it('rejects project-dir = "/etc" as system root', () => {
-    expect(() => validateProjectDir('/etc')).toThrow(/system root/)
+    expect(() => validateProjectDir('/etc')).toThrow(/system root/i)
   })
 
   it('rejects project-dir = "/var" as system root', () => {
-    expect(() => validateProjectDir('/var')).toThrow(/system root/)
+    expect(() => validateProjectDir('/var')).toThrow(/system root/i)
   })
 
   it('rejects project-dir = "/usr" as system root', () => {
-    expect(() => validateProjectDir('/usr')).toThrow(/system root/)
+    expect(() => validateProjectDir('/usr')).toThrow(/system root/i)
   })
 })
 

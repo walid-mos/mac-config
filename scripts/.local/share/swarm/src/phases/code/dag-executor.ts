@@ -15,6 +15,8 @@ import type {
   IterationOutcome,
   GitState,
   TaskCompletionRecord,
+  IterationExecutionMetadata,
+  IterationTddMetadata,
 } from '../phase-results.js'
 import type { PlannerTask } from '../plan/task-parser.js'
 import { buildDependencyGraph } from '../plan/task-scheduler.js'
@@ -63,6 +65,11 @@ export interface DagExecutorResult {
   lastOutcome?: IterationOutcome
 }
 
+interface AgentExecutionResult {
+  output: ReturnType<typeof extractCodeAgentOutput>
+  deltaFiles: string[]
+}
+
 // === Errors ===
 
 // === Helpers ===
@@ -75,7 +82,7 @@ async function spawnFreshAgent(
   testFiles: string[],
   decisionLog: string,
   signal?: AbortSignal,
-): Promise<ReturnType<typeof extractCodeAgentOutput>> {
+): Promise<AgentExecutionResult> {
   const { driver, model, agent } = registry.getDriver('code', node.task.tag)
   const prompt = buildCodeAgentPrompt(node.task, testFiles, techStack, undefined, decisionLog)
 
@@ -94,14 +101,16 @@ async function spawnFreshAgent(
 
     if (result.success) {
       const output = extractCodeAgentOutput(result.output)
+      const deltaFiles: string[] = []
       if (output) {
         for (const f of output.filesChanged) {
           if (!node.handle.filesChanged.includes(f)) {
             node.handle.filesChanged.push(f)
           }
+          deltaFiles.push(f)
         }
       }
-      return output
+      return { output, deltaFiles }
     }
 
     if (isImmediateFailErrorCode(result.errorCode)) {
@@ -121,7 +130,7 @@ async function spawnFreshAgent(
     throw new Error(`Code agent failed after ${attempt + 1} attempts: ${result.errorCode}`)
   }
 
-  return null
+  return { output: null, deltaFiles: [] }
 }
 
 async function resumeAgentWithFindings(
@@ -132,7 +141,7 @@ async function resumeAgentWithFindings(
   testFiles: string[],
   decisionLog: string,
   signal?: AbortSignal,
-): Promise<ReturnType<typeof extractCodeAgentOutput>> {
+): Promise<AgentExecutionResult> {
   const { driver, model, agent } = registry.getDriver('code', node.task.tag)
   const findings = node.lastFindings ?? []
   const prompt = buildFindingFixPrompt(findings, decisionLog)
@@ -153,14 +162,16 @@ async function resumeAgentWithFindings(
 
     if (result.success) {
       const output = extractCodeAgentOutput(result.output)
+      const deltaFiles: string[] = []
       if (output) {
         for (const f of output.filesChanged) {
           if (!node.handle.filesChanged.includes(f)) {
             node.handle.filesChanged.push(f)
           }
+          deltaFiles.push(f)
         }
       }
-      return output
+      return { output, deltaFiles }
     }
 
     // On first resume failure, fall back to fresh invocation with full prompt
@@ -183,14 +194,16 @@ async function resumeAgentWithFindings(
 
       if (fallbackResult.success) {
         const output = extractCodeAgentOutput(fallbackResult.output)
+        const deltaFiles: string[] = []
         if (output) {
           for (const f of output.filesChanged) {
             if (!node.handle.filesChanged.includes(f)) {
               node.handle.filesChanged.push(f)
             }
+            deltaFiles.push(f)
           }
         }
-        return output
+        return { output, deltaFiles }
       }
 
       if (isImmediateFailErrorCode(fallbackResult.errorCode)) {
@@ -216,7 +229,35 @@ async function resumeAgentWithFindings(
     throw new Error(`Code agent failed after ${attempt + 1} attempts: ${result.errorCode}`)
   }
 
-  return null
+  return { output: null, deltaFiles: [] }
+}
+
+function createFilesByTask(wave: TaskNode[], perTaskDeltaFiles: Map<string, string[]>): Record<string, string[]> {
+  const filesByTask: Record<string, string[]> = {}
+
+  for (const node of wave) {
+    filesByTask[node.taskId] = perTaskDeltaFiles.get(node.taskId) ?? []
+  }
+
+  return filesByTask
+}
+
+function createIterationMetadata(
+  wave: TaskNode[],
+  pendingInWave: TaskNode[],
+  fixable: TaskNode[],
+  reviewedFiles: string[],
+  perTaskDeltaFiles: Map<string, string[]>,
+  tdd: IterationTddMetadata,
+): IterationExecutionMetadata {
+  return {
+    taskIds: wave.map(node => node.taskId),
+    pendingTaskIds: pendingInWave.map(node => node.taskId),
+    convergingTaskIds: fixable.map(node => node.taskId),
+    reviewedFiles,
+    filesByTask: createFilesByTask(wave, perTaskDeltaFiles),
+    tdd,
+  }
 }
 
 function isTimeoutAbort(signal: AbortSignal | undefined): boolean {
@@ -394,10 +435,7 @@ export async function executeDag(
       // 3. Build wave (ready + fixable)
       const wave = [...ready, ...fixable]
       const waveHandles: AgentHandle[] = wave.map(n => n.handle)
-
-      for (const node of wave) {
-        node.attempts++
-      }
+      const perTaskDeltaFiles = new Map<string, string[]>()
 
       ctx.emitter.emit({
         type: 'iteration:start',
@@ -413,37 +451,77 @@ export async function executeDag(
 
       // 4. Run TDD for pending tasks in this wave (not converging/fix tasks)
       const pendingInWave = wave.filter(n => n.status === 'pending')
-      if (pendingInWave.length > 0) {
+      const tddPromise = pendingInWave.length > 0
+        ? runTddForTasks(
+          ctx,
+          registry,
+          plannerOutput,
+          pendingInWave.map(node => node.task),
+          techStack,
+          signal,
+        )
+        : null
+
+      const convergingAgentPromises = fixable.map(async (node) => {
+        const decisionLog = buildDecisionLogSection(node.decisionLogEntries)
+        const result = await resumeAgentWithFindings(
+          node,
+          ctx,
+          registry,
+          techStack,
+          accumulatedTestFiles,
+          decisionLog,
+          signal,
+        )
+
+        perTaskDeltaFiles.set(node.taskId, result.deltaFiles)
+        return result.output
+      })
+
+      let tddMetadata: IterationTddMetadata = { status: 'skipped', testFiles: [] }
+
+      if (tddPromise) {
         try {
-          const tddResult = await runTddForTasks(
-            ctx, registry, plannerOutput,
-            pendingInWave.map(n => n.task), techStack, signal
-          )
-          for (const f of tddResult.testFiles) {
-            if (!accumulatedTestFiles.includes(f)) {
-              accumulatedTestFiles.push(f)
+          const tddResult = await tddPromise
+          tddMetadata = { status: 'succeeded', testFiles: tddResult.testFiles }
+
+          for (const file of tddResult.testFiles) {
+            if (!accumulatedTestFiles.includes(file)) {
+              accumulatedTestFiles.push(file)
             }
           }
         } catch (err) {
+          tddMetadata = { status: 'failed', testFiles: [] }
           process.stderr.write(`Warning: TDD for wave ${waveIndex} failed: ${(err as Error).message}\n`)
         }
       }
 
+      throwIfAborted(signal)
+
       // 5. For each task in wave: spawn fresh (pending) or resume with findings (converging)
       let agentTestResult: TestResult = DEFAULT_TEST_RESULT
 
-      const agentOutputs = await Promise.all(
-        wave.map(async (node) => {
-          const decisionLog = buildDecisionLogSection(node.decisionLogEntries)
+      const pendingAgentPromises = pendingInWave.map(async (node) => {
+        const decisionLog = buildDecisionLogSection(node.decisionLogEntries)
 
-          if (node.status === 'pending') {
-            node.status = 'running'
-            return spawnFreshAgent(node, ctx, registry, techStack, accumulatedTestFiles, decisionLog, signal)
-          }
+        node.status = 'running'
+        const result = await spawnFreshAgent(
+          node,
+          ctx,
+          registry,
+          techStack,
+          accumulatedTestFiles,
+          decisionLog,
+          signal,
+        )
+        perTaskDeltaFiles.set(node.taskId, result.deltaFiles)
+        return result.output
+      })
 
-          return resumeAgentWithFindings(node, ctx, registry, techStack, accumulatedTestFiles, decisionLog, signal)
-        })
-      )
+      const agentOutputs = await Promise.all([
+        ...convergingAgentPromises,
+        ...pendingAgentPromises,
+      ])
 
       // 6. Extract best test result from agent outputs
       for (const output of agentOutputs) {
@@ -452,14 +530,19 @@ export async function executeDag(
         }
       }
 
-      // 7. Run GLOBAL review on all changed files
-      const allChangedFiles = await getChangedFiles(ctx.projectDir)
+      // 7. Run review on wave-local changes, falling back to repo changes when needed
+      const waveChangedFiles = [...new Set(
+        [...perTaskDeltaFiles.values()].flatMap(files => files)
+      )]
+      const reviewedFiles = waveChangedFiles.length > 0
+        ? waveChangedFiles
+        : await getChangedFiles(ctx.projectDir)
       const globalDecisionLog = buildDecisionLogSection(
         [...nodes.values()].flatMap(n => n.decisionLogEntries)
       )
 
       const review = await runReviewPhase(
-        ctx, registry, allChangedFiles, agentTestResult, signal, globalDecisionLog, waveIndex, iterations
+        ctx, registry, reviewedFiles, agentTestResult, signal, globalDecisionLog, waveIndex, iterations
       )
 
       logger.logReview(waveIndex, 0, review)
@@ -483,7 +566,7 @@ export async function executeDag(
       }
       const attribution = attributeFindingsToAgents(blockingFindings, waveHandles)
 
-      const uncommittedFiles = new Set(allChangedFiles)
+      const uncommittedFiles = new Set(await getChangedFiles(ctx.projectDir))
 
       // 9. Per-task decision
       const greenNodes: TaskNode[] = []
@@ -491,6 +574,7 @@ export async function executeDag(
       let reachedMaxAttempts = false
 
       for (const node of wave) {
+        node.attempts++
         const taskFindings = attribution.get(node.taskId) ?? []
         const deduplicated = deduplicateFindings(taskFindings, node.seenSignatures)
 
@@ -565,7 +649,12 @@ export async function executeDag(
           ? { status: 'needs-iteration', testResult: agentTestResult, review, reason: 'review-findings' }
           : { status: 'green', testResult: agentTestResult, review }
 
-      iterations.push({ iteration: waveIndex, outcome, changedFiles: allChangedFiles })
+      iterations.push({
+        iteration: waveIndex,
+        outcome,
+        changedFiles: reviewedFiles,
+        metadata: createIterationMetadata(wave, pendingInWave, fixable, reviewedFiles, perTaskDeltaFiles, tddMetadata),
+      })
       lastOutcome = outcome
 
       emitIterationEnd(ctx, waveIndex, outcome)

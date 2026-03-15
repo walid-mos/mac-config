@@ -1,11 +1,11 @@
 // === Review & Merge Orchestration (Spec 4 — FR-6, FR-7) ===
 
-import { spawn } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import type { SessionContext } from '../../core/types.js'
 import type { DriverRegistry, AgentResult } from '../../drivers/driver.js'
 import type { TestResult, MergedReview, ReviewFinding, IterationState } from '../phase-results.js'
+import { intentToAddFiles } from '../../git/git-operations.js'
 import { buildReviewPrompt } from './review-prompt.js'
 import { buildSecurityPrompt } from './security-prompt.js'
 import { buildConsistencyPrompt } from './consistency-prompt.js'
@@ -33,30 +33,6 @@ function filterSensitiveFiles(files: string[]): string[] {
   return files.filter(f => {
     const basename = f.split('/').pop() ?? f
     return !SENSITIVE_PATTERNS.some(p => p.test(basename))
-  })
-}
-
-function spawnGit(
-  args: string[],
-  cwd: string
-): Promise<{ stdout: string; stderr: string }> {
-  return new Promise((resolve, reject) => {
-    const proc = spawn('git', args, { cwd })
-    let stdout = ''
-    let stderr = ''
-
-    proc.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString() })
-    proc.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString() })
-    proc.on('close', (code) => {
-      if (code === 0) {
-        resolve({ stdout, stderr })
-      } else {
-        reject(new Error(`git ${args[0]} failed (exit ${code}): ${stderr || stdout}`))
-      }
-    })
-    proc.on('error', (err) => {
-      reject(new Error(`git spawn error: ${err.message}`))
-    })
   })
 }
 
@@ -191,7 +167,7 @@ export async function runReviewPhase(
   // Intent-to-add new files so agents' `git diff HEAD` sees them
   if (safeFiles.length > 0) {
     try {
-      await spawnGit(['add', '-N', '--', ...safeFiles], ctx.projectDir)
+      await intentToAddFiles(ctx.projectDir, safeFiles)
     } catch (err) {
       process.stderr.write(`WARNING: git add -N failed: ${(err as Error).message}\n`)
     }

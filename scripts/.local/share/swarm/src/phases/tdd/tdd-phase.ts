@@ -37,7 +37,8 @@ function extractTddAgentOutput(output: string): TddAgentOutput | null {
       },
       isRed: json.isRed ?? false,
     }
-  } catch {
+  } catch (err) {
+    process.stderr.write(`WARNING: Failed to parse TDD agent output JSON: ${(err as Error).message}\n`)
     return null
   }
 }

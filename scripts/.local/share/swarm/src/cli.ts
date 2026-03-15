@@ -1,6 +1,5 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import { spawn } from 'node:child_process'
 import { readCodePhaseResult, readPlanPhaseResult } from './phases/phase-results.js'
 import type {
   ResolvedConfig,
@@ -308,32 +307,6 @@ const cleanupRuntimeArtifacts = async (
   }
 }
 
-const pushCurrentBranch = async (projectDir: string): Promise<void> => {
-  try {
-    await new Promise<void>((resolve, reject) => {
-      const proc = spawn('git', ['push'], { cwd: projectDir })
-      let stderr = ''
-
-      proc.stderr.on('data', (chunk: Buffer) => {
-        stderr += chunk.toString()
-      })
-      proc.on('close', (code) => {
-        if (code === 0) {
-          resolve()
-          return
-        }
-
-        reject(new Error(stderr || `git push failed with exit code ${code}`))
-      })
-      proc.on('error', (error) => {
-        reject(error)
-      })
-    })
-  } catch (error) {
-    process.stderr.write(`WARNING: git push skipped: ${formatError(error)}\n`)
-  }
-}
-
 const ensureWorktreeContext = async (
   sessionId: SessionId,
   stateManager: SwarmStateManager,
@@ -505,8 +478,6 @@ const runSession = async (
     if (!docsDone) {
       await runDocsPhase(ctx, registry, controller.signal)
     }
-
-    await pushCurrentBranch(ctx.projectDir)
 
     emitter.emit({
       type: 'session:end',

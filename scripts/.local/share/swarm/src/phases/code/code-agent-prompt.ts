@@ -7,6 +7,23 @@ import type { ReviewFinding, ReviewCategory } from '../phase-results.js'
 // === Constants ===
 
 const MAX_FINDINGS_BYTES = 32_768 // 32KB (DL-SC-7)
+const MAX_LISTED_TEST_FILES = 8
+
+function buildTestFilesSection(testFiles: string[]): string | null {
+  if (testFiles.length === 0) {
+    return null
+  }
+
+  const recentTestFiles = testFiles.slice(-MAX_LISTED_TEST_FILES)
+  const omittedCount = Math.max(0, testFiles.length - recentTestFiles.length)
+  const lines = recentTestFiles.map(file => `- ${file}`)
+
+  if (omittedCount > 0) {
+    lines.unshift(`- ${omittedCount} earlier test file(s) already exist in the workspace; focus on the most relevant recent files below.`)
+  }
+
+  return `# Test Files\n\n${lines.join('\n')}`
+}
 
 // === API ===
 
@@ -31,8 +48,9 @@ export function buildCodeAgentPrompt(
   }
 
   // Test files
-  if (testFiles.length > 0) {
-    sections.push(`# Test Files\n\n${testFiles.map(f => `- ${f}`).join('\n')}`)
+  const testFilesSection = buildTestFilesSection(testFiles)
+  if (testFilesSection) {
+    sections.push(testFilesSection)
   }
 
   // Tech stack

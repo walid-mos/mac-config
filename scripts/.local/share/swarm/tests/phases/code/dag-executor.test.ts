@@ -548,6 +548,70 @@ describe('executeDag', () => {
     expect(testFilesArg).toContain('tests/task2.test.ts')
   })
 
+  it('reviews only the current wave delta instead of the full accumulated diff', async () => {
+    const { runReviewPhase } = await import('../../../src/phases/code/review-merge.js')
+    const { getChangedFiles } = await import('../../../src/git/git-operations.js')
+    const { parseStructuredOutput } = await import('../../../src/drivers/output-parser.js')
+
+    let parseCallCount = 0
+    vi.mocked(parseStructuredOutput).mockImplementation(() => {
+      parseCallCount++
+      const filesChanged = parseCallCount === 1 ? ['src/task-1.ts'] : ['src/task-2.ts']
+
+      return {
+        ok: true,
+        output: JSON.stringify({
+          filesChanged,
+          testResult: { totalTests: 1, passingTests: 1, failingTests: 0, durationMs: 100 },
+          buildResult: null,
+          summary: 'done',
+        }),
+        raw: '',
+      }
+    })
+    vi.mocked(getChangedFiles).mockResolvedValue(['src/task-1.ts', 'src/task-2.ts'])
+
+    const tasks = [
+      createTask('TASK-1'),
+      createTask('TASK-2', { dependencies: ['TASK-1'] }),
+    ]
+
+    await executeDag(
+      ctx, registry, tasks, createTechStack(), 'planner output', undefined, createMockLogger(), createGitState()
+    )
+
+    expect(vi.mocked(runReviewPhase).mock.calls[0]?.[2]).toEqual(['src/task-1.ts'])
+    expect(vi.mocked(runReviewPhase).mock.calls[1]?.[2]).toEqual(['src/task-2.ts'])
+  })
+
+  it('records incremental per-wave metadata for downstream consumers', async () => {
+    const { parseStructuredOutput } = await import('../../../src/drivers/output-parser.js')
+
+    vi.mocked(parseStructuredOutput).mockReturnValue({
+      ok: true,
+      output: JSON.stringify({
+        filesChanged: ['src/a.ts'],
+        testResult: { totalTests: 1, passingTests: 1, failingTests: 0, durationMs: 100 },
+        buildResult: null,
+        summary: 'done',
+      }),
+      raw: '',
+    })
+
+    const result = await executeDag(
+      ctx, registry, [createTask('TASK-1')], createTechStack(), 'planner output', undefined, createMockLogger(), createGitState()
+    )
+
+    expect(result.iterations[0]?.metadata).toEqual({
+      taskIds: ['TASK-1'],
+      pendingTaskIds: ['TASK-1'],
+      convergingTaskIds: [],
+      reviewedFiles: ['src/a.ts'],
+      filesByTask: { 'TASK-1': ['src/a.ts'] },
+      tdd: { status: 'succeeded', testFiles: ['tests/feature.test.ts'] },
+    })
+  })
+
   it('does not call runTddForTasks for converging (fix) tasks', async () => {
     const { runTddForTasks } = await import('../../../src/phases/tdd/tdd-phase.js')
     const { runReviewPhase } = await import('../../../src/phases/code/review-merge.js')

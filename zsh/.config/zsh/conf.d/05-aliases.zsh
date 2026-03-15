@@ -40,6 +40,7 @@ alias ghwprod="gh workflow run deploy-prod.yml -R"
 alias upclaude="rm -rf ~/.local/state/claude/locks && curl -fsSL https://claude.ai/install.sh | sh -s"
 alias ghclean="gh run list --limit 500 --json databaseId -q '.[].databaseId' | xargs -I {} gh run delete {}"
 alias oc="opencode"
+alias qwen-server='llama-server -m ~/unsloth/Qwen3.5-35B-A3B-GGUF/unsloth_Qwen3.5-35B-A3B-GGUF_Qwen3.5-35B-A3B-MXFP4_MOE.gguf -ngl 999 -c 140000 -np 2 -fa on --host 127.0.0.1 --port 8080'
 
 # FNM (Fast Node Manager) shortcuts
 alias fnmi="fnm install"

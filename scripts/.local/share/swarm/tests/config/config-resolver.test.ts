@@ -2,7 +2,11 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import * as os from 'node:os'
-import { resolveSwarmConfig, getModelAssignment } from '../../src/config/config-resolver.js'
+import {
+  createResolvedConfigSnapshot,
+  resolveSwarmConfig,
+  getModelAssignment,
+} from '../../src/config/config-resolver.js'
 import { ConfigValidationError } from '../../src/core/errors.js'
 import type { SwarmConfig, AgentRole } from '../../src/core/types.js'
 import {
@@ -489,3 +493,14 @@ describe('getModelAssignment', () => {
   })
 })
 
+describe('createResolvedConfigSnapshot', () => {
+  it('returns a CLI-friendly resolved config payload', () => {
+    const resolvedConfig = resolveSwarmConfig(tmpDir)
+
+    const snapshot = createResolvedConfigSnapshot(tmpDir, resolvedConfig)
+
+    expect(snapshot.projectDir).toBe(path.resolve(tmpDir))
+    expect(snapshot.resolvedFrom).toBe(resolvedConfig.resolvedFrom)
+    expect(snapshot.config).toEqual(resolvedConfig.config)
+  })
+})

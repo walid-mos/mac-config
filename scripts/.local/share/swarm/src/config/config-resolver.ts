@@ -8,6 +8,12 @@ import { ConfigValidationError } from '../core/errors.js'
 import { ModelAssignmentSchema } from '../core/validation.js'
 import { resolveModel } from './model-registry.js'
 
+export interface ResolvedConfigSnapshot {
+  projectDir: string
+  resolvedFrom: string
+  config: SwarmConfig
+}
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -74,6 +80,17 @@ export function getModelAssignment(config: SwarmConfig, role: AgentRole, tag?: s
   }
 
   return config.models.agents[role]
+}
+
+export function createResolvedConfigSnapshot(
+  projectDir: string,
+  resolvedConfig: ResolvedConfig
+): ResolvedConfigSnapshot {
+  return {
+    projectDir: path.resolve(projectDir),
+    resolvedFrom: resolvedConfig.resolvedFrom,
+    config: resolvedConfig.config,
+  }
 }
 
 // ---------------------------------------------------------------------------

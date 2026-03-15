@@ -5,6 +5,26 @@ import type { PlannerTask } from '../plan/task-parser.js'
 
 // === API ===
 
+const MAX_PLANNER_OUTPUT_BYTES = 8_192
+
+function buildPlannerExcerpt(plannerOutput: string): string {
+  const trimmed = plannerOutput.trim()
+  if (trimmed.length === 0) {
+    return 'No planner output provided.'
+  }
+
+  if (Buffer.byteLength(trimmed, 'utf-8') <= MAX_PLANNER_OUTPUT_BYTES) {
+    return trimmed
+  }
+
+  const truncated = Buffer
+    .from(trimmed, 'utf-8')
+    .subarray(0, MAX_PLANNER_OUTPUT_BYTES)
+    .toString('utf-8')
+
+  return `${truncated}\n\n[Planner output truncated to the relevant leading 8KB excerpt]`
+}
+
 export function buildTestPrompt(
   plannerOutput: string,
   tasks: PlannerTask[],
@@ -31,7 +51,7 @@ export function buildTestPrompt(
   // Planner output
   lines.push('# Planner Output')
   lines.push('')
-  lines.push(plannerOutput.trim())
+  lines.push(buildPlannerExcerpt(plannerOutput))
   lines.push('')
 
   // Task descriptions

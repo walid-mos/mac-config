@@ -213,13 +213,53 @@ const IGNORED_PATH_PREFIXES = [
   '.swarm',
 ]
 
+function isIgnoredPath(file: string): boolean {
+  return IGNORED_PATH_PREFIXES.some(prefix => file === prefix || file.startsWith(prefix))
+}
+
+function parsePorcelainPath(line: string): string {
+  return line.slice(3)
+}
+
+function parseStatusPorcelain(stdout: string): string[] {
+  return stdout
+    .split('\n')
+    .filter(Boolean)
+    .map(parsePorcelainPath)
+    .filter(file => !isIgnoredPath(file))
+}
+
 export async function getChangedFiles(projectDir: string): Promise<string[]> {
   // Use git status --porcelain to capture BOTH modified tracked files AND new untracked files.
   // git diff --name-only HEAD only shows tracked changes — new files created by code agents are invisible.
   const { stdout } = await spawnGit(['status', '--porcelain'], projectDir)
+  return parseStatusPorcelain(stdout)
+}
+
+export async function getUntrackedFiles(
+  projectDir: string,
+  candidateFiles?: string[]
+): Promise<string[]> {
+  const { stdout } = await spawnGit(['status', '--porcelain'], projectDir)
+  const candidates = candidateFiles ? new Set(candidateFiles) : null
+
   return stdout
     .split('\n')
-    .filter(Boolean)
-    .map(line => line.slice(3)) // Remove status prefix (e.g., " M ", "?? ", "A  ")
-    .filter(file => !IGNORED_PATH_PREFIXES.some(prefix => file === prefix || file.startsWith(prefix)))
+    .filter(line => line.startsWith('?? '))
+    .map(parsePorcelainPath)
+    .filter(file => !isIgnoredPath(file))
+    .filter(file => candidates?.has(file) ?? true)
+}
+
+export async function intentToAddFiles(projectDir: string, changedFiles: string[]): Promise<void> {
+  if (changedFiles.length === 0) {
+    return
+  }
+
+  const untrackedFiles = await getUntrackedFiles(projectDir, changedFiles)
+  if (untrackedFiles.length === 0) {
+    return
+  }
+
+  await spawnGit(['add', '-N', '--', ...untrackedFiles], projectDir)
 }

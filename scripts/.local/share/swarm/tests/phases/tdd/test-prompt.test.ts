@@ -256,6 +256,20 @@ describe('buildTestPrompt — content', () => {
     expect(result).toContain('isRed')
   })
 
+  it('truncates oversized planner output to a smaller excerpt', () => {
+    const largePlannerOutput = `${PLANNER_OUTPUT}\n${'x'.repeat(12_000)}`
+
+    const result = buildTestPrompt(
+      largePlannerOutput,
+      [createPlannerTask()],
+      createTechStack(),
+      TEST_CONVENTIONS
+    )
+
+    expect(result).toContain('Planner output truncated')
+    expect(result).not.toContain('x'.repeat(9_000))
+  })
+
   it('requires functional naming for describe blocks and test names', () => {
     const result = buildTestPrompt(
       PLANNER_OUTPUT,

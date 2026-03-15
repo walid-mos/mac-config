@@ -104,6 +104,21 @@ export interface IterationState {
   iteration: number
   outcome: IterationOutcome
   changedFiles: string[]
+  metadata?: IterationExecutionMetadata
+}
+
+export interface IterationExecutionMetadata {
+  taskIds: string[]
+  pendingTaskIds: string[]
+  convergingTaskIds: string[]
+  reviewedFiles: string[]
+  filesByTask: Record<string, string[]>
+  tdd: IterationTddMetadata
+}
+
+export interface IterationTddMetadata {
+  status: 'skipped' | 'succeeded' | 'failed'
+  testFiles: string[]
 }
 
 export interface CommitRecord {
@@ -240,6 +255,17 @@ const iterationStateSchema = z.object({
   iteration: z.number(),
   outcome: iterationOutcomeSchema,
   changedFiles: z.array(z.string()),
+  metadata: z.object({
+    taskIds: z.array(z.string()),
+    pendingTaskIds: z.array(z.string()),
+    convergingTaskIds: z.array(z.string()),
+    reviewedFiles: z.array(z.string()),
+    filesByTask: z.record(z.string(), z.array(z.string())),
+    tdd: z.object({
+      status: z.union([z.literal('skipped'), z.literal('succeeded'), z.literal('failed')]),
+      testFiles: z.array(z.string()),
+    }),
+  }).optional(),
 })
 
 const taskWaveSchema = z.object({

@@ -245,6 +245,18 @@ describe('buildCodeAgentPrompt', () => {
     expect(prompt).toContain('summary')
   })
 
+  it('summarizes older test files when the list grows large', () => {
+    const task = createTask()
+    const techStack = createTechStack()
+    const testFiles = Array.from({ length: 10 }, (_, index) => `tests/task-${index + 1}.test.ts`)
+
+    const prompt = buildCodeAgentPrompt(task, testFiles, techStack)
+
+    expect(prompt).toContain('earlier test file(s) already exist')
+    expect(prompt).toContain('tests/task-10.test.ts')
+    expect(prompt).not.toContain('tests/task-1.test.ts')
+  })
+
   it('includes decision log when provided', () => {
     const task = createTask()
     const techStack = createTechStack()

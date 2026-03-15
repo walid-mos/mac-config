@@ -3,6 +3,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import * as os from 'node:os'
 import { createSessionId } from '../src/core/types.js'
+import { validateProjectDir, validateSpecContainment } from '../src/cli.js'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -99,11 +100,7 @@ describe('CLI — spec path containment (FR-7, SC-4)', () => {
     const specPath = path.join(projectDir, 'spec.md')
     fs.writeFileSync(specPath, '# Spec', 'utf-8')
 
-    const canonicalProject = fs.realpathSync(projectDir)
-    const canonicalSpec = fs.realpathSync(specPath)
-
-    // The run handler must enforce this invariant
-    expect(canonicalSpec.startsWith(canonicalProject + path.sep)).toBe(true)
+    expect(() => validateSpecContainment(specPath, projectDir)).not.toThrow()
   })
 
   it('spec path outside project-dir fails containment check', () => {
@@ -112,10 +109,7 @@ describe('CLI — spec path containment (FR-7, SC-4)', () => {
     const outsideSpec = path.join(tmpDir, 'outside-spec.md')
     fs.writeFileSync(outsideSpec, '# Outside', 'utf-8')
 
-    const canonicalProject = fs.realpathSync(projectDir)
-    const canonicalSpec = fs.realpathSync(outsideSpec)
-
-    expect(canonicalSpec.startsWith(canonicalProject + path.sep)).toBe(false)
+    expect(() => validateSpecContainment(outsideSpec, projectDir)).toThrow(/not under project directory/i)
   })
 
   it('symlink-based escape is caught by realpathSync canonicalization', () => {
@@ -126,11 +120,7 @@ describe('CLI — spec path containment (FR-7, SC-4)', () => {
     const symlinkPath = path.join(projectDir, 'escape.md')
     fs.symlinkSync(outsideFile, symlinkPath)
 
-    const canonicalProject = fs.realpathSync(projectDir)
-    const canonicalSpec = fs.realpathSync(symlinkPath)
-
-    // realpathSync resolves the symlink, revealing it points outside
-    expect(canonicalSpec.startsWith(canonicalProject + path.sep)).toBe(false)
+    expect(() => validateSpecContainment(symlinkPath, projectDir)).toThrow(/not under project directory/i)
   })
 })
 
@@ -142,13 +132,26 @@ describe('CLI — spec path containment (FR-7, SC-4)', () => {
 // ---------------------------------------------------------------------------
 
 describe('CLI — system root rejection (FR-7, SC-4)', () => {
-  // These tests require the validateProjectDir function to be exported from
-  // cli.ts or a validation module. Once available, each test should call the
-  // function and assert it throws for system roots.
-  // blocked on SF-001: validateProjectDir not yet exposed as testable unit
+  it('rejects project-dir = "/" as system root', () => {
+    expect(() => validateProjectDir('/')).toThrow(/system root/i)
+  })
 
-  it.todo('rejects project-dir = "/" as system root') // blocked on SF-001
-  it.todo('rejects project-dir = "/etc" as system root') // blocked on SF-001
-  it.todo('rejects project-dir = "/var" as system root') // blocked on SF-001
-  it.todo('rejects project-dir = "/usr" as system root') // blocked on SF-001
+  it('rejects project-dir = "/etc" as system root', () => {
+    expect(() => validateProjectDir('/etc')).toThrow(/system root/i)
+  })
+
+  it('rejects project-dir = "/var" as system root', () => {
+    expect(() => validateProjectDir('/var')).toThrow(/system root/i)
+  })
+
+  it('rejects project-dir = "/usr" as system root', () => {
+    expect(() => validateProjectDir('/usr')).toThrow(/system root/i)
+  })
+
+  it('accepts a normal project directory', () => {
+    const projectDir = path.join(tmpDir, 'project')
+    fs.mkdirSync(projectDir, { recursive: true })
+
+    expect(() => validateProjectDir(projectDir)).not.toThrow()
+  })
 })

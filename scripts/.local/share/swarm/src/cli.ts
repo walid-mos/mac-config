@@ -5,7 +5,7 @@ import * as path from 'node:path'
 // Validation helpers (exported for testability — SF-001)
 // ---------------------------------------------------------------------------
 
-const SYSTEM_ROOTS = new Set(['/', '/etc', '/var', '/usr'])
+const SYSTEM_ROOTS = new Set(['/', '/etc', '/var', '/usr', '/private/etc', '/private/var'])
 
 export function validateProjectDir(dir: string): void {
   const canonical = fs.realpathSync(dir)
@@ -203,24 +203,6 @@ if (isDirectExecution) {
 
           // Phase 3: Docs
           await runDocsPhase(ctx, registry, signal)
-
-          // Final push — code commit + docs commit may still be local-only.
-          // Non-fatal: no remote configured is fine (local-only workflow).
-          try {
-            const { spawn: spawnChild } = await import('node:child_process')
-            await new Promise<void>((resolve, reject) => {
-              const proc = spawnChild('git', ['push'], { cwd: ctx.projectDir })
-              let stderr = ''
-              proc.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString() })
-              proc.on('close', (code) => {
-                if (code === 0) resolve()
-                else reject(new Error(stderr))
-              })
-              proc.on('error', (err) => reject(err))
-            })
-          } catch (err) {
-            process.stderr.write(`WARNING: git push skipped (no remote?): ${(err as Error).message}\n`)
-          }
 
           // Session end
           emitter.emit({

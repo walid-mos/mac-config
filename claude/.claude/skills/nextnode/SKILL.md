@@ -16,12 +16,13 @@ This skill auto-loads on all NextNode/SaaS projects. It defines what a compliant
 | Skill | Purpose | Auto-loads? |
 |-------|---------|-------------|
 | `standards` | `@nextnode-solutions/standards` — linting, formatting, TypeScript, Tailwind, testing, commit conventions | Yes (same dirs) |
-| `logger` | `@nextnode-solutions/logger` — logging library API and patterns | Yes (when in deps) |
+| `logger` | `@nextnode-solutions/logger` — logging library API and patterns | Yes (same dirs; use when logger integration is relevant) |
 | `email-manager` | `@nextnode-solutions/email-manager` — email sending library API | Yes (same dirs, conditional) |
 | `nn` | `@nextnode-solutions/nn` — local dev DX CLI (nn up, nn env, nn down) | Yes (same dirs) |
 | `nextnode-infra` | Infrastructure operations — infra CLI commands, Terraform, VPS, deployment, DNS | Yes (same dirs) |
 | `nextnode-standards` | Compliance audit — checks all standards and produces a report | Yes (same dirs) |
-| `nextnode-brand` | Brand guidelines — colors, typography, logo system | No (manual `/nextnode-brand`) |
+| `nextnode-brand` | Brand guidelines — colors, typography, logo system | Yes (same dirs; applied during UI/frontend work) |
+| `n8n-cli` | n8n workflow operations against the shared automation instance | Yes (same dirs) |
 | `structure-astro` | Astro project `src/` structure — domain-driven components, shared/page separation, lib layer, islands | Yes (same dirs + clients) |
 | `docker` | Docker standards — multi-stage builds, pnpm optimization, security hardening, nextnode.toml integration | Yes (when editing Docker files) |
 

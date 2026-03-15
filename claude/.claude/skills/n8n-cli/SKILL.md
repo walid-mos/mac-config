@@ -1,3 +1,13 @@
+---
+name: n8n-cli
+description: Manage n8n workflows on the NextNode automation instance with the local n8n-cli tool.
+user-invocable: true
+argument-hint: <list|get|create|update|activate|deactivate|execute|delete> [args]
+autoload-dirs:
+  - /Users/walid/Development/nextnode
+  - /Users/walid/Development/saas
+---
+
 # n8n-cli Skill
 
 Skill for managing n8n workflows using the n8n-cli command-line tool.

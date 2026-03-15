@@ -32,6 +32,14 @@
    - **Step 2:** `query-docs` — fetch the actual documentation using that ID
    - Never skip Step 1 unless the user provides an explicit `/org/project` ID
 
+# Interactive Questions
+
+- When the runtime exposes a `question` tool, ALWAYS use it for bounded user choices instead of asking in plain text.
+- Never render numbered or bulleted choice lists in normal assistant text when the same choice can be asked with `question`.
+- Use `question` whenever the user must choose between 2 or more concrete options, or when clarification can be expressed as a short list of valid answers.
+- Prefer single-select by default; use `multiple: true` only when the user can meaningfully choose several options at once.
+- Keep option labels short, add a short description, and only fall back to plain-text questions when the answer is genuinely open-ended or the `question` tool is unavailable.
+
 # Naming Conventions
 
 ## TypeScript / React

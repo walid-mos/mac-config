@@ -119,16 +119,16 @@ If the file does not exist: **MISSING**.
 
 ### 7. CI Pipelines (`.github/workflows/`)
 
-**First, read `nextnode.toml`** to determine if the dev environment is enabled. The `[environment.dev]` section controls whether `deploy-dev.yml` is required:
+**First, read `nextnode.toml`** to determine if the development environment is enabled. The `[environment.development]` section controls whether `deploy-dev.yml` is required:
 
-- `[environment.dev].enabled = true` (default if section absent) → `deploy-dev.yml` is **required**
-- `[environment.dev].enabled = false` → `deploy-dev.yml` is **not required** → **SKIP**
+- `[environment.development].enabled = true` (default if section absent) → `deploy-dev.yml` is **required**
+- `[environment.development].enabled = false` → `deploy-dev.yml` is **not required** → **SKIP**
 
 **`deploy-dev.yml`**:
 - **PASS**: file exists and contains `NextNodeSolutions/infrastructure/.github/workflows/pipeline.yml@main`
 - **FAIL**: file exists but uses custom logic instead of the reusable pipeline
 - **MISSING**: file does not exist
-- **SKIP**: `[environment.dev].enabled = false` in `nextnode.toml` — no dev deployment configured
+- **SKIP**: `[environment.development].enabled = false` in `nextnode.toml` — no dev deployment configured
 
 **`deploy-prod.yml`** (always required):
 - **PASS**: file exists and contains `NextNodeSolutions/infrastructure/.github/workflows/pipeline.yml@main` with `action: deploy-prod`
@@ -142,7 +142,7 @@ Skip these checks if `type = "package"` in `nextnode.toml`. Refer to the `docker
 **`Dockerfile`:**
 - **PASS**: file exists with multi-stage build (`FROM ... AS builder` + `FROM ... AS runtime`)
 - **WARN**: file exists but no multi-stage build
-- **WARN**: build-only variables (`HUSKY`, `CI`) declared as `ENV` or inlined in `RUN` — use `--ignore-scripts` instead (see `docker` skill, anti-pattern #2)
+- **WARN**: build-only variables (`HUSKY`, `CI`) declared as `ENV` or inlined in `RUN` — remove the root `prepare` script in the prod-deps stage or follow the canonical Docker patterns from the `docker` skill
 - **WARN**: `corepack prepare pnpm@X.Y.Z` with hardcoded version — use `corepack prepare --activate` (see `docker` skill, anti-pattern #1)
 - **WARN**: missing `# syntax=docker/dockerfile:1` on line 1
 - **WARN**: missing BuildKit cache mounts on `pnpm install`
@@ -238,7 +238,7 @@ Type: <app|package> | Domain: <domain or n/a>
 | 9 | Husky hooks | PASS | pre-commit + commit-msg |
 | 10 | package.json scripts | FAIL | Missing: format:check |
 | 11 | pnpm enforced | PASS | No package-lock.json or yarn.lock |
-| 12 | CI pipeline (deploy-dev.yml) | SKIP | environment.dev.enabled = false |
+| 12 | CI pipeline (deploy-dev.yml) | SKIP | environment.development.enabled = false |
 | 13 | CI pipeline (deploy-prod.yml) | PASS | Uses reusable workflow |
 | 14 | Dockerfile | WARN | No multi-stage build |
 | 15 | docker-compose.yml | SKIP | Not needed — Dockerfile present, infra auto-generates compose |

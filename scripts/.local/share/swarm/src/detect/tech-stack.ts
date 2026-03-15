@@ -1,6 +1,6 @@
 // === Tech Stack Types & Project Context ===
 
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 // === Types ===

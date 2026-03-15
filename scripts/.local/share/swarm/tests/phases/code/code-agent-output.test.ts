@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import { parseCodeAgentOutput } from '../../../src/phases/code/code-agent-output.js'
-import type { CodeAgentOutput } from '../../../src/phases/phase-results.js'
+import type { TaskCodeAgentOutput } from '../../../src/phases/phase-results.js'
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function validCompletedOutput(): CodeAgentOutput {
+function validCompletedOutput(): TaskCodeAgentOutput {
   return {
     taskId: 'TASK-1',
     status: 'completed',
@@ -16,7 +16,7 @@ function validCompletedOutput(): CodeAgentOutput {
   }
 }
 
-function validFailedOutput(): CodeAgentOutput {
+function validFailedOutput(): TaskCodeAgentOutput {
   return {
     taskId: 'TASK-2',
     status: 'failed',
@@ -27,7 +27,7 @@ function validFailedOutput(): CodeAgentOutput {
   }
 }
 
-function validBlockedOutput(): CodeAgentOutput {
+function validBlockedOutput(): TaskCodeAgentOutput {
   return {
     taskId: 'TASK-3',
     status: 'blocked',

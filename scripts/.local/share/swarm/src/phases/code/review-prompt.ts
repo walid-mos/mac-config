@@ -1,6 +1,12 @@
 // === Review Prompt Builder (Spec 4 — FR-6) ===
 
 import type { TestResult } from '../phase-results.js'
+import {
+  buildFileReferenceInstructions,
+  buildIterationAwarenessSection,
+  buildReviewJsonOutputSection,
+  buildTestResultSection,
+} from './review-prompt-shared.js'
 
 // === Types ===
 
@@ -49,58 +55,6 @@ function buildIntegrationRules(): string {
   return rules.join('\n')
 }
 
-// === Helpers ===
-
-function buildIterationAwareness(iterationIndex: number): string {
-  return [
-    '# Iteration Awareness',
-    '',
-    `This is review iteration ${iterationIndex}. Previous iterations already identified and addressed multiple findings`,
-    '(see Decision Log above).',
-    '',
-    'Rules for late iterations:',
-    '- Severity is INTRINSIC to the finding. A suggestion on iteration 1 does NOT become important on',
-    '  iteration 5 just because it persists. The severity reflects the IMPACT, not how many times you\'ve',
-    '  seen the codebase.',
-    '- Do NOT re-raise findings from a different angle if the Decision Log shows they were already addressed.',
-    '  "Missing null check" addressed in iteration 2 should not reappear as "potential undefined access" in',
-    '  iteration 5 — that\'s the same issue rephrased.',
-    '- Do NOT flag files under `.swarm/` — those are session artifacts, not project code.',
-    '- If you have zero genuinely new findings, return an empty findings array. That is the CORRECT outcome —',
-    '  it means the code has converged.',
-    '',
-  ].join('\n')
-}
-
-function buildFileReferenceInstructions(opts: ReviewPromptOpts): string {
-  const lines: string[] = [
-    '# How to Access Content',
-    '',
-    '## Git Diff',
-    'Run the following command to see all changes:',
-    '```',
-    `git diff HEAD -- ${opts.changedFiles.join(' ')}`,
-    '```',
-    '',
-    '## Spec',
-    `Read the spec file at: \`${opts.specPath}\``,
-    '',
-    '## Project Context',
-    'Read `package.json` for dependencies. Check config files (tsconfig.json, vite.config.ts, astro.config.mjs, etc.) for build setup.',
-    '',
-  ]
-
-  if (opts.decisionLogPath) {
-    lines.push(
-      '## Decision Log',
-      `Read the decision log at: \`${opts.decisionLogPath}\``,
-      '',
-    )
-  }
-
-  return lines.join('\n')
-}
-
 // === API ===
 
 export function buildReviewPrompt(opts: ReviewPromptOpts): string {
@@ -110,7 +64,10 @@ export function buildReviewPrompt(opts: ReviewPromptOpts): string {
   sections.push('# Role\n\nYou are a code review agent. Review the following code changes for bugs, quality issues, performance problems, integration conflicts, and adherence to best practices.')
 
   // File reference instructions (replaces inlined diff, spec, project context, decision log)
-  sections.push(buildFileReferenceInstructions(opts))
+  sections.push(buildFileReferenceInstructions({
+    ...opts,
+    projectContextLine: 'Read `package.json` for dependencies. Check config files (tsconfig.json, vite.config.ts, astro.config.mjs, etc.) for build setup.',
+  }))
 
   // Changed files list
   sections.push(`# Changed Files\n\n${opts.changedFiles.map(f => `- ${f}`).join('\n')}`)
@@ -119,11 +76,11 @@ export function buildReviewPrompt(opts: ReviewPromptOpts): string {
   sections.push(buildIntegrationRules())
 
   // Test results
-  sections.push(`# Test Results\n\n- Total: ${opts.testResult.totalTests}\n- Passing: ${opts.testResult.passingTests}\n- Failing: ${opts.testResult.failingTests}\n- Duration: ${opts.testResult.durationMs}ms`)
+  sections.push(buildTestResultSection(opts.testResult))
 
   // Iteration awareness (appended at iteration >= 2)
   if (opts.iterationIndex >= 2) {
-    sections.push(buildIterationAwareness(opts.iterationIndex))
+    sections.push(buildIterationAwarenessSection(opts.iterationIndex))
   }
 
   // DRY enforcement
@@ -133,7 +90,7 @@ export function buildReviewPrompt(opts: ReviewPromptOpts): string {
   sections.push('# Fix Quality\n\nEvery `suggestedFix` MUST be actionable — include the target file, the specific change, and why.\nBAD:  "Fix the link." / "Add missing element."\nGOOD: Specific file + what to add/change + where in the file.')
 
   // Output format
-  sections.push('# Output Format\n\nIMPORTANT: Output ONLY raw JSON. No markdown fences, no narrative text, no commentary before or after the JSON.\n\nReturn a JSON object with this structure:\n\n{\n  "findings": [\n    {\n      "file": "string",\n      "line": number,\n      "severity": "critical" | "important" | "suggestion",\n      "category": "bug" | "security" | "quality" | "performance" | "dry-violation" | "dead-code" | "spec-compliance",\n      "description": "string",\n      "suggestedFix": "string"\n    }\n  ]\n}\n\nAll string values in JSON must use proper JSON escaping — newlines as \\n, quotes as \\", backslashes as \\\\. Do NOT put raw newlines inside JSON string values.')
+  sections.push(buildReviewJsonOutputSection())
 
   return sections.join('\n\n')
 }

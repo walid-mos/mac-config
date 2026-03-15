@@ -5,10 +5,11 @@ import type { DriverRegistry } from '../../drivers/driver.js'
 import type {
   PlanPhaseResult,
   CodePhaseResult,
+  AgentCodeOutput,
   ReviewFinding,
   TestResult,
-  CodeAgentOutput,
 } from '../phase-results.js'
+import { isImmediateFailErrorCode, isRetryableErrorCode } from '../retryable-agent.js'
 import { openDraftPr, getChangedFiles } from '../../git/git-operations.js'
 import { createIterationLogger } from './iteration-logger.js'
 import { parseStructuredOutput } from '../../drivers/output-parser.js'
@@ -27,13 +28,7 @@ export interface AgentHandle {
 
 // === Exported Helpers (used by dag-executor.ts) ===
 
-export function isRetryableErrorCode(code: string): boolean {
-  return code === 'timeout' || code === 'crash' || code === 'empty_output' || code === 'invalid_json'
-}
-
-export function isImmediateFailErrorCode(code: string): boolean {
-  return code === 'aborted' || code === 'spawn_error'
-}
+export { isRetryableErrorCode, isImmediateFailErrorCode }
 
 export function findingSignature(f: ReviewFinding): string {
   return `${f.file}:${f.line ?? 0}:${f.category}`
@@ -90,12 +85,12 @@ export function deduplicateFindings(
   return deduplicated
 }
 
-export function extractCodeAgentOutput(output: string): CodeAgentOutput | null {
+export function extractCodeAgentOutput(output: string): AgentCodeOutput | null {
   const parsed = parseStructuredOutput(output)
   if (!parsed.ok) return null
 
   try {
-    const json = JSON.parse(parsed.output) as Partial<CodeAgentOutput>
+    const json = JSON.parse(parsed.output) as Partial<AgentCodeOutput>
     return {
       filesChanged: json.filesChanged ?? [],
       testResult: {

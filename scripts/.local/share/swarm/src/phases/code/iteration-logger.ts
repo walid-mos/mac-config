@@ -2,7 +2,7 @@
 
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { MergedReview, ReviewFinding, TestResult, BuildResult } from '../phase-results.js'
+import type { MergedReview, TestResult, BuildResult } from '../phase-results.js'
 
 // === Types ===
 

@@ -1,62 +1,30 @@
 // === Review & Merge Orchestration (Spec 4 — FR-6, FR-7) ===
 
-import { spawn } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import type { SessionContext } from '../../core/types.js'
 import type { DriverRegistry, AgentResult } from '../../drivers/driver.js'
 import type { TestResult, MergedReview, ReviewFinding, IterationState } from '../phase-results.js'
+import { invokeAgentWithRetry } from '../retryable-agent.js'
 import { buildReviewPrompt } from './review-prompt.js'
 import { buildSecurityPrompt } from './security-prompt.js'
 import { buildConsistencyPrompt } from './consistency-prompt.js'
 import { buildMergePrompt } from './merge-prompt.js'
 import { parseStructuredOutput } from '../../drivers/output-parser.js'
+import { spawnGit } from '../../utils/process.js'
 
 // === Constants ===
 
-const MAX_RETRIES = 2
 const SENSITIVE_PATTERNS = [/^\.env($|\.)/, /\.pem$/, /\.key$/]
 const DECISION_LOG_RELATIVE = '.swarm/review-decision-log.md'
 
 
 // === Helpers ===
 
-function isRetryableErrorCode(code: string): boolean {
-  return code === 'timeout' || code === 'crash' || code === 'empty_output' || code === 'invalid_json'
-}
-
-function isImmediateFailErrorCode(code: string): boolean {
-  return code === 'aborted' || code === 'spawn_error'
-}
-
 function filterSensitiveFiles(files: string[]): string[] {
   return files.filter(f => {
     const basename = f.split('/').pop() ?? f
     return !SENSITIVE_PATTERNS.some(p => p.test(basename))
-  })
-}
-
-function spawnGit(
-  args: string[],
-  cwd: string
-): Promise<{ stdout: string; stderr: string }> {
-  return new Promise((resolve, reject) => {
-    const proc = spawn('git', args, { cwd })
-    let stdout = ''
-    let stderr = ''
-
-    proc.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString() })
-    proc.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString() })
-    proc.on('close', (code) => {
-      if (code === 0) {
-        resolve({ stdout, stderr })
-      } else {
-        reject(new Error(`git ${args[0]} failed (exit ${code}): ${stderr || stdout}`))
-      }
-    })
-    proc.on('error', (err) => {
-      reject(new Error(`git spawn error: ${err.message}`))
-    })
   })
 }
 
@@ -119,42 +87,27 @@ async function invokeWithRetry(
   prompt: string,
   signal?: AbortSignal
 ): Promise<AgentResult> {
-  const { driver, model, agent } = registry.getDriver(role)
-
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    if (signal?.aborted) {
-      throw new Error(`${role} review aborted`)
-    }
-
-    const result = await driver.invoke({
-      prompt,
-      role,
-      agent,
-      model,
-      projectDir: ctx.projectDir,
-      signal,
-    })
-
-    if (result.success) return result
-
-    if (isImmediateFailErrorCode(result.errorCode)) {
-      throw new Error(`${role} review failed: ${result.errorCode}: ${result.error}`)
-    }
-
-    if (isRetryableErrorCode(result.errorCode) && attempt < MAX_RETRIES) {
+  return invokeAgentWithRetry({
+    ctx,
+    registry,
+    role,
+    prompt,
+    signal,
+    onRetryableError: (result) => {
       ctx.emitter.emit({
         type: 'agent:error',
         timestamp: new Date().toISOString(),
         sessionId: ctx.sessionId,
         data: { role, reason: `${result.errorCode}: ${result.error}` },
       })
-      continue
-    }
-
-    throw new Error(`${role} review failed after ${attempt + 1} attempts: ${result.errorCode}`)
-  }
-
-  throw new Error(`${role} review failed: all retries exhausted`)
+    },
+    onImmediateFailure: (result) => {
+      throw new Error(`${role} review failed: ${result.errorCode}: ${result.error}`)
+    },
+    onExhausted: (result, attempt) => {
+      throw new Error(`${role} review failed after ${attempt + 1} attempts: ${result.errorCode}`)
+    },
+  })
 }
 
 // === Trajectory ===

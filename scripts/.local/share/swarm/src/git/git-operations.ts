@@ -1,8 +1,8 @@
 // === Git Operations (Spec 4 — FR-9, FR-11, FR-12) ===
 
-import { spawn } from 'node:child_process'
 import type { SessionId } from '../core/types.js'
 import { checkStagingBlocklist } from '../phases/code/file-verification.js'
+import { spawnGit, spawnNamedCommand } from '../utils/process.js'
 
 // === Constants ===
 
@@ -10,65 +10,6 @@ const SESSION_ID_RE = /^[a-zA-Z0-9_-]{1,64}$/
 const CONTROL_CHARS_RE = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g
 const MAX_COMMIT_MSG_LEN = 500
 const FILE_BATCH_SIZE = 100
-
-// === Helpers ===
-
-function spawnGit(
-  args: string[],
-  cwd: string
-): Promise<{ stdout: string; stderr: string }> {
-  return new Promise((resolve, reject) => {
-    const proc = spawn('git', args, { cwd })
-    let stdout = ''
-    let stderr = ''
-
-    proc.stdout.on('data', (chunk: Buffer) => {
-      stdout += chunk.toString()
-    })
-    proc.stderr.on('data', (chunk: Buffer) => {
-      stderr += chunk.toString()
-    })
-    proc.on('close', (code) => {
-      if (code === 0) {
-        resolve({ stdout: stdout.trimEnd(), stderr: stderr.trimEnd() })
-      } else {
-        reject(new Error(`git ${args[0]} failed (exit ${code}): ${stderr || stdout}`))
-      }
-    })
-    proc.on('error', (err) => {
-      reject(new Error(`git spawn error: ${err.message}`))
-    })
-  })
-}
-
-function spawnCommand(
-  cmd: string,
-  args: string[],
-  cwd: string
-): Promise<{ stdout: string; stderr: string }> {
-  return new Promise((resolve, reject) => {
-    const proc = spawn(cmd, args, { cwd })
-    let stdout = ''
-    let stderr = ''
-
-    proc.stdout.on('data', (chunk: Buffer) => {
-      stdout += chunk.toString()
-    })
-    proc.stderr.on('data', (chunk: Buffer) => {
-      stderr += chunk.toString()
-    })
-    proc.on('close', (code) => {
-      if (code === 0) {
-        resolve({ stdout: stdout.trimEnd(), stderr: stderr.trimEnd() })
-      } else {
-        reject(new Error(`${cmd} failed (exit ${code}): ${stderr || stdout}`))
-      }
-    })
-    proc.on('error', (err) => {
-      reject(new Error(`${cmd} spawn error: ${err.message}`))
-    })
-  })
-}
 
 // === API ===
 
@@ -83,7 +24,7 @@ export async function createWorktree(
 
   const resolvedBranch = branch ?? `swarm/${sessionId}`
   const binWt = new URL('../bin/wt', import.meta.url).pathname
-  const { stdout } = await spawnCommand('zsh', [binWt, 'new', resolvedBranch, '-y'], projectDir)
+  const { stdout } = await spawnNamedCommand('zsh', [binWt, 'new', resolvedBranch, '-y'], projectDir)
 
   const pathMatch = /Path:\s*(.+)/.exec(stdout)
   if (!pathMatch?.[1]) {
@@ -123,7 +64,7 @@ export async function removeWorktree(
     ? branchOrSessionId
     : `swarm/${branchOrSessionId}`
   const binWt = new URL('../bin/wt', import.meta.url).pathname
-  await spawnCommand('zsh', [binWt, 'clean', branch, '-y'], projectDir)
+  await spawnNamedCommand('zsh', [binWt, 'clean', branch, '-y'], projectDir)
 }
 
 export async function openDraftPr(
@@ -135,7 +76,7 @@ export async function openDraftPr(
   await spawnGit(['push', '-u', 'origin', branch], projectDir)
 
   // Create draft PR
-  const { stdout } = await spawnCommand(
+  const { stdout } = await spawnNamedCommand(
     'gh',
     [
       'pr', 'create',
@@ -143,7 +84,7 @@ export async function openDraftPr(
       '--title', `swarm: ${sessionId}`,
       '--body', `Automated PR for swarm session \`${sessionId}\``,
     ],
-    projectDir
+    projectDir,
   )
 
   // gh pr create outputs the PR URL on stdout
@@ -198,7 +139,7 @@ export async function markPrReady(
   prNumber: number,
   projectDir: string
 ): Promise<void> {
-  await spawnCommand('gh', ['pr', 'ready', String(prNumber)], projectDir)
+  await spawnNamedCommand('gh', ['pr', 'ready', String(prNumber)], projectDir)
 }
 
 // Directories that should never be committed — caches, deps, VCS internals.

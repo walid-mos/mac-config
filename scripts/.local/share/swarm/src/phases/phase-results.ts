@@ -29,7 +29,7 @@ export interface TddAgentOutput {
   isRed: boolean
 }
 
-export interface CodeAgentOutput {
+export interface AgentCodeOutput {
   filesChanged: string[]
   testResult: TestResult
   buildResult: BuildResult | null
@@ -58,7 +58,7 @@ export interface TaskWave {
   tasks: PlannerTask[]
 }
 
-export type CodeAgentOutput =
+export type TaskCodeAgentOutput =
   | {
       taskId: `TASK-${number}`
       status: 'completed'

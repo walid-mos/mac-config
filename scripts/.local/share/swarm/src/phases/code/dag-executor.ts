@@ -1,11 +1,9 @@
 // === DAG Task Executor (wave-based scheduling) ===
 
-import { randomUUID } from 'node:crypto'
 import type { SessionContext } from '../../core/types.js'
 import type { DriverRegistry } from '../../drivers/driver.js'
 import type { TechStack } from '../../detect/tech-stack.js'
 import type {
-  ReviewFinding,
   TestResult,
   IterationState,
   IterationOutcome,
@@ -15,7 +13,6 @@ import type {
 import type { PlannerTask } from '../plan/task-parser.js'
 import { buildDependencyGraph } from '../plan/task-scheduler.js'
 import { runReviewPhase } from './review-merge.js'
-import { buildCodeAgentPrompt, buildFindingFixPrompt } from './code-agent-prompt.js'
 import { commitSpecItem, getChangedFiles } from '../../git/git-operations.js'
 import type { IterationLogger } from './iteration-logger.js'
 import { runTddForTasks } from '../tdd/tdd-phase.js'
@@ -25,192 +22,20 @@ import {
   deduplicateFindings,
   buildDecisionEntry,
   buildDecisionLogSection,
-  extractCodeAgentOutput,
-  isRetryableErrorCode,
-  isImmediateFailErrorCode,
   DEFAULT_TEST_RESULT,
 } from './code-phase.js'
-
-// === Constants ===
-
-const MAX_RETRIES = 2
+import { resumeAgentWithFindings, spawnFreshAgent } from './dag-executor-agents.js'
+import { collectWaveNodes, createTaskNode } from './dag-executor-state.js'
+import type { TaskNode, TaskStatus } from './dag-executor-state.js'
 
 // === Types ===
 
-export type TaskStatus = 'pending' | 'running' | 'converging' | 'green'
-
-export interface TaskNode {
-  taskId: string
-  task: PlannerTask
-  status: TaskStatus
-  handle: AgentHandle
-  lastFindings?: ReviewFinding[]
-  attempts: number
-  commitHash?: string
-  decisionLogEntries: string[]
-  seenSignatures: Set<string>
-}
+export type { TaskNode, TaskStatus }
 
 export interface DagExecutorResult {
   taskCompletions: TaskCompletionRecord[]
   iterations: IterationState[]
   lastOutcome?: IterationOutcome
-}
-
-// === Errors ===
-
-// === Helpers ===
-
-async function spawnFreshAgent(
-  node: TaskNode,
-  ctx: SessionContext,
-  registry: DriverRegistry,
-  techStack: TechStack,
-  testFiles: string[],
-  decisionLog: string,
-  signal?: AbortSignal,
-): Promise<ReturnType<typeof extractCodeAgentOutput>> {
-  const { driver, model, agent } = registry.getDriver('code', node.task.tag)
-  const prompt = buildCodeAgentPrompt(node.task, testFiles, techStack, undefined, decisionLog)
-
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    if (signal?.aborted) throw new Error('DAG execution aborted')
-
-    const result = await driver.invoke({
-      prompt,
-      role: 'code',
-      agent,
-      model,
-      projectDir: ctx.projectDir,
-      signal,
-      sessionId: node.handle.sessionId,
-    })
-
-    if (result.success) {
-      const output = extractCodeAgentOutput(result.output)
-      if (output) {
-        for (const f of output.filesChanged) {
-          if (!node.handle.filesChanged.includes(f)) {
-            node.handle.filesChanged.push(f)
-          }
-        }
-      }
-      return output
-    }
-
-    if (isImmediateFailErrorCode(result.errorCode)) {
-      throw new Error(`Code agent failed: ${result.errorCode}: ${result.error}`)
-    }
-
-    if (isRetryableErrorCode(result.errorCode) && attempt < MAX_RETRIES) {
-      ctx.emitter.emit({
-        type: 'agent:error',
-        timestamp: new Date().toISOString(),
-        sessionId: ctx.sessionId,
-        data: { role: 'code', reason: `${result.errorCode}: ${result.error}` },
-      })
-      continue
-    }
-
-    throw new Error(`Code agent failed after ${attempt + 1} attempts: ${result.errorCode}`)
-  }
-
-  return null
-}
-
-async function resumeAgentWithFindings(
-  node: TaskNode,
-  ctx: SessionContext,
-  registry: DriverRegistry,
-  techStack: TechStack,
-  testFiles: string[],
-  decisionLog: string,
-  signal?: AbortSignal,
-): Promise<ReturnType<typeof extractCodeAgentOutput>> {
-  const { driver, model, agent } = registry.getDriver('code', node.task.tag)
-  const findings = node.lastFindings ?? []
-  const prompt = buildFindingFixPrompt(findings, decisionLog)
-
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    if (signal?.aborted) throw new Error('DAG execution aborted')
-
-    const isFirstAttempt = attempt === 0
-    const result = await driver.invoke({
-      prompt,
-      role: 'code',
-      agent,
-      model,
-      projectDir: ctx.projectDir,
-      signal,
-      ...(isFirstAttempt ? { resume: node.handle.sessionId } : {}),
-    })
-
-    if (result.success) {
-      const output = extractCodeAgentOutput(result.output)
-      if (output) {
-        for (const f of output.filesChanged) {
-          if (!node.handle.filesChanged.includes(f)) {
-            node.handle.filesChanged.push(f)
-          }
-        }
-      }
-      return output
-    }
-
-    // On first resume failure, fall back to fresh invocation with full prompt
-    if (isFirstAttempt && isRetryableErrorCode(result.errorCode)) {
-      ctx.emitter.emit({
-        type: 'agent:error',
-        timestamp: new Date().toISOString(),
-        sessionId: ctx.sessionId,
-        data: { role: 'code', reason: `Resume failed (${result.errorCode}), falling back to fresh invocation` },
-      })
-      const fullPrompt = buildCodeAgentPrompt(node.task, testFiles, techStack, findings, decisionLog)
-      const fallbackResult = await driver.invoke({
-        prompt: fullPrompt,
-        role: 'code',
-        agent,
-        model,
-        projectDir: ctx.projectDir,
-        signal,
-      })
-
-      if (fallbackResult.success) {
-        const output = extractCodeAgentOutput(fallbackResult.output)
-        if (output) {
-          for (const f of output.filesChanged) {
-            if (!node.handle.filesChanged.includes(f)) {
-              node.handle.filesChanged.push(f)
-            }
-          }
-        }
-        return output
-      }
-
-      if (isImmediateFailErrorCode(fallbackResult.errorCode)) {
-        throw new Error(`Code agent failed: ${fallbackResult.errorCode}: ${fallbackResult.error}`)
-      }
-      continue
-    }
-
-    if (isImmediateFailErrorCode(result.errorCode)) {
-      throw new Error(`Code agent failed: ${result.errorCode}: ${result.error}`)
-    }
-
-    if (isRetryableErrorCode(result.errorCode) && attempt < MAX_RETRIES) {
-      ctx.emitter.emit({
-        type: 'agent:error',
-        timestamp: new Date().toISOString(),
-        sessionId: ctx.sessionId,
-        data: { role: 'code', reason: `${result.errorCode}: ${result.error}` },
-      })
-      continue
-    }
-
-    throw new Error(`Code agent failed after ${attempt + 1} attempts: ${result.errorCode}`)
-  }
-
-  return null
 }
 
 // === API ===
@@ -238,21 +63,7 @@ export async function executeDag(
   for (const task of tasks) {
     const validDeps = task.dependencies.filter(d => taskMap.has(d))
     remainingDeps.set(task.id, validDeps.length)
-    nodes.set(task.id, {
-      taskId: task.id,
-      task,
-      status: 'pending',
-      handle: {
-        taskId: task.id,
-        sessionId: randomUUID(),
-        task,
-        filesChanged: [],
-        status: 'active',
-      },
-      attempts: 0,
-      decisionLogEntries: [],
-      seenSignatures: new Set(),
-    })
+    nodes.set(task.id, createTaskNode(task))
   }
 
   const iterations: IterationState[] = []
@@ -265,20 +76,7 @@ export async function executeDag(
     if (signal?.aborted) throw new Error('DAG execution aborted')
 
     // 1. Find ready tasks: status=pending AND all deps green
-    const ready: TaskNode[] = []
-    for (const node of nodes.values()) {
-      if (node.status === 'pending' && (remainingDeps.get(node.taskId) ?? 0) === 0) {
-        ready.push(node)
-      }
-    }
-
-    // 2. Find fixable tasks: status=converging AND has lastFindings
-    const fixable: TaskNode[] = []
-    for (const node of nodes.values()) {
-      if (node.status === 'converging' && node.lastFindings && node.lastFindings.length > 0) {
-        fixable.push(node)
-      }
-    }
+    const { ready, fixable } = collectWaveNodes(nodes.values(), remainingDeps)
 
     // Nothing left to process — exit
     if (ready.length === 0 && fixable.length === 0) break

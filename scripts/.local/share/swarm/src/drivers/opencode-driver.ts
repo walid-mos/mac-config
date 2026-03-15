@@ -3,16 +3,13 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import type { SessionId, SwarmEventEmitter } from '../core/types.js'
 import type { Driver, AgentRequest, AgentResult, DriverAvailability } from './driver.js'
+import { JSON_DIRECTIVE, safeKill, truncate, validateAgentRequest } from './driver-runtime.js'
 import { parseStructuredOutput } from './output-parser.js'
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const MODEL_RE = /^[a-zA-Z0-9._\/-]{1,64}$/
-const AGENT_NAME_RE = /^[a-zA-Z0-9_-]{1,64}$/
-const MIN_TIMEOUT = 10_000
-const MAX_TIMEOUT = 3_600_000
 const DEFAULT_TIMEOUT = 600_000
 const MAX_RAW_OUTPUT = 1024 * 1024  // 1MB
 const MAX_STDERR = 64 * 1024        // 64KB
@@ -28,70 +25,6 @@ const ALLOWED_HOST_PREFIXES = [
   '127.0.0.1:', '127.0.0.1/', '127.0.0.1',
   '[::1]:', '[::1]/', '[::1]',
 ]
-
-const JSON_DIRECTIVE = '\n\nIMPORTANT: Output ONLY raw JSON matching the provided schema. No markdown fences, no narrative text, no commentary.'
-
-// ---------------------------------------------------------------------------
-// Process group kill with ESRCH handling
-// ---------------------------------------------------------------------------
-
-function safeKill(pid: number, signal: NodeJS.Signals): void {
-  try {
-    process.kill(-pid, signal)
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== 'ESRCH') throw err
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Truncation helpers
-// ---------------------------------------------------------------------------
-
-function truncate(value: string, max: number): string {
-  if (value.length <= max) return value
-  return value.slice(0, max)
-}
-
-// ---------------------------------------------------------------------------
-// Input validation
-// ---------------------------------------------------------------------------
-
-function validateCommonInputs(
-  request: AgentRequest
-): string | null {
-  if (!MODEL_RE.test(request.model)) {
-    return `Invalid model: "${request.model}"`
-  }
-
-  if (request.agent !== undefined && !AGENT_NAME_RE.test(request.agent)) {
-    return `Invalid agent name: "${request.agent}"`
-  }
-
-  if (request.schema !== undefined) {
-    try {
-      JSON.parse(request.schema)
-    } catch {
-      return `Invalid schema: not valid JSON`
-    }
-  }
-
-  try {
-    const stat = fs.statSync(request.projectDir)
-    if (!stat.isDirectory()) {
-      return `projectDir is not a directory: "${request.projectDir}"`
-    }
-  } catch {
-    return `projectDir is not accessible: "${request.projectDir}"`
-  }
-
-  if (request.timeout !== undefined) {
-    if (request.timeout < MIN_TIMEOUT || request.timeout > MAX_TIMEOUT) {
-      return `Timeout must be between ${MIN_TIMEOUT}ms and ${MAX_TIMEOUT}ms, got ${request.timeout}ms`
-    }
-  }
-
-  return null
-}
 
 // ---------------------------------------------------------------------------
 // DS-2: Context file containment validation
@@ -186,7 +119,7 @@ export function createOpenCodeDriver(emitter: SwarmEventEmitter): Driver {
     }
 
     // Input validation
-    const validationError = validateCommonInputs(request)
+    const validationError = validateAgentRequest(request)
     if (validationError) {
       return {
         success: false,

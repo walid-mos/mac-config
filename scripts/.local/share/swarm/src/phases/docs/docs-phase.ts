@@ -2,32 +2,24 @@
 
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import { spawn } from 'node:child_process'
 import type { SessionContext } from '../../core/types.js'
-import type { DriverRegistry, AgentResult } from '../../drivers/driver.js'
+import type { DriverRegistry } from '../../drivers/driver.js'
 import type { DocsPhaseResult } from '../phase-results.js'
 import { readPlanPhaseResult, readTddPhaseResult, readCodePhaseResult } from '../phase-results.js'
+import { invokeAgentWithRetry } from '../retryable-agent.js'
 import { buildDeliveryReportInput } from './report-builder.js'
 import { buildIterationLog, renderIterationLog } from './iteration-log-builder.js'
 import { generateFallbackReport } from './fallback-report.js'
 import { buildDocWriterPrompt } from './docs-prompt.js'
 import { commitSpecItem, markPrReady } from '../../git/git-operations.js'
+import { spawnCommand } from '../../utils/process.js'
 
 // === Constants ===
 
-const MAX_RETRIES = 2
 const CONTROL_CHARS_RE = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g
 const MAX_PR_BODY_CHARS = 60_000
 
 // === Helpers ===
-
-function isRetryableErrorCode(code: string): boolean {
-  return code === 'timeout' || code === 'crash' || code === 'empty_output' || code === 'invalid_json'
-}
-
-function isImmediateFailErrorCode(code: string): boolean {
-  return code === 'aborted' || code === 'spawn_error'
-}
 
 function sanitizeOutput(text: string): string {
   return text.replace(CONTROL_CHARS_RE, '')
@@ -38,50 +30,6 @@ function verifyPathUnderProject(filePath: string, projectDir: string): void {
   if (!resolved.startsWith(path.resolve(projectDir) + path.sep)) {
     throw new Error(`Output path "${filePath}" is outside project directory`)
   }
-}
-
-function spawnWithTimeout(
-  cmd: string,
-  args: string[],
-  cwd: string,
-  timeoutMs: number,
-  stdin?: string
-): Promise<{ stdout: string; stderr: string }> {
-  return new Promise((resolve, reject) => {
-    const proc = spawn(cmd, args, { cwd })
-    let stdout = ''
-    let stderr = ''
-    let timedOut = false
-
-    const timer = setTimeout(() => {
-      timedOut = true
-      proc.kill('SIGTERM')
-    }, timeoutMs)
-
-    if (stdin !== undefined && proc.stdin) {
-      proc.stdin.write(stdin)
-      proc.stdin.end()
-    }
-
-    proc.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString() })
-    proc.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString() })
-
-    proc.on('close', (code) => {
-      clearTimeout(timer)
-      if (timedOut) {
-        reject(new Error(`${cmd} timed out after ${timeoutMs}ms`))
-      } else if (code === 0) {
-        resolve({ stdout, stderr })
-      } else {
-        reject(new Error(`${cmd} failed (exit ${code}): ${stderr || stdout}`))
-      }
-    })
-
-    proc.on('error', (err) => {
-      clearTimeout(timer)
-      reject(new Error(`${cmd} spawn error: ${err.message}`))
-    })
-  })
 }
 
 // === API ===
@@ -131,54 +79,36 @@ export async function runDocsPhase(
   const reportInput = buildDeliveryReportInput(ctx, planResult!, tddResult, codeResult)
 
   // Invoke doc writer agent with retry/fallback
-  let reportContent: string
+  let reportContent = ''
   let usedFallback = false
 
-  const { driver, model, agent } = registry.getDriver('docs')
   const prompt = buildDocWriterPrompt(reportInput)
 
   let agentSucceeded = false
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+  try {
+    const result = await invokeAgentWithRetry({
+      ctx,
+      registry,
+      role: 'docs',
+      prompt,
+      signal,
+      onRetryableError: (retryResult) => {
+        ctx.emitter.emit({
+          type: 'agent:error',
+          timestamp: new Date().toISOString(),
+          sessionId: ctx.sessionId,
+          data: { role: 'docs', reason: `${retryResult.errorCode}: ${retryResult.error}` },
+        })
+      },
+    })
+
+    reportContent = sanitizeOutput(result.output)
+    agentSucceeded = true
+  } catch (err) {
     if (signal?.aborted) {
       throw new Error('Docs phase aborted')
     }
-
-    const result: AgentResult = await driver.invoke({
-      prompt,
-      role: 'docs',
-      agent,
-      model,
-      projectDir: ctx.projectDir,
-      signal,
-    })
-
-    if (result.success) {
-      reportContent = sanitizeOutput(result.output)
-      agentSucceeded = true
-      break
-    }
-
-    if (isImmediateFailErrorCode(result.errorCode)) {
-      // Fallback immediately on spawn_error
-      break
-    }
-
-    if (result.errorCode === 'aborted') {
-      throw new Error('Docs phase aborted')
-    }
-
-    if (isRetryableErrorCode(result.errorCode) && attempt < MAX_RETRIES) {
-      ctx.emitter.emit({
-        type: 'agent:error',
-        timestamp: new Date().toISOString(),
-        sessionId: ctx.sessionId,
-        data: { role: 'docs', reason: `${result.errorCode}: ${result.error}` },
-      })
-      continue
-    }
-
-    // All retries exhausted
-    break
+    process.stderr.write(`Warning: docs agent failed, using fallback report: ${(err as Error).message}\n`)
   }
 
   if (!agentSucceeded) {
@@ -200,7 +130,7 @@ export async function runDocsPhase(
   // Write files
   const absDeliveryPath = path.join(ctx.projectDir, deliveryReportPath)
   const absIterationsPath = path.join(ctx.projectDir, iterationsLogPath)
-  fs.writeFileSync(absDeliveryPath, reportContent!, 'utf-8')
+  fs.writeFileSync(absDeliveryPath, reportContent, 'utf-8')
   fs.writeFileSync(absIterationsPath, iterationContent, 'utf-8')
 
   // Commit doc files
@@ -220,15 +150,16 @@ export async function runDocsPhase(
 
     // Update PR body
     try {
-      let prBody = reportContent!
+      let prBody = reportContent
       if (prBody.length > MAX_PR_BODY_CHARS) {
         prBody = prBody.slice(0, MAX_PR_BODY_CHARS) + '\n\n...(truncated)'
       }
 
-      await spawnWithTimeout(
-        'gh', ['pr', 'edit', String(prNumber), '--body-file', '-'],
-        ctx.projectDir, 30_000, prBody
-      )
+      await spawnCommand('gh', ['pr', 'edit', String(prNumber), '--body-file', '-'], {
+        cwd: ctx.projectDir,
+        timeoutMs: 30_000,
+        stdin: prBody,
+      })
       prUpdated = true
     } catch (err) {
       process.stderr.write(`Warning: PR body update failed: ${(err as Error).message}\n`)

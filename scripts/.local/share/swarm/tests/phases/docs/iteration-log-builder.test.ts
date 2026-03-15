@@ -46,7 +46,7 @@ function createIterationEndEvent(iteration: number, success: boolean, offsetMs =
     type: 'iteration:end',
     timestamp: ts(offsetMs),
     sessionId: SESSION_ID,
-    data: { iteration, success },
+    data: { iteration, success, status: success ? 'green' : 'failed' },
   }
 }
 
@@ -155,6 +155,7 @@ function createCodeResult(overrides: Partial<CodePhaseResult> = {}): CodePhaseRe
     },
     changedFiles: ['src/feature.ts'],
     success: true,
+    terminalStatus: 'green',
     ...overrides,
   }
 }
@@ -228,12 +229,12 @@ describe('buildIterationLog', () => {
       iterations: [{
         iteration: 1,
         outcome: {
-          status: 'needs-iteration',
-          testResult: createTestResult({ failingTests: 3, passingTests: 7 }),
-          review: createMergedReview(),
-          reason: 'tests-failing',
-        },
-        changedFiles: [],
+            status: 'needs-iteration',
+            testResult: createTestResult({ failingTests: 3, passingTests: 7 }),
+            review: createMergedReview(),
+            reason: 'review-findings',
+          },
+          changedFiles: [],
       }],
     })
 
@@ -327,8 +328,8 @@ describe('buildIterationLog', () => {
     // codeResult has 3 iterations, but events only have 2
     const codeResult = createCodeResult({
       iterations: [
-        { iteration: 1, outcome: { status: 'needs-iteration', testResult: createTestResult(), review: createMergedReview(), reason: 'tests-failing' }, changedFiles: [] },
-        { iteration: 2, outcome: { status: 'needs-iteration', testResult: createTestResult(), review: createMergedReview(), reason: 'tests-failing' }, changedFiles: [] },
+        { iteration: 1, outcome: { status: 'needs-iteration', testResult: createTestResult(), review: createMergedReview(), reason: 'review-findings' }, changedFiles: [] },
+        { iteration: 2, outcome: { status: 'needs-iteration', testResult: createTestResult(), review: createMergedReview(), reason: 'review-findings' }, changedFiles: [] },
         { iteration: 3, outcome: { status: 'green', testResult: createTestResult(), review: createMergedReview() }, changedFiles: [] },
       ],
     })

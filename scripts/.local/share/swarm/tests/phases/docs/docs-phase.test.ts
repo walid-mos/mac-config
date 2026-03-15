@@ -117,6 +117,7 @@ function createCodePhaseResult(): CodePhaseResult {
     gitState: { branch: 'swarm/test', commits: [], prNumber: 42, prUrl: 'https://github.com/org/repo/pull/42' },
     changedFiles: ['src/index.ts'],
     success: true,
+    terminalStatus: 'green',
   }
 }
 

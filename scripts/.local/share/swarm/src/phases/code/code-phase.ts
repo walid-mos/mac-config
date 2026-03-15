@@ -1,6 +1,9 @@
 // === Code Phase (Spec 4 — FR-2, FR-5, FR-8, FR-13, FR-15, FR-16, FR-18) ===
 
-import type { SessionContext } from '../../core/types.js'
+import {
+  CODE_PHASE_TIMEOUT_SIGNAL_REASON,
+  type SessionContext,
+} from '../../core/types.js'
 import type { DriverRegistry } from '../../drivers/driver.js'
 import type {
   PlanPhaseResult,
@@ -113,6 +116,7 @@ export function extractCodeAgentOutput(output: string): CodeAgentOutput | null {
 }
 
 export const DEFAULT_TEST_RESULT: TestResult = { totalTests: 0, passingTests: 0, failingTests: 0, durationMs: 0 }
+export const CODE_PHASE_TIMEOUT_MS = 20 * 60 * 1000
 
 // === Decision Log ===
 
@@ -211,6 +215,8 @@ export async function runCodePhase(
       gitState: { branch: '', commits: [] },
       changedFiles: [],
       success: true,
+      terminalStatus: 'green',
+      codePhaseTimeoutMs: CODE_PHASE_TIMEOUT_MS,
     }
 
     ctx.emitter.emit({
@@ -239,16 +245,39 @@ export async function runCodePhase(
   // Create iteration logger
   const logger = createIterationLogger(ctx.projectDir, ctx.sessionId)
 
+  const phaseController = new AbortController()
+  const abortFromParent = (): void => {
+    phaseController.abort(signal?.reason ?? new Error('Code phase aborted'))
+  }
+
+  if (signal) {
+    if (signal.aborted) {
+      abortFromParent()
+    } else {
+      signal.addEventListener('abort', abortFromParent, { once: true })
+    }
+  }
+
+  const timeoutId = setTimeout(() => {
+    phaseController.abort(new Error(CODE_PHASE_TIMEOUT_SIGNAL_REASON))
+  }, CODE_PHASE_TIMEOUT_MS)
+
   // Execute DAG (wave-based scheduling — TDD runs per-wave inside)
-  const dagResult = await executeDag(
-    ctx, registry, plan.tasks, plan.techStack,
-    plan.plannerOutput, signal, logger, gitState
-  )
+  let dagResult: Awaited<ReturnType<typeof executeDag>>
+  try {
+    dagResult = await executeDag(
+      ctx, registry, plan.tasks, plan.techStack,
+      plan.plannerOutput, phaseController.signal, logger, gitState
+    )
+  } finally {
+    clearTimeout(timeoutId)
+    signal?.removeEventListener('abort', abortFromParent)
+  }
 
   const lastOutcome = dagResult.lastOutcome
   const finalTestResult = lastOutcome?.testResult ?? DEFAULT_TEST_RESULT
   const finalReview = lastOutcome && 'review' in lastOutcome ? lastOutcome.review : undefined
-  const success = true
+  const success = dagResult.terminalStatus === 'green'
 
   // Final changed files from git — includes everything across all iterations
   let finalChangedFiles: string[] = []
@@ -266,6 +295,8 @@ export async function runCodePhase(
     gitState,
     changedFiles: finalChangedFiles,
     success,
+    terminalStatus: dagResult.terminalStatus,
+    codePhaseTimeoutMs: CODE_PHASE_TIMEOUT_MS,
     taskCompletions: dagResult.taskCompletions,
   }
 

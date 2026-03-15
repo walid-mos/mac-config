@@ -1,6 +1,7 @@
 // === DAG Task Executor (wave-based scheduling) ===
 
 import { randomUUID } from 'node:crypto'
+import { emitWarningEvent } from '../../core/event-emitter.js'
 import type { SessionContext } from '../../core/types.js'
 import type { DriverRegistry } from '../../drivers/driver.js'
 import type { TechStack } from '../../detect/tech-stack.js'
@@ -61,6 +62,63 @@ export interface DagExecutorResult {
 
 // === Helpers ===
 
+function buildTaskCorrelation(node: TaskNode, iteration: number, attempt: number) {
+  return {
+    invocationId: randomUUID(),
+    taskId: node.taskId,
+    iteration,
+    attempt,
+  }
+}
+
+function emitFileEvents(
+  ctx: SessionContext,
+  filesChanged: string[],
+  correlation: { invocationId: string; taskId: string; iteration: number; attempt: number; backendSessionId?: string }
+): void {
+  for (const filePath of filesChanged) {
+    ctx.emitter.emit({
+      type: 'file:changed',
+      timestamp: new Date().toISOString(),
+      sessionId: ctx.sessionId,
+      correlation,
+      data: { path: filePath, action: 'modified' },
+    })
+  }
+}
+
+function emitBuildEvent(
+  ctx: SessionContext,
+  buildResult: { success: boolean; output?: string; error?: string | null; durationMs?: number } | null,
+  correlation: { invocationId: string; taskId: string; iteration: number; attempt: number; backendSessionId?: string }
+): void {
+  if (!buildResult) {
+    return
+  }
+
+  if (buildResult.success) {
+    ctx.emitter.emit({
+      type: 'build:success',
+      timestamp: new Date().toISOString(),
+      sessionId: ctx.sessionId,
+      correlation,
+      data: { durationMs: buildResult.durationMs ?? 0 },
+    })
+    return
+  }
+
+  ctx.emitter.emit({
+    type: 'build:fail',
+    timestamp: new Date().toISOString(),
+    sessionId: ctx.sessionId,
+    correlation,
+    data: {
+      output: buildResult.output ?? buildResult.error ?? 'Build failed',
+      durationMs: buildResult.durationMs ?? 0,
+    },
+  })
+}
+
 async function spawnFreshAgent(
   node: TaskNode,
   ctx: SessionContext,
@@ -68,13 +126,17 @@ async function spawnFreshAgent(
   techStack: TechStack,
   testFiles: string[],
   decisionLog: string,
+  iteration: number,
   signal?: AbortSignal,
 ): Promise<ReturnType<typeof extractCodeAgentOutput>> {
   const { driver, model, agent } = registry.getDriver('code', node.task.tag)
   const prompt = buildCodeAgentPrompt(node.task, testFiles, techStack, undefined, decisionLog)
+  const attemptNumber = node.attempts + 1
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     if (signal?.aborted) throw new Error('DAG execution aborted')
+
+    const correlation = buildTaskCorrelation(node, iteration, attemptNumber)
 
     const result = await driver.invoke({
       prompt,
@@ -83,6 +145,8 @@ async function spawnFreshAgent(
       model,
       projectDir: ctx.projectDir,
       signal,
+      swarmSessionId: ctx.sessionId,
+      correlation,
       sessionId: node.handle.sessionId,
     })
 
@@ -94,6 +158,14 @@ async function spawnFreshAgent(
             node.handle.filesChanged.push(f)
           }
         }
+        emitFileEvents(ctx, output.filesChanged, {
+          ...correlation,
+          backendSessionId: result.sessionId,
+        })
+        emitBuildEvent(ctx, output.buildResult, {
+          ...correlation,
+          backendSessionId: result.sessionId,
+        })
       }
       return output
     }
@@ -125,16 +197,19 @@ async function resumeAgentWithFindings(
   techStack: TechStack,
   testFiles: string[],
   decisionLog: string,
+  iteration: number,
   signal?: AbortSignal,
 ): Promise<ReturnType<typeof extractCodeAgentOutput>> {
   const { driver, model, agent } = registry.getDriver('code', node.task.tag)
   const findings = node.lastFindings ?? []
   const prompt = buildFindingFixPrompt(findings, decisionLog)
+  const attemptNumber = node.attempts + 1
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     if (signal?.aborted) throw new Error('DAG execution aborted')
 
     const isFirstAttempt = attempt === 0
+    const correlation = buildTaskCorrelation(node, iteration, attemptNumber)
     const result = await driver.invoke({
       prompt,
       role: 'code',
@@ -142,6 +217,8 @@ async function resumeAgentWithFindings(
       model,
       projectDir: ctx.projectDir,
       signal,
+      swarmSessionId: ctx.sessionId,
+      correlation,
       ...(isFirstAttempt ? { resume: node.handle.sessionId } : {}),
     })
 
@@ -153,6 +230,14 @@ async function resumeAgentWithFindings(
             node.handle.filesChanged.push(f)
           }
         }
+        emitFileEvents(ctx, output.filesChanged, {
+          ...correlation,
+          backendSessionId: result.sessionId,
+        })
+        emitBuildEvent(ctx, output.buildResult, {
+          ...correlation,
+          backendSessionId: result.sessionId,
+        })
       }
       return output
     }
@@ -166,26 +251,36 @@ async function resumeAgentWithFindings(
         data: { role: 'code', reason: `Resume failed (${result.errorCode}), falling back to fresh invocation` },
       })
       const fullPrompt = buildCodeAgentPrompt(node.task, testFiles, techStack, findings, decisionLog)
-      const fallbackResult = await driver.invoke({
-        prompt: fullPrompt,
-        role: 'code',
-        agent,
-        model,
-        projectDir: ctx.projectDir,
-        signal,
-      })
+        const fallbackResult = await driver.invoke({
+          prompt: fullPrompt,
+          role: 'code',
+          agent,
+          model,
+          projectDir: ctx.projectDir,
+          signal,
+          swarmSessionId: ctx.sessionId,
+          correlation,
+        })
 
-      if (fallbackResult.success) {
-        const output = extractCodeAgentOutput(fallbackResult.output)
-        if (output) {
+        if (fallbackResult.success) {
+          const output = extractCodeAgentOutput(fallbackResult.output)
+          if (output) {
           for (const f of output.filesChanged) {
             if (!node.handle.filesChanged.includes(f)) {
-              node.handle.filesChanged.push(f)
+                node.handle.filesChanged.push(f)
+              }
             }
+            emitFileEvents(ctx, output.filesChanged, {
+              ...correlation,
+              backendSessionId: fallbackResult.sessionId,
+            })
+            emitBuildEvent(ctx, output.buildResult, {
+              ...correlation,
+              backendSessionId: fallbackResult.sessionId,
+            })
           }
+          return output
         }
-        return output
-      }
 
       if (isImmediateFailErrorCode(fallbackResult.errorCode)) {
         throw new Error(`Code agent failed: ${fallbackResult.errorCode}: ${fallbackResult.error}`)
@@ -314,7 +409,11 @@ export async function executeDag(
         }
       } catch (err) {
         // TDD failure is non-fatal — log and continue with whatever test files we have
-        process.stderr.write(`Warning: TDD for wave ${waveIndex} failed: ${(err as Error).message}\n`)
+        const message = `Warning: TDD for wave ${waveIndex} failed: ${(err as Error).message}`
+        process.stderr.write(message + '\n')
+        emitWarningEvent(ctx.emitter, ctx.sessionId, 'code.dag.tdd', message, {
+          correlation: { iteration: waveIndex },
+        })
       }
     }
 
@@ -327,11 +426,11 @@ export async function executeDag(
 
         if (node.status === 'pending') {
           node.status = 'running'
-          return spawnFreshAgent(node, ctx, registry, techStack, accumulatedTestFiles, decisionLog, signal)
+          return spawnFreshAgent(node, ctx, registry, techStack, accumulatedTestFiles, decisionLog, waveIndex, signal)
         }
 
         // Converging — resume with findings
-        return resumeAgentWithFindings(node, ctx, registry, techStack, accumulatedTestFiles, decisionLog, signal)
+        return resumeAgentWithFindings(node, ctx, registry, techStack, accumulatedTestFiles, decisionLog, waveIndex, signal)
       })
     )
 
@@ -382,11 +481,13 @@ export async function executeDag(
 
     if (review.convergenceRecommendation === 'converged') {
       const demoted = blockingFindings.filter(f => f.severity === 'important')
-      if (demoted.length > 0) {
-        process.stderr.write(
-          `[convergence] Merge agent recommends converged — demoting ${demoted.length} important finding(s)\n`
-        )
-      }
+        if (demoted.length > 0) {
+          const message = `[convergence] Merge agent recommends converged — demoting ${demoted.length} important finding(s)`
+          process.stderr.write(message + '\n')
+          emitWarningEvent(ctx.emitter, ctx.sessionId, 'code.dag.convergence', message, {
+            correlation: { iteration: waveIndex },
+          })
+        }
       blockingFindings = blockingFindings.filter(f => f.severity === 'critical')
     }
     const attribution = attributeFindingsToAgents(blockingFindings, waveHandles)
@@ -454,7 +555,15 @@ export async function executeDag(
           data: { hash, message: msg, filesChanged: taskFiles.length },
         })
       } catch (err) {
-        process.stderr.write(`Warning: commit failed for ${node.taskId}: ${(err as Error).message}\n`)
+        const message = `Warning: commit failed for ${node.taskId}: ${(err as Error).message}`
+        process.stderr.write(message + '\n')
+        emitWarningEvent(ctx.emitter, ctx.sessionId, 'code.dag.commit', message, {
+          correlation: {
+            taskId: node.taskId,
+            iteration: waveIndex,
+            attempt: node.attempts,
+          },
+        })
       }
     }
 

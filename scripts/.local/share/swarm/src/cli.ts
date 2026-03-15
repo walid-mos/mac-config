@@ -1,11 +1,45 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { emitWarningEvent } from './core/event-emitter.js'
 
 // ---------------------------------------------------------------------------
 // Validation helpers (exported for testability — SF-001)
 // ---------------------------------------------------------------------------
 
 const SYSTEM_ROOTS = new Set(['/', '/etc', '/var', '/usr'])
+export const EVENT_LOG_RETENTION = {
+  maxSessionLogs: 20,
+  maxAgeDays: 14,
+} as const
+
+export function pruneRuntimeSessionLogs(runtimeRoot: string, currentSession: string): void {
+  if (!fs.existsSync(runtimeRoot)) {
+    return
+  }
+
+  const now = Date.now()
+  const maxAgeMs = EVENT_LOG_RETENTION.maxAgeDays * 24 * 60 * 60 * 1000
+  const entries = fs.readdirSync(runtimeRoot, { withFileTypes: true })
+    .filter(entry => entry.isDirectory() && entry.name !== currentSession)
+    .map(entry => {
+      const fullPath = path.join(runtimeRoot, entry.name)
+      return {
+        name: entry.name,
+        fullPath,
+        mtimeMs: fs.statSync(fullPath).mtimeMs,
+      }
+    })
+    .sort((a, b) => b.mtimeMs - a.mtimeMs)
+
+  for (const entry of entries) {
+    const isExpired = now - entry.mtimeMs > maxAgeMs
+    const exceedsCount = entries.indexOf(entry) >= EVENT_LOG_RETENTION.maxSessionLogs
+
+    if (isExpired || exceedsCount) {
+      fs.rmSync(entry.fullPath, { recursive: true, force: true })
+    }
+  }
+}
 
 export function validateProjectDir(dir: string): void {
   const canonical = fs.realpathSync(dir)
@@ -80,14 +114,17 @@ if (isDirectExecution) {
         const resolvedConfig = resolveSwarmConfig(projectDir, configPath)
 
         // Runtime directory — project-local, deterministic across execution contexts
-        const runtimeDir = path.join(projectDir, '.swarm', 'run', sessionId)
+        const runtimeRoot = path.join(projectDir, '.swarm', 'run')
+        pruneRuntimeSessionLogs(runtimeRoot, sessionId)
+        const runtimeDir = path.join(runtimeRoot, sessionId)
+        const eventLogPath = path.join(runtimeDir, 'events.ndjson')
         fs.mkdirSync(runtimeDir, { recursive: true })
 
         // Expose runtime dir so claude-driver writes NDJSON logs here
         process.env.SWARM_DEBUG_DIR = runtimeDir
 
         // Create emitter + state manager
-        const emitter = createEventEmitter(sessionId)
+        const emitter = createEventEmitter(sessionId, { logFilePath: eventLogPath })
         const state = createStateManager(sessionId, { tmpDir: runtimeDir })
 
         // Acquire lock
@@ -134,7 +171,12 @@ if (isDirectExecution) {
           type: 'session:start',
           timestamp: new Date().toISOString(),
           sessionId,
-          data: { specPath, projectDir },
+          data: {
+            specPath,
+            projectDir,
+            eventLogPath,
+            retention: EVENT_LOG_RETENTION,
+          },
         })
 
         const signal = controller.signal
@@ -219,7 +261,9 @@ if (isDirectExecution) {
               proc.on('error', (err) => reject(err))
             })
           } catch (err) {
-            process.stderr.write(`WARNING: git push skipped (no remote?): ${(err as Error).message}\n`)
+            const message = `WARNING: git push skipped (no remote?): ${(err as Error).message}`
+            process.stderr.write(message + '\n')
+            emitWarningEvent(emitter, sessionId, 'cli.git-push', message)
           }
 
           // Session end
@@ -254,7 +298,9 @@ if (isDirectExecution) {
                 ),
               ])
             } catch (err) {
-              process.stderr.write(`WARNING: Worktree cleanup failed: ${(err as Error).message}\n`)
+              const message = `WARNING: Worktree cleanup failed: ${(err as Error).message}`
+              process.stderr.write(message + '\n')
+              emitWarningEvent(emitter, sessionId, 'cli.worktree-cleanup', message)
             }
           }
 
@@ -268,7 +314,9 @@ if (isDirectExecution) {
                 }
               }
             } catch (err) {
-              process.stderr.write(`WARNING: NDJSON cleanup failed: ${(err as Error).message}\n`)
+              const message = `WARNING: NDJSON cleanup failed: ${(err as Error).message}`
+              process.stderr.write(message + '\n')
+              emitWarningEvent(emitter, sessionId, 'cli.ndjson-cleanup', message)
             }
           }
 

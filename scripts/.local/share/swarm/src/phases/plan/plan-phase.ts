@@ -91,6 +91,7 @@ export async function runPlanPhase(
       agent,
       model,
       projectDir: ctx.projectDir,
+      swarmSessionId: ctx.sessionId,
     })
 
     // Handle agent failure

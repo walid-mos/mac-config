@@ -87,6 +87,7 @@ export async function runTddForTasks(
       agent,
       model,
       projectDir: ctx.projectDir,
+      swarmSessionId: ctx.sessionId,
     })
 
     // Handle agent failure

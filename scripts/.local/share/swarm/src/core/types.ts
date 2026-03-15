@@ -88,11 +88,26 @@ export type SwarmEventType =
   | 'review:findings'
   | 'commit'
   | 'file:changed'
+  | 'warning'
+
+export interface EventCorrelation {
+  invocationId?: string
+  taskId?: string
+  iteration?: number
+  attempt?: number
+  backendSessionId?: string
+}
+
+export interface EventLogRetention {
+  maxSessionLogs: number
+  maxAgeDays: number
+}
 
 export interface BaseEvent {
   type: SwarmEventType
   timestamp: string
   sessionId: SessionId
+  correlation?: EventCorrelation
 }
 
 export interface PhaseStartEvent extends BaseEvent {
@@ -132,7 +147,12 @@ export interface AgentActivityEvent extends BaseEvent {
 
 export interface SessionStartEvent extends BaseEvent {
   type: 'session:start'
-  data: { specPath: string; projectDir: string }
+  data: {
+    specPath: string
+    projectDir: string
+    eventLogPath?: string
+    retention?: EventLogRetention
+  }
 }
 
 export interface SessionEndEvent extends BaseEvent {
@@ -195,6 +215,16 @@ export interface FileChangedEvent extends BaseEvent {
   data: { path: string; action: 'created' | 'modified' | 'deleted' }
 }
 
+export interface WarningEvent extends BaseEvent {
+  type: 'warning'
+  data: {
+    source: string
+    message: string
+    stream: 'stderr'
+    code?: string
+  }
+}
+
 export type SwarmEvent =
   | PhaseStartEvent | PhaseEndEvent | PhaseErrorEvent
   | AgentInvokeEvent | AgentResultEvent | AgentErrorEvent | AgentActivityEvent
@@ -205,6 +235,7 @@ export type SwarmEvent =
   | ReviewFindingsEvent
   | CommitEvent
   | FileChangedEvent
+  | WarningEvent
 
 // === State ===
 

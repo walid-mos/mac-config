@@ -232,6 +232,7 @@ export function createAgentRequest(
     role: 'plan',
     model: 'opus' as ModelId,
     projectDir: '/tmp/project',
+    swarmSessionId: 'test-session' as SessionId,
     ...overrides,
   }
 }

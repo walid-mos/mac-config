@@ -1,7 +1,8 @@
 import * as childProcess from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
-import type { SessionId, SwarmEventEmitter } from '../core/types.js'
+import type { EventCorrelation, SessionId, SwarmEventEmitter } from '../core/types.js'
 import type { Driver, AgentRequest, AgentResult, DriverAvailability } from './driver.js'
 import { parseStructuredOutput } from './output-parser.js'
 
@@ -50,6 +51,22 @@ function safeKill(pid: number, signal: NodeJS.Signals): void {
 function truncate(value: string, max: number): string {
   if (value.length <= max) return value
   return value.slice(0, max)
+}
+
+function buildCorrelation(
+  request: AgentRequest,
+  invocationId: string,
+  backendSessionId?: string
+): EventCorrelation | undefined {
+  if (!request.correlation && !backendSessionId) {
+    return undefined
+  }
+
+  return {
+    ...request.correlation,
+    invocationId,
+    backendSessionId: backendSessionId ?? request.correlation?.backendSessionId,
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -170,6 +187,8 @@ export function createOpenCodeDriver(emitter: SwarmEventEmitter): Driver {
     const startTime = Date.now()
     const backend = name
     const model = request.model
+    const swarmSessionId = request.swarmSessionId ?? ('driver' as SessionId)
+    const invokeCorrelation = buildCorrelation(request, randomUUID())
 
     // Pre-aborted signal check
     if (request.signal?.aborted) {
@@ -258,7 +277,8 @@ export function createOpenCodeDriver(emitter: SwarmEventEmitter): Driver {
     emitter.emit({
       type: 'agent:invoke',
       timestamp: new Date().toISOString(),
-      sessionId: 'driver' as SessionId,
+      sessionId: swarmSessionId,
+      correlation: invokeCorrelation,
       data: { role: request.role, backend, model: String(model) },
     })
 
@@ -275,7 +295,8 @@ export function createOpenCodeDriver(emitter: SwarmEventEmitter): Driver {
         emitter.emit({
           type: 'agent:error',
           timestamp: new Date().toISOString(),
-          sessionId: 'driver' as SessionId,
+          sessionId: swarmSessionId,
+          correlation: invokeCorrelation,
           data: { role: request.role, reason: (err as Error).message },
         })
         resolve({
@@ -368,7 +389,8 @@ export function createOpenCodeDriver(emitter: SwarmEventEmitter): Driver {
         emitter.emit({
           type: 'agent:error',
           timestamp: new Date().toISOString(),
-          sessionId: 'driver' as SessionId,
+          sessionId: swarmSessionId,
+          correlation: invokeCorrelation,
           data: { role: request.role, reason: err.message },
         })
         doResolve({
@@ -390,7 +412,8 @@ export function createOpenCodeDriver(emitter: SwarmEventEmitter): Driver {
           emitter.emit({
             type: 'agent:error',
             timestamp: new Date().toISOString(),
-            sessionId: 'driver' as SessionId,
+            sessionId: swarmSessionId,
+            correlation: invokeCorrelation,
             data: { role: request.role, reason: `Process ${errorCode}` },
           })
           doResolve({
@@ -414,7 +437,8 @@ export function createOpenCodeDriver(emitter: SwarmEventEmitter): Driver {
           emitter.emit({
             type: 'agent:error',
             timestamp: new Date().toISOString(),
-            sessionId: 'driver' as SessionId,
+            sessionId: swarmSessionId,
+            correlation: invokeCorrelation,
             data: { role: request.role, reason },
           })
           doResolve({
@@ -434,7 +458,8 @@ export function createOpenCodeDriver(emitter: SwarmEventEmitter): Driver {
           emitter.emit({
             type: 'agent:error',
             timestamp: new Date().toISOString(),
-            sessionId: 'driver' as SessionId,
+            sessionId: swarmSessionId,
+            correlation: invokeCorrelation,
             data: { role: request.role, reason: 'Empty output from backend' },
           })
           doResolve({
@@ -456,7 +481,8 @@ export function createOpenCodeDriver(emitter: SwarmEventEmitter): Driver {
           emitter.emit({
             type: 'agent:result',
             timestamp: new Date().toISOString(),
-            sessionId: 'driver' as SessionId,
+            sessionId: swarmSessionId,
+            correlation: invokeCorrelation,
             data: { role: request.role, durationMs },
           })
           doResolve({
@@ -472,7 +498,8 @@ export function createOpenCodeDriver(emitter: SwarmEventEmitter): Driver {
           emitter.emit({
             type: 'agent:error',
             timestamp: new Date().toISOString(),
-            sessionId: 'driver' as SessionId,
+            sessionId: swarmSessionId,
+            correlation: invokeCorrelation,
             data: { role: request.role, reason: 'Failed to parse output' },
           })
           doResolve({

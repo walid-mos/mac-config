@@ -1,4 +1,12 @@
-import type { SessionId, SwarmEvent, SwarmEventEmitter, SwarmEventType } from './types.js'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
+import type {
+  EventCorrelation,
+  SessionId,
+  SwarmEvent,
+  SwarmEventEmitter,
+  SwarmEventType,
+} from './types.js'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -21,10 +29,17 @@ const STRUCTURAL_TYPES: ReadonlySet<SwarmEventType> = new Set([
 
 export function createEventEmitter(
   _sessionId: SessionId,
-  options?: { output?: NodeJS.WritableStream }
+  options?: { output?: NodeJS.WritableStream; logFilePath?: string }
 ): SwarmEventEmitter {
   const output = options?.output ?? process.stdout
   const events: SwarmEvent[] = []
+  const logFilePath = options?.logFilePath
+  let logFd: number | undefined
+
+  if (logFilePath) {
+    fs.mkdirSync(path.dirname(logFilePath), { recursive: true })
+    logFd = fs.openSync(logFilePath, 'a', 0o600)
+  }
 
   // Install error handler on the output stream to prevent uncaught EPIPE crashes
   output.on('error', (err: NodeJS.ErrnoException) => {
@@ -58,6 +73,16 @@ export function createEventEmitter(
       )
     }
 
+    if (logFd !== undefined) {
+      try {
+        fs.writeSync(logFd, serialized + '\n')
+      } catch (err) {
+        process.stderr.write(
+          `Failed to persist event log: ${(err as NodeJS.ErrnoException).code ?? (err as Error).message}\n`
+        )
+      }
+    }
+
     // Accumulate in memory
     events.push(event)
 
@@ -75,6 +100,27 @@ export function createEventEmitter(
   }
 
   return { emit, getEvents }
+}
+
+export function emitWarningEvent(
+  emitter: SwarmEventEmitter,
+  sessionId: SessionId,
+  source: string,
+  message: string,
+  options?: { code?: string; correlation?: EventCorrelation }
+): void {
+  emitter.emit({
+    type: 'warning',
+    timestamp: new Date().toISOString(),
+    sessionId,
+    correlation: options?.correlation,
+    data: {
+      source,
+      message,
+      stream: 'stderr',
+      code: options?.code,
+    },
+  })
 }
 
 // ---------------------------------------------------------------------------

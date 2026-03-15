@@ -1,6 +1,6 @@
 // === Iteration Log Builder (Spec 5 — FR-5) ===
 
-import type { SwarmEvent, AgentRole, TokenUsage } from '../../core/types.js'
+import type { SwarmEvent, AgentRole } from '../../core/types.js'
 import type { CodePhaseResult, IterationLogEntry, AgentInvocationRecord, TestResult } from '../phase-results.js'
 
 // === API ===
@@ -29,31 +29,47 @@ export function buildIterationLog(
   const entries: IterationLogEntry[] = []
 
   for (const [iterationIndex, groupEvents] of iterationGroups) {
-    // Correlate agent:invoke with agent:result by role
-    const invokesByRole = new Map<AgentRole, { model: string }>()
-    const resultsByRole = new Map<AgentRole, { durationMs: number; tokenUsage?: TokenUsage }>()
+    const invocationRecords = new Map<string, AgentInvocationRecord>()
+    const pendingLegacyInvokes = new Map<AgentRole, string[]>()
 
     for (const event of groupEvents) {
       if (event.type === 'agent:invoke') {
-        invokesByRole.set(event.data.role, { model: event.data.model })
+        const invocationId = event.correlation?.invocationId ?? `${event.data.role}:${invocationRecords.size}`
+        const roleQueue = pendingLegacyInvokes.get(event.data.role) ?? []
+        roleQueue.push(invocationId)
+        pendingLegacyInvokes.set(event.data.role, roleQueue)
+        invocationRecords.set(invocationId, {
+          invocationId: event.correlation?.invocationId,
+          role: event.data.role,
+          model: event.data.model,
+          durationMs: 0,
+          taskId: event.correlation?.taskId,
+          attempt: event.correlation?.attempt,
+          backendSessionId: event.correlation?.backendSessionId,
+        })
       } else if (event.type === 'agent:result') {
-        resultsByRole.set(event.data.role, { durationMs: event.data.durationMs, tokenUsage: event.data.tokenUsage })
+        const invocationId = event.correlation?.invocationId
+          ?? pendingLegacyInvokes.get(event.data.role)?.shift()
+          ?? `${event.data.role}:result:${invocationRecords.size}`
+        const existing = invocationRecords.get(invocationId)
+        const baseRecord: AgentInvocationRecord = existing ?? {
+          role: event.data.role,
+          model: 'unknown',
+          durationMs: 0,
+        }
+        invocationRecords.set(invocationId, {
+          ...baseRecord,
+          invocationId: event.correlation?.invocationId ?? baseRecord.invocationId,
+          taskId: event.correlation?.taskId ?? baseRecord.taskId,
+          attempt: event.correlation?.attempt ?? baseRecord.attempt,
+          backendSessionId: event.correlation?.backendSessionId ?? baseRecord.backendSessionId,
+          durationMs: event.data.durationMs,
+          tokenUsage: event.data.tokenUsage,
+        })
       }
     }
 
-    const agentsInvoked: AgentInvocationRecord[] = []
-    for (const [role, invoke] of invokesByRole) {
-      const result = resultsByRole.get(role)
-      const record: AgentInvocationRecord = {
-        role,
-        model: invoke.model,
-        durationMs: result?.durationMs ?? 0,
-      }
-      if (result?.tokenUsage) {
-        record.tokenUsage = result.tokenUsage
-      }
-      agentsInvoked.push(record)
-    }
+    const agentsInvoked = [...invocationRecords.values()]
 
     // Extract test results
     let testResult: TestResult | undefined

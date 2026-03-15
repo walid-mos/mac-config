@@ -1,65 +1,109 @@
 ---
 name: interview
-description: Interview user in-depth to create detailed specs or implementation plans
-argument-hint: [feature or task description]
+description: Deep interview for a single feature or module brief that produces a final spec or implementation plan.
+argument-hint: [feature, module, or brief description]
 allowed-tools: AskUserQuestion, Write, Read, Glob, Grep, Edit, Task, Skill
 ---
 
 # Interview Skill
 
-Interview the user in depth about their feature or task, then produce a detailed spec or implementation plan document.
+Interview the user in depth about **one feature, one module, or one implementation stream**, then produce a final spec or implementation plan document.
+
+`/interview` is the **micro-specification** skill. It goes deeper than `/planification` and produces the final document that implementation work should follow.
+
+---
+
+## When To Use This Skill
+
+Use `/interview` when:
+- the request is one feature
+- the request is one module from a larger plan
+- the user already has a brief and wants a final spec
+- the user wants one implementation plan instead of project decomposition
+
+Do **not** use `/interview` for a large multi-module roadmap. Use `/planification` first.
+
+If the prompt clearly contains 2 or more independent modules, stop and recommend `/planification`.
+
+---
 
 ## Argument Parsing
 
-The user invokes `/interview <free-form prompt>`. There is no `specs` or `plan` prefix — the skill determines the output type (spec vs plan) organically during the interview, or asks the user if ambiguous.
+The user invokes `/interview <free-form prompt>`.
 
-Derive a **date-prefixed kebab-case** feature name from the prompt for the output filename. The prefix is today's date in `YYMMDD` format (6 digits, no separators), followed by a hyphen, then the kebab-case slug.
+There is no `spec` or `plan` prefix. The skill determines the output type during the interview, or asks the user if needed.
 
-Examples (assuming today is 2026-02-16):
-- `/interview I want a skill that loops with multiple agents` → `260216-multi-agent-loop`
-- `/interview authentication system with OAuth and magic links` → `260216-auth-system`
+Derive a **date-prefixed kebab-case** feature name from the prompt for the output filename.
+
+Examples:
+- `/interview authentication system with OAuth and magic links` -> `260315-auth-system`
+- `/interview turn docs/specs/billing.brief.md into a final spec` -> `260315-billing`
+
+---
+
+## Optional Brief Intake
+
+Before starting the interview, check whether the prompt refers to an existing brief such as `docs/specs/*.brief.md`.
+
+If a matching brief exists:
+- read it first
+- treat it as upstream context
+- use it to guide the interview
+- resolve every important `Open Questions For Interview` item during the session
+
+The brief is input material, not the final output.
+
+---
 
 ## Update Mode Detection
 
-Before starting the interview, check for existing documents:
+Before starting the interview:
 
-1. Glob `docs/specs/*.spec.md` and check if `docs/plan.md` exists
-2. If an existing file matches the subject:
-   - Read the file and briefly summarize its contents to the user
-   - Ask via AskUserQuestion with these options:
-     - **Deepen**: start from existing content, interview to refine and enrich (use Edit at the end)
-     - **New spec**: ignore existing content, start fresh (create a new file with a different name)
-     - **Replace**: delete existing content and start from scratch (overwrite the file)
-3. If no file matches: proceed with a fresh interview
+1. Glob `docs/specs/*.spec.md`, `docs/specs/*.brief.md`, and check whether `docs/plan.md` exists
+2. If an existing final document matches the subject:
+   - read and summarize it
+   - ask via AskUserQuestion:
+     - **Deepen**: refine and enrich the existing document
+     - **New spec**: create a separate new document
+     - **Replace**: overwrite the existing document from scratch
+3. If only a brief exists, use the brief as context and continue toward a final document
+
+---
 
 ## Interview Process
 
-Conduct a thorough, adaptive interview:
+Conduct a deep, adaptive interview for this single stream of work.
 
-- Ask non-obvious, in-depth questions that build on previous answers
-- No rigid phases or fixed number of rounds — go as deep as necessary
-- If an answer opens 10 new questions, ask them
-- Strike the right balance: not too atomic (no trivial either/or questions just for the sake of it), but precise enough to produce ultra-detailed specs
-- Cover organically as relevant: technical implementation, UI/UX, business logic, edge cases, security, performance, tradeoffs, dependencies, error handling, data model, API design...
-- End the interview when there is enough material to write a complete, precise document
-- Use AskUserQuestion for each round of questions — batch related questions together when it makes sense, but prefer depth over breadth
+- Ask non-obvious questions that build on earlier answers
+- Go deep enough to remove ambiguity
+- Cover whatever matters for the module: data model, business rules, API design, UI/UX, security, performance, error handling, edge cases, dependencies, rollout constraints
+- Prefer a few dense rounds over many shallow rounds
+- Use AskUserQuestion for bounded choices
+- End only when the output can serve as a final implementation reference
+
+When working from a brief:
+- preserve the module boundary from the brief
+- deepen the details substantially
+- convert open questions into concrete decisions
+- challenge vague assumptions before writing the final document
+
+---
 
 ## Output
 
-After the interview is complete, write the document to its target file path using the appropriate template (spec or plan) below.
+After the interview is complete, write the final document using one of these targets:
 
-### Directory Structure
+- `docs/specs/<feature-name>.spec.md` for final specs
+- `docs/plan.md` for plans
 
-```
-docs/
-  specs/
-    <feature-name>.spec.md
-  plan.md
-```
+### Final Spec Expectations
 
-- `docs/specs/<feature-name>.spec.md` for specs
-- `docs/plan.md` for plans (before specs are written)
-- No index file
+A final spec should be implementation-grade:
+- has `FR-*` requirements
+- has enough detail to derive tests from
+- has explicit scope boundaries
+- has acceptance criteria
+- has no unresolved critical ambiguity
 
 ### Spec Template
 
@@ -70,7 +114,7 @@ docs/
 Brief description of the feature and its purpose.
 
 ## Context
-Why this feature is needed, current state, motivation.
+Why this feature is needed and how it fits the current project.
 
 ## Functional Requirements
 - **FR-1**: ...
@@ -78,31 +122,41 @@ Why this feature is needed, current state, motivation.
 - **FR-3**: ...
 
 ## Data Model
-Entities, fields, relationships, types.
+Entities, fields, relationships, and types.
 
 ## API Contract
-Endpoints, methods, request/response shapes, status codes.
+Endpoints, methods, payloads, responses, and status codes.
 
 ## UI/UX Requirements
-Screens, components, interactions, states, responsive behavior.
+Screens, components, interactions, states, accessibility, and responsive behavior.
+
+## Business Logic
+Rules, calculations, workflows, invariants.
 
 ## Edge Cases
-Unusual scenarios and how to handle them.
+Unusual scenarios and how they are handled.
 
 ## Security
-Authentication, authorization, input validation, data protection.
+Authentication, authorization, validation, and data protection.
 
 ## Performance
-Targets, caching strategy, optimization considerations.
+Targets, limits, and optimization considerations.
 
 ## Dependencies
-External services, libraries, internal modules.
+Internal and external dependencies.
+
+## Human Prerequisites
+Accounts, secrets, approvals, assets, DNS, or manual setup.
 
 ## Out of Scope
-What this spec explicitly does NOT cover.
+What this spec explicitly does not cover.
+
+## Acceptance Criteria
+- [ ] ...
+- [ ] ...
 
 ## Open Questions
-Unresolved decisions or items needing further discussion.
+Leave empty or omit entirely when the spec is ready.
 ```
 
 ### Plan Template
@@ -129,31 +183,47 @@ What must be in place before starting.
 - **Effort**: ...
 
 ## Technical Decisions
-Key choices and their rationale.
+Key choices and rationale.
 
 ## File Changes Summary
 Overview of files to create, modify, or delete.
 
 ## Testing Strategy
-What to test, how, and acceptance criteria.
+What to test, how, and what proves completion.
 
 ## Risks & Mitigations
 Potential issues and how to address them.
 
 ## Open Questions
-Unresolved decisions or items needing further discussion.
+Leave empty or omit entirely when possible.
 ```
+
+---
 
 ## Update Mode (Deepen)
 
 When deepening an existing document:
 
-- Use Edit (not Write) to preserve existing content
-- Add or enrich sections based on new information
-- Never delete content unless the user explicitly asks
-- Add a `## Revision History` section at the end (or append to it) with date and description:
+- Use Edit, not Write
+- Preserve valuable existing content
+- Add or refine sections based on the interview
+- Do not delete content unless the user explicitly wants replacement
+- Add or append a `## Revision History` section
 
-```markdown
-## Revision History
-- **2026-02-05**: Deepened security requirements, added OAuth flow details
-```
+---
+
+## Relationship With Other Skills
+
+- `/planification` creates briefs and manifests for large projects
+- `/interview` turns one brief or one feature request into a final spec or plan
+- `/swarm` should consume the final spec produced here, not a high-level brief
+
+---
+
+## Constraints
+
+- Focus on exactly one module, feature, or implementation stream
+- If the prompt is multi-module, redirect to `/planification`
+- Final output must be materially more detailed than any upstream brief
+- Use AskUserQuestion for bounded decisions
+- No code generation during the interview

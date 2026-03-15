@@ -1,9 +1,10 @@
 ---
 name: logger
-description: "@nextnode-solutions/logger standards. Auto-load when @nextnode-solutions/logger is in the project's package.json (dependencies or devDependencies)."
+description: "@nextnode-solutions/logger standards. Reference this skill when a project uses @nextnode-solutions/logger or when logger integration is being added."
 user-invocable: false
 autoload-dirs:
-  - src/
+  - /Users/walid/Development/nextnode
+  - /Users/walid/Development/saas
 version: 0.3.2
 ---
 

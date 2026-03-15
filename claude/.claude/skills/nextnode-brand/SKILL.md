@@ -2,14 +2,16 @@
 name: nextnode-brand
 description: NextNode brand guidelines — color palette, typography, logo system, and per-project branding rules. Use when doing UI/frontend work on a NextNode project.
 user-invocable: true
-autoload-dirs: []
+autoload-dirs:
+  - /Users/walid/Development/nextnode
+  - /Users/walid/Development/saas
 ---
 
 # NextNode Brand Guidelines
 
 ## Per-Project Branding Question (MANDATORY — ask ONCE per project)
 
-When this skill loads on a NextNode/SaaS project, **check if a `.nextnode-branding.json` file exists at the project root**. If it does NOT exist, you MUST ask the user the following question BEFORE doing any UI/frontend work:
+When this skill is active in a NextNode/SaaS project and UI/frontend work begins, **check if a `.nextnode-branding.json` file exists at the project root**. If it does NOT exist, you MUST ask the user the following question BEFORE doing any UI/frontend work:
 
 > **Do you want to apply NextNode branding to this project?**
 

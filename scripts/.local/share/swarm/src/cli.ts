@@ -202,7 +202,8 @@ if (isDirectExecution) {
           savePhaseResult('code', codeResult)
 
           // Phase 3: Docs
-          await runDocsPhase(ctx, registry, signal)
+          const docsResult = await runDocsPhase(ctx, registry, signal)
+          savePhaseResult('docs', docsResult)
 
           // Final push — code commit + docs commit may still be local-only.
           // Non-fatal: no remote configured is fine (local-only workflow).
@@ -229,6 +230,14 @@ if (isDirectExecution) {
             sessionId,
             data: { success: codeResult.success, durationMs: Date.now() - Date.parse(swarmState.startedAt) },
           })
+
+          process.stdout.write(`${JSON.stringify({
+            success: codeResult.success,
+            deliveryReportJsonPath: docsResult.deliveryReportJsonPath,
+            deliveryReportMarkdownPath: docsResult.deliveryReportMarkdownPath,
+            iterationLogJsonPath: docsResult.iterationLogJsonPath,
+            iterationLogMarkdownPath: docsResult.iterationLogMarkdownPath,
+          }, null, 2)}\n`)
 
           exitCode = codeResult.success ? 0 : 1
         } catch (err) {

@@ -311,12 +311,20 @@ export function readCodePhaseResult(state: SwarmState): CodePhaseResult | null {
 // === Spec 5 Types ===
 
 export interface DeliveryReportInput {
+  schemaVersion: 2
   sessionId: SessionId
   specPath: string
   specItems: SpecItemSummary[]
   totalDuration: number
   startedAt: string
   completedAt: string
+}
+
+export interface IterationLogArtifact {
+  schemaVersion: 2
+  sessionId: SessionId
+  generatedAt: string
+  entries: IterationLogEntry[]
 }
 
 export interface SpecItemSummary {
@@ -337,6 +345,8 @@ export interface TaskSummary {
 }
 
 export type ReviewFindingSummary = Pick<ReviewFinding, 'severity' | 'category' | 'description'> & {
+  file: string
+  line?: number | null
   resolved: boolean
   resolution?: string
 }
@@ -358,12 +368,11 @@ export interface IterationLogEntry {
 }
 
 export interface DocsPhaseResult {
-  deliveryReportPath: string
-  iterationsLogPath: string
+  deliveryReportJsonPath: string
+  deliveryReportMarkdownPath: string
+  iterationLogJsonPath: string
+  iterationLogMarkdownPath: string
   commitHash?: string
-  prUpdated: boolean
-  prMarkedReady: boolean
-  usedFallbackReport: boolean
   success: boolean
 }
 
@@ -388,6 +397,8 @@ const agentInvocationRecordSchema = z.object({
 })
 
 const reviewFindingSummarySchema = z.object({
+  file: z.string().min(1),
+  line: z.number().int().nullable().optional(),
   severity: z.union([z.literal('critical'), z.literal('important'), z.literal('suggestion')]),
   category: z.union([
     z.literal('bug'), z.literal('security'), z.literal('quality'),
@@ -397,57 +408,65 @@ const reviewFindingSummarySchema = z.object({
   description: z.string(),
   resolved: z.boolean(),
   resolution: z.string().optional(),
-})
+}).strict()
 
 const taskSummarySchema = z.object({
   id: z.string().regex(/^TASK-\d+$/),
-  title: z.string(),
+  title: z.string().min(1),
   tag: z.union([z.literal('backend'), z.literal('frontend'), z.literal('fullstack')]),
   filesModified: z.array(z.string()),
-})
+}).strict()
 
 const specItemSummarySchema = z.object({
-  title: z.string(),
-  iterationCount: z.number(),
+  title: z.string().min(1),
+  iterationCount: z.number().int().nonnegative(),
   success: z.boolean(),
   tasks: z.array(taskSummarySchema),
   testResult: testResultSchema,
   reviewFindings: z.array(reviewFindingSummarySchema),
   commitHash: z.string().optional(),
-})
+}).strict()
 
 const deliveryReportInputSchema = z.object({
-  sessionId: z.string(),
-  specPath: z.string(),
+  schemaVersion: z.literal(2),
+  sessionId: z.string().min(1),
+  specPath: z.string().min(1),
   specItems: z.array(specItemSummarySchema),
-  totalDuration: z.number(),
-  startedAt: z.string(),
-  completedAt: z.string(),
-})
+  totalDuration: z.number().nonnegative(),
+  startedAt: z.string().datetime({ offset: true }),
+  completedAt: z.string().datetime({ offset: true }),
+}).strict()
 
 const iterationLogEntrySchema = z.object({
-  specItem: z.string(),
-  iterationIndex: z.number(),
+  specItem: z.string().min(1),
+  iterationIndex: z.number().int().nonnegative(),
   agentsInvoked: z.array(agentInvocationRecordSchema),
   testResult: testResultSchema.optional(),
-  reviewFindingCount: z.number(),
+  reviewFindingCount: z.number().int().nonnegative(),
   filesChanged: z.array(z.string()),
-})
+}).strict()
+
+const iterationLogArtifactSchema = z.object({
+  schemaVersion: z.literal(2),
+  sessionId: z.string().min(1),
+  generatedAt: z.string().datetime({ offset: true }),
+  entries: z.array(iterationLogEntrySchema),
+}).strict()
 
 const docsPhaseResultSchema = z.object({
-  deliveryReportPath: z.string(),
-  iterationsLogPath: z.string(),
+  deliveryReportJsonPath: z.string().min(1),
+  deliveryReportMarkdownPath: z.string().min(1),
+  iterationLogJsonPath: z.string().min(1),
+  iterationLogMarkdownPath: z.string().min(1),
   commitHash: z.string().optional(),
-  prUpdated: z.boolean(),
-  prMarkedReady: z.boolean(),
-  usedFallbackReport: z.boolean(),
   success: z.boolean(),
-})
+}).strict()
 
 // Export schemas for external use
 export {
   deliveryReportInputSchema,
   iterationLogEntrySchema,
+  iterationLogArtifactSchema,
   docsPhaseResultSchema,
   specItemSummarySchema,
   taskSummarySchema,

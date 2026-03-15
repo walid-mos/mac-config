@@ -1,5 +1,6 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { emitWarningEvent } from './core/event-emitter.js'
 import { readCodePhaseResult, readPlanPhaseResult } from './phases/phase-results.js'
 import type {
   ResolvedConfig,
@@ -12,6 +13,11 @@ import type {
 } from './core/types.js'
 
 const SYSTEM_ROOTS = new Set(['/', '/etc', '/private/etc', '/var', '/private/var', '/usr'])
+
+export const EVENT_LOG_RETENTION = {
+  maxSessionLogs: 20,
+  maxAgeDays: 14,
+} as const
 
 export const CLI_RUNTIME_OWNERSHIP = {
   worktree: 'cli',
@@ -62,6 +68,34 @@ const getRequiredString = (options: Record<string, unknown>, key: string): strin
 
 export const getRuntimeDir = (projectDir: string, sessionId: string): string => {
   return path.join(projectDir, '.swarm', 'run', sessionId)
+}
+
+export const pruneRuntimeSessionLogs = (runtimeRoot: string, currentSession: string): void => {
+  if (!fs.existsSync(runtimeRoot)) {
+    return
+  }
+
+  const now = Date.now()
+  const maxAgeMs = EVENT_LOG_RETENTION.maxAgeDays * 24 * 60 * 60 * 1000
+  const entries = fs.readdirSync(runtimeRoot, { withFileTypes: true })
+    .filter(entry => entry.isDirectory() && entry.name !== currentSession)
+    .map(entry => {
+      const fullPath = path.join(runtimeRoot, entry.name)
+      return {
+        fullPath,
+        mtimeMs: fs.statSync(fullPath).mtimeMs,
+      }
+    })
+    .sort((a, b) => b.mtimeMs - a.mtimeMs)
+
+  for (const [index, entry] of entries.entries()) {
+    const isExpired = now - entry.mtimeMs > maxAgeMs
+    const exceedsCount = index >= EVENT_LOG_RETENTION.maxSessionLogs
+
+    if (isExpired || exceedsCount) {
+      fs.rmSync(entry.fullPath, { recursive: true, force: true })
+    }
+  }
 }
 
 const getWorktreeSpecPath = (worktreePath: string, projectDir: string, specPath: string): string => {
@@ -259,6 +293,8 @@ const markSessionTerminal = (
 }
 
 const cleanupRuntimeArtifacts = async (
+  emitter: SessionContext['emitter'],
+  sessionId: SessionId,
   stateManager: SwarmStateManager,
   baseProjectDir: string,
   runtimeDir: string,
@@ -278,32 +314,24 @@ const cleanupRuntimeArtifacts = async (
             updatedAt: new Date().toISOString(),
           }))
         } catch (error) {
-          process.stderr.write(`WARNING: Worktree cleanup failed: ${formatError(error)}\n`)
+          const message = `WARNING: Worktree cleanup failed: ${formatError(error)}`
+          process.stderr.write(`${message}\n`)
+          emitWarningEvent(emitter, sessionId, 'cli.worktree-cleanup', message)
         }
       }
     } catch (error) {
-      process.stderr.write(`WARNING: Worktree cleanup skipped: ${formatError(error)}\n`)
+      const message = `WARNING: Worktree cleanup skipped: ${formatError(error)}`
+      process.stderr.write(`${message}\n`)
+      emitWarningEvent(emitter, sessionId, 'cli.worktree-cleanup', message)
     }
   }
 
   try {
-    const finalState = readValidState(stateManager)
-    if (finalState.status !== 'completed') {
-      return
-    }
-
-    try {
-      const entries = fs.readdirSync(runtimeDir)
-      for (const entry of entries) {
-        if (entry.startsWith('swarm-agent-') && entry.endsWith('.ndjson')) {
-          fs.unlinkSync(path.join(runtimeDir, entry))
-        }
-      }
-    } catch (error) {
-      process.stderr.write(`WARNING: NDJSON cleanup failed: ${formatError(error)}\n`)
-    }
+    fs.mkdirSync(runtimeDir, { recursive: true })
   } catch (error) {
-    process.stderr.write(`WARNING: NDJSON cleanup skipped: ${formatError(error)}\n`)
+    const message = `WARNING: runtime log retention check failed: ${formatError(error)}`
+    process.stderr.write(`${message}\n`)
+    emitWarningEvent(emitter, sessionId, 'cli.runtime-retention', message)
   }
 }
 
@@ -353,6 +381,8 @@ const runSession = async (
     existingState?: SwarmState
   },
 ): Promise<number> => {
+  const runtimeRoot = path.dirname(input.runtimeDir)
+  pruneRuntimeSessionLogs(runtimeRoot, input.sessionId)
   fs.mkdirSync(input.runtimeDir, { recursive: true })
   process.env.SWARM_DEBUG_DIR = input.runtimeDir
 
@@ -363,7 +393,8 @@ const runSession = async (
   const { runCodePhase } = await import('./phases/code/code-phase.js')
   const { runDocsPhase } = await import('./phases/docs/docs-phase.js')
 
-  const emitter = createEventEmitter(input.sessionId)
+  const eventLogPath = path.join(input.runtimeDir, 'events.ndjson')
+  const emitter = createEventEmitter(input.sessionId, { logFilePath: eventLogPath })
   const stateManager = createStateManager(input.sessionId, { tmpDir: input.runtimeDir })
   const registry = createDriverRegistry(input.resolvedConfig.config, emitter)
 
@@ -415,13 +446,18 @@ const runSession = async (
     }
 
     if (input.existingState === undefined) {
-      emitter.emit({
-        type: 'session:start',
-        timestamp: new Date().toISOString(),
-        sessionId: input.sessionId,
-        data: { specPath: input.specPath, projectDir: input.projectDir },
-      })
-    }
+        emitter.emit({
+          type: 'session:start',
+          timestamp: new Date().toISOString(),
+          sessionId: input.sessionId,
+          data: {
+            specPath: input.specPath,
+            projectDir: input.projectDir,
+            eventLogPath,
+            retention: EVENT_LOG_RETENTION,
+          },
+        })
+      }
     let planResult = readPlanPhaseResult(currentState)
     if (planResult === null) {
       const specContent = fs.readFileSync(input.specPath, 'utf-8')
@@ -500,7 +536,9 @@ const runSession = async (
     try {
       markSessionTerminal(stateManager, status, { failureReason: formatError(error) })
     } catch (stateError) {
-      process.stderr.write(`WARNING: failed to persist terminal session state: ${formatError(stateError)}\n`)
+      const message = `WARNING: failed to persist terminal session state: ${formatError(stateError)}`
+      process.stderr.write(`${message}\n`)
+      emitWarningEvent(emitter, input.sessionId, 'cli.state-terminal', message)
     }
 
     emitter.emit({
@@ -516,7 +554,7 @@ const runSession = async (
   } finally {
     process.off('SIGINT', onSignal)
     process.off('SIGTERM', onSignal)
-    await cleanupRuntimeArtifacts(stateManager, input.projectDir, input.runtimeDir, shouldCleanupWorktree)
+    await cleanupRuntimeArtifacts(emitter, input.sessionId, stateManager, input.projectDir, input.runtimeDir, shouldCleanupWorktree)
     stateManager.releaseLock()
   }
 }

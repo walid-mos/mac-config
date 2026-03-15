@@ -3,6 +3,8 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { spawn } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
+import { emitWarningEvent } from '../../core/event-emitter.js'
 import type { SessionContext } from '../../core/types.js'
 import type { DriverRegistry, AgentResult } from '../../drivers/driver.js'
 import type { DocsPhaseResult } from '../phase-results.js'
@@ -143,6 +145,7 @@ export async function runDocsPhase(
       throw new Error('Docs phase aborted')
     }
 
+    const correlation = { invocationId: randomUUID(), attempt: attempt + 1 }
     const result: AgentResult = await driver.invoke({
       prompt,
       role: 'docs',
@@ -150,6 +153,8 @@ export async function runDocsPhase(
       model,
       projectDir: ctx.projectDir,
       signal,
+      swarmSessionId: ctx.sessionId,
+      correlation,
     })
 
     if (result.success) {
@@ -200,15 +205,31 @@ export async function runDocsPhase(
   // Write files
   const absDeliveryPath = path.join(ctx.projectDir, deliveryReportPath)
   const absIterationsPath = path.join(ctx.projectDir, iterationsLogPath)
+  const deliveryAction = fs.existsSync(absDeliveryPath) ? 'modified' : 'created'
+  const iterationsAction = fs.existsSync(absIterationsPath) ? 'modified' : 'created'
   fs.writeFileSync(absDeliveryPath, reportContent!, 'utf-8')
   fs.writeFileSync(absIterationsPath, iterationContent, 'utf-8')
+  ctx.emitter.emit({
+    type: 'file:changed',
+    timestamp: new Date().toISOString(),
+    sessionId: ctx.sessionId,
+    data: { path: deliveryReportPath, action: deliveryAction },
+  })
+  ctx.emitter.emit({
+    type: 'file:changed',
+    timestamp: new Date().toISOString(),
+    sessionId: ctx.sessionId,
+    data: { path: iterationsLogPath, action: iterationsAction },
+  })
 
   // Commit doc files
   let commitHash: string | undefined
   try {
     commitHash = await commitSpecItem(ctx.projectDir, [deliveryReportPath, iterationsLogPath], 'docs(swarm): add delivery report and iteration log')
   } catch (err) {
-    process.stderr.write(`Warning: doc commit failed: ${(err as Error).message}\n`)
+    const message = `Warning: doc commit failed: ${(err as Error).message}`
+    process.stderr.write(message + '\n')
+    emitWarningEvent(ctx.emitter, ctx.sessionId, 'docs.commit', message)
   }
 
   // PR operations
@@ -231,7 +252,9 @@ export async function runDocsPhase(
       )
       prUpdated = true
     } catch (err) {
-      process.stderr.write(`Warning: PR body update failed: ${(err as Error).message}\n`)
+      const message = `Warning: PR body update failed: ${(err as Error).message}`
+      process.stderr.write(message + '\n')
+      emitWarningEvent(ctx.emitter, ctx.sessionId, 'docs.pr-body', message)
     }
 
     // Mark PR ready
@@ -239,7 +262,9 @@ export async function runDocsPhase(
       await markPrReady(prNumber, ctx.projectDir)
       prMarkedReady = true
     } catch (err) {
-      process.stderr.write(`Warning: mark PR ready failed: ${(err as Error).message}\n`)
+      const message = `Warning: mark PR ready failed: ${(err as Error).message}`
+      process.stderr.write(message + '\n')
+      emitWarningEvent(ctx.emitter, ctx.sessionId, 'docs.pr-ready', message)
     }
   }
 
@@ -261,7 +286,9 @@ export async function runDocsPhase(
     state.updatedAt = new Date().toISOString()
     ctx.state.save(state)
   } catch (err) {
-    process.stderr.write(`Warning: state save failed: ${(err as Error).message}\n`)
+    const message = `Warning: state save failed: ${(err as Error).message}`
+    process.stderr.write(message + '\n')
+    emitWarningEvent(ctx.emitter, ctx.sessionId, 'docs.state-save', message)
   }
 
   // Emit phase:end

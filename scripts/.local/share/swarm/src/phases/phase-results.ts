@@ -382,9 +382,13 @@ export type ReviewFindingSummary = Pick<ReviewFinding, 'severity' | 'category' |
 }
 
 export interface AgentInvocationRecord {
+  invocationId?: string
   role: AgentRole
   model: string
   durationMs: number
+  taskId?: string
+  attempt?: number
+  backendSessionId?: string
   tokenUsage?: TokenUsage
 }
 
@@ -417,6 +421,7 @@ const tokenUsageSchema = z.object({
 })
 
 const agentInvocationRecordSchema = z.object({
+  invocationId: z.string().optional(),
   role: z.union([
     z.literal('plan'), z.literal('test'), z.literal('code'),
     z.literal('review'), z.literal('security'), z.literal('consistency'),
@@ -424,6 +429,9 @@ const agentInvocationRecordSchema = z.object({
   ]),
   model: z.string(),
   durationMs: z.number(),
+  taskId: z.string().optional(),
+  attempt: z.number().optional(),
+  backendSessionId: z.string().optional(),
   tokenUsage: tokenUsageSchema.optional(),
 })
 

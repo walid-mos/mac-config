@@ -109,6 +109,7 @@ async function invokeWithRetry(
       model,
       projectDir: ctx.projectDir,
       signal,
+      swarmSessionId: ctx.sessionId,
     })
 
     if (result.success) return result

@@ -1,8 +1,9 @@
 import * as childProcess from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import type { SessionId, SwarmEventEmitter, TokenUsage } from '../core/types.js'
+import type { EventCorrelation, SessionId, SwarmEventEmitter, TokenUsage } from '../core/types.js'
 import type { Driver, AgentRequest, AgentResult, DriverAvailability } from './driver.js'
 import { extractStreamResult } from './output-parser.js'
 
@@ -50,6 +51,22 @@ function safeKill(pid: number, signal: NodeJS.Signals): void {
 function truncate(value: string, max: number): string {
   if (value.length <= max) return value
   return value.slice(0, max)
+}
+
+function buildCorrelation(
+  request: AgentRequest,
+  invocationId: string,
+  backendSessionId?: string
+): EventCorrelation | undefined {
+  if (!request.correlation && !backendSessionId) {
+    return undefined
+  }
+
+  return {
+    ...request.correlation,
+    invocationId,
+    backendSessionId: backendSessionId ?? request.correlation?.backendSessionId,
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -116,6 +133,7 @@ export function createClaudeDriver(emitter: SwarmEventEmitter): Driver {
     const startTime = Date.now()
     const backend = name
     const model = request.model
+    const swarmSessionId = request.swarmSessionId ?? ('driver' as SessionId)
 
     // Pre-aborted signal check (before any other validation)
     if (request.signal?.aborted) {
@@ -181,10 +199,13 @@ export function createClaudeDriver(emitter: SwarmEventEmitter): Driver {
     }
 
     // Emit agent:invoke event
+    const initialBackendSessionId = request.sessionId ?? request.resume
+    const invokeCorrelation = buildCorrelation(request, randomUUID(), initialBackendSessionId)
     emitter.emit({
       type: 'agent:invoke',
       timestamp: new Date().toISOString(),
-      sessionId: 'driver' as SessionId,
+      sessionId: swarmSessionId,
+      correlation: invokeCorrelation,
       data: { role: request.role, backend, model: String(model) },
     })
 
@@ -214,7 +235,8 @@ export function createClaudeDriver(emitter: SwarmEventEmitter): Driver {
         emitter.emit({
           type: 'agent:error',
           timestamp: new Date().toISOString(),
-          sessionId: 'driver' as SessionId,
+          sessionId: swarmSessionId,
+          correlation: invokeCorrelation,
           data: { role: request.role, reason: (err as Error).message },
         })
         resolve({
@@ -377,7 +399,8 @@ export function createClaudeDriver(emitter: SwarmEventEmitter): Driver {
             emitter.emit({
               type: 'agent:activity',
               timestamp: new Date().toISOString(),
-              sessionId: 'driver' as SessionId,
+              sessionId: swarmSessionId,
+              correlation: invokeCorrelation,
               data: { role: request.role, tool: event.message.name ?? 'unknown' },
             })
           }
@@ -414,7 +437,8 @@ export function createClaudeDriver(emitter: SwarmEventEmitter): Driver {
         emitter.emit({
           type: 'agent:error',
           timestamp: new Date().toISOString(),
-          sessionId: 'driver' as SessionId,
+          sessionId: swarmSessionId,
+          correlation: invokeCorrelation,
           data: { role: request.role, reason: err.message, tokenUsage },
         })
         doResolve({
@@ -449,7 +473,8 @@ export function createClaudeDriver(emitter: SwarmEventEmitter): Driver {
           emitter.emit({
             type: 'agent:error',
             timestamp: new Date().toISOString(),
-            sessionId: 'driver' as SessionId,
+            sessionId: swarmSessionId,
+            correlation: invokeCorrelation,
             data: { role: request.role, reason, tokenUsage },
           })
           doResolve({
@@ -476,7 +501,8 @@ export function createClaudeDriver(emitter: SwarmEventEmitter): Driver {
           emitter.emit({
             type: 'agent:error',
             timestamp: new Date().toISOString(),
-            sessionId: 'driver' as SessionId,
+            sessionId: swarmSessionId,
+            correlation: invokeCorrelation,
             data: { role: request.role, reason, tokenUsage },
           })
           doResolve({
@@ -499,7 +525,8 @@ export function createClaudeDriver(emitter: SwarmEventEmitter): Driver {
           emitter.emit({
             type: 'agent:error',
             timestamp: new Date().toISOString(),
-            sessionId: 'driver' as SessionId,
+            sessionId: swarmSessionId,
+            correlation: invokeCorrelation,
             data: { role: request.role, reason: 'Empty output from backend', tokenUsage },
           })
           doResolve({
@@ -526,10 +553,13 @@ export function createClaudeDriver(emitter: SwarmEventEmitter): Driver {
 
         const tokenUsage = buildTokenUsage()
         if (resultText !== undefined && resultText.trim() !== '') {
+          const echoSessionId = request.sessionId ?? request.resume
+          const resultCorrelation = buildCorrelation(request, invokeCorrelation?.invocationId ?? randomUUID(), echoSessionId)
           emitter.emit({
             type: 'agent:result',
             timestamp: new Date().toISOString(),
-            sessionId: 'driver' as SessionId,
+            sessionId: swarmSessionId,
+            correlation: resultCorrelation,
             data: { role: request.role, durationMs, tokenUsage },
           })
           const successResult: AgentResult = {
@@ -542,7 +572,6 @@ export function createClaudeDriver(emitter: SwarmEventEmitter): Driver {
             durationMs,
             tokenUsage,
           }
-          const echoSessionId = request.sessionId ?? request.resume
           if (echoSessionId) {
             successResult.sessionId = echoSessionId
           }
@@ -551,7 +580,8 @@ export function createClaudeDriver(emitter: SwarmEventEmitter): Driver {
           emitter.emit({
             type: 'agent:error',
             timestamp: new Date().toISOString(),
-            sessionId: 'driver' as SessionId,
+            sessionId: swarmSessionId,
+            correlation: invokeCorrelation,
             data: { role: request.role, reason: 'No result event in stream output', tokenUsage },
           })
           doResolve({

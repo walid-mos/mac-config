@@ -1,4 +1,4 @@
-import type { AgentRole, ModelId, TokenUsage } from '../core/types.js'
+import type { AgentRole, EventCorrelation, ModelId, SessionId, TokenUsage } from '../core/types.js'
 
 export type { TokenUsage }
 
@@ -19,6 +19,8 @@ export interface AgentRequest {
   contextFiles?: string[]
   attachUrl?: string
   signal?: AbortSignal
+  swarmSessionId?: SessionId
+  correlation?: EventCorrelation
   sessionId?: string  // UUID for --session-id (first invocation — saves session for future resume)
   resume?: string     // UUID for --resume (subsequent invocations — resumes existing session)
 }

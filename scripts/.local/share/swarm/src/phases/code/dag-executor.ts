@@ -70,9 +70,70 @@ interface AgentExecutionResult {
   deltaFiles: string[]
 }
 
+interface TaskCorrelation {
+  invocationId: string
+  taskId: string
+  iteration: number
+  attempt: number
+  backendSessionId?: string
+}
+
 // === Errors ===
 
 // === Helpers ===
+
+function buildTaskCorrelation(node: TaskNode, iteration: number, attempt: number): TaskCorrelation {
+  return {
+    invocationId: randomUUID(),
+    taskId: node.taskId,
+    iteration,
+    attempt,
+  }
+}
+
+function emitFileEvents(ctx: SessionContext, filesChanged: string[], correlation: TaskCorrelation): void {
+  for (const filePath of filesChanged) {
+    ctx.emitter.emit({
+      type: 'file:changed',
+      timestamp: new Date().toISOString(),
+      sessionId: ctx.sessionId,
+      correlation,
+      data: { path: filePath, action: 'modified' },
+    })
+  }
+}
+
+function emitBuildEvent(
+  ctx: SessionContext,
+  buildResult: { success: boolean; output?: string; error?: string | null; durationMs?: number } | null,
+  correlation: TaskCorrelation,
+): void {
+  if (!buildResult) {
+    return
+  }
+
+  if (buildResult.success) {
+    ctx.emitter.emit({
+      type: 'build:success',
+      timestamp: new Date().toISOString(),
+      sessionId: ctx.sessionId,
+      correlation,
+      data: { durationMs: buildResult.durationMs ?? 0 },
+    })
+    return
+  }
+
+  ctx.emitter.emit({
+    type: 'build:fail',
+    timestamp: new Date().toISOString(),
+    sessionId: ctx.sessionId,
+    correlation,
+    data: {
+      output: buildResult.output ?? buildResult.error ?? 'Build failed',
+      durationMs: buildResult.durationMs ?? 0,
+    },
+  })
+}
 
 async function spawnFreshAgent(
   node: TaskNode,
@@ -81,13 +142,16 @@ async function spawnFreshAgent(
   techStack: TechStack,
   testFiles: string[],
   decisionLog: string,
+  iteration: number,
   signal?: AbortSignal,
 ): Promise<AgentExecutionResult> {
   const { driver, model, agent } = registry.getDriver('code', node.task.tag)
   const prompt = buildCodeAgentPrompt(node.task, testFiles, techStack, undefined, decisionLog)
+  const attemptNumber = node.attempts + 1
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     throwIfAborted(signal)
+    const correlation = buildTaskCorrelation(node, iteration, attemptNumber)
 
     const result = await driver.invoke({
       prompt,
@@ -96,6 +160,8 @@ async function spawnFreshAgent(
       model,
       projectDir: ctx.projectDir,
       signal,
+      swarmSessionId: ctx.sessionId,
+      correlation,
       sessionId: node.handle.sessionId,
     })
 
@@ -109,6 +175,14 @@ async function spawnFreshAgent(
           }
           deltaFiles.push(f)
         }
+        emitFileEvents(ctx, output.filesChanged, {
+          ...correlation,
+          backendSessionId: result.sessionId,
+        })
+        emitBuildEvent(ctx, output.buildResult, {
+          ...correlation,
+          backendSessionId: result.sessionId,
+        })
       }
       return { output, deltaFiles }
     }
@@ -140,16 +214,19 @@ async function resumeAgentWithFindings(
   techStack: TechStack,
   testFiles: string[],
   decisionLog: string,
+  iteration: number,
   signal?: AbortSignal,
 ): Promise<AgentExecutionResult> {
   const { driver, model, agent } = registry.getDriver('code', node.task.tag)
   const findings = node.lastFindings ?? []
   const prompt = buildFindingFixPrompt(findings, decisionLog)
+  const attemptNumber = node.attempts + 1
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     throwIfAborted(signal)
 
     const isFirstAttempt = attempt === 0
+    const correlation = buildTaskCorrelation(node, iteration, attemptNumber)
     const result = await driver.invoke({
       prompt,
       role: 'code',
@@ -157,6 +234,8 @@ async function resumeAgentWithFindings(
       model,
       projectDir: ctx.projectDir,
       signal,
+      swarmSessionId: ctx.sessionId,
+      correlation,
       ...(isFirstAttempt ? { resume: node.handle.sessionId } : {}),
     })
 
@@ -170,6 +249,14 @@ async function resumeAgentWithFindings(
           }
           deltaFiles.push(f)
         }
+        emitFileEvents(ctx, output.filesChanged, {
+          ...correlation,
+          backendSessionId: result.sessionId,
+        })
+        emitBuildEvent(ctx, output.buildResult, {
+          ...correlation,
+          backendSessionId: result.sessionId,
+        })
       }
       return { output, deltaFiles }
     }
@@ -190,6 +277,8 @@ async function resumeAgentWithFindings(
         model,
         projectDir: ctx.projectDir,
         signal,
+        swarmSessionId: ctx.sessionId,
+        correlation,
       })
 
       if (fallbackResult.success) {
@@ -202,6 +291,14 @@ async function resumeAgentWithFindings(
             }
             deltaFiles.push(f)
           }
+          emitFileEvents(ctx, output.filesChanged, {
+            ...correlation,
+            backendSessionId: fallbackResult.sessionId,
+          })
+          emitBuildEvent(ctx, output.buildResult, {
+            ...correlation,
+            backendSessionId: fallbackResult.sessionId,
+          })
         }
         return { output, deltaFiles }
       }
@@ -471,6 +568,7 @@ export async function executeDag(
           techStack,
           accumulatedTestFiles,
           decisionLog,
+          waveIndex,
           signal,
         )
 
@@ -512,6 +610,7 @@ export async function executeDag(
           techStack,
           accumulatedTestFiles,
           decisionLog,
+          waveIndex,
           signal,
         )
         perTaskDeltaFiles.set(node.taskId, result.deltaFiles)

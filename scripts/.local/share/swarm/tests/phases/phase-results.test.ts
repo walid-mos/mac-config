@@ -372,12 +372,11 @@ describe('readCodePhaseResult', () => {
 
 function createValidDocsPhaseResult(): DocsPhaseResult {
   return {
-    deliveryReportPath: 'docs/swarm/test-session/delivery-report.md',
-    iterationsLogPath: 'docs/swarm/test-session/iterations.md',
+    deliveryReportJsonPath: '.swarm/artifacts/test-session/delivery-report.json',
+    deliveryReportMarkdownPath: '.swarm/artifacts/test-session/delivery-report.md',
+    iterationLogJsonPath: '.swarm/artifacts/test-session/iterations.json',
+    iterationLogMarkdownPath: '.swarm/artifacts/test-session/iterations.md',
     commitHash: 'def5678',
-    prUpdated: true,
-    prMarkedReady: true,
-    usedFallbackReport: false,
     success: true,
   }
 }
@@ -405,11 +404,8 @@ describe('readDocsPhaseResult', () => {
 
     expect(result).not.toBeNull()
     expect(result!.success).toBe(true)
-    expect(result!.deliveryReportPath).toContain('delivery-report.md')
-    expect(result!.iterationsLogPath).toContain('iterations.md')
-    expect(result!.prUpdated).toBe(true)
-    expect(result!.prMarkedReady).toBe(true)
-    expect(result!.usedFallbackReport).toBe(false)
+    expect(result!.deliveryReportMarkdownPath).toContain('delivery-report.md')
+    expect(result!.iterationLogMarkdownPath).toContain('iterations.md')
   })
 
   it('throws on structurally invalid data', () => {
@@ -441,6 +437,7 @@ describe('readDocsPhaseResult', () => {
 describe('Spec 5 Zod schemas', () => {
   it('deliveryReportInputSchema validates a well-formed input', () => {
     const valid = {
+      schemaVersion: 2,
       sessionId: 'test-session',
       specPath: '/tmp/project/spec.md',
       specItems: [
@@ -455,7 +452,14 @@ describe('Spec 5 Zod schemas', () => {
             filesModified: ['src/a.ts'],
           }],
           testResult: { totalTests: 5, passingTests: 5, failingTests: 0, durationMs: 1000 },
-          reviewFindings: [],
+          reviewFindings: [{
+            file: 'src/a.ts',
+            severity: 'important',
+            category: 'quality',
+            description: 'Example finding',
+            resolved: true,
+            resolution: 'Resolved in iteration 1',
+          }],
           commitHash: 'abc1234',
         },
       ],

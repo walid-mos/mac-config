@@ -1,56 +1,40 @@
-// === Docs Phase (Spec 5 — FR-1 through FR-10) ===
+// === Docs Phase ===
 
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { spawn } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
 import { emitWarningEvent } from '../../core/event-emitter.js'
 import type { SessionContext } from '../../core/types.js'
-import type { DriverRegistry, AgentResult } from '../../drivers/driver.js'
+import type { DriverRegistry } from '../../drivers/driver.js'
 import type { DocsPhaseResult } from '../phase-results.js'
 import { readPlanPhaseResult, readTddPhaseResult, readCodePhaseResult } from '../phase-results.js'
 import { buildDeliveryReportInput } from './report-builder.js'
-import { buildIterationLog, renderIterationLog } from './iteration-log-builder.js'
+import { buildIterationLogArtifact, renderIterationLog } from './iteration-log-builder.js'
 import { generateFallbackReport } from './fallback-report.js'
-import { buildDocWriterPrompt } from './docs-prompt.js'
 import { commitSpecItem, markPrReady } from '../../git/git-operations.js'
 
-// === Constants ===
-
-const MAX_RETRIES = 2
-const CONTROL_CHARS_RE = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g
 const MAX_PR_BODY_CHARS = 60_000
 
-// === Helpers ===
-
-function isRetryableErrorCode(code: string): boolean {
-  return code === 'timeout' || code === 'crash' || code === 'empty_output' || code === 'invalid_json'
-}
-
-function isImmediateFailErrorCode(code: string): boolean {
-  return code === 'aborted' || code === 'spawn_error'
-}
-
-function sanitizeOutput(text: string): string {
-  return text.replace(CONTROL_CHARS_RE, '')
-}
-
-function verifyPathUnderProject(filePath: string, projectDir: string): void {
+const verifyPathUnderProject = (filePath: string, projectDir: string): void => {
   const resolved = path.resolve(projectDir, filePath)
   if (!resolved.startsWith(path.resolve(projectDir) + path.sep)) {
     throw new Error(`Output path "${filePath}" is outside project directory`)
   }
 }
 
-function spawnWithTimeout(
-  cmd: string,
+const writeJsonFile = (filePath: string, value: unknown): void => {
+  fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, 'utf-8')
+}
+
+const spawnWithTimeout = (
+  command: string,
   args: string[],
   cwd: string,
   timeoutMs: number,
   stdin?: string
-): Promise<{ stdout: string; stderr: string }> {
+): Promise<{ stdout: string; stderr: string }> => {
   return new Promise((resolve, reject) => {
-    const proc = spawn(cmd, args, { cwd })
+    const proc = spawn(command, args, { cwd })
     let stdout = ''
     let stderr = ''
     let timedOut = false
@@ -71,31 +55,32 @@ function spawnWithTimeout(
     proc.on('close', (code) => {
       clearTimeout(timer)
       if (timedOut) {
-        reject(new Error(`${cmd} timed out after ${timeoutMs}ms`))
-      } else if (code === 0) {
-        resolve({ stdout, stderr })
-      } else {
-        reject(new Error(`${cmd} failed (exit ${code}): ${stderr || stdout}`))
+        reject(new Error(`${command} timed out after ${timeoutMs}ms`))
+        return
       }
+
+      if (code === 0) {
+        resolve({ stdout, stderr })
+        return
+      }
+
+      reject(new Error(`${command} failed (exit ${code}): ${stderr || stdout}`))
     })
 
-    proc.on('error', (err) => {
+    proc.on('error', (error) => {
       clearTimeout(timer)
-      reject(new Error(`${cmd} spawn error: ${err.message}`))
+      reject(new Error(`${command} spawn error: ${error.message}`))
     })
   })
 }
 
-// === API ===
-
-export async function runDocsPhase(
+export const runDocsPhase = async (
   ctx: SessionContext,
-  registry: DriverRegistry,
+  _registry: DriverRegistry,
   signal?: AbortSignal
-): Promise<DocsPhaseResult> {
+): Promise<DocsPhaseResult> => {
   const startTime = Date.now()
 
-  // Guard abort — throw without fallback (FR-10)
   if (signal?.aborted) {
     ctx.emitter.emit({
       type: 'phase:error',
@@ -106,7 +91,6 @@ export async function runDocsPhase(
     throw new Error('Docs phase aborted')
   }
 
-  // Emit phase:start
   ctx.emitter.emit({
     type: 'phase:start',
     timestamp: new Date().toISOString(),
@@ -114,7 +98,6 @@ export async function runDocsPhase(
     data: { phase: 'docs' },
   })
 
-  // Load state and phase results
   const loadResult = ctx.state.load()
   if (!loadResult.found || !('valid' in loadResult) || !loadResult.valid) {
     throw new Error('Cannot load state for docs phase')
@@ -125,173 +108,128 @@ export async function runDocsPhase(
   const tddResult = readTddPhaseResult(state)
   const codeResult = readCodePhaseResult(state)
 
+  if (!planResult) {
+    throw new Error('Missing plan phase result - cannot generate docs')
+  }
+
   if (!codeResult) {
-    throw new Error('Missing code phase result — cannot generate docs')
+    throw new Error('Missing code phase result - cannot generate docs')
   }
 
-  // Build delivery report input
-  const reportInput = buildDeliveryReportInput(ctx, planResult!, tddResult, codeResult)
+  const deliveryReport = buildDeliveryReportInput(ctx, planResult, tddResult, codeResult)
+  const iterationLog = buildIterationLogArtifact(
+    ctx.sessionId,
+    ctx.emitter.getEvents(),
+    codeResult,
+    deliveryReport.completedAt
+  )
+  const deliveryMarkdown = generateFallbackReport(deliveryReport)
+  const iterationMarkdown = renderIterationLog(iterationLog)
 
-  // Invoke doc writer agent with retry/fallback
-  let reportContent: string
-  let usedFallback = false
+  const artifactDir = path.join('.swarm', 'artifacts', ctx.sessionId)
+  fs.mkdirSync(path.join(ctx.projectDir, artifactDir), { recursive: true })
 
-  const { driver, model, agent } = registry.getDriver('docs')
-  const prompt = buildDocWriterPrompt(reportInput)
+  const deliveryReportJsonPath = path.join(artifactDir, 'delivery-report.json')
+  const deliveryReportMarkdownPath = path.join(artifactDir, 'delivery-report.md')
+  const iterationLogJsonPath = path.join(artifactDir, 'iterations.json')
+  const iterationLogMarkdownPath = path.join(artifactDir, 'iterations.md')
 
-  let agentSucceeded = false
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    if (signal?.aborted) {
-      throw new Error('Docs phase aborted')
-    }
+  for (const artifactPath of [
+    deliveryReportJsonPath,
+    deliveryReportMarkdownPath,
+    iterationLogJsonPath,
+    iterationLogMarkdownPath,
+  ]) {
+    verifyPathUnderProject(artifactPath, ctx.projectDir)
+  }
 
-    const correlation = { invocationId: randomUUID(), attempt: attempt + 1 }
-    const result: AgentResult = await driver.invoke({
-      prompt,
-      role: 'docs',
-      agent,
-      model,
-      projectDir: ctx.projectDir,
-      signal,
-      swarmSessionId: ctx.sessionId,
-      correlation,
+  writeJsonFile(path.join(ctx.projectDir, deliveryReportJsonPath), deliveryReport)
+  fs.writeFileSync(path.join(ctx.projectDir, deliveryReportMarkdownPath), deliveryMarkdown, 'utf-8')
+  writeJsonFile(path.join(ctx.projectDir, iterationLogJsonPath), iterationLog)
+  fs.writeFileSync(path.join(ctx.projectDir, iterationLogMarkdownPath), iterationMarkdown, 'utf-8')
+
+  for (const artifactPath of [
+    deliveryReportJsonPath,
+    deliveryReportMarkdownPath,
+    iterationLogJsonPath,
+    iterationLogMarkdownPath,
+  ]) {
+    ctx.emitter.emit({
+      type: 'file:changed',
+      timestamp: new Date().toISOString(),
+      sessionId: ctx.sessionId,
+      data: { path: artifactPath, action: 'modified' },
     })
-
-    if (result.success) {
-      reportContent = sanitizeOutput(result.output)
-      agentSucceeded = true
-      break
-    }
-
-    if (isImmediateFailErrorCode(result.errorCode)) {
-      // Fallback immediately on spawn_error
-      break
-    }
-
-    if (result.errorCode === 'aborted') {
-      throw new Error('Docs phase aborted')
-    }
-
-    if (isRetryableErrorCode(result.errorCode) && attempt < MAX_RETRIES) {
-      ctx.emitter.emit({
-        type: 'agent:error',
-        timestamp: new Date().toISOString(),
-        sessionId: ctx.sessionId,
-        data: { role: 'docs', reason: `${result.errorCode}: ${result.error}` },
-      })
-      continue
-    }
-
-    // All retries exhausted
-    break
   }
 
-  if (!agentSucceeded) {
-    reportContent = generateFallbackReport(reportInput)
-    usedFallback = true
-  }
-
-  // Build iteration log
-  const events = ctx.emitter.getEvents()
-  const iterationEntries = buildIterationLog(events, codeResult)
-  const iterationContent = renderIterationLog(iterationEntries)
-
-  // Verify output paths
-  const deliveryReportPath = 'delivery-report.md'
-  const iterationsLogPath = 'iterations.md'
-  verifyPathUnderProject(deliveryReportPath, ctx.projectDir)
-  verifyPathUnderProject(iterationsLogPath, ctx.projectDir)
-
-  // Write files
-  const absDeliveryPath = path.join(ctx.projectDir, deliveryReportPath)
-  const absIterationsPath = path.join(ctx.projectDir, iterationsLogPath)
-  const deliveryAction = fs.existsSync(absDeliveryPath) ? 'modified' : 'created'
-  const iterationsAction = fs.existsSync(absIterationsPath) ? 'modified' : 'created'
-  fs.writeFileSync(absDeliveryPath, reportContent!, 'utf-8')
-  fs.writeFileSync(absIterationsPath, iterationContent, 'utf-8')
-  ctx.emitter.emit({
-    type: 'file:changed',
-    timestamp: new Date().toISOString(),
-    sessionId: ctx.sessionId,
-    data: { path: deliveryReportPath, action: deliveryAction },
-  })
-  ctx.emitter.emit({
-    type: 'file:changed',
-    timestamp: new Date().toISOString(),
-    sessionId: ctx.sessionId,
-    data: { path: iterationsLogPath, action: iterationsAction },
-  })
-
-  // Commit doc files
   let commitHash: string | undefined
   try {
-    commitHash = await commitSpecItem(ctx.projectDir, [deliveryReportPath, iterationsLogPath], 'docs(swarm): add delivery report and iteration log')
-  } catch (err) {
-    const message = `Warning: doc commit failed: ${(err as Error).message}`
-    process.stderr.write(message + '\n')
+    commitHash = await commitSpecItem(
+      ctx.projectDir,
+      [
+        deliveryReportJsonPath,
+        deliveryReportMarkdownPath,
+        iterationLogJsonPath,
+        iterationLogMarkdownPath,
+      ],
+      'docs(swarm): add delivery report artifacts'
+    )
+  } catch (error) {
+    const message = `Warning: doc commit failed: ${(error as Error).message}`
+    process.stderr.write(`${message}\n`)
     emitWarningEvent(ctx.emitter, ctx.sessionId, 'docs.commit', message)
   }
 
-  // PR operations
-  let prUpdated = false
-  let prMarkedReady = false
-
   if (codeResult.gitState.prNumber) {
-    const prNumber = codeResult.gitState.prNumber
-
-    // Update PR body
     try {
-      let prBody = reportContent!
+      let prBody = deliveryMarkdown
       if (prBody.length > MAX_PR_BODY_CHARS) {
-        prBody = prBody.slice(0, MAX_PR_BODY_CHARS) + '\n\n...(truncated)'
+        prBody = `${prBody.slice(0, MAX_PR_BODY_CHARS)}\n\n...(truncated)`
       }
 
       await spawnWithTimeout(
-        'gh', ['pr', 'edit', String(prNumber), '--body-file', '-'],
-        ctx.projectDir, 30_000, prBody
+        'gh',
+        ['pr', 'edit', String(codeResult.gitState.prNumber), '--body-file', '-'],
+        ctx.projectDir,
+        30_000,
+        prBody
       )
-      prUpdated = true
-    } catch (err) {
-      const message = `Warning: PR body update failed: ${(err as Error).message}`
-      process.stderr.write(message + '\n')
+    } catch (error) {
+      const message = `Warning: PR body update failed: ${(error as Error).message}`
+      process.stderr.write(`${message}\n`)
       emitWarningEvent(ctx.emitter, ctx.sessionId, 'docs.pr-body', message)
     }
 
-    // Mark PR ready
     try {
-      await markPrReady(prNumber, ctx.projectDir)
-      prMarkedReady = true
-    } catch (err) {
-      const message = `Warning: mark PR ready failed: ${(err as Error).message}`
-      process.stderr.write(message + '\n')
+      await markPrReady(codeResult.gitState.prNumber, ctx.projectDir)
+    } catch (error) {
+      const message = `Warning: mark PR ready failed: ${(error as Error).message}`
+      process.stderr.write(`${message}\n`)
       emitWarningEvent(ctx.emitter, ctx.sessionId, 'docs.pr-ready', message)
     }
   }
 
   const result: DocsPhaseResult = {
-    deliveryReportPath: absDeliveryPath,
-    iterationsLogPath: absIterationsPath,
+    deliveryReportJsonPath: path.join(ctx.projectDir, deliveryReportJsonPath),
+    deliveryReportMarkdownPath: path.join(ctx.projectDir, deliveryReportMarkdownPath),
+    iterationLogJsonPath: path.join(ctx.projectDir, iterationLogJsonPath),
+    iterationLogMarkdownPath: path.join(ctx.projectDir, iterationLogMarkdownPath),
     commitHash,
-    prUpdated,
-    prMarkedReady,
-    usedFallbackReport: usedFallback,
     success: true,
   }
 
-  // Save state
   try {
     state.currentPhase = 'docs'
     state.completedPhases = [...state.completedPhases, 'docs']
     state.phaseResults = { ...state.phaseResults, docs: result }
     state.updatedAt = new Date().toISOString()
     ctx.state.save(state)
-  } catch (err) {
-    const message = `Warning: state save failed: ${(err as Error).message}`
-    process.stderr.write(message + '\n')
+  } catch (error) {
+    const message = `Warning: state save failed: ${(error as Error).message}`
+    process.stderr.write(`${message}\n`)
     emitWarningEvent(ctx.emitter, ctx.sessionId, 'docs.state-save', message)
   }
 
-  // Emit phase:end
   ctx.emitter.emit({
     type: 'phase:end',
     timestamp: new Date().toISOString(),

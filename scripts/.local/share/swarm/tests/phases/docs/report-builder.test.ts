@@ -24,7 +24,16 @@ function createSessionContext(overrides: Partial<SessionContext> = {}): SessionC
     sessionId: 'test-session' as SessionId,
     config: { config: createSwarmConfig(), resolvedFrom: 'test' },
     emitter: createMockEmitter(),
-    state: { load: vi.fn(), save: vi.fn(), acquireLock: vi.fn(), releaseLock: vi.fn() },
+    state: {
+      load: vi.fn().mockReturnValue({
+        found: true,
+        valid: true,
+        state: { startedAt: '2026-01-15T10:00:00.000Z' },
+      }),
+      save: vi.fn(),
+      acquireLock: vi.fn(),
+      releaseLock: vi.fn(),
+    },
     specPath: '/tmp/project/spec.md',
     projectDir: '/tmp/project',
     dryRun: false,
@@ -159,6 +168,7 @@ describe('buildDeliveryReportInput', () => {
     const result = buildDeliveryReportInput(ctx, plan, tdd, code)
 
     expect(result).toMatchObject({
+      schemaVersion: 2,
       sessionId: 'test-session',
       specPath: '/tmp/project/spec.md',
     })
@@ -182,7 +192,11 @@ describe('buildDeliveryReportInput', () => {
   it('includes session duration calculation', () => {
     const startedAt = new Date(Date.now() - 60_000).toISOString()
     const state = {
-      load: vi.fn(),
+      load: vi.fn().mockReturnValue({
+        found: true,
+        valid: true,
+        state: { startedAt },
+      }),
       save: vi.fn(),
       acquireLock: vi.fn(),
       releaseLock: vi.fn(),
@@ -224,6 +238,7 @@ describe('buildDeliveryReportInput', () => {
     expect(taskIds).toContain('TASK-2')
     const t1 = allTasks.find(t => t.id === 'TASK-1')
     expect(t1?.tag).toBe('frontend')
+    expect(t1?.filesModified).toEqual(['src/api.ts', 'src/ui.ts'])
   })
 
   it('includes review findings from iterations', () => {
@@ -260,6 +275,7 @@ describe('buildDeliveryReportInput', () => {
     const allFindings = result.specItems.flatMap(si => si.reviewFindings)
     expect(allFindings.length).toBeGreaterThan(0)
     expect(allFindings.some(f => f.severity === 'critical')).toBe(true)
+    expect(allFindings[0]).toHaveProperty('file')
   })
 
   it('keeps last reviewed findings visible for max-iterations outcomes', () => {

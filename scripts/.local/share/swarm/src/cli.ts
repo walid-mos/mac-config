@@ -1,7 +1,7 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { emitWarningEvent } from './core/event-emitter.js'
-import { readCodePhaseResult, readPlanPhaseResult } from './phases/phase-results.js'
+import { readCodePhaseResult, readDocsPhaseResult, readPlanPhaseResult } from './phases/phase-results.js'
 import type {
   ResolvedConfig,
   SessionId,
@@ -511,8 +511,9 @@ const runSession = async (
     }
 
     const docsDone = readValidState(stateManager).completedPhases.includes('docs')
+    let docsResult = readDocsPhaseResult(readValidState(stateManager))
     if (!docsDone) {
-      await runDocsPhase(ctx, registry, controller.signal)
+      docsResult = await runDocsPhase(ctx, registry, controller.signal)
     }
 
     emitter.emit({
@@ -527,6 +528,17 @@ const runSession = async (
 
     markSessionTerminal(stateManager, 'completed')
     shouldCleanupWorktree = true
+
+    if (docsResult) {
+      printJson({
+        success: codeResult?.success ?? true,
+        deliveryReportJsonPath: docsResult.deliveryReportJsonPath,
+        deliveryReportMarkdownPath: docsResult.deliveryReportMarkdownPath,
+        iterationLogJsonPath: docsResult.iterationLogJsonPath,
+        iterationLogMarkdownPath: docsResult.iterationLogMarkdownPath,
+      })
+    }
+
     exitCode = codeResult?.success === false ? 1 : 0
     return exitCode
   } catch (error) {

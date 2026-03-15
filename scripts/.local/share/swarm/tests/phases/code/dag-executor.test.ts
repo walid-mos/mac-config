@@ -11,7 +11,7 @@ import type { DriverRegistry, Driver, AgentResult } from '../../../src/drivers/d
 import type { ModelId } from '../../../src/core/types.js'
 import type { TechStack } from '../../../src/detect/tech-stack.js'
 import type { PlannerTask } from '../../../src/phases/plan/task-parser.js'
-import { createMockEmitter, createSwarmConfig } from '../../__test-utils__/factories.js'
+import { createMockEmitter, createSwarmConfig, createSwarmState } from '../../__test-utils__/factories.js'
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -84,11 +84,18 @@ function createMockRegistry(driver?: Driver): DriverRegistry {
 }
 
 function createSessionContext(overrides: Partial<SessionContext> = {}): SessionContext {
+  const state = createSwarmState()
+
   return {
     sessionId: 'test-session' as SessionId,
     config: { config: createSwarmConfig(), resolvedFrom: 'test' },
     emitter: createMockEmitter(),
-    state: { load: vi.fn(), save: vi.fn(), acquireLock: vi.fn(), releaseLock: vi.fn() },
+    state: {
+      load: vi.fn().mockReturnValue({ found: true, valid: true, state }),
+      save: vi.fn(),
+      acquireLock: vi.fn(),
+      releaseLock: vi.fn(),
+    },
     specPath: '/tmp/project/spec.md',
     projectDir: '/tmp/project',
     dryRun: false,
@@ -603,6 +610,7 @@ describe('executeDag', () => {
   })
 
   it('demotes important findings when convergenceRecommendation is converged', async () => {
+    const stderrSpy = vi.spyOn(process.stderr, 'write').mockReturnValue(true)
     const { runReviewPhase } = await import('../../../src/phases/code/review-merge.js')
     const { getChangedFiles } = await import('../../../src/git/git-operations.js')
     const { parseStructuredOutput } = await import('../../../src/drivers/output-parser.js')
@@ -638,6 +646,9 @@ describe('executeDag', () => {
     expect(result.taskCompletions).toHaveLength(1)
     expect(result.taskCompletions[0]!.status).toBe('green')
     expect(result.iterations).toHaveLength(1)
+    expect(stderrSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Merge agent recommends converged')
+    )
   })
 
   it('does not demote critical findings even when converged', async () => {

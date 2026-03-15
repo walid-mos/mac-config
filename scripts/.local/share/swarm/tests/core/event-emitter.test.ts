@@ -173,7 +173,7 @@ describe('createEventEmitter — EPIPE handling', () => {
     vi.restoreAllMocks()
   })
 
-  it('does not crash when writing to a closed/destroyed stream', () => {
+  it('does not crash when writing to a closed/destroyed stream', async () => {
     const stream = new PassThrough()
     const emitter = createEventEmitter(TEST_SESSION_ID, { output: stream })
 
@@ -186,7 +186,7 @@ describe('createEventEmitter — EPIPE handling', () => {
     }).not.toThrow()
   })
 
-  it('logs EPIPE errors to stderr instead of crashing', () => {
+  it('logs EPIPE errors to stderr instead of crashing', async () => {
     const stderrSpy = vi.spyOn(process.stderr, 'write').mockReturnValue(true)
     const stream = new Writable({
       write(_chunk, _encoding, callback) {
@@ -199,7 +199,7 @@ describe('createEventEmitter — EPIPE handling', () => {
 
     emitter.emit(createSessionStartEvent(TEST_SESSION_ID))
 
-    // Give the error handler a tick to fire
+    await new Promise(resolve => setTimeout(resolve, 0))
     expect(stderrSpy).toHaveBeenCalled()
   })
 })

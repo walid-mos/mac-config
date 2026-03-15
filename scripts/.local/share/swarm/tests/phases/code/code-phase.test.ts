@@ -13,7 +13,7 @@ import type { DriverRegistry, Driver, AgentResult } from '../../../src/drivers/d
 import type { ModelId } from '../../../src/core/types.js'
 import type { TechStack } from '../../../src/detect/tech-stack.js'
 import type { PlannerTask } from '../../../src/phases/plan/task-parser.js'
-import { createMockEmitter, createSwarmConfig } from '../../__test-utils__/factories.js'
+import { createMockEmitter, createSwarmConfig, createSwarmState } from '../../__test-utils__/factories.js'
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -110,11 +110,18 @@ function createMockRegistry(driver?: Driver): DriverRegistry {
 }
 
 function createSessionContext(overrides: Partial<SessionContext> = {}): SessionContext {
+  const state = createSwarmState()
+
   return {
     sessionId: 'test-session' as SessionId,
     config: { config: createSwarmConfig(), resolvedFrom: 'test' },
     emitter: createMockEmitter(),
-    state: { load: vi.fn(), save: vi.fn(), acquireLock: vi.fn(), releaseLock: vi.fn() },
+    state: {
+      load: vi.fn().mockReturnValue({ found: true, valid: true, state }),
+      save: vi.fn(),
+      acquireLock: vi.fn(),
+      releaseLock: vi.fn(),
+    },
     specPath: '/tmp/project/spec.md',
     projectDir: '/tmp/project',
     dryRun: false,

@@ -10,7 +10,12 @@ import type {
 } from '../../../src/phases/phase-results.js'
 import type { PlannerTask } from '../../../src/phases/plan/task-parser.js'
 import type { TestResult } from '../../../src/phases/phase-results.js'
-import { createMockEmitter, createSwarmConfig, createSwarmState } from '../../__test-utils__/factories.js'
+import {
+  createMockChildProcess,
+  createMockEmitter,
+  createSwarmConfig,
+  createSwarmState,
+} from '../../__test-utils__/factories.js'
 
 // ---------------------------------------------------------------------------
 // Module mocks — all internal modules the docs phase depends on
@@ -66,7 +71,6 @@ vi.mock('node:fs', async (importOriginal) => {
 
 vi.mock('node:child_process', () => ({
   spawn: vi.fn().mockImplementation(() => {
-    const { createMockChildProcess } = require('../../__test-utils__/factories.js')
     const proc = createMockChildProcess()
     setTimeout(() => proc.simulateOutput('', 0), 0)
     return proc
@@ -166,7 +170,7 @@ describe('runDocsPhase', () => {
   let registry: DriverRegistry
 
   beforeEach(async () => {
-    vi.restoreAllMocks()
+    vi.clearAllMocks()
     ctx = createSessionContext()
     registry = createMockRegistry()
     await setupMocksWithCodeResult()

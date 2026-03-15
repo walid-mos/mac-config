@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { PHASES, TOP_LEVEL_PHASES } from './types.js'
 
 // ---------------------------------------------------------------------------
 // Shared regex patterns
@@ -40,7 +41,8 @@ export const SwarmConfigSchema = z.object({
 // Phase schema
 // ---------------------------------------------------------------------------
 
-const PhaseSchema = z.enum(['init', 'plan', 'tdd', 'code', 'review', 'commit', 'docs'])
+const PhaseSchema = z.enum(PHASES)
+const TopLevelPhaseSchema = z.enum(TOP_LEVEL_PHASES)
 
 // ---------------------------------------------------------------------------
 // PhaseError schema
@@ -61,12 +63,21 @@ export const SwarmStateSchema = z.object({
   sessionId: z.string().regex(SESSION_ID_RE),
   specPath: z.string(),
   projectDir: z.string(),
+  worktreePath: z.string().optional(),
+  worktreeBranch: z.string().optional(),
+  runtimeDir: z.string(),
+  configResolvedFrom: z.string(),
+  status: z.enum(['running', 'paused', 'completed', 'failed']),
+  prNumber: z.number().int().positive().optional(),
+  prUrl: z.string().optional(),
+  completedAt: z.string().optional(),
+  failureReason: z.string().optional(),
   config: SwarmConfigSchema,
-  currentPhase: PhaseSchema,
+  currentPhase: TopLevelPhaseSchema,
   currentIteration: z.number(),
   currentSpecItem: z.number(),
   totalSpecItems: z.number(),
-  completedPhases: z.array(PhaseSchema),
+  completedPhases: z.array(TopLevelPhaseSchema),
   phaseResults: z.record(z.string(), z.unknown()),
   errors: z.array(PhaseErrorSchema),
   startedAt: z.string(),

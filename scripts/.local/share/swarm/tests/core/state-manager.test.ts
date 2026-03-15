@@ -214,6 +214,33 @@ describe('createStateManager — load (FR-6)', () => {
       expect(result.valid).toBe(false)
     }
   })
+
+  it('loads persisted runtime metadata including worktree and PR fields', () => {
+    const manager = createStateManager(TEST_SESSION_ID, { tmpDir })
+    const state = createSwarmState({
+      sessionId: TEST_SESSION_ID,
+      worktreePath: '/tmp/project-wt',
+      worktreeBranch: 'swarm/test-session',
+      prNumber: 42,
+      prUrl: 'https://github.com/org/repo/pull/42',
+      status: 'paused',
+      currentPhase: 'code',
+      completedPhases: ['plan'],
+    })
+
+    manager.save(state)
+
+    const result = manager.load()
+    if (result.found && result.valid) {
+      expect(result.state.worktreePath).toBe('/tmp/project-wt')
+      expect(result.state.worktreeBranch).toBe('swarm/test-session')
+      expect(result.state.prNumber).toBe(42)
+      expect(result.state.prUrl).toBe('https://github.com/org/repo/pull/42')
+      expect(result.state.status).toBe('paused')
+    } else {
+      expect.unreachable('expected valid state with runtime metadata')
+    }
+  })
 })
 
 // ---------------------------------------------------------------------------

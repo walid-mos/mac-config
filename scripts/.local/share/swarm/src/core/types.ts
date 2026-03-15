@@ -54,7 +54,13 @@ export type Phase =
   | 'commit'
   | 'docs'
 
-export const PHASES: readonly Phase[] = ['init', 'plan', 'tdd', 'code', 'review', 'commit', 'docs'] as const
+export const PHASES = ['init', 'plan', 'tdd', 'code', 'review', 'commit', 'docs'] as const satisfies readonly Phase[]
+
+export type TopLevelPhase = 'init' | 'plan' | 'code' | 'docs'
+
+export const TOP_LEVEL_PHASES = ['init', 'plan', 'code', 'docs'] as const satisfies readonly TopLevelPhase[]
+
+export type SessionStatus = 'running' | 'paused' | 'completed' | 'failed'
 
 // === Config ===
 
@@ -220,12 +226,20 @@ export interface SwarmState {
   specPath: string
   projectDir: string
   worktreePath?: string
+  worktreeBranch?: string
+  runtimeDir: string
+  configResolvedFrom: string
+  status: SessionStatus
+  prNumber?: number
+  prUrl?: string
+  completedAt?: string
+  failureReason?: string
   config: SwarmConfig
-  currentPhase: Phase
+  currentPhase: TopLevelPhase
   currentIteration: number
   currentSpecItem: number
   totalSpecItems: number
-  completedPhases: Phase[]
+  completedPhases: TopLevelPhase[]
   phaseResults: Partial<Record<Phase, unknown>>
   errors: PhaseError[]
   startedAt: string

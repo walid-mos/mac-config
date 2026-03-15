@@ -10,6 +10,14 @@ import { SwarmStateSchema } from './validation.js'
 
 const MAX_ERRORS = 50
 
+const formatError = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message
+  }
+
+  return String(error)
+}
+
 // ---------------------------------------------------------------------------
 // createStateManager
 // ---------------------------------------------------------------------------
@@ -47,11 +55,13 @@ export function createStateManager(
       // Parse-back failed — delete .tmp, do NOT overwrite existing state
       try {
         fs.unlinkSync(tmpPath)
-      } catch {
-        // Best-effort cleanup
+      } catch (cleanupError) {
+        process.stderr.write(
+          `Warning: failed to remove temporary state file "${tmpPath}": ${formatError(cleanupError)}\n`
+        )
       }
       throw new Error(
-        `State write-back verification failed: ${(err as Error).message}`
+        `State write-back verification failed: ${formatError(err)}`
       )
     }
 
@@ -71,7 +81,8 @@ export function createStateManager(
     let raw: string
     try {
       raw = fs.readFileSync(stateFile, 'utf-8')
-    } catch {
+    } catch (error) {
+      process.stderr.write(`Warning: failed to read state file "${stateFile}": ${formatError(error)}\n`)
       return { found: false, reason: 'inaccessible' }
     }
 
@@ -127,7 +138,8 @@ export function createStateManager(
     let lockData: { pid: number; startedAt: string; hostname: string }
     try {
       lockData = JSON.parse(lockContent)
-    } catch {
+    } catch (error) {
+      process.stderr.write(`Warning: replacing corrupt lock file "${lockFile}": ${formatError(error)}\n`)
       // Corrupt lock file — overwrite it
       writeLockFile()
       return
@@ -178,7 +190,16 @@ function isPidAlive(pid: number): boolean {
   try {
     process.kill(pid, 0)
     return true
-  } catch {
+  } catch (error) {
+    const err = error as NodeJS.ErrnoException
+    if (err.code !== 'EPERM' && err.code !== 'ESRCH') {
+      process.stderr.write(`Warning: failed to probe PID ${pid}: ${formatError(error)}\n`)
+    }
+
+    if (err.code === 'EPERM') {
+      return true
+    }
+
     return false
   }
 }

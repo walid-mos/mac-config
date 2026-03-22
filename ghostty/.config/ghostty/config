@@ -1,6 +1,0 @@
-config-file = globals.conf
-config-file = keybindings.conf
-config-file = fonts.conf
-config-file = appearance.conf
-keybind = shift+enter=text:\x1b\r
-auto-update-channel = tip

@@ -1,6 +1,0 @@
-# Starship prompt configuration
-# https://starship.rs/config/
-
-# Increase global command timeout to 2 seconds
-# Prevents timeout warnings with fnm's shim-based node lookup
-command_timeout = 2000

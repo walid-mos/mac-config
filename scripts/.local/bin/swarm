@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-SWARM_HOME="${SWARM_HOME:-$(dirname "$(dirname "$(realpath "$0")")")/share/swarm}"
-exec node "${SWARM_HOME}/dist/cli.js" "$@"

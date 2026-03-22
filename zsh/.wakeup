@@ -1,4 +1,0 @@
-#!/bin/bash
-# Reconnect NAS shares after wake from sleep
-sleep 3
-/Users/walid/.local/bin/mount-nas.sh 2>/dev/null

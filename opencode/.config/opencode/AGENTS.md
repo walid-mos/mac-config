@@ -1,1 +1,0 @@
-/Users/walid/.claude/CLAUDE.md

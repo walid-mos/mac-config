@@ -1,9 +1,0 @@
-[models]
-plan        = { backend = "claude", model = "opus", agent = "task-planner" }
-test        = { backend = "claude", model = "opus", agent = "test-writer" }
-code        = { backend = "claude", model = "opus", agent = "code-implementer" }
-review      = { backend = "claude", model = "opus", agent = "code-reviewer" }
-security    = { backend = "claude", model = "opus", agent = "security-reviewer" }
-consistency = { backend = "claude", model = "opus", agent = "consistency-reviewer" }
-merge       = { backend = "claude", model = "opus", agent = "review-merger" }
-docs        = { backend = "claude", model = "opus", agent = "docs-writer" }

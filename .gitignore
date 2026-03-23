@@ -39,3 +39,6 @@ node_modules/
 # pnpm store
 .pnpm-store/
 
+
+# Languages: built from source (nested git repos)
+languages/.config/languages/ols/

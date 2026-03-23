@@ -63,6 +63,10 @@ return {
 			})
 
 			-- mason-lspconfig auto-enable les serveurs installés via vim.lsp.enable()
+
+			-- ols n'est pas dans Mason, installé manuellement (brew install ols)
+			vim.lsp.config("ols", {})
+			vim.lsp.enable("ols")
 		end,
 	},
 }

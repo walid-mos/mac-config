@@ -30,7 +30,7 @@ vim.opt.wrap = false
 vim.opt.scrolloff = 4
 vim.opt.sidescrolloff = 8
 vim.opt.pumheight = 10
-vim.opt.pumblend = 10
+vim.opt.pumblend = 0
 
 -- Splits
 vim.opt.splitbelow = true

@@ -17,7 +17,8 @@
   },
   "permissions": {
     "allow": [
-      "Bash(git:*)"
+      "Bash(git:*)",
+      "mcp__claude_ai_Context7__*"
     ],
     "deny": []
   }

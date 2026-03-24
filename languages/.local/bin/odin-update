@@ -1,0 +1,20 @@
+#!/bin/sh
+set -e
+
+echo "Updating Odin..."
+brew upgrade odin 2>/dev/null || echo "Odin already up to date"
+
+# Get Odin version tag (format: dev-YYYY-MM)
+odin_version=$(odin version 2>&1 | grep -o 'dev-[0-9]\{4\}-[0-9]\{2\}')
+if [ -z "$odin_version" ]; then
+	echo "Error: could not detect Odin version"
+	exit 1
+fi
+
+echo "Rebuilding ols for $odin_version..."
+cd "$HOME/.config/languages/ols"
+git fetch --tags
+git checkout "$odin_version"
+./build.sh
+
+echo "Done — Odin + ols updated to $odin_version"

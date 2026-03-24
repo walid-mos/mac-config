@@ -51,7 +51,7 @@ vim.opt.smartcase = true
 -- UI
 vim.wo.signcolumn = "yes"
 vim.opt.updatetime = 250
-vim.opt.timeoutlen = 125
+vim.opt.timeoutlen = 300
 vim.opt.numberwidth = 4
 vim.opt.completeopt = { "menuone", "noselect" }
 vim.opt.cmdheight = 1

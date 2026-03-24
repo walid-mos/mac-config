@@ -18,7 +18,12 @@
   "permissions": {
     "allow": [
       "Bash(git:*)",
-      "mcp__claude_ai_Context7__*"
+      "mcp__claude_ai_Context7__*",
+      "mcp__context7__*",
+      "Bash(ssh:*)",
+      "Bash(ssh-add:*)",
+      "Bash(ls:*)",
+      "WebFetch(*)"
     ],
     "deny": []
   }

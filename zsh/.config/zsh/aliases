@@ -1,3 +1,41 @@
 # =============================================================================
 # Aliases
 # =============================================================================
+
+alias szsh="source ~/.zshrc"
+
+# Git - unalias OMZ conflicts
+unalias gf 2>/dev/null
+unalias gl 2>/dev/null
+
+# Git - basics
+alias gs="git status"
+alias ga="git add"
+alias gc="git commit"
+alias gcm="git commit -m"
+alias gca="git commit --amend --no-edit"
+alias gd="git diff"
+alias gds="git diff --staged"
+
+# Git - branches
+alias gb="git branch"
+alias gsw="git switch"
+alias gcb="git switch -c"
+
+# Git - log
+alias gl="git log --oneline --graph --decorate --all"
+
+# Git - remote
+alias gp="git push"
+alias gpf="git push --force-with-lease"
+alias gpl="git pull --all"
+
+# Git - rebase
+alias gr="git rebase"
+
+# Git - stash
+alias gst="git stash"
+alias gstp="git stash pop"
+
+# Git - restore
+alias grs="git restore --staged"

@@ -7,6 +7,14 @@ return {
 
 	config = function()
 		require("conform").setup({
+			formatters = {
+				odinfmt = {
+					command = "odinfmt",
+					args = { "-stdin" },
+					stdin = true,
+				},
+			},
+
 			formatters_by_ft = {
 				javascript = web_formatters,
 				typescript = web_formatters,

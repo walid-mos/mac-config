@@ -4,6 +4,9 @@
 vim.keymap.set("n", "go", "o<Esc>k", { desc = "Add blank line below" })
 vim.keymap.set("n", "gO", "O<Esc>j", { desc = "Add blank line above" })
 
+-- Clear search highlight
+vim.keymap.set("n", "<Esc>", "<cmd>nohlsearch<CR>", { desc = "Clear search highlight" })
+
 -- Diagnostics
 vim.keymap.set("n", "<leader>e", vim.diagnostic.open_float, { desc = "Show diagnostic" })
 vim.keymap.set("n", "]e", function()

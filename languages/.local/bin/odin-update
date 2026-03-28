@@ -17,4 +17,7 @@ git fetch --tags
 git checkout "$odin_version"
 ./build.sh
 
-echo "Done — Odin + ols updated to $odin_version"
+echo "Rebuilding odinfmt..."
+odin build tools/odinfmt/main.odin -file -collection:src=src -out:odinfmt -o:speed -no-bounds-check
+
+echo "Done — Odin + ols + odinfmt updated to $odin_version"

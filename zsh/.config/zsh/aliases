@@ -3,6 +3,7 @@
 # =============================================================================
 
 alias szsh="source ~/.zshrc"
+alias getip="ifconfig | grep \"inet \" | grep -v 127.0.0.1"
 
 # Git - unalias OMZ conflicts
 unalias gf 2>/dev/null
@@ -39,3 +40,16 @@ alias gstp="git stash pop"
 
 # Git - restore
 alias grs="git restore --staged"
+
+# Editor
+alias v="nvim"
+alias oc="opencode"
+
+# Navigation - quick cd to important dirs
+alias cdev="cd ~/Development"
+alias cddl="cd ~/Downloads"
+alias cdstow="cd ~/.stow_repository"
+alias cdcfg="cd ~/.config"
+
+
+

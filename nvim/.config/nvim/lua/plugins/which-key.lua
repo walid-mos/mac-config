@@ -12,6 +12,8 @@ return {
 			{ "<leader>f", group = "[F]ind" },
 			{ "<leader>t", group = "[T]oggle" },
 			{ "<leader>w", group = "[W]orkspace" },
+			{ "<leader>x", group = "Diagnostics" },
+			{ "<leader>k", desc = "Open completion" },
 		},
 
 		win = {

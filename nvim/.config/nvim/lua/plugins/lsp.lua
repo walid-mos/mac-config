@@ -18,8 +18,10 @@ end
 local function setup_diagnostics()
 	vim.diagnostic.config({
 		virtual_text = { prefix = "●", spacing = 4 },
+		virtual_lines = { current_line = true },
 		severity_sort = true,
-		float = { border = "rounded", source = "always" },
+		underline = true,
+		float = { border = "rounded", source = true },
 	})
 
 	local signs = { Error = " ", Warn = " ", Hint = " ", Info = " " }

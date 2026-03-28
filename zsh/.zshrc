@@ -12,3 +12,6 @@ done
 # Aliases & secrets (outside conf.d for quick access)
 source ~/.config/zsh/aliases
 [[ -f ~/.config/zsh/secrets ]] && source ~/.config/zsh/secrets
+
+# opencode
+export PATH=/Users/walid-mos/.opencode/bin:$PATH

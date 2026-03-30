@@ -84,7 +84,7 @@ return {
 
 		-- Buffers
 		map("n", "<leader><space>", function()
-			builtin.buffers({ sort_mru = true })
+			builtin.buffers({ sort_mru = true, ignore_current_buffer = true, initial_mode = "normal" })
 		end, { desc = "Buffers (MRU)" })
 		map("n", "<leader>C", "<cmd>bdelete<CR>", { desc = "Close buffer" })
 

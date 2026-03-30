@@ -14,6 +14,7 @@ return {
 			{ "<leader>w", group = "[W]orkspace" },
 			{ "<leader>x", group = "Diagnostics" },
 			{ "<leader>k", desc = "Open completion" },
+			{ "<leader>s", group = "[S]plit" },
 		},
 
 		win = {

@@ -11,7 +11,7 @@
       "allowWrite": ["~/"]
     },
     "network": {
-      "allowedDomains": ["github.com", "api.github.com", "registry.npmjs.org", "gitlab.com"],
+      "allowedDomains": ["github.com", "api.github.com", "registry.npmjs.org", "gitlab.com", "eu-central-1-1.aws.cloud2.influxdata.com"],
       "allowLocalBinding": true
     }
   },
@@ -26,6 +26,7 @@
       "Bash(gh:*)",
       "Bash(curl:*)",
       "Bash(nvim:*)",
+      "Bash(stow:*)",
 
       "WebFetch(*)",
       "WebSearch(*)",

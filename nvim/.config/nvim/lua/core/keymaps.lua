@@ -16,6 +16,10 @@ vim.keymap.set("n", "[e", function()
 	vim.diagnostic.jump({ count = -1, severity = vim.diagnostic.severity.ERROR })
 end, { desc = "Previous error" })
 
+-- Split creation
+vim.keymap.set("n", "<leader>sh", "<cmd>vsplit<CR>", { desc = "Split right" })
+vim.keymap.set("n", "<leader>sv", "<cmd>split<CR>", { desc = "Split below" })
+
 -- Split navigation (Alt+hjkl) — shared with Ghostty's performable:goto_split
 vim.keymap.set("n", "<A-h>", "<C-w>h", { desc = "Go to left split" })
 vim.keymap.set("n", "<A-j>", "<C-w>j", { desc = "Go to lower split" })

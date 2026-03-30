@@ -1,0 +1,33 @@
+# =============================================================================
+# Colima Default Template
+# =============================================================================
+# Applied to new profiles via `colima start`
+# Edit with `colima template` or directly here
+# =============================================================================
+
+# VM resources
+cpu: 4
+memory: 4
+disk: 60
+
+# Apple Virtualization.framework (faster than QEMU on Apple Silicon)
+vmType: vz
+rosetta: true
+mountType: virtiofs
+
+# Docker runtime
+runtime: docker
+autoActivate: true
+
+# Network
+forwardAgent: false
+dns: []
+
+# Docker settings
+docker:
+  features:
+    buildkit: true
+
+# Kubernetes (disabled)
+kubernetes:
+  enabled: false

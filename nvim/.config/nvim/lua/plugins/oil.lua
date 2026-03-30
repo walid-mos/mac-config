@@ -24,8 +24,8 @@ return {
 			},
 
 			keymaps = {
-				["<C-v>"] = { "actions.select", opts = { vertical = true }, desc = "Open in vertical split" },
-				["<C-s>"] = { "actions.select", opts = { horizontal = true }, desc = "Open in horizontal split" },
+				["<leader>sh"] = { "actions.select", opts = { vertical = true, split = "botright" }, desc = "Open in split right" },
+				["<leader>sv"] = { "actions.select", opts = { horizontal = true, split = "botright" }, desc = "Open in split below" },
 				["<C-t>"] = { "actions.select", opts = { tab = true }, desc = "Open in new tab" },
 			},
 

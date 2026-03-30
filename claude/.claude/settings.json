@@ -7,6 +7,7 @@
   "sandbox": {
     "enabled": true,
     "autoAllowBashIfSandboxed": true,
+    "excludedCommands": ["git", "docker", "colima", "ssh", "ssh-add", "curl"],
     "filesystem": {
       "allowWrite": ["~/"]
     },
@@ -27,6 +28,10 @@
       "Bash(curl:*)",
       "Bash(nvim:*)",
       "Bash(stow:*)",
+      "Bash(docker:*)",
+      "Bash(cat:*)",
+      "Bash(find:*)",
+      "Bash(colima:*)",
 
       "WebFetch(*)",
       "WebSearch(*)",

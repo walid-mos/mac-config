@@ -1,0 +1,20 @@
+return {
+	"MagicDuck/grug-far.nvim",
+	config = function()
+		require("grug-far").setup({})
+
+		local map = vim.keymap.set
+		map("n", "<leader>sr", function()
+			require("grug-far").open()
+		end, { desc = "Search and Replace" })
+		map("n", "<leader>sw", function()
+			require("grug-far").open({ prefills = { search = vim.fn.expand("<cword>") } })
+		end, { desc = "Replace word under cursor" })
+		map("n", "<leader>sf", function()
+			require("grug-far").open({ prefills = { paths = vim.fn.expand("%") } })
+		end, { desc = "Replace in current file" })
+		map("v", "<leader>sr", function()
+			require("grug-far").open({ prefills = { search = require("grug-far").get_current_visual_selection() } })
+		end, { desc = "Replace visual selection" })
+	end,
+}

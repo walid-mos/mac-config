@@ -7,7 +7,7 @@
   "sandbox": {
     "enabled": true,
     "autoAllowBashIfSandboxed": true,
-    "excludedCommands": ["git", "docker", "colima", "ssh", "ssh-add", "curl"],
+    "excludedCommands": ["git", "docker", "colima", "ssh", "ssh-add", "curl", "brew", "tailscale"],
     "filesystem": {
       "allowWrite": ["~/"]
     },
@@ -40,6 +40,7 @@
       "mcp__context7__*",
 
       "Read",
+      "Grep",
       "Glob"
     ],
     "deny": [

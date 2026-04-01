@@ -7,7 +7,7 @@
   "sandbox": {
     "enabled": true,
     "autoAllowBashIfSandboxed": true,
-    "excludedCommands": ["git", "docker", "colima", "ssh", "ssh-add", "curl", "brew", "tailscale"],
+    "excludedCommands": ["git:*", "docker:*", "colima:*", "ssh:*", "ssh-add:*", "curl:*", "brew:*", "tailscale:*", "gh:*"],
     "filesystem": {
       "allowWrite": ["~/"]
     },

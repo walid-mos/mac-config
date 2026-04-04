@@ -35,6 +35,7 @@
       "Bash(node:*)",
       "Bash(cd:*)",
       "Bash(sqlite3:*)",
+      "Bash(for:*)",
 
       "WebFetch(*)",
       "WebSearch(*)",

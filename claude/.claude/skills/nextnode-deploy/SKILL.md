@@ -5,6 +5,7 @@ description: >-
   parsing and CI quality gates. Use when working on or integrating the infra
   CLI in a NextNode project.
 user-invocable: true
+synced-at: b582aa0
 ---
 
 # @nextnode-solutions/infrastructure
@@ -31,8 +32,11 @@ Always read the actual code before answering:
 1. `packages/infrastructure/src/index.ts` — CLI entry point
 2. `packages/infrastructure/src/config/schema.ts` — Config types and validation
 3. `packages/infrastructure/src/config/load.ts` — TOML loading
-4. `packages/infrastructure/src/pipeline/quality.ts` — Quality gate runner
-5. `packages/infrastructure/CLAUDE.md` — Architecture and design decisions
+4. `packages/infrastructure/src/pipeline/quality.ts` — Quality matrix builder
+5. `packages/infrastructure/src/pipeline/plan.ts` — GITHUB_OUTPUT writer
+6. `.github/workflows/pipeline.yml` — Reusable workflow
+7. `.github/actions/setup/action.yml` — Composite setup action
+8. `packages/infrastructure/CLAUDE.md` — Architecture and design decisions
 
 ---
 
@@ -53,50 +57,74 @@ test = false           # Disable tests in CI
 build = "build:prod"   # Custom script name
 ```
 
+### Monorepo filter
+
+For packages inside a turborepo monorepo, add `filter` to scope quality commands to a single package via `turbo --filter`:
+
+```toml
+[project]
+name = "logger"
+type = "package"
+filter = "@nextnode-solutions/logger"
+```
+
+When `filter` is set, quality commands become `pnpm turbo run {task} --filter={filter}` instead of `pnpm {task}`. When absent or `false`, commands run unscoped (default behavior).
+
 **Validation**: returns typed `NextNodeConfig` or a list of errors (discriminated union `ok: true | false`).
+
+See [config.md](config.md) for full schema reference.
 
 ---
 
-## Quality gate (CI)
+## Pipeline architecture
 
-Invoked via:
+### Workflow: `pipeline.yml`
 
-```bash
-PIPELINE_CONFIG_FILE=nextnode.toml PIPELINE_ACTION=ci tsx src/index.ts
-```
+Reusable workflow (`workflow_call`) — every NextNode project calls it, never defines its own CI jobs.
 
-Flow:
-1. Read `nextnode.toml`
-2. Build quality matrix from `[scripts]` — runs `lint` and `test` (not `build`)
-3. Execute each via `pnpm {script}` with `execSync`
-4. Report pass/fail with timing per task
-5. Exit 1 if any check fails
+**Inputs**:
+- `config_file` (string, default `"nextnode.toml"`) — path to config in caller repo
+- `environment` (string, default `"development"`) — target: `development` or `production`
 
-### CLI env vars
+**Jobs**:
+1. **Plan** — reads `nextnode.toml`, outputs `quality_matrix`, `project_name`, `project_type`
+2. **Quality** — matrix job running each quality task (lint, test) in parallel
+3. **Post-quality routes** (exactly one fires based on `project_type` + `environment`):
+   - `publish` — when `type = "package"`
+   - `deploy-dev` — when `type = "app"` + `environment = "development"`
+   - `deploy-prod` — when `type = "app"` + `environment = "production"`
 
-- `PIPELINE_CONFIG_FILE` — path to `nextnode.toml` (required)
-- `PIPELINE_ACTION` — currently only `"ci"` (required)
+### Composite action: `setup/action.yml`
 
-### Dependencies
+Shared setup for all jobs. Two modes via inputs:
+- `infra: "true"` — sparse-checkout core infrastructure + install its deps (for plan/deploy jobs)
+- `deps: "true"` (default) — install caller project deps (for quality/publish jobs)
 
-- `@nextnode-solutions/logger` — structured logging
-- `smol-toml` — TOML parsing
+### Quality matrix generation
+
+`buildQualityMatrix(scripts, project)` in `quality.ts`:
+- Produces tasks for enabled `lint` and `test` scripts (never `build`)
+- When `project.filter` is a string: `pnpm turbo run {task} --filter={filter}`
+- When `project.filter` is `false`: `pnpm {task}`
+- Empty matrix triggers skip sentinel in `plan.ts`
+
+See [pipeline.md](pipeline.md) for flow details.
 
 ---
 
 ## Using in a NextNode project
 
-### 1. Create nextnode.toml
+### Single-package repo
 
 ```toml
+# nextnode.toml
 [project]
 name = "my-app"
 type = "app"
 ```
 
-### 2. GitHub Actions
-
 ```yaml
+# .github/workflows/pipeline.yml
 name: Pipeline
 on:
   push:
@@ -109,7 +137,37 @@ jobs:
     secrets: inherit
 ```
 
-Runs lint + test on every push to main and on PRs.
+### Monorepo (per-package workflows)
+
+Each package gets its own workflow with path filters, its own `nextnode.toml`, and calls the same pipeline:
+
+```yaml
+# .github/workflows/logger.yml
+name: Logger
+on:
+  push:
+    branches: [main]
+    paths: ['packages/logger/**']
+  pull_request:
+    paths: ['packages/logger/**']
+
+jobs:
+  pipeline:
+    uses: NextNodeSolutions/core/.github/workflows/pipeline.yml@main
+    with:
+      config_file: packages/logger/nextnode.toml
+    secrets: inherit
+```
+
+```toml
+# packages/logger/nextnode.toml
+[project]
+name = "logger"
+type = "package"
+filter = "@nextnode-solutions/logger"
+```
+
+GitHub only triggers the workflow when files in that package change. The `filter` field scopes turbo to that package.
 
 ---
 
@@ -127,12 +185,6 @@ pnpm format       # oxfmt
 pnpm typecheck    # tsc --noEmit
 ```
 
-### Adding a pipeline action
-
-1. Add the action name to `VALID_ACTIONS` in `src/index.ts`
-2. Create the action logic in `src/pipeline/`
-3. Dispatch to it from `main()`
-
 ### Extending the config schema
 
 1. Add types to `src/config/schema.ts`
@@ -140,9 +192,16 @@ pnpm typecheck    # tsc --noEmit
 3. Add fixtures in `src/config/fixtures/`
 4. Update tests
 
+### Adding a pipeline action
+
+1. Create the action logic in `src/pipeline/`
+2. Dispatch to it from `main()` in `src/index.ts`
+
 ## Rules
 
 1. **Check the code, not assumptions** — only reference features that exist in source
 2. **Config grows with implementation** — add schema sections only when building their feature
 3. **pnpm only** — pnpm workspace
 4. **ESM only** — `import`, not `require`
+5. **One pipeline workflow** — every project calls `pipeline.yml`, never defines its own CI jobs
+6. **Path-filtered triggers for monorepos** — one workflow per package with `paths:` filter, not one workflow for everything

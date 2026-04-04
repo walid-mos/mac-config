@@ -29,13 +29,12 @@ Create `.oxfmt.json` at the project root:
 | Tailwind CSS | Experimental support enabled |
 
 **Import sort order**:
-1. Side effects (`import './polyfill'`)
-2. Builtins (`import path from 'node:path'`)
-3. External (`import express from 'express'`)
-4. Internal (`import { db } from '@/lib/db'`)
-5. Parent (`import { helper } from '../utils'`)
-6. Sibling (`import { schema } from './schema'`)
-7. Index (`import { config } from '.'`)
+1. Builtins (`import path from 'node:path'`)
+2. External (`import express from 'express'`)
+3. Internal (`import { db } from '@/lib/db'`)
+4. Parent (`import { helper } from '../utils'`)
+5. Sibling (`import { schema } from './schema'`)
+6. Index (`import { config } from '.'`)
 
 Type imports are grouped with their category but sorted after value imports.
 

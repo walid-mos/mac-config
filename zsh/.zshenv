@@ -13,6 +13,7 @@ export XDG_STATE_HOME="$HOME/.local/state"
 # App-specific XDG overrides
 export COLIMA_HOME="$XDG_CONFIG_HOME/colima"
 export DOCKER_BUILDKIT=1
+export TURBO_TELEMETRY_DISABLED=1
 
 # Essential PATH
 export PATH="$HOME/.local/bin:$PATH"

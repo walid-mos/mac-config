@@ -32,6 +32,9 @@
       "Bash(cat:*)",
       "Bash(find:*)",
       "Bash(colima:*)",
+      "Bash(node:*)",
+      "Bash(cd:*)",
+      "Bash(sqlite3:*)",
 
       "WebFetch(*)",
       "WebSearch(*)",

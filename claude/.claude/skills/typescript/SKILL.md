@@ -1,5 +1,6 @@
 ---
 name: typescript
+user-invocable: false
 description: >-
   TypeScript best practices and strict type-safety rules. This skill MUST be
   loaded whenever writing or modifying TypeScript files (*.ts, *.tsx). It

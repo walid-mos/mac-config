@@ -1,5 +1,6 @@
 ---
-name: Testing Best Practices
+name: test
+user-invocable: false
 description: >-
   This skill MUST be loaded ANY TIME tests are being written, whether
   explicitly requested by the user ("write tests", "add tests", "test this",

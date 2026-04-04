@@ -1,5 +1,6 @@
 ---
 name: javascript
+user-invocable: false
 description: >-
   JavaScript-specific best practices that MUST be loaded whenever writing or
   modifying JavaScript files (*.js, *.jsx, *.mjs, *.cjs). Enforces modern
@@ -328,6 +329,34 @@ class ValidationError extends Error {
     this.field = field
   }
 }
+```
+
+---
+
+## No Inline Non-JS Content
+
+NEVER embed non-JS content (TOML, JSON, YAML, HTML, XML, SQL, CSS, etc.) as hardcoded multiline strings or template literals in JS/TS files.
+
+**In application code**: ALWAYS use separate files with the proper extension and load them (`fs.readFileSync`, `import`, etc.).
+
+**In tests**: Use separate fixture files in a `fixtures/` or `__fixtures__/` directory next to the test file. Load them with a helper.
+
+**Only exception**: Very short strings (1-2 lines max) where a separate file would be overkill (e.g., a one-line parser test).
+
+```js
+// FORBIDDEN — inline TOML in template literal
+const path = writeTOML(`
+[project]
+name = "my-app"
+type = "app"
+
+[scripts]
+lint = "lint"
+test = "test"
+`)
+
+// CORRECT — fixture file: fixtures/minimal-config.toml
+const path = writeTOML(readFixture("minimal-config.toml"))
 ```
 
 ---

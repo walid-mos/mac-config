@@ -1,5 +1,6 @@
 ---
 name: coding
+user-invocable: false
 description: >-
   Language-agnostic coding rules that MUST be loaded whenever writing or
   modifying code in ANY language. Enforces early returns, flat control flow,

@@ -1,5 +1,6 @@
 ---
-name: Vitest Testing
+name: vitest
+user-invocable: false
 description: >-
   This skill MUST be used IN ADDITION to the "Testing Best Practices" skill
   when the project uses Vitest. It activates when the user asks to write tests

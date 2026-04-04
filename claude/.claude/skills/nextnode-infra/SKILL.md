@@ -1,171 +1,94 @@
 ---
 name: nextnode-infra
 description: >-
-  NextNode core monorepo overview. Entry point for understanding the platform's
-  shared packages (@nextnode-solutions/standards, logger, infrastructure) and how
-  to use them in any NextNode project. Dispatches to sub-skills per package.
+  NextNode core monorepo overview. Audits any NextNode project for compliance
+  with standards, logger, and infrastructure conventions. Dispatches to
+  sub-skills per package.
 user-invocable: true
 ---
 
 # NextNode Core Monorepo
 
-The `@nextnode/core` monorepo is the foundation of all NextNode projects. It contains three packages that every NextNode project depends on. This skill gives an overview and dispatches to the right sub-skill.
+`@nextnode/core` — pnpm workspaces + Turborepo, ESM only, Node >=24.
 
 ## Arguments
 
-- No argument: overview of the monorepo and all packages
-- `standards`: redirect to `/nextnode-standards`
-- `logger`: redirect to `/nextnode-logger`
-- `deploy` or `infra`: redirect to `/nextnode-deploy`
-- `setup`: full setup guide for a new NextNode project
-- `update`: how to update core packages in a project
+- No argument: **run full compliance audit** (default behavior)
+- `standards` -> `/nextnode-standards`
+- `logger` -> `/nextnode-logger`
+- `deploy` or `infra` -> `/nextnode-deploy`
 
 ## Instructions
 
-### If the user provides a sub-skill argument
+### When called without argument: compliance audit
+
+1. **Read the project** — `package.json`, config files, `nextnode.toml`, existing imports
+2. **Run the checklist** below against the project state
+3. **Present the results** as a table: item, status (pass/missing/misconfigured), detail
+4. **Ask the user**:
+   > "Want me to bring the project to 100% compliance, or pick specific items to fix?"
+   - If 100%: fix everything
+   - If selective: list the missing/misconfigured items and let the user choose
+
+### Compliance checklist
+
+#### Package manager & runtime
+- [ ] `pnpm-lock.yaml` exists (not npm/yarn/bun)
+- [ ] `package.json` has `"packageManager": "pnpm@<version>"` (exact version)
+- [ ] `package.json` has `"type": "module"`
+- [ ] `engines.node` >= 24
+
+#### Standards (`@nextnode-solutions/standards`)
+- [ ] Installed as devDependency
+- [ ] `oxlint` and `oxfmt` installed as devDependencies
+- [ ] `oxlint.json` exists and extends `@nextnode-solutions/standards/oxlint`
+- [ ] `.oxfmt.json` exists and extends `@nextnode-solutions/standards/oxfmt`
+- [ ] `tsconfig.json` exists and extends one of `standards/typescript/{library,nextjs,astro}`
+- [ ] Scripts: `lint` (oxlint), `format` (oxfmt --write .), `format:check` (oxfmt --check .), `type-check` (tsc --noEmit)
+
+#### Testing (if applicable)
+- [ ] `vitest` installed as devDependency
+- [ ] `vitest.config.ts` imports from `standards/vitest/{backend,frontend}`
+- [ ] Script: `test` (vitest run)
+
+#### Commit conventions (if applicable)
+- [ ] `@commitlint/cli` + `@commitlint/config-conventional` installed
+- [ ] `commitlint.config.js` imports from `standards/commitlint`
+- [ ] `husky` + `lint-staged` installed
+- [ ] `lint-staged.config.js` imports from `standards/lint-staged`
+
+#### Publishing (if `type=package`)
+- [ ] `.releaserc.json` extends `standards/semantic-release`
+- [ ] `nextnode.toml` has `[package]` section with `access`
+
+#### CI/CD
+- [ ] `nextnode.toml` exists with `[project]` section (name + type)
+- [ ] GitHub workflow calls the correct reusable workflow from `NextNodeSolutions/core`
+- [ ] Monorepo: per-package workflow with `paths:` filter + `filter` in nextnode.toml
+
+#### Logger (if used)
+- [ ] `@nextnode-solutions/logger` imported (not `console.log`)
+- [ ] Logger injected via constructor/parameter (not global import in business logic)
+- [ ] Tests use `createSpyLogger()` or `createNoopLogger()` from `logger/testing`
+
+### When called with a sub-skill argument
 
 Redirect immediately:
 - `standards` -> invoke `/nextnode-standards`
 - `logger` -> invoke `/nextnode-logger`
 - `deploy` or `infra` -> invoke `/nextnode-deploy`
 
-### If no argument or `setup` or `update`
+## Sub-skills
 
-Read the project's `package.json` to understand what core packages it already uses, then provide guidance.
-
----
-
-## The Monorepo: `@nextnode/core`
-
-**Repo**: `NextNodeSolutions/core`
-**Package manager**: pnpm (workspaces)
-**Build orchestration**: Turborepo
-**Node**: >=24.0.0
-**Module system**: ESM only
-
-### Packages
-
-| Package | npm name | Purpose | Has runtime code? |
-|---------|----------|---------|-------------------|
-| **standards** | `@nextnode-solutions/standards` | Centralized linting, formatting, TypeScript, Vitest, commitlint configs | No (config-only) |
-| **logger** | `@nextnode-solutions/logger` | Zero-dependency structured logging with scope, transports, environment detection | Yes |
-| **infrastructure** | `@nextnode-solutions/infrastructure` | CI/CD CLI — quality gates, deployment to VPS/Cloudflare/serverless | Yes (CLI binary) |
-
-### Dependency graph
-
-```
-@nextnode-solutions/standards (config, no runtime)
-  ^-- devDependency of every package and every NextNode project
-
-@nextnode-solutions/logger (zero-dep library)
-  ^-- dependency of infrastructure
-  ^-- dependency of NextNode apps that need logging
-
-@nextnode-solutions/infrastructure (CLI tool)
-  ^-- called by GitHub Actions in every NextNode project
-  ^-- depends on logger + smol-toml
-```
-
----
-
-## Setting up a new NextNode project
-
-### 1. Install core packages
-
-```bash
-# Standards (always — devDependency)
-pnpm add -D @nextnode-solutions/standards oxlint oxfmt
-
-# Logger (if your app needs logging)
-pnpm add @nextnode-solutions/logger
-
-# Vitest (if you have tests)
-pnpm add -D vitest @vitest/coverage-v8
-
-# Commitlint (if you want commit message linting)
-pnpm add -D @commitlint/cli @commitlint/config-conventional
-```
-
-### 2. Configure tooling
-
-Create config files that extend from standards. See `/nextnode-standards` for the full reference.
-
-**Minimum setup** (every project):
-
-```
-oxlint.json          -> extends @nextnode-solutions/standards/oxlint
-.oxfmt.json          -> extends @nextnode-solutions/standards/oxfmt
-tsconfig.json        -> extends @nextnode-solutions/standards/typescript/{library|nextjs|astro}
-```
-
-**Optional** (depending on project type):
-
-```
-vitest.config.ts     -> imports from @nextnode-solutions/standards/vitest/{backend|frontend}
-commitlint.config.js -> imports from @nextnode-solutions/standards/commitlint
-.editorconfig        -> copy from @nextnode-solutions/standards/editorconfig
-.npmrc               -> copy from @nextnode-solutions/standards/npmrc
-lint-staged.config.js -> imports from @nextnode-solutions/standards/lint-staged
-```
-
-### 3. Add scripts to package.json
-
-```json
-{
-  "scripts": {
-    "build": "tsup",
-    "lint": "oxlint",
-    "format": "oxfmt --write .",
-    "format:check": "oxfmt --check .",
-    "test": "vitest run",
-    "type-check": "tsc --noEmit"
-  }
-}
-```
-
-### 4. Create nextnode.toml (for deployable apps)
-
-```toml
-[project]
-name = "my-app"
-type = "app"
-
-[scripts]
-lint = "lint"
-test = "test"
-build = "build"
-```
-
-See `/nextnode-deploy` for full config reference.
-
----
-
-## Updating core packages
-
-```bash
-# Update all NextNode packages
-pnpm update @nextnode-solutions/standards @nextnode-solutions/logger
-
-# Check what changed
-pnpm outdated @nextnode-solutions/*
-```
-
-Standards is a config package — updates may introduce new lint rules or stricter TypeScript settings. Always run `pnpm lint` and `pnpm type-check` after updating.
-
----
-
-## Sub-skills reference
-
-| Skill | Invoke with | What it covers |
-|-------|------------|----------------|
-| `/nextnode-standards` | `/nextnode-standards` | oxlint, oxfmt, TypeScript, Vitest, commitlint, lint-staged configs |
-| `/nextnode-logger` | `/nextnode-logger` | Logger API, transports, testing utilities, integration patterns |
-| `/nextnode-deploy` | `/nextnode-deploy` | nextnode.toml, CI/CD pipeline, deployment targets, environments |
+| Skill | What it covers |
+|-------|----------------|
+| `/nextnode-standards` | oxlint, oxfmt, TypeScript, Vitest, commitlint, lint-staged, semantic-release |
+| `/nextnode-logger` | Logger API, transports, testing utilities |
+| `/nextnode-deploy` | nextnode.toml, CI pipeline, deployment |
 
 ## Rules
 
-1. **pnpm only** — all NextNode projects use pnpm. Never suggest npm or yarn.
-2. **ESM only** — all packages are ESM. Use `import`, not `require`.
-3. **Standards first** — every project MUST use `@nextnode-solutions/standards`. It's not optional.
-4. **Config-driven** — behavior is derived from `nextnode.toml` + `docker-compose.yml`. Don't hardcode infrastructure details.
-5. **Zero tolerance for `any`** — oxlint enforces `no-explicit-any` as error. Use proper types.
+1. **pnpm only** — never npm or yarn
+2. **ESM only** — `import`, not `require`
+3. **Standards first** — every project MUST use `@nextnode-solutions/standards`
+4. **Config-driven** — behavior from `nextnode.toml`, not hardcoded

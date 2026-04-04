@@ -59,7 +59,8 @@ The second argument to any log method is an optional `LogObject`:
 logger.info('User created', {
   scope: 'users',                    // Override logger's default scope for this call
   requestId: 'req-xyz',             // Override request ID for this call
-  details: { userId: 42, role: 'admin' }  // Arbitrary data attached to the log entry
+  details: { userId: 42, role: 'admin' },  // Arbitrary data
+  status: 201,                       // HTTP status code
 })
 ```
 
@@ -67,13 +68,15 @@ logger.info('User created', {
 |-------|------|---------|
 | `scope` | `string` | Per-call scope override |
 | `requestId` | `string` | Per-call request ID override |
-| `details` | `Record<string, unknown>` | Arbitrary structured data |
+| `details` | `unknown` | Arbitrary structured data |
+| `status` | `number` | HTTP status code |
+| `[key: string]` | `unknown` | Additional arbitrary fields |
 
 ---
 
 ## Disposal
 
-If using transports that buffer logs (like HttpTransport), call `dispose()` on shutdown:
+`dispose()` is on the `NextNodeLogger` class (not the `Logger` interface). Use it to flush buffered transports on shutdown:
 
 ```typescript
 process.on('SIGTERM', async () => {
@@ -93,15 +96,14 @@ interface Logger {
   warn(message: string, object?: LogObject): void
   error(message: string, object?: LogObject): void
   child(config: ChildLoggerConfig): Logger
-  dispose(): Promise<void>
 }
 
 interface LoggerConfig {
-  environment?: Environment        // 'development' | 'production'
+  environment?: Environment
   prefix?: string
   scope?: string
   includeLocation?: boolean
-  minLevel?: LogLevel              // 'debug' | 'info' | 'warn' | 'error'
+  minLevel?: LogLevel
   silent?: boolean
   transports?: Transport[]
   requestId?: string
@@ -121,15 +123,15 @@ interface LogEntry {
   location: DevelopmentLocationInfo | ProductionLocationInfo
   requestId: string
   scope?: string
-  object?: Record<string, unknown>
+  object?: Omit<LogObject, 'scope'>
 }
 
 interface Transport {
-  log(entry: LogEntry): void
-  dispose?(): Promise<void>
+  log(entry: LogEntry): void | Promise<void>
+  dispose?(): void | Promise<void>
 }
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 type Environment = 'development' | 'production'
-type RuntimeEnvironment = 'node' | 'browser' | 'webworker'
+type RuntimeEnvironment = 'node' | 'browser' | 'webworker' | 'unknown'
 ```

@@ -20,3 +20,4 @@ export PATH="$HOME/.local/bin:$PATH"
 
 # Custom functions
 fpath=(~/.config/zsh/functions $fpath)
+. "$HOME/.cargo/env"

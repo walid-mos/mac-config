@@ -1,0 +1,27 @@
+# Known false-positive security heuristics in Claude Code.
+# One PCRE regex per line. Lines starting with # are ignored.
+# Add new patterns here — the hook picks them up immediately.
+
+# "Contains command_substitution" / "Command contains $() command substitution"
+# Example: git commit -m "$(cat <<'EOF' ... EOF)"
+\$\(
+
+# "Contains brace with quote character (expansion obfuscation)"
+# Example: echo '{"key": "value"}'
+\{[^}]*['"]
+
+# "'.' evaluates arguments as shell code"
+# Example: . "$HOME/.cargo/env" && cargo clippy ...
+(?:^|&&\s*|;\s*|\|\|\s*)\.\s
+
+# "Command contains heredoc" / heredoc-related warnings
+# Example: cat <<'EOF' ... EOF
+<<-?\s*\\?['"]?\w+
+
+# "Compound commands with cd and git require approval to prevent bare repository attacks"
+# Example: cd /path/to/repo && git status
+cd\s.*(?:&&|;|\|\|)\s*git
+
+# "Command contains quoted characters in flag names"
+# Example: --format="json"
+\s--?\w+=(['"])

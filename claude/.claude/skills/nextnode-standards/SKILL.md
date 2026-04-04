@@ -3,8 +3,9 @@ name: nextnode-standards
 description: >-
   How to use @nextnode-solutions/standards in NextNode projects. Covers all
   exported configs: oxlint, oxfmt, TypeScript, Vitest, commitlint, lint-staged,
-  editorconfig, npmrc, and Tailwind theme.
+  semantic-release, editorconfig, npmrc, and Tailwind theme.
 user-invocable: true
+synced-at: 1027421
 ---
 
 # @nextnode-solutions/standards
@@ -43,6 +44,24 @@ Use the relevant sub-file for details:
 - [lint-staged.md](lint-staged.md) — pre-commit hook commands
 - [tailwind.md](tailwind.md) — Tailwind theme, editorconfig, npmrc
 
+### semantic-release
+
+**Export path**: `@nextnode-solutions/standards/semantic-release`
+
+Shared config for semantic-release in monorepo packages. The standards package ships `@semantic-release/git`, `@semantic-release/github`, and `semantic-release-monorepo` as transitive `dependencies` — consumers only need `semantic-release` itself.
+
+```json
+// .releaserc.json
+{
+  "extends": ["semantic-release-monorepo", "@nextnode-solutions/standards/semantic-release"],
+  "tagFormat": "@nextnode-solutions/<name>-v${version}"
+}
+```
+
+**Important**: `semantic-release-monorepo` MUST be in the `extends` array (not via CLI `-e` flag). The `-e` flag silently overrides the plugin list from the shared config, dropping `@semantic-release/git`. Order matters: monorepo first, standards second (later entries override earlier ones for `plugins`).
+
+Plugins: commit-analyzer, release-notes-generator, npm, git (commits `package.json` version), github.
+
 ---
 
 ## Installation
@@ -70,6 +89,7 @@ tsconfig.json             # extends standards/typescript/{library|nextjs|astro}
 vitest.config.ts          # imports standards/vitest/{backend|frontend}
 commitlint.config.js      # imports standards/commitlint
 lint-staged.config.js     # imports standards/lint-staged
+.releaserc.json           # extends standards/semantic-release (for publishable packages)
 .editorconfig             # copied from standards
 .npmrc                    # copied from standards
 ```

@@ -12,26 +12,42 @@ filter = "@nextnode-solutions/logger"        # Optional — string | false (defa
 lint = "lint"                                # Optional — string | false (default: "lint")
 test = "test"                                # Optional — string | false (default: "test")
 build = "build"                              # Optional — string | false (default: "build")
+
+[package]
+access = "public"                            # Required if section present — string
+
+[environment]
+development = true                           # Optional — boolean (default: true)
 ```
 
 ## TypeScript types
 
 ```typescript
 interface NextNodeConfig {
-  readonly project: ProjectSection;
-  readonly scripts: ScriptsSection;
+  readonly project: ProjectSection
+  readonly scripts: ScriptsSection
+  readonly package: PackageSection | false
+  readonly environment: EnvironmentSection
 }
 
 interface ProjectSection {
-  readonly name: string;
-  readonly type: "app" | "package";
-  readonly filter: string | false;
+  readonly name: string
+  readonly type: "app" | "package"
+  readonly filter: string | false
 }
 
 interface ScriptsSection {
-  readonly lint: string | false;
-  readonly test: string | false;
-  readonly build: string | false;
+  readonly lint: string | false
+  readonly test: string | false
+  readonly build: string | false
+}
+
+interface PackageSection {
+  readonly access: string
+}
+
+interface EnvironmentSection {
+  readonly development: boolean
 }
 ```
 
@@ -39,11 +55,11 @@ interface ScriptsSection {
 
 ### `[project]` (required)
 
-| Field    | Type                    | Required | Default | Description                                |
-| -------- | ----------------------- | -------- | ------- | ------------------------------------------ |
-| `name`   | `string`                | Yes      | —       | Project identifier                         |
-| `type`   | `"app" \| "package"`    | Yes      | —       | Routes post-quality jobs (deploy/publish)  |
-| `filter` | `string \| false`       | No       | `false` | Turbo `--filter` value for monorepo scoping |
+| Field    | Type                 | Required | Default | Description                                |
+| -------- | -------------------- | -------- | ------- | ------------------------------------------ |
+| `name`   | `string`             | Yes      | —       | Project identifier                         |
+| `type`   | `"app" \| "package"` | Yes      | —       | Routes to correct reusable workflow        |
+| `filter` | `string \| false`    | No       | `false` | Turbo `--filter` value for monorepo scoping |
 
 ### `[scripts]` (optional)
 
@@ -53,67 +69,31 @@ interface ScriptsSection {
 | `test`  | `string \| false` | `"test"`  | Test script name, or `false`   |
 | `build` | `string \| false` | `"build"` | Build script name, or `false`  |
 
-Set a script to `false` to disable it. Only `lint` and `test` appear in the quality matrix — `build` is never run in quality gates.
+Only `lint` and `test` appear in the quality matrix — `build` is only used in the publish job.
 
-## Validation
+### `[package]` (optional)
 
-`parseConfig(raw)` returns a discriminated union:
+| Field    | Type     | Required | Description                |
+| -------- | -------- | -------- | -------------------------- |
+| `access` | `string` | Yes*     | npm publish access level   |
 
-```typescript
-type ParseConfigResult =
-  | { ok: true; config: NextNodeConfig }
-  | { ok: false; errors: readonly string[] };
-```
+*Required only when the section is present. Absence of the section means `package = false` (no publish).
 
-All errors are collected and returned at once — validation does not short-circuit on the first error.
+### `[environment]` (optional)
 
-## Filter behavior
+| Field         | Type      | Default | Description                                    |
+| ------------- | --------- | ------- | ---------------------------------------------- |
+| `development` | `boolean` | `true`  | When true: prod-gate checks dev passed first. When false: deploy-prod runs inline quality instead. |
 
-When `filter` is set to a string:
-- Quality commands: `pnpm turbo run {task} --filter={filter}`
-- Scopes turbo to the target package in a monorepo
+## Plan outputs
 
-When `filter` is `false` (default):
-- Quality commands: `pnpm {task}`
-- Runs scripts from the project root as-is
+Written to `GITHUB_OUTPUT` by `writePlanOutputs()`:
 
-## Examples
-
-### Standalone app
-
-```toml
-[project]
-name = "my-saas"
-type = "app"
-```
-
-### Library package
-
-```toml
-[project]
-name = "my-lib"
-type = "package"
-
-[scripts]
-build = "build:lib"
-```
-
-### Monorepo package with turbo filter
-
-```toml
-[project]
-name = "logger"
-type = "package"
-filter = "@nextnode-solutions/logger"
-```
-
-### Minimal (disable tests)
-
-```toml
-[project]
-name = "config-pkg"
-type = "package"
-
-[scripts]
-test = false
-```
+| Key                   | Source                         | Used by              |
+| --------------------- | ------------------------------ | -------------------- |
+| `quality_matrix`      | `buildQualityMatrix()`         | quality job matrix   |
+| `project_name`        | `config.project.name`          | post-quality jobs    |
+| `project_type`        | `config.project.type`          | workflow routing     |
+| `project_filter`      | `config.project.filter`        | publish job          |
+| `publish`             | `config.package ? true : false`| publish gate         |
+| `development_enabled` | `config.environment.development`| prod-gate condition |

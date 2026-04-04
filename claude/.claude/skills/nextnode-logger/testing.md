@@ -8,36 +8,57 @@ import { createSpyLogger, createMockLogger, createNoopLogger } from '@nextnode-s
 
 ## Spy logger
 
-Records all log calls for assertions:
+Returns a `SpyLogger` directly — records all log calls with query methods:
 
 ```typescript
-const { logger, spy } = createSpyLogger()
+const spy = createSpyLogger()
 
-myFunction(logger)
+myFunction(spy)
 
-expect(spy.info).toHaveBeenCalledWith('expected message', expect.objectContaining({
-  scope: 'users',
-}))
-expect(spy.error).not.toHaveBeenCalled()
+expect(spy.wasCalledWith('expected message')).toBe(true)
+expect(spy.wasCalledWithLevel('info', 'expected message')).toBe(true)
+expect(spy.calls).toHaveLength(1)
+expect(spy.calls[0].level).toBe('info')
+expect(spy.getCallsByLevel('error')).toHaveLength(0)
+expect(spy.getLastCall()?.message).toBe('expected message')
+
+spy.clear() // Reset between tests
 ```
+
+`SpyLogger` extends `Logger` and adds:
+
+| Method | Returns | Purpose |
+|--------|---------|---------|
+| `calls` | `LogEntry[]` | All recorded log entries |
+| `getCallsByLevel(level)` | `LogEntry[]` | Filter calls by level |
+| `getLastCall()` | `LogEntry \| undefined` | Most recent call |
+| `wasCalledWith(message)` | `boolean` | Check if any call includes message |
+| `wasCalledWithLevel(level, message)` | `boolean` | Check by level + message |
+| `clear()` | `void` | Reset recorded calls |
+| `child(config)` | `SpyLogger` | Child spy sharing the same calls array |
 
 ## Mock logger
 
-A logger with mock functions (vi.fn()) — same as spy but without console output:
+Returns a `MockLogger` directly with trackable mock functions (works without vitest/jest):
 
 ```typescript
-const { logger, mock } = createMockLogger()
+const mock = createMockLogger()
 
-myService.process(logger)
+myService.process(mock)
 
-expect(mock.warn).toHaveBeenCalledTimes(1)
+expect(mock.info.mock.calls).toHaveLength(1)
+expect(mock.info.mock.calls[0][0]).toBe('Expected message')
+```
+
+For full vitest integration, create your own mocks instead:
+```typescript
+const mockLogger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), child: () => mockLogger }
 ```
 
 ## Noop logger
 
-Silent logger that discards everything — use when you need to satisfy a Logger dependency but don't care about output:
+Silent logger that discards everything — satisfies a `Logger` dependency with no output:
 
 ```typescript
 const logger = createNoopLogger()
-// All methods are no-ops
 ```

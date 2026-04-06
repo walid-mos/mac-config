@@ -214,6 +214,12 @@ const spy = vi.spyOn(console, "error").mockImplementation(() => {});
 // Missing: afterEach cleanup
 ```
 
+## Astro — Container API
+
+When testing Astro components (`.astro` files) or API endpoints, use the Astro Container API with Vitest. Covers `renderToString`, `renderToResponse`, props, slots, locals, params, framework renderers, and endpoints.
+
+See [astro.md](astro.md) for full guide.
+
 ## File Naming and Location
 
 - Co-locate test files next to source: `src/utils/parser.ts` -> `src/utils/parser.test.ts`

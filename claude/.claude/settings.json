@@ -1,34 +1,4 @@
 {
-  "effortLevel": "high",
-  "statusLine": {
-    "type": "command",
-    "command": "bash ~/.claude/statusline-command.sh"
-  },
-  "sandbox": {
-    "enabled": true,
-    "autoAllowBashIfSandboxed": true,
-    "excludedCommands": ["git:*", "docker:*", "colima:*", "ssh:*", "ssh-add:*", "curl:*", "brew:*", "tailscale:*", "gh:*"],
-    "filesystem": {
-      "allowWrite": ["~/"]
-    },
-    "network": {
-      "allowedDomains": ["*.github.com", "*.npmjs.org", "*.gitlab.com", "*.influxdata.com", "*.githubusercontent.com", "*.rust-lang.org", "*.crates.io"],
-      "allowLocalBinding": true
-    }
-  },
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash ~/.claude/hooks/bypass-heuristics.sh"
-          }
-        ]
-      }
-    ]
-  },
   "permissions": {
     "allow": [
       "Bash(git:*)",
@@ -47,19 +17,19 @@
       "Bash(colima:*)",
       "Bash(node:*)",
       "Bash(cd:*)",
+      "Bash(echo:*)",
       "Bash(sqlite3:*)",
       "Bash(for:*)",
       "Bash(.:*)",
-
       "WebFetch(*)",
       "WebSearch(*)",
-
       "mcp__claude_ai_Context7__*",
       "mcp__context7__*",
-
       "Read",
       "Grep",
-      "Glob"
+      "Glob",
+      "Edit",
+      "Write"
     ],
     "deny": [
       "Bash(gh repo delete *)",
@@ -70,5 +40,55 @@
       "Bash(curl * -T *)",
       "Bash(curl * -X DELETE *)"
     ]
-  }
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/bypass-heuristics.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "bash ~/.claude/statusline-command.sh"
+  },
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true,
+    "network": {
+      "allowedDomains": [
+        "*.github.com",
+        "*.npmjs.org",
+        "*.gitlab.com",
+        "*.influxdata.com",
+        "*.githubusercontent.com",
+        "*.rust-lang.org",
+        "*.crates.io"
+      ],
+      "allowLocalBinding": true
+    },
+    "filesystem": {
+      "allowWrite": [
+        "~/"
+      ]
+    },
+    "excludedCommands": [
+      "git:*",
+      "docker:*",
+      "colima:*",
+      "ssh:*",
+      "ssh-add:*",
+      "curl:*",
+      "brew:*",
+      "tailscale:*",
+      "gh:*"
+    ]
+  },
+  "effortLevel": "high"
 }

@@ -84,7 +84,7 @@ For a typical NextNode project, you need these files:
 
 ```
 oxlint.json               # extends standards/oxlint
-.oxfmt.json               # extends standards/oxfmt
+oxfmt.config.ts           # extends standards/oxfmt (requires oxfmt >=0.43.0)
 tsconfig.json             # extends standards/typescript/{library|nextjs|astro}
 vitest.config.ts          # imports standards/vitest/{backend|frontend}
 commitlint.config.js      # imports standards/commitlint

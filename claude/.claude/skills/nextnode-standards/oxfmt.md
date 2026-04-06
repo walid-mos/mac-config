@@ -2,14 +2,22 @@
 
 **Export path**: `@nextnode-solutions/standards/oxfmt`
 
+**Requires**: `oxfmt >= 0.43.0` (native `oxfmt.config.ts` support)
+
 ## Project setup
 
-Create `.oxfmt.json` at the project root:
+Create `oxfmt.config.ts` at the project root:
 
-```json
-{
-  "extends": ["@nextnode-solutions/standards/oxfmt"]
-}
+```ts
+export { default } from '@nextnode-solutions/standards/oxfmt'
+```
+
+To override specific settings:
+
+```ts
+import base from '@nextnode-solutions/standards/oxfmt'
+
+export default { ...base, printWidth: 120 }
 ```
 
 ## What it enforces

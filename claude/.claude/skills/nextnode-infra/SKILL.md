@@ -5,7 +5,7 @@ description: >-
   with standards, logger, and infrastructure conventions. Dispatches to
   sub-skills per package.
 user-invocable: true
-synced-at: 1bd49ff
+synced-at: 770f696
 ---
 
 # NextNode Core Monorepo
@@ -31,6 +31,7 @@ NextNode is the user's consulting business. Keep this in mind when suggesting ar
 - `standards` -> `/nextnode-standards`
 - `logger` -> `/nextnode-logger`
 - `deploy` or `infra` -> `/nextnode-deploy`
+- `design` -> `/nextnode-design`
 
 ## Instructions
 
@@ -52,10 +53,22 @@ NextNode is the user's consulting business. Keep this in mind when suggesting ar
 - [ ] `package.json` has `"type": "module"`
 - [ ] `engines.node` >= 24
 
+#### NextNode package versions (MANDATORY — check first)
+For every `@nextnode-solutions/*` dep in `package.json`, compare the **installed** version (from `pnpm-lock.yaml` or `node_modules/<pkg>/package.json`) against the **latest** on npm via `npm view <pkg> version`. Flag any mismatch as **outdated**, even if the package.json range (`^1.5.1`) would allow the newer version — what matters is what's actually installed.
+
+- [ ] `@nextnode-solutions/standards` — installed version == npm latest
+- [ ] `@nextnode-solutions/logger` — installed version == npm latest
+- [ ] `@nextnode-solutions/infrastructure` — installed version == npm latest (if used)
+- [ ] Any other `@nextnode-solutions/*` dep — installed version == npm latest
+
+**Why**: NextNode packages evolve fast and older versions carry real bugs. Example: `@nextnode-solutions/standards@1.5.1` exports `./oxlint` as a raw JSON file, which breaks under Node 22.12+ without `with { type: 'json' }` import attribute — fixed in 1.9.x where the export is a JS module. Outdated installs = CI failures that don't reproduce locally. Recent projects especially should never be more than a minor behind.
+
+**How to resolve**: `pnpm update <pkg>` (or `pnpm update @nextnode-solutions/*` for all).
+
 #### Standards (`@nextnode-solutions/standards`)
 - [ ] Installed as devDependency
 - [ ] `oxlint` and `oxfmt` installed as devDependencies
-- [ ] `.oxlintrc.json` exists and extends `@nextnode-solutions/standards/oxlint`
+- [ ] `oxlint.config.ts` exists and extends `@nextnode-solutions/standards/oxlint` (requires oxlint >=1.58.0)
 - [ ] `oxfmt.config.ts` exists and extends `@nextnode-solutions/standards/oxfmt` (requires oxfmt >=0.43.0)
 - [ ] `tsconfig.json` exists and extends one of `standards/typescript/{library,nextjs,astro}`
 - [ ] Scripts: `lint` (oxlint), `format` (oxfmt --write .), `format:check` (oxfmt --check .), `type-check` (tsc --noEmit)
@@ -91,6 +104,7 @@ Redirect immediately:
 - `standards` -> invoke `/nextnode-standards`
 - `logger` -> invoke `/nextnode-logger`
 - `deploy` or `infra` -> invoke `/nextnode-deploy`
+- `design` -> invoke `/nextnode-design`
 
 ## Sub-skills
 
@@ -99,6 +113,7 @@ Redirect immediately:
 | `/nextnode-standards` | oxlint, oxfmt, TypeScript, Vitest, commitlint, lint-staged, semantic-release |
 | `/nextnode-logger` | Logger API, transports, testing utilities |
 | `/nextnode-deploy` | nextnode.toml, CI pipeline, deployment |
+| `/nextnode-design` | Brand colors, typography, logos, UI conventions |
 
 ## Rules
 
@@ -106,3 +121,4 @@ Redirect immediately:
 2. **ESM only** — `import`, not `require`
 3. **Standards first** — every project MUST use `@nextnode-solutions/standards`
 4. **Config-driven** — behavior from `nextnode.toml`, not hardcoded
+5. **Always check NextNode package freshness** — before any audit or CI debug, run `npm view <pkg> version` for each installed `@nextnode-solutions/*` package and compare against the installed version. Outdated NextNode packages are the #1 cause of CI-only failures that don't reproduce locally.

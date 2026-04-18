@@ -150,6 +150,38 @@ const active = users
 - When you need `await` inside the loop body (sequential async processing)
 - When performance matters on very large arrays (avoids intermediate allocations)
 
+### Prefer `.some()` and `.every()` over `for...of` for boolean checks
+
+When the loop's only purpose is to test whether *any* or *all* elements match a condition, use `.some()` / `.every()`. They express intent, return a boolean directly, and short-circuit on the first decisive match — no manual `break` or flag variable needed.
+
+```js
+// AVOID — imperative search with flag + break
+let hasAdmin = false
+for (const user of users) {
+  if (user.role === "admin") {
+    hasAdmin = true
+    break
+  }
+}
+
+// MANDATORY
+const hasAdmin = users.some(u => u.role === "admin")
+
+// AVOID
+let allValid = true
+for (const item of items) {
+  if (!item.isValid) {
+    allValid = false
+    break
+  }
+}
+
+// MANDATORY
+const allValid = items.every(i => i.isValid)
+```
+
+Keep `for...of` only when the loop body does real work beyond a boolean test (side effects, `await`, accumulating non-boolean state).
+
 **FORBIDDEN:** `for...in` on arrays. It iterates over keys (strings), not values, and includes inherited properties.
 
 ```js
@@ -185,21 +217,42 @@ async function getUser(id) {
 
 ### Parallelize independent async operations
 
+Never run independent async operations sequentially. Choose the right concurrency strategy:
+
+| Strategy | When to use | Behavior |
+|---|---|---|
+| `Promise.allSettled` | **Default choice** - best-effort, every result matters | Runs all, never short-circuits, returns status per promise |
+| `Promise.all` | Fail-fast - one failure should abort the whole batch | Rejects on first failure, other results lost |
+| `for...of` with `await` | Sequential ordering required, or race conditions are a concern | One at a time, full control |
+
 ```js
 // FORBIDDEN — sequential when they could be parallel
 const users = await fetchUsers()
 const orders = await fetchOrders()
 const products = await fetchProducts()
 
-// MANDATORY — parallel
+// PREFERRED — best-effort parallel (all results visible)
+const results = await Promise.allSettled([
+  fetchUsers(),
+  fetchOrders(),
+  fetchProducts(),
+])
+// inspect results[i].status === "fulfilled" | "rejected"
+
+// ACCEPTABLE — fail-fast parallel (when any failure is fatal)
 const [users, orders, products] = await Promise.all([
   fetchUsers(),
   fetchOrders(),
   fetchProducts(),
 ])
+
+// ACCEPTABLE — sequential (when order matters or shared resource)
+for (const cmd of commands) {
+  await session.exec(cmd) // each command depends on the previous
+}
 ```
 
-Use `Promise.all` for independent operations. Use `Promise.allSettled` when you need results from all promises regardless of failures.
+**Decision rule:** start with `Promise.allSettled`. Move to `Promise.all` only when a single failure makes the entire batch useless. Use sequential `for...of` only when operations must run in order or share a resource that doesn't support concurrency.
 
 ### Never fire-and-forget
 
@@ -370,6 +423,7 @@ const path = writeTOML(readFixture("minimal-config.toml"))
 | `eval()` | NEVER | Find another way |
 | `arguments` | NEVER | Rest params `...args` |
 | `for...in` on arrays | NEVER | `for...of` |
+| `for...of` for boolean any/all checks | AVOID | `.some()` / `.every()` |
 | `.then()` chains | AVOID | `async/await` |
 | `JSON.parse(JSON.stringify())` for cloning | NEVER | `structuredClone()` |
 | `\|\|` for non-boolean defaults | AVOID | `??` (nullish coalescing) |
@@ -377,4 +431,6 @@ const path = writeTOML(readFixture("minimal-config.toml"))
 | `function` in callbacks | AVOID | Arrow functions |
 | Default exports | AVOID | Named exports |
 | Fire-and-forget promises | NEVER | `await` or `.catch()` |
+| Sequential `await` for independent ops | NEVER | `Promise.allSettled` (default) or `Promise.all` |
+| `for...of` + `await` when parallelizable | AVOID | `Promise.allSettled` unless order/race matters |
 | Unchecked `fetch` response | NEVER | Check `res.ok` |

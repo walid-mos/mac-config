@@ -43,6 +43,24 @@ function getDiscount(user) {
 
 **The rule is simple:** if you can exit early, exit early. The main logic should never be inside a conditional — it should be the natural continuation after all guards have passed.
 
+### Error-first ordering
+
+When a branch produces both a success and an error path, handle the **error first** and return early. The success/happy path comes last, at natural indentation.
+
+```
+// FORBIDDEN — success first, error dangling at the end
+if (result.success) {
+  return ok(result.data)
+}
+return error(result.error)
+
+// MANDATORY — error first, success is the natural continuation
+if (!result.success) {
+  return error(result.error)
+}
+return ok(result.data)
+```
+
 ---
 
 ## RULE 2 — Maximum Nesting Depth: 2 Levels
@@ -201,17 +219,7 @@ Do not mutate inputs. Do not mutate shared state. Create new values.
 
 ---
 
-## RULE 8 — Compose, Don't Inherit
-
-Prefer composition over class inheritance. Deep inheritance hierarchies are fragile and hard to reason about.
-
-- Favor small, focused interfaces/traits and compose them.
-- If you have a class hierarchy deeper than 2 levels, reconsider the design.
-- Use dependency injection over hard-coded base class behavior.
-
----
-
-## RULE 9 — Pure Functions First
+## RULE 8 — Pure Functions First
 
 Prefer functions with no side effects. A pure function takes inputs and returns outputs — nothing else.
 
@@ -221,7 +229,7 @@ Prefer functions with no side effects. A pure function takes inputs and returns 
 
 ---
 
-## RULE 10 — Simplify Conditionals
+## RULE 9 — Simplify Conditionals
 
 ### Prefer positive conditions
 ```
@@ -260,7 +268,7 @@ return handler()
 
 ---
 
-## RULE 11 — No Dead Code
+## RULE 10 — No Dead Code
 
 - Delete commented-out code. Git remembers.
 - Delete unused functions, variables, imports. Don't leave them "just in case".
@@ -268,7 +276,7 @@ return handler()
 
 ---
 
-## RULE 12 — Fail Fast, Fail Loud
+## RULE 11 — Fail Fast, Fail Loud
 
 Errors should be caught AS CLOSE to their source as possible and should produce a CLEAR message.
 
@@ -278,18 +286,35 @@ Errors should be caught AS CLOSE to their source as possible and should produce 
 
 ---
 
+## RULE 12 — No Em Dashes
+
+Never use the em dash character `—` (U+2014). Use a regular hyphen `-` surrounded by spaces, or rephrase.
+
+```
+// FORBIDDEN
+This module handles auth — tokens, sessions, and refresh.
+
+// MANDATORY
+This module handles auth - tokens, sessions, and refresh.
+```
+
+This applies everywhere: code comments, strings, commit messages, documentation, and all text output.
+
+---
+
 ## Quick Reference — Forbidden vs Mandatory
 
 | Pattern | Verdict | Instead |
 |---|---|---|
 | Whole function body inside `if` | FORBIDDEN | Early return |
+| Success path before error path | FORBIDDEN | Error-first, early return |
 | Nesting > 2 levels | FORBIDDEN | Extract, early return, continue |
 | Functions doing multiple things | FORBIDDEN | Split by responsibility |
 | Generic names (`data`, `result`, `temp`) | FORBIDDEN | Descriptive domain names |
 | Magic numbers/strings | FORBIDDEN | Named constants |
 | Boolean parameters | FORBIDDEN (2+) | Options object or separate functions |
 | Mutating function inputs | FORBIDDEN | Return new values |
-| Deep inheritance (3+ levels) | FORBIDDEN | Composition |
 | Commented-out code | FORBIDDEN | Delete it |
 | Negated boolean names | FORBIDDEN | Positive form |
 | Side effects in pure helpers | FORBIDDEN | Push IO to the edges |
+| Em dash character `—` (U+2014) | FORBIDDEN | Use `-` with spaces or rephrase |

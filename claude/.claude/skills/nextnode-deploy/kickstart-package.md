@@ -14,8 +14,8 @@ packages/<name>/
   tsconfig.json
   tsup.config.ts
   vitest.config.ts        # if the package has tests
-  .oxlintrc.json
-  .oxfmtrc.json
+  oxlint.config.ts
+  oxfmt.config.ts
 ```
 
 ## 1. package.json
@@ -204,38 +204,48 @@ For packages with no tests, set `test = false` in `nextnode.toml` `[scripts]` se
 
 ## 7. Linting and formatting configs
 
-### .oxlintrc.json
+### oxlint.config.ts
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "extends": [
-    "./node_modules/@nextnode-solutions/standards/src/oxlint/base.json"
-  ]
-}
+Requires oxlint >= 1.58.0.
+
+```ts
+import standardsConfig from '@nextnode-solutions/standards/oxlint'
+import { defineConfig } from 'oxlint'
+
+export default defineConfig({
+	extends: [standardsConfig],
+})
 ```
 
 Add rule overrides as needed:
 
-```json
-{
-  "rules": {
-    "no-console": "off"
-  },
-  "overrides": [
-    {
-      "files": ["**/*.spec.ts", "**/*.test.ts"],
-      "rules": {
-        "unicorn/consistent-function-scoping": "off"
-      }
-    }
-  ]
-}
+```ts
+import standardsConfig from '@nextnode-solutions/standards/oxlint'
+import { defineConfig } from 'oxlint'
+
+export default defineConfig({
+	extends: [standardsConfig],
+	rules: {
+		'eslint/no-console': 'off',
+	},
+	overrides: [
+		{
+			files: ['**/*.spec.ts', '**/*.test.ts'],
+			rules: {
+				'unicorn/consistent-function-scoping': 'off',
+			},
+		},
+	],
+})
 ```
 
-### .oxfmtrc.json
+### oxfmt.config.ts
 
-Copy from an existing package (e.g. `packages/logger/.oxfmtrc.json`). All packages use the same formatting config.
+Requires oxfmt >= 0.43.0.
+
+```ts
+export { default } from '@nextnode-solutions/standards/oxfmt'
+```
 
 ## 8. GitHub workflow
 
@@ -320,3 +330,15 @@ Before pushing:
 **Build not found in dist**: Ensure `tsup.config.ts` entry keys match what `package.json` exports reference. The `files` field must include `dist`.
 
 **turbo cache misses**: Verify `filter` in `nextnode.toml` matches exactly the `name` in `package.json` (e.g. `@nextnode-solutions/logger`).
+
+**Publish fails with E422 provenance error**: npm provenance (sigstore) requires `repository.url` in `package.json` to match the GitHub repo. Add a full `repository` field:
+
+```jsonc
+{
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NextNodeSolutions/core.git",
+    "directory": "packages/<name>"
+  }
+}
+```

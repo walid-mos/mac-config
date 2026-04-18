@@ -21,14 +21,13 @@ Create `tsconfig.json` at the project root:
 {
   "extends": "@nextnode-solutions/standards/typescript/nextjs",
   "include": ["src", "next-env.d.ts"],
-  "exclude": ["node_modules", ".next"]
+  "exclude": ["node_modules", ".next", "vitest.config.ts"]
 }
 
 // For an Astro app
 {
   "extends": "@nextnode-solutions/standards/typescript/astro",
-  "include": ["src"],
-  "exclude": ["node_modules", "dist"]
+  "exclude": ["vitest.config.ts"]
 }
 ```
 

@@ -28,7 +28,7 @@ Centralized development standards for all NextNode projects. This is a **config-
 ### Phase 1: Read the project
 
 1. Read `package.json` — check if `@nextnode-solutions/standards` is installed and which configs are in use
-2. Read existing config files (`oxlint.json`, `.oxfmt.json`, `tsconfig.json`, `vitest.config.ts`, etc.)
+2. Read existing config files (`oxlint.config.ts`, `oxfmt.config.ts`, `tsconfig.json`, `vitest.config.ts`, etc.)
 3. Identify gaps — missing or misconfigured standards
 
 ### Phase 2: Provide guidance
@@ -83,7 +83,7 @@ pnpm add -D tailwindcss                                         # If you use Tai
 For a typical NextNode project, you need these files:
 
 ```
-oxlint.json               # extends standards/oxlint
+oxlint.config.ts          # extends standards/oxlint (requires oxlint >=1.58.0)
 oxfmt.config.ts           # extends standards/oxfmt (requires oxfmt >=0.43.0)
 tsconfig.json             # extends standards/typescript/{library|nextjs|astro}
 vitest.config.ts          # imports standards/vitest/{backend|frontend}
@@ -119,3 +119,5 @@ And these package.json fields:
 4. **Single quotes** — Except in JSX where double quotes are used.
 5. **Import sorting is automatic** — Don't manually sort imports. oxfmt handles it.
 6. **Type imports must be separate** — Use `import type { Foo }` not `import { type Foo }`.
+7. **Astro projects: run `astro check` as part of Definition of Done** — oxlint does not catch TypeScript type errors in `.astro` files. For any Astro project, the sanitization pipeline MUST include both `pnpm run lint` (oxlint) AND `pnpm astro check`. A task is not done until both pass.
+8. **Exclude `vitest.config.ts` from tsconfig** — `vitest.config.ts` uses `getViteConfig` (Astro) or Vite's `defineConfig`, which only types the `test` property via Vitest's type augmentation (`/// <reference types="vitest/config" />`). `astro check` and `tsc` don't resolve this augmentation, causing a `ts(2353)` error. Since TypeScript does NOT inherit `exclude` from extended tsconfigs (only `compilerOptions` are merged), every project must add `"exclude": ["vitest.config.ts"]` in its own `tsconfig.json`.

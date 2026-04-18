@@ -5,13 +5,15 @@
 
 ## Project setup
 
-Create `.oxlintrc.json` at the project root:
+Create `oxlint.config.ts` at the project root:
 
-```json
-{
-  "$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/npm/oxlint/configuration_schema.json",
-  "extends": ["@nextnode-solutions/standards/oxlint"]
-}
+```ts
+import standardsConfig from '@nextnode-solutions/standards/oxlint'
+import { defineConfig } from 'oxlint'
+
+export default defineConfig({
+	extends: [standardsConfig],
+})
 ```
 
 ## What it enforces
@@ -53,19 +55,22 @@ Create `.oxlintrc.json` at the project root:
 
 ## Adding project-specific overrides
 
-```json
-{
-  "extends": ["@nextnode-solutions/standards/oxlint"],
-  "rules": {
-    "eslint/no-console": "off"
-  },
-  "overrides": [
-    {
-      "files": ["src/migrations/**"],
-      "rules": {
-        "eslint/no-magic-numbers": "off"
-      }
-    }
-  ]
-}
+```ts
+import standardsConfig from '@nextnode-solutions/standards/oxlint'
+import { defineConfig } from 'oxlint'
+
+export default defineConfig({
+	extends: [standardsConfig],
+	rules: {
+		'eslint/no-console': 'off',
+	},
+	overrides: [
+		{
+			files: ['src/migrations/**'],
+			rules: {
+				'eslint/no-magic-numbers': 'off',
+			},
+		},
+	],
+})
 ```

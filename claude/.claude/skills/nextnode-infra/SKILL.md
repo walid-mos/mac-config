@@ -5,7 +5,7 @@ description: >-
   with standards, logger, and infrastructure conventions. Dispatches to
   sub-skills per package.
 user-invocable: true
-synced-at: 770f696
+synced-at: 50e2bbd
 ---
 
 # NextNode Core Monorepo
@@ -89,8 +89,10 @@ For every `@nextnode-solutions/*` dep in `package.json`, compare the **installed
 - [ ] `nextnode.toml` has `[package]` section with `access` (+ optional `canary_on_label`)
 
 #### CI/CD
-- [ ] `nextnode.toml` exists with `[project]` section (name + type)
-- [ ] GitHub workflow calls the correct reusable workflow from `NextNodeSolutions/core` — `deploy-static.yml` for Astro/Cloudflare-Pages sites (auto-provisions per-env Pages project + custom domains + DNS), `deploy.yml` for generic deploys, `publish-package.yml` for packages
+- [ ] `nextnode.toml` exists with `[project]` section (name + type + optional `internal`)
+- [ ] `project.internal` set to `true` for VPS apps reachable only via Tailscale (defaults to `false`). Controls DNS (tailnet IP vs. public), firewall (tailscale0-only vs. open HTTP/S), Caddy cert strategy, and UFW rules. See `/nextnode-deploy` for details.
+- [ ] GitHub workflow calls the correct reusable workflow from `NextNodeSolutions/core` — `deploy-static.yml` for Astro/Cloudflare-Pages sites (auto-provisions per-env Pages project + custom domains + DNS), `deploy.yml` for Hetzner VPS containerized apps (runs `plan → quality → provision → dns → build-image → deploy`, pushes to GHCR, SSH-deploys to the VPS), `publish-package.yml` for packages
+- [ ] For `type=app` (Hetzner): `Dockerfile` at root, minimal `docker-compose.yml` with `services.app.build.context: .` (no `image:`/`ports:`/`env_file:`/`restart:`), app respects `$PORT` (12-factor). See `/nextnode-deploy` → `hetzner-caller.md` for the full caller convention.
 - [ ] Monorepo: per-package workflow with `paths:` filter + `filter` in nextnode.toml
 
 #### Logger (if used)

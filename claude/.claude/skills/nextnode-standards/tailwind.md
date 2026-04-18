@@ -11,6 +11,8 @@ Import in your main CSS file:
 @import '@nextnode-solutions/standards/tailwind';
 ```
 
+The Tailwind theme implements the NextNode design system (colors, fonts, spacing). See `/nextnode-design` for the full brand guidelines (color palette, typography roles, logo usage).
+
 ---
 
 # Config: editorconfig & npmrc

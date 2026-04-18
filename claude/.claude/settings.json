@@ -18,9 +18,13 @@
       "Bash(node:*)",
       "Bash(cd:*)",
       "Bash(echo:*)",
+      "Bash(source:*)",
       "Bash(sqlite3:*)",
       "Bash(for:*)",
       "Bash(.:*)",
+      "Bash(mkdir:*)",
+      "Bash(awk:*)",
+      "Bash(grep:*)",
       "WebFetch(*)",
       "WebSearch(*)",
       "mcp__claude_ai_Context7__*",
@@ -39,7 +43,8 @@
       "Bash(curl * --upload-file *)",
       "Bash(curl * -T *)",
       "Bash(curl * -X DELETE *)"
-    ]
+    ],
+    "defaultMode": "auto"
   },
   "hooks": {
     "PreToolUse": [
@@ -69,13 +74,17 @@
         "*.influxdata.com",
         "*.githubusercontent.com",
         "*.rust-lang.org",
-        "*.crates.io"
+        "*.crates.io",
+        "*.astro.build",
+        "*.playwright.dev",
+        "*.googleapis.com"
       ],
       "allowLocalBinding": true
     },
     "filesystem": {
       "allowWrite": [
-        "~/"
+        "~/",
+        "/tmp"
       ]
     },
     "excludedCommands": [
@@ -90,5 +99,6 @@
       "gh:*"
     ]
   },
-  "effortLevel": "high"
+  "effortLevel": "high",
+  "skipAutoPermissionPrompt": true
 }

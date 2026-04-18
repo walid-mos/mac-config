@@ -55,12 +55,12 @@ test -n "$ALLOWED" || exit 0
 
 # If "Bash" (bare) is in the allowlist, approve everything
 if printf '%s\n' "$ALLOWED" | grep -qxF "__ALLOW_ALL__"; then
-  printf '{"decision":"allow"}\n'
+  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}\n'
   exit 0
 fi
 
 # --- 3. Check that the leading command is in the allowlist ----------------
 FIRST=$(printf '%s' "$CMD" | awk '{print $1}')
 if printf '%s\n' "$ALLOWED" | grep -qxF "$FIRST"; then
-  printf '{"decision":"allow"}\n'
+  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}\n'
 fi

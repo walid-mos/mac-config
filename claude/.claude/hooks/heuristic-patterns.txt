@@ -25,3 +25,7 @@ cd\s.*(?:&&|;|\|\|)\s*git
 # "Command contains quoted characters in flag names"
 # Example: --format="json"
 \s--?\w+=(['"])
+
+# "Contains simple_expansion"
+# Example: mkdir -p $TMPDIR/foo, echo $HOME
+\$[A-Za-z_]\w*

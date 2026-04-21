@@ -94,6 +94,7 @@ For every `@nextnode-solutions/*` dep in `package.json`, compare the **installed
 - [ ] GitHub workflow calls the correct reusable workflow from `NextNodeSolutions/core` — `deploy-static.yml` for Astro/Cloudflare-Pages sites (auto-provisions per-env Pages project + custom domains + DNS), `deploy.yml` for Hetzner VPS containerized apps (runs `plan → quality → provision → dns → build-image → deploy`, pushes to GHCR, SSH-deploys to the VPS), `publish-package.yml` for packages
 - [ ] For `type=app` (Hetzner): `Dockerfile` at root, minimal `docker-compose.yml` with `services.app.build.context: .` (no `image:`/`ports:`/`env_file:`/`restart:`), app respects `$PORT` (12-factor). See `/nextnode-deploy` → `hetzner-caller.md` for the full caller convention.
 - [ ] Monorepo: per-package workflow with `paths:` filter + `filter` in nextnode.toml
+- [ ] `SITE_URL` is **never hardcoded** — Astro `astro.config.ts` MUST set `site: process.env.SITE_URL` (same for any other framework that needs a canonical URL). The infrastructure pipeline auto-computes and injects `SITE_URL` at build + runtime via `computeDeployEnv`; hardcoding a domain breaks dev/prod URL resolution and bypasses the config-as-code flow.
 
 #### Logger (if used)
 - [ ] `@nextnode-solutions/logger` imported (not `console.log`)
@@ -124,3 +125,4 @@ Redirect immediately:
 3. **Standards first** — every project MUST use `@nextnode-solutions/standards`
 4. **Config-driven** — behavior from `nextnode.toml`, not hardcoded
 5. **Always check NextNode package freshness** — before any audit or CI debug, run `npm view <pkg> version` for each installed `@nextnode-solutions/*` package and compare against the installed version. Outdated NextNode packages are the #1 cause of CI-only failures that don't reproduce locally.
+6. **`SITE_URL` is infra-owned, never hardcoded** — the deploy pipeline (`computeDeployEnv`) generates `SITE_URL` from `nextnode.toml` domain + environment and injects it at build and runtime. Frameworks that need a canonical URL (Astro `site`, sitemap generators, etc.) MUST read `process.env.SITE_URL` (or `import.meta.env.SITE_URL`). Hardcoding a literal domain breaks dev/prod resolution and is a compliance violation.

@@ -18,7 +18,6 @@
       "Bash(node:*)",
       "Bash(cd:*)",
       "Bash(echo:*)",
-      "Bash(source:*)",
       "Bash(sqlite3:*)",
       "Bash(for:*)",
       "Bash(.:*)",
@@ -100,5 +99,5 @@
     ]
   },
   "effortLevel": "high",
-  "skipAutoPermissionPrompt": true
+  "autoUpdatesChannel": "latest"
 }

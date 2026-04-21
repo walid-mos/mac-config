@@ -1,0 +1,50 @@
+{
+  "$schema": "https://raw.githubusercontent.com/manaflow-ai/cmux/main/web/data/cmux-settings.schema.json",
+  "schemaVersion": 1,
+
+  // This file uses JSON with comments (JSONC).
+  // Any setting present here overrides the GUI-saved value.
+  // Remove a setting to fall back to the value saved in Settings.
+
+  "app": {
+    "appearance": "system",
+    "appIcon": "light",
+    "focusPaneOnFirstClick": true,
+    "reorderOnNotification": false
+  },
+
+  "notifications": {
+    "sound": "Submarine"
+  },
+
+  "sidebar": {
+    "openPortLinksInCmuxBrowser": true,
+    "showLog": false,
+    "showNotificationMessage": true,
+    "showPorts": false,
+    "showProgress": true,
+    "showSSH": false
+  },
+
+  "workspaceColors": {
+    "indicatorStyle": "leftRail"
+  },
+
+  "sidebarAppearance": {
+    "matchTerminalBackground": true,
+    "tintColor": "#000000",
+    "tintOpacity": 0.18
+  },
+
+  "browser": {
+    "theme": "system"
+  },
+
+  "shortcuts": {
+    "bindings": {
+      "nextSidebarTab": "cmd+]",
+      "nextSurface": "cmd+shift+]",
+      "prevSidebarTab": "cmd+["
+    }
+  }
+}

@@ -12,7 +12,7 @@ packages/<name>/
   nextnode.toml
   .releaserc.json
   tsconfig.json
-  tsup.config.ts
+  tsdown.config.ts
   vitest.config.ts        # if the package has tests
   oxlint.config.ts
   oxfmt.config.ts
@@ -39,7 +39,7 @@ Critical fields for publishing:
     "access": "public"
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsdown",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "lint": "oxlint",
@@ -50,7 +50,7 @@ Critical fields for publishing:
     "@nextnode-solutions/standards": "workspace:*",
     "oxfmt": "^0.28.0",
     "oxlint": "^1.43.0",
-    "tsup": "^8.5.1",
+    "tsdown": "^0.21.9",
     "typescript": "^6",
     "vitest": "^3"
   },
@@ -147,23 +147,24 @@ The `tagFormat` is critical in a monorepo — each package needs a unique tag pr
 
 Add `"lib": ["ES2023", "DOM"]` in `compilerOptions` if the package targets browser environments.
 
-## 5. tsup.config.ts
+## 5. tsdown.config.ts
+
+Always extend the shared base from `@nextnode-solutions/standards/tsdown`:
 
 ```typescript
-import { defineConfig } from 'tsup'
+import baseConfig from '@nextnode-solutions/standards/tsdown'
+import { defineConfig } from 'tsdown'
 
 export default defineConfig({
+  ...baseConfig,
   entry: {
     '<entry>': 'src/<entry>.ts',
   },
-  format: ['esm'],
   dts: true,
-  treeshake: true,
-  clean: true,
-  target: 'es2023',
-  splitting: true,
 })
 ```
+
+The base provides: `format: ['esm']`, `fixedExtension: false`, `target: 'es2023'`, `treeshake: true`, `clean: true`. Override only what your package needs. `fixedExtension: false` (in the base) makes output use `.js`/`.d.ts` instead of tsdown's default `.mjs`/`.d.mts`, matching `package.json` exports — requires `"type": "module"`.
 
 Each key in `entry` maps to an export in `package.json`. Example with multiple entry points:
 
@@ -176,6 +177,8 @@ entry: {
 ```
 
 This produces `dist/logger.js`, `dist/testing.js`, `dist/transports/http.js` with matching `.d.ts` files.
+
+**Why tsdown over tsup**: tsup is in maintenance mode and has an unfixed bug ([#1388](https://github.com/egoist/tsup/issues/1388)) where its DTS plugin injects `baseUrl: "."`, triggering TS5101 deprecation errors on TypeScript 6+. tsdown (same author) uses Rolldown + Oxc, is actively maintained, and avoids the issue. API is nearly drop-in compatible.
 
 ## 6. vitest.config.ts
 
@@ -312,7 +315,7 @@ Before pushing:
 - [ ] `package.json` has `version: "0.0.0-development"` and `publishConfig.access: "public"`
 - [ ] `nextnode.toml` has correct `name`, `type = "package"`, and `filter`
 - [ ] `.releaserc.json` has unique `tagFormat` with package name prefix
-- [ ] `tsup.config.ts` entry points match `package.json` exports
+- [ ] `tsdown.config.ts` entry points match `package.json` exports
 - [ ] `.github/workflows/<name>.yml` exists with correct `paths` filter and `config_file`
 - [ ] `pnpm install` works from root (new package is auto-detected by workspace)
 - [ ] `pnpm turbo run build --filter=@nextnode-solutions/<name>` succeeds
@@ -327,7 +330,7 @@ Before pushing:
 
 **Quality matrix is empty**: The plan job skips quality when both `lint` and `test` are `false` in `[scripts]`. Verify your `nextnode.toml`.
 
-**Build not found in dist**: Ensure `tsup.config.ts` entry keys match what `package.json` exports reference. The `files` field must include `dist`.
+**Build not found in dist**: Ensure `tsdown.config.ts` entry keys match what `package.json` exports reference. The `files` field must include `dist`.
 
 **turbo cache misses**: Verify `filter` in `nextnode.toml` matches exactly the `name` in `package.json` (e.g. `@nextnode-solutions/logger`).
 

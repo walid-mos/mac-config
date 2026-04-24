@@ -2,8 +2,8 @@
 name: nextnode-standards
 description: >-
   How to use @nextnode-solutions/standards in NextNode projects. Covers all
-  exported configs: oxlint, oxfmt, TypeScript, Vitest, commitlint, lint-staged,
-  semantic-release, editorconfig, npmrc, and Tailwind theme.
+  exported configs: oxlint, oxfmt, TypeScript, tsdown, Vitest, commitlint,
+  lint-staged, semantic-release, editorconfig, npmrc, and Tailwind theme.
 user-invocable: true
 synced-at: 1027421
 ---
@@ -18,6 +18,7 @@ Centralized development standards for all NextNode projects. This is a **config-
 - `oxlint`: linting config details
 - `oxfmt`: formatting config details
 - `typescript`: TypeScript config details
+- `tsdown`: bundler config details (for publishable packages)
 - `vitest`: test config details
 - `commitlint`: commit message config
 - `lint-staged`: pre-commit hooks config
@@ -39,6 +40,7 @@ Use the relevant sub-file for details:
 - [oxlint.md](oxlint.md) — linting rules and overrides
 - [oxfmt.md](oxfmt.md) — formatting settings and import sorting
 - [typescript.md](typescript.md) — TypeScript configs (library, Next.js, Astro)
+- [tsdown.md](tsdown.md) — bundler config base for publishable packages
 - [vitest.md](vitest.md) — test configs (backend, frontend)
 - [commitlint.md](commitlint.md) — commit message format and rules
 - [lint-staged.md](lint-staged.md) — pre-commit hook commands
@@ -86,6 +88,7 @@ For a typical NextNode project, you need these files:
 oxlint.config.ts          # extends standards/oxlint (requires oxlint >=1.58.0)
 oxfmt.config.ts           # extends standards/oxfmt (requires oxfmt >=0.43.0)
 tsconfig.json             # extends standards/typescript/{library|nextjs|astro}
+tsdown.config.ts          # imports standards/tsdown (publishable packages)
 vitest.config.ts          # imports standards/vitest/{backend|frontend}
 commitlint.config.js      # imports standards/commitlint
 lint-staged.config.js     # imports standards/lint-staged

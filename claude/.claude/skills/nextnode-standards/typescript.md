@@ -37,7 +37,7 @@ Create `tsconfig.json` at the project root:
 - **Module**: ESNext with bundler resolution
 - **Maximum strictness**: `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`, `noImplicitReturns`
 - **ESM-ready**: `isolatedModules`, `verbatimModuleSyntax`
-- **No emit**: uses tsup/other bundler for output
+- **No emit**: uses tsdown/other bundler for output
 
 ## Next.js config highlights
 

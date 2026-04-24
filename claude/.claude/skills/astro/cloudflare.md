@@ -14,10 +14,10 @@ export default defineConfig({
 
 ## Version Compatibility
 
-`@astrojs/cloudflare` v12.x is for Astro 5, v13.x is for Astro 6. Always verify:
+`@astrojs/cloudflare` v13.x tracks **Astro 6** (current). v12.x is Astro 5 (legacy). Always verify before installing:
 
 ```sh
-npm view @astrojs/cloudflare@12 peerDependencies
+npm view @astrojs/cloudflare@13 peerDependencies
 ```
 
 ## workerd Build Script

@@ -1,24 +1,33 @@
 ---
 name: astro
 description: >-
-  Astro 5 framework rules, patterns, and best practices. Load whenever working
-  on an Astro project (astro.config.ts, .astro files, src/pages/, src/content/).
-  Covers components, routing, content collections, rendering modes, islands
-  architecture, styling, API routes, and deployment. Must be used alongside
-  /typescript and /coding.
+  Astro 6 framework rules, patterns, and best practices (latest major; 6.1.8
+  as of 2026-04-22). Load whenever working on an Astro project
+  (astro.config.ts, .astro files, src/pages/, src/content/). Covers
+  components, routing, content collections, rendering modes, islands
+  architecture, styling, API routes, env vars, and deployment. Must be used
+  alongside /typescript and /coding.
 user-invocable: true
 synced-at: 3fbec5f3da69a242a9c400e13193e6dd593b8296
 ---
 
-# Astro 5 — Mandatory Rules
+# Astro 6 — Mandatory Rules
 
-These rules apply to ALL Astro code you write or modify. Astro 5 introduced breaking changes from Astro 4 — many patterns from older documentation are wrong.
+These rules apply to ALL Astro code you write or modify. This skill targets **Astro 6** (latest major — tracks the latest release, not legacy lines). Most rules also apply unchanged to Astro 5, but assume 6 unless a rule says otherwise. When starting a new Astro project, install the latest major — never default to 5 just because tutorials still show it.
+
+**Astro 6 key breaking changes from 5** (check these when upgrading):
+- Minimum Node ≥ 22.12 (Node 18 / 20 dropped).
+- `import.meta.env` no longer auto-transforms to `process.env` — reference `process.env.X` explicitly when you need it.
+- Stabilized experimental flags — remove these from `experimental` if present: `csp`, `fonts`, `liveContentCollections`, `preserveScriptOrder`, `staticImportMetaEnv`, `headingIdCompat`, `failOnPrerenderConflict`.
+- Adapter major bumps: `@astrojs/node` v11, `@astrojs/cloudflare` v13, `@astrojs/vercel` v9.
+- `astro:build:setup` hook is now called once with all environments — remove the `target` parameter, use `vite.environments` instead.
+- `setAdapter` API: drop the deprecated `exports` and `args`, set `entrypointResolution: 'auto'`.
 
 ---
 
 ## RULE 1 — NO `hybrid` OUTPUT MODE
 
-Astro 5 removed the `hybrid` output mode. There are only two modes:
+Astro 5 removed the `hybrid` output mode, and it stays gone in Astro 6. There are only two modes:
 
 - `output: 'static'` (default) — all pages prerendered at build time
 - `output: 'server'` — all pages rendered on demand
@@ -31,14 +40,16 @@ See [rendering.md](rendering.md) for full details and decision table.
 
 ## RULE 2 — ADAPTER VERSION COMPATIBILITY
 
-Always check adapter peer dependencies before installing. Major adapter versions track Astro major versions:
+Always check adapter peer dependencies before installing. Major adapter versions track Astro major versions. Default to the row matching the **Astro major you're installing** — for a new project, that's Astro 6:
 
 | Astro version | `@astrojs/cloudflare` | `@astrojs/node` | `@astrojs/vercel` |
 |---|---|---|---|
-| Astro 5 | ^12.x | ^10.x | ^8.x |
-| Astro 6 | ^13.x | ^11.x | ^9.x |
+| Astro 6 (current) | ^13.x | ^11.x | ^9.x |
+| Astro 5 (legacy) | ^12.x | ^10.x | ^8.x |
 
 Before installing: `npm view @astrojs/<adapter>@<major> peerDependencies`
+
+Before starting a new project: `npm view astro version` — always install the current major, not what tutorials show.
 
 ---
 
@@ -73,21 +84,56 @@ See [api-routes.md](api-routes.md) for validation patterns, JSON responses, and 
 
 ---
 
-## RULE 5 — ENVIRONMENT VARIABLES
+## RULE 5 — ENVIRONMENT VARIABLES — USE `astro:env`
 
-`process.env` is NOT available in all runtimes (Cloudflare Workers, Deno). Access env vars differently depending on context:
+Runtime env vars go through `astro:env/server`. Works on all adapters (Node, Cloudflare, Vercel, Netlify). Same API in Astro 5 and 6.
 
-- **Astro built-ins**: `import.meta.env.SITE`, `import.meta.env.BASE_URL` — always available (inlined at build time)
-- **Public (client-safe)**: prefix with `PUBLIC_` — `import.meta.env.PUBLIC_ANALYTICS_ID` (inlined at build time)
-- **Private runtime vars on Cloudflare**: use `locals.runtime.env.RESEND_API_KEY` in API routes — `import.meta.env.RESEND_API_KEY` is **undefined** at runtime because Vite does not inline non-PUBLIC custom vars
+**Never** read runtime secrets via `process.env[name]` (not populated from `.env` on the server) or `import.meta.env[varName]` with bracket access (Vite only replaces literal accesses).
 
-See [cloudflare.md](cloudflare.md) for the full breakdown of build-time vs runtime env vars.
+**Declare the schema** in `astro.config.ts` (extract to `src/config/env.schema.ts` once it exceeds 2-3 entries):
+
+```ts
+// src/config/env.schema.ts
+import { envField } from 'astro/config'
+
+export const envSchema = {
+  API_TOKEN: envField.string({ context: 'server', access: 'secret', optional: true }),
+} as const
+```
+
+```ts
+// astro.config.ts
+import { envSchema } from './src/config/env.schema.ts'
+
+export default defineConfig({
+  env: { schema: envSchema },
+})
+```
+
+**Read at runtime**:
+
+```ts
+// Dynamic lookup (by name) — for wrapper helpers
+import { getSecret } from 'astro:env/server'
+const token = getSecret('API_TOKEN')
+
+// Direct named import — when the name is known statically
+import { API_TOKEN } from 'astro:env/server'
+```
+
+**`optional: true`** lets missing vars surface as per-page errors instead of crashing the whole server at startup. Use it for dashboards / internal tools that should render a "missing config" UI state.
+
+**`access: 'secret'`** keeps the value out of client bundles. Mandatory for credentials.
+
+**Always-available build-time vars** (no schema needed): `import.meta.env.SITE`, `import.meta.env.BASE_URL`, `import.meta.env.DEV|PROD|SSR|MODE`. **Public vars** (`PUBLIC_*`) stay inlined at build time and work in both server and client.
+
+See [env.md](env.md) for full `envField` API, `access`/`context` matrix, and adapter specifics (Node `.env` hot-reload caveat, Cloudflare bindings).
 
 ---
 
 ## RULE 6 — CONTENT COLLECTIONS USE CONTENT LAYER API
 
-Astro 5 uses the Content Layer API with explicit loaders. Define collections in `src/content.config.ts` with `glob()` or `file()` loaders and Zod schemas.
+Astro 6 (and 5) use the Content Layer API with explicit loaders. Define collections in `src/content.config.ts` with `glob()` or `file()` loaders and Zod schemas. The pre-5 legacy collection format is gone.
 
 Import `z` from `astro/zod` — never from `zod` directly.
 
@@ -207,6 +253,35 @@ In `output: 'server'`, dynamic params come from `Astro.params` directly — no `
 
 ---
 
+## RULE 15 — UNION TYPES IN FRONTMATTER STAY ON ONE LINE
+
+Write TypeScript union types in `.astro` frontmatter on a **single line**. The esbuild-based TS-strip pass used by Astro 5 and 6 mishandles multi-line unions with leading pipes — it strips the `type X =` line but leaks the continuation `| 'x'` lines into compiled output, producing a runtime `Unexpected "|"` esbuild error.
+
+```astro
+---
+// FORBIDDEN — breaks at runtime with "Unexpected '|'"
+export type ButtonVariant =
+  | 'default'
+  | 'accent'
+  | 'muted'
+
+type Tag =
+  | 'a'
+  | 'p'
+  | 'span'
+
+// MANDATORY — single line
+export type ButtonVariant = 'default' | 'accent' | 'muted'
+type Tag = 'a' | 'p' | 'span'
+---
+```
+
+This applies to every union in the frontmatter fence (`---`), including `type`, `export type`, and inline types inside `interface Props`. Prettier's default multi-line union formatting must be overridden for `.astro` files — either keep unions short enough to fit one line, or suppress the formatter on that line. Long unions also survive as a single line: do not split them for readability at the cost of breaking the build.
+
+`.ts`/`.tsx` files outside `.astro` are unaffected — this is specifically the Astro compiler's frontmatter extraction pipeline.
+
+---
+
 ## Quick Reference
 
 | Topic | File |
@@ -218,4 +293,5 @@ In `output: 'server'`, dynamic params come from `Astro.params` directly — no `
 | Scoped styles, global CSS, class:list, define:vars | [styling.md](styling.md) |
 | Rendering modes, prerender, adapters | [rendering.md](rendering.md) |
 | API routes, endpoints, JSON responses | [api-routes.md](api-routes.md) |
+| Env vars, `astro:env`, `getSecret`, `envField`, Astro 6 notes | [env.md](env.md) |
 | Cloudflare deployment specifics | [cloudflare.md](cloudflare.md) |

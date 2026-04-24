@@ -67,3 +67,4 @@ vim.cmd([[set iskeyword+=-]])
 
 vim.opt.fillchars = vim.opt.fillchars + "eob: "
 vim.opt.fillchars:append({ stl = " " })
+vim.opt.showtabline = 0

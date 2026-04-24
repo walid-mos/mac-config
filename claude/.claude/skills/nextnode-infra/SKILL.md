@@ -101,6 +101,11 @@ For every `@nextnode-solutions/*` dep in `package.json`, compare the **installed
 - [ ] Logger injected via constructor/parameter (not global import in business logic)
 - [ ] Tests use `createSpyLogger()` or `createNoopLogger()` from `logger/testing`
 
+#### Date handling (if used)
+- [ ] No `date-fns`, `luxon`, `dayjs`, or `moment` in `dependencies`/`devDependencies`
+- [ ] If date/time code exists, `@js-temporal/polyfill` is the dep and `Temporal` is used (not raw `Date` arithmetic)
+- [ ] Project code imports `Temporal` from `@js-temporal/polyfill` (e.g. `Temporal.Instant.from(iso)`, `Temporal.PlainDate`, `.since()`, `.total('minute')`) instead of `new Date()` math or `Date.parse()`
+
 ### When called with a sub-skill argument
 
 Redirect immediately:
@@ -126,3 +131,4 @@ Redirect immediately:
 4. **Config-driven** — behavior from `nextnode.toml`, not hardcoded
 5. **Always check NextNode package freshness** — before any audit or CI debug, run `npm view <pkg> version` for each installed `@nextnode-solutions/*` package and compare against the installed version. Outdated NextNode packages are the #1 cause of CI-only failures that don't reproduce locally.
 6. **`SITE_URL` is infra-owned, never hardcoded** — the deploy pipeline (`computeDeployEnv`) generates `SITE_URL` from `nextnode.toml` domain + environment and injects it at build and runtime. Frameworks that need a canonical URL (Astro `site`, sitemap generators, etc.) MUST read `process.env.SITE_URL` (or `import.meta.env.SITE_URL`). Hardcoding a literal domain breaks dev/prod resolution and is a compliance violation.
+7. **Dates go through Temporal, never `Date` or date libraries** — for any date/time code in a NextNode project, use TC39 Temporal via `@js-temporal/polyfill`. BAN `date-fns`, `luxon`, `dayjs`, `moment`, and raw `Date` arithmetic for new code. Reason: Temporal is the standardized future native JS API — when Node exposes it stable, the polyfill is stripped with zero code change; other libraries are legacy ergonomics that will be superseded. Cost: ~40 kB polyfill, SSR/server-only, acceptable for every NextNode project. Install per-package: `pnpm add @js-temporal/polyfill`. Use `Temporal.Instant.from(iso)`, `Temporal.PlainDate`, `.since()`, `.total('minute'|'hour'|'day')`, `.toZonedDateTimeISO('UTC').toPlainDate()` instead of `new Date()`, `Date.now()` math, or `getTime()` subtraction. `Date.now()` remains acceptable only as a raw epoch-ms source passed into Temporal (`Temporal.Instant.fromEpochMilliseconds(Date.now())`).

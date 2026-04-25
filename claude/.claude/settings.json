@@ -59,6 +59,17 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/stop-notify.sh",
+            "async": true
+          }
+        ]
+      }
     ]
   },
   "statusLine": {

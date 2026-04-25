@@ -1,8 +1,15 @@
 #!/bin/sh
 set -e
 
-echo "Updating Odin..."
-brew upgrade odin 2>/dev/null || echo "Odin already up to date"
+ols_dir="$HOME/.config/languages/ols"
+
+if ! command -v odin >/dev/null 2>&1; then
+	echo "Installing Odin..."
+	brew install odin
+else
+	echo "Updating Odin..."
+	brew upgrade odin 2>/dev/null || echo "Odin already up to date"
+fi
 
 # Get Odin version tag (format: dev-YYYY-MM)
 odin_version=$(odin version 2>&1 | grep -o 'dev-[0-9]\{4\}-[0-9]\{2\}')
@@ -11,8 +18,14 @@ if [ -z "$odin_version" ]; then
 	exit 1
 fi
 
+if [ ! -d "$ols_dir/.git" ]; then
+	echo "Cloning ols into $ols_dir..."
+	mkdir -p "$(dirname "$ols_dir")"
+	git clone https://github.com/DanielGavin/ols "$ols_dir"
+fi
+
 echo "Rebuilding ols for $odin_version..."
-cd "$HOME/.config/languages/ols"
+cd "$ols_dir"
 git fetch --tags
 git checkout "$odin_version"
 ./build.sh

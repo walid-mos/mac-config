@@ -112,8 +112,8 @@
       "gh:*"
     ]
   },
-  "effortLevel": "high",
+  "effortLevel": "xhigh",
   "autoUpdatesChannel": "latest",
-  "skipAutoPermissionPrompt": true,
-  "theme": "auto"
+  "theme": "auto",
+  "skipAutoPermissionPrompt": true
 }

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Stop hook: notify when Claude finishes; click focuses the originating Ghostty tab.
-# Identifies the source terminal via the parent process TTY and matches it against
-# Ghostty's AppleScript surface list.
+# Only fires when Claude's pty is owned by a Ghostty surface — skips nested
+# terminals like cmux/tmux whose inner pty isn't in Ghostty's surface list.
 
 set -euo pipefail
 
@@ -17,18 +17,39 @@ tty_short=$(ps -o tty= -p "$claude_pid" 2>/dev/null | tr -d ' \n' || true)
 [ -z "$tty_short" ] || [ "$tty_short" = "??" ] && exit 0
 target_tty="/dev/$tty_short"
 
-# Skip if Ghostty is already frontmost on the originating tab — no need to interrupt.
-front_tty=$(osascript <<'APPLESCRIPT' 2>/dev/null || true
-tell application "Ghostty"
-  if not frontmost then return ""
-  try
-    return tty of (focused terminal of selected tab of front window)
-  on error
-    return ""
-  end try
-end tell
+ghostty_info=$(osascript <<'APPLESCRIPT' 2>/dev/null || true
+if application "Ghostty" is running then
+  tell application "Ghostty"
+    set frontTty to ""
+    try
+      if frontmost then set frontTty to tty of (focused terminal of selected tab of front window)
+    end try
+    set allTtys to ""
+    try
+      repeat with w in windows
+        repeat with t in tabs of w
+          repeat with term in terminals of t
+            set allTtys to allTtys & (tty of term) & "|"
+          end repeat
+        end repeat
+      end repeat
+    end try
+    return frontTty & "###" & allTtys
+  end tell
+end if
 APPLESCRIPT
 )
+
+front_tty="${ghostty_info%%###*}"
+all_ttys="${ghostty_info##*###}"
+
+# Skip if Claude's pty isn't a Ghostty surface (e.g. running inside cmux/tmux).
+case "|$all_ttys" in
+  *"|$target_tty|"*) ;;
+  *) exit 0 ;;
+esac
+
+# Skip if Ghostty is already frontmost on the originating tab — no need to interrupt.
 [ "$front_tty" = "$target_tty" ] && exit 0
 
 folder=""

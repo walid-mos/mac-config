@@ -118,77 +118,13 @@ EXPOSE 3000
 CMD ["node", "dist/server.js"]
 ```
 
-## Monorepo (pnpm workspaces)
+## Monorepo callers
 
-When the caller is a single package inside a pnpm workspace (e.g. `packages/monitoring` in `@nextnode/core`), the Dockerfile must build workspace dependencies first and use the modern `pnpm deploy` to produce an isolated bundle.
+When the caller is a workspace package inside a Turborepo monorepo (e.g. `packages/monitoring` in `@nextnode/core`), the Dockerfile pattern is **provider-agnostic** — same image runs on Hetzner, Render, ECS, Scaleway, Fly. That pattern lives in its own skill:
 
-### Two non-obvious traps
+→ See **[/turborepo](../turborepo/SKILL.md)** for the canonical `turbo prune --docker` Dockerfile, layer-caching breakdown, anti-patterns (legacy `pnpm deploy` + `inject-workspace-packages`), and migration checklist.
 
-**1. Build dependencies topologically — `pnpm --filter <pkg>... build`.**
-
-A naive `pnpm --filter <pkg> build` only builds the target package. If `<pkg>` depends on a workspace package that exports built artifacts (e.g. `"exports": { ".": "./dist/logger.js" }`), the consumer's bundler (Vite, tsdown, esbuild) will fail at resolve time because `dist/` does not exist inside the container. The trailing `...` is the canonical pnpm filter operator for "the package and all its workspace dependencies, in topological order".
-
-```dockerfile
-# WRONG — only builds <pkg>; deps' dist/ is missing → resolve fails
-RUN pnpm --filter @org/app build
-
-# RIGHT — builds workspace deps first, then <pkg>
-RUN pnpm --filter @org/app... build
-```
-
-The same operator goes on the install step (`pnpm install --frozen-lockfile --filter <pkg>...`) so transitive workspace deps land in `node_modules`.
-
-**2. Drop `--legacy` from `pnpm deploy` — set `inject-workspace-packages: true`.**
-
-`pnpm 10` rebuilt the `deploy` command to produce a properly isolated subgraph with a dedicated lockfile, but it requires `inject-workspace-packages=true` in `pnpm-workspace.yaml`. Without that setting, `pnpm deploy` errors with `ERR_PNPM_DEPLOY_NONINJECTED_WORKSPACE` and tells you to either flip the flag or pass `--legacy`. The `--legacy` flag is the escape hatch to keep pre-pnpm-10 behavior; choosing it permanently is a code smell because it locks the project out of the modern lockfile semantics.
-
-```yaml
-# pnpm-workspace.yaml
-packages:
-  - packages/*
-inject-workspace-packages: true   # MANDATORY to use modern pnpm deploy
-```
-
-```dockerfile
-# WRONG — masks the real fix with a legacy escape hatch
-RUN pnpm --filter @org/app deploy --legacy --prod /deploy
-
-# RIGHT — modern deploy with injection enabled at workspace level
-RUN pnpm --filter @org/app deploy --prod /deploy
-```
-
-DX impact of injection: workspace deps become hard-linked instead of symlinked, so editing a workspace dep's source requires `pnpm install` to refresh consumers. For monorepos where libraries are already built (tsdown / tsc) before being consumed, this is essentially free — devs already need to rebuild after editing.
-
-### Reference monorepo Dockerfile
-
-```dockerfile
-FROM node:24-alpine AS base
-WORKDIR /repo
-RUN corepack enable pnpm
-
-FROM base AS deps
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
-COPY packages ./packages
-RUN pnpm install --frozen-lockfile --filter @org/app...
-
-FROM deps AS build
-RUN pnpm --filter @org/app... build
-
-FROM build AS bundle
-RUN pnpm --filter @org/app deploy --prod /deploy
-
-FROM node:24-alpine AS runtime
-ENV NODE_ENV=production
-WORKDIR /app
-COPY --from=bundle /deploy ./
-EXPOSE 3000
-CMD ["node", "dist/server/entry.mjs"]
-```
-
-Notes:
-- The build stage does NOT need `COPY . .` — the `deps` stage already copied `packages/`, which is everything the build needs. Re-copying the whole repo wastes the `deps` cache and pulls in `.git`/build artifacts.
-- The `bundle` stage's `pnpm deploy` produces a self-contained `/deploy` directory with the app, its built deps (hard-linked), and a dedicated lockfile.
-- The `runtime` stage starts from a fresh `node:24-alpine` and only copies `/deploy` — no pnpm, no source, smallest possible image.
+What stays Hetzner-specific (this file) is the **runtime contract**: the `app` service name, port `3000`, infra-owned compose keys, env injection, Caddy proxy. The Dockerfile must respect those, but its build strategy is generic monorepo concern.
 
 ## Image naming
 
@@ -235,6 +171,6 @@ A green smoke test is mandatory before pushing — treat it like `pnpm test` for
 3. **Respect `$PORT`** — read `process.env.PORT` (12-factor). Infra sets it to 3000. Never hardcode a listening port in the app.
 4. **Everything non-build-related is infra-owned** — ports, env vars, restart policy, volumes all belong to the infra layer.
 5. **Image naming is centralized** — `computeImageRef` is the only normalizer. Never reconstruct `ghcr.io/...:sha-...` by hand.
-6. **Monorepo builds use the topological filter** — `pnpm --filter <pkg>... build` (trailing `...`) builds the package AND its workspace deps in dependency order. A bare `--filter <pkg> build` only builds the target and breaks any consumer that imports a workspace dep with a built `dist/` entry.
-7. **`pnpm deploy` runs without `--legacy`** — set `inject-workspace-packages: true` in `pnpm-workspace.yaml` once and use the modern deploy everywhere. `--legacy` is a smell, not a solution.
+6. **Monorepo callers delegate the Dockerfile build strategy to `/turborepo`** — the `turbo prune --docker` pattern is provider-agnostic and lives in its own skill. The Hetzner caller only owns the runtime contract (port 3000, service name `app`, infra-owned compose keys).
+7. **Smoke-test `docker build && docker run` locally before pushing a deploy** — Definition of Done for any change that triggers `deploy.yml`. The local loop catches `MODULE_NOT_FOUND`, wrong `HOST` binding, broken `CMD` paths, and crash-loops in seconds. Pushing without it burns 5+ minutes of CI per failed iteration.
 8. **Smoke-test `docker compose build && docker compose up` locally before pushing a deploy** — Definition of Done for any change that triggers `deploy.yml`. The local loop catches `MODULE_NOT_FOUND` (missing `dist/` in the published bundle), wrong `HOST` binding, broken `CMD` paths, and crash-loops in seconds. Pushing without it burns 5+ minutes of CI per failed iteration. See the pre-flight section above.

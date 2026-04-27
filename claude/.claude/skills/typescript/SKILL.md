@@ -107,12 +107,18 @@ const status: "active" | "inactive" = computeStatus()
 ## Strict Null Handling
 
 - **Prefer null checks, early returns, `??`, and `?.` over `!`** in most cases.
-- **`!` is acceptable** when the non-null condition is guaranteed by surrounding logic but TypeScript's control flow can't see it (e.g. after a `.filter()`, in a loop that only runs when the value exists, or when a prior check already covers it).
-- **`!` is NOT acceptable** as a lazy shortcut to skip proper null handling. If you're using `!` because you don't want to think about the null case, that's wrong.
+- **Prefer type-system fixes over `!`** when one exists — non-empty tuples (`[T, ...Array<T>]`), discriminated unions, type guards, or proper narrowing are all better than asserting.
+- **`!` is acceptable** when the non-null condition is guaranteed by surrounding logic but TypeScript's control flow can't see it. The bar is provability: you (or a reviewer) can point to the exact runtime check or invariant that makes it safe. Common cases TS can't follow: `Map.has() + Map.get()`, `arr.find()` after a length/match guarantee, async boundaries, and test assertions like `expect(x).toBeDefined()`.
+- **`!` is NOT acceptable** as a lazy shortcut to skip null handling. If you can't articulate the proof in one sentence, you don't have one.
+- Note: `if (!x) throw …` narrows `x` automatically — you don't need `!` after it. Reach for `!` only when narrowing isn't available.
 
 ```typescript
 // BAD — lazy, no guarantee user exists
 const name = user!.name
+
+// BAD — narrowing already works, the bang is noise
+if (!user) throw new Error("User not found")
+const name = user!.name // just write user.name
 
 // GOOD — handle it
 if (!user) throw new Error("User not found")
@@ -121,11 +127,22 @@ const name = user.name
 // GOOD
 const name = user?.name ?? "Unknown"
 
-// ACCEPTABLE — guaranteed by .has() check above
+// ACCEPTABLE — TS doesn't connect .has() and .get()
 if (map.has(key)) {
   const value = map.get(key)!
 }
+
+// ACCEPTABLE — .find() returns T | undefined even when we know it matches
+const admin = users.find(u => u.role === "admin")!
+//            ^^ requires a real guarantee (e.g. seed data) — otherwise handle undefined
+
+// ACCEPTABLE in tests — expect().toBeDefined() doesn't narrow types
+const result = parseConfig(input)
+expect(result).toBeDefined()
+expect(result!.host).toBe("localhost")
 ```
+
+When a type-system fix is available (e.g. typing a Map's values as `[T, ...Array<T>]` so `arr[0]` is `T` not `T | undefined`), use it instead of sprinkling `!` at every read site.
 
 ## Unions Over Enums
 
@@ -240,5 +257,5 @@ import { createUser } from "./users"
 | `as const` | ALLOWED | Use it freely |
 | `// @ts-ignore` | NEVER | Fix the type error |
 | `// @ts-expect-error` | Only in tests | Must have a comment explaining why |
-| `!` (non-null assertion) | OK if guaranteed | Prefer null checks, but fine when logic guarantees non-null |
+| `!` (non-null assertion) | OK if provable | Prefer type-system fixes / null checks; bang is fine when a runtime check or test assertion guarantees non-null but TS can't see it |
 | `enum` | AVOID | String literal unions, `as const` objects |

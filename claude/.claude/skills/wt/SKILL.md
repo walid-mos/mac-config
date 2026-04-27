@@ -58,17 +58,27 @@ This is the main flow. Steps:
    fi
    ```
 
-4. **Spawn cmux workspace + claude**:
+4. **Compute workspace name** from the branch:
+   - Split on `/`, capitalize the first letter of each segment, join with ` - `.
+   - `fix-login` → `Fix-login`
+   - `feat/auth` → `Feat - Auth`
+   - `walid/feat/auth` → `Walid - Feat - Auth`
 
    ```bash
-   cmux new-workspace --name "$branch" --cwd "$target" --command "claude"
+   workspace_name=$(echo "$branch" | awk -F'/' '{for(i=1;i<=NF;i++){$i=toupper(substr($i,1,1)) substr($i,2)} OFS=" - "; $1=$1; print}')
    ```
 
-   - `--name "$branch"` sets the workspace tab title.
+5. **Spawn cmux workspace + claude**:
+
+   ```bash
+   cmux new-workspace --name "$workspace_name" --cwd "$target" --command "claude"
+   ```
+
+   - `--name "$workspace_name"` sets the workspace tab title (formatted from the branch).
    - `--cwd` opens the workspace at the worktree path.
    - `--command "claude"` auto-launches Claude Code in the main pane.
 
-5. **Report** to the user: branch name, worktree path, and that a new cmux workspace was opened.
+6. **Report** to the user: branch name, worktree path, and that a new cmux workspace was opened.
 
 ### Compact one-liner (preferred when invoking)
 
@@ -78,8 +88,9 @@ source ~/.config/zsh/functions/wt && \
   remote=$(git config --get remote.origin.url 2>/dev/null) && \
   if [ -n "$remote" ]; then project=$(echo "$remote" | sed -E 's#.*/([^/]+)(\.git)?$#\1#' | sed 's/\.git$//'); else project=$(basename "$(git rev-parse --show-toplevel)"); fi && \
   target="$HOME/development/worktrees/${project}-${branch}" && \
-  [ -d "$target" ] || wt new "$branch" -y && \
-  cmux new-workspace --name "$branch" --cwd "$target" --command "claude"
+  workspace_name=$(echo "$branch" | awk -F'/' '{for(i=1;i<=NF;i++){$i=toupper(substr($i,1,1)) substr($i,2)} OFS=" - "; $1=$1; print}') && \
+  { [ -d "$target" ] || wt new "$branch" -y; } && \
+  cmux new-workspace --name "$workspace_name" --cwd "$target" --command "claude"
 ```
 
 ### Subcommands

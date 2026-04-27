@@ -1,116 +1,118 @@
 ---
 name: wt
 description: >-
-  Manage git worktrees: create, list, switch, clean up, and prune worktrees.
-  Wraps the `wt` zsh function for non-interactive use within Claude Code.
+  Spawn a git worktree + a new cmux workspace running Claude in it. Primary
+  command: `/wt <branch>` creates the worktree, opens a new cmux workspace
+  scoped to that worktree, and launches `claude` inside it. Also supports
+  list/clean/prune for managing existing worktrees.
 user-invocable: true
 ---
 
-# Git Worktree Manager
+# Worktree + cmux Workspace Spawner
 
-Manage git worktrees from Claude Code. All worktrees are centralized in `~/development/worktrees` with the naming pattern `{project}-{branch}`.
+Primary use case: from inside a Claude session running in a cmux workspace, spawn a fresh worktree on a new branch AND a new cmux workspace (left-side tab) with `claude` already running in it.
+
+This is the one-shot replacement for the manual chain: open cmux tab → `wt new` → `claude`.
 
 ## Arguments
 
-- `subcommand` (optional): The worktree operation to perform.
-- Additional args depend on the subcommand.
+- `branch` (or first arg): branch name → spawn flow.
+- `subcommand`: `list`, `clean`, `prune` for managing existing worktrees.
 
 Examples:
-- `/wt` — List all worktrees for the current project
-- `/wt new feature-auth` — Create a worktree for branch `feature-auth`
-- `/wt clean feature-auth` — Remove the worktree for `feature-auth`
-- `/wt prune` — Remove worktrees for branches deleted on remote
-- `/wt status` — Show git status of all worktrees
+- `/wt fix-login` — create worktree for `fix-login` + cmux workspace + claude
+- `/wt list` — list all worktrees for the current project
+- `/wt clean fix-login` — remove the `fix-login` worktree
+- `/wt prune` — remove worktrees for branches deleted on remote
 
 ## Instructions
 
-### Important: Non-interactive mode
+### Dispatch rule
 
-Claude Code cannot interact with prompts (fzf, read). Always use the `-y` flag or provide explicit branch names to avoid interactive prompts.
+If the first argument is `list`, `clean`, or `prune`, run that subcommand. Otherwise treat the argument as a branch name and run the spawn flow. With no arguments, default to `list`.
 
-### Environment setup
+### Spawn flow — `/wt <branch>`
 
-The `wt` zsh function is available as a shell function. Source it before use:
+This is the main flow. Steps:
+
+1. **Resolve project name** (same logic as the `wt` zsh function — git remote origin URL, falling back to git root basename):
+
+   ```bash
+   git rev-parse --git-dir > /dev/null 2>&1 || { echo "Not in a git repo"; exit 1; }
+   remote=$(git config --get remote.origin.url 2>/dev/null)
+   if [ -n "$remote" ]; then
+     project=$(echo "$remote" | sed -E 's#.*/([^/]+)(\.git)?$#\1#' | sed 's/\.git$//')
+   else
+     project=$(basename "$(git rev-parse --show-toplevel)")
+   fi
+   ```
+
+2. **Compute target path**: `~/development/worktrees/{project}-{branch}`
+
+3. **Create the worktree if missing** (skip if path already exists — idempotent):
+
+   ```bash
+   target="$HOME/development/worktrees/${project}-${branch}"
+   if [ ! -d "$target" ]; then
+     source ~/.config/zsh/functions/wt && wt new "$branch" -y
+   fi
+   ```
+
+4. **Spawn cmux workspace + claude**:
+
+   ```bash
+   cmux new-workspace --name "$branch" --cwd "$target" --command "claude"
+   ```
+
+   - `--name "$branch"` sets the workspace tab title.
+   - `--cwd` opens the workspace at the worktree path.
+   - `--command "claude"` auto-launches Claude Code in the main pane.
+
+5. **Report** to the user: branch name, worktree path, and that a new cmux workspace was opened.
+
+### Compact one-liner (preferred when invoking)
 
 ```bash
-source ~/.config/zsh/functions/wt
+source ~/.config/zsh/functions/wt && \
+  branch="<branch>" && \
+  remote=$(git config --get remote.origin.url 2>/dev/null) && \
+  if [ -n "$remote" ]; then project=$(echo "$remote" | sed -E 's#.*/([^/]+)(\.git)?$#\1#' | sed 's/\.git$//'); else project=$(basename "$(git rev-parse --show-toplevel)"); fi && \
+  target="$HOME/development/worktrees/${project}-${branch}" && \
+  [ -d "$target" ] || wt new "$branch" -y && \
+  cmux new-workspace --name "$branch" --cwd "$target" --command "claude"
 ```
-
-However, since `cd` in Bash tool does not persist across calls, **do not rely on `wt switch` or `wt new` to change directories**. Instead, after creating or identifying a worktree, report its path to the user and use that path in subsequent commands.
 
 ### Subcommands
 
-#### `new <branch> [-y]` — Create a worktree
-
-```bash
-source ~/.config/zsh/functions/wt && wt new <branch> -y
-```
-
-- Creates `~/development/worktrees/{project}-{branch}/`
-- If branch doesn't exist, creates it from current HEAD (auto-confirmed with `-y`)
-- If worktree already exists, reports the path
-- After creation, tell the user the worktree path
-
-#### `list` — List worktrees
+#### `list` — list worktrees
 
 ```bash
 source ~/.config/zsh/functions/wt && wt list
 ```
 
-- Shows all worktrees for the current project with their paths and branches
-- This is the **default** when `/wt` is invoked with no arguments
+Default when `/wt` is invoked with no arguments.
 
-#### `status` — Show status of all worktrees
-
-```bash
-source ~/.config/zsh/functions/wt && wt status
-```
-
-- Shows git status (clean/dirty) for each worktree
-
-#### `clean <branch...> -y` — Remove specific worktrees
+#### `clean <branch...>` — remove worktrees
 
 ```bash
 source ~/.config/zsh/functions/wt && wt clean <branch1> [branch2...] -y
 ```
 
-- Always provide branch name(s) explicitly (no interactive fzf)
-- Always use `-y` to skip confirmation
-- This removes the worktree but keeps the local branch
+Always provide explicit branch names (no fzf). Removes worktree directory; keeps local branch.
 
-#### `prune` — Remove worktrees for deleted remote branches
+#### `prune` — remove worktrees for deleted remote branches
 
 ```bash
 source ~/.config/zsh/functions/wt && wt prune
 ```
 
-- Fetches with `--prune`, finds branches marked as "gone" on remote
-- Removes both the worktree AND the local branch
-- Will prompt for confirmation — if the user wants auto-confirm, they should run it themselves with `! wt prune`
-
-### Working in a worktree
-
-After creating or identifying a worktree, use its full path for any file operations:
-
-```bash
-# Run commands in the worktree directory
-git -C ~/development/worktrees/{project}-{branch} status
-git -C ~/development/worktrees/{project}-{branch} log --oneline -5
-```
-
-Or prefix commands with `cd`:
-```bash
-cd ~/development/worktrees/{project}-{branch} && git status
-```
-
-### Using Claude Code's built-in worktree isolation
-
-For running agents in isolated worktrees, use the Agent tool with `isolation: "worktree"`. This creates a temporary git worktree managed by Claude Code itself — separate from the `wt` managed worktrees. Use the `wt` skill for persistent, user-facing worktrees.
+Fetches with `--prune`, removes worktrees AND local branches marked "gone" on remote. Will prompt for confirmation — if user wants auto-confirm, suggest they run `! wt prune` themselves.
 
 ## Rules
 
-1. **Always use `-y` flag** for `new` and `clean` to avoid interactive prompts
-2. **Always provide explicit branch names** for `clean` — never invoke without arguments (it opens fzf)
-3. **Never invoke `wt switch` without a branch argument** — it opens fzf
-4. **Report worktree paths** after creation so the user knows where to find them
-5. **Warn before destructive operations** — `clean` and `prune` delete worktree directories
+1. **Spawn flow is idempotent on the worktree**: if `~/development/worktrees/{project}-{branch}` already exists, skip `wt new` and just open the cmux workspace pointing at it.
+2. **Always pass `-y`** to `wt new` and `wt clean` — Claude cannot answer interactive prompts.
+3. **Never invoke `wt clean` without explicit branch names** — opens fzf otherwise.
+4. **Verify cmux is reachable**: the spawn command requires the cmux app to be running. If `cmux new-workspace` fails with a socket error, tell the user cmux isn't running.
+5. **Warn before destructive ops**: `clean` and `prune` delete worktree directories.
+6. **Do not `cd` into the new worktree from the current Bash session** — `cd` doesn't persist across Bash calls and the new worktree lives in the new cmux workspace anyway.

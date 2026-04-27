@@ -27,6 +27,7 @@
       "Bash(mkdir:*)",
       "Bash(awk:*)",
       "Bash(grep:*)",
+      "Bash(cmux:*)",
       "WebFetch(*)",
       "WebSearch(*)",
       "mcp__claude_ai_Context7__*",
@@ -109,7 +110,8 @@
       "curl:*",
       "brew:*",
       "tailscale:*",
-      "gh:*"
+      "gh:*",
+      "cmux:*"
     ]
   },
   "effortLevel": "xhigh",

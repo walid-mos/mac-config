@@ -25,10 +25,14 @@ development = true                           # Optional -- boolean (default: tru
 [deploy]
 target = "hetzner-vps"                       # Optional -- inferred from type (app->hetzner-vps, static->cloudflare-pages)
 secrets = ["RESEND_API_KEY", "SUPABASE_URL"] # Optional -- string[]
+vps = "monitoring"                           # Optional -- override shared VPS hostname per env (Hetzner only). null = shared default.
 
 [deploy.hetzner]                             # Required when target is "hetzner-vps"
-server_type = "cpx22"                        # Required -- Hetzner server type
-location = "nbg1"                            # Required -- Hetzner datacenter location
+server_type = "cx23"                         # Optional -- Hetzner server type (default: "cx23"). NOTE: cx22 was deprecated, use cx23.
+location = "nbg1"                            # Optional -- Hetzner datacenter location (default: "nbg1")
+
+[services.r2]                                # Optional -- per-project R2 buckets (Cloudflare R2)
+buckets = ["uploads", "thumbnails"]          # Bucket aliases (kebab-case). Materialized as `<projectName>-<environment>-<alias>`.
 ```
 
 ## TypeScript types
@@ -40,6 +44,15 @@ interface NextNodeConfig {
   readonly package: PackageSection | false
   readonly environment: EnvironmentSection
   readonly deploy: DeploySection | false  // false for packages
+  readonly services: ServicesConfig         // {} when no services declared
+}
+
+interface ServicesConfig {
+  readonly r2?: R2ServiceConfig
+}
+
+interface R2ServiceConfig {
+  readonly buckets: ReadonlyArray<string>
 }
 
 interface ProjectSection {
@@ -68,15 +81,18 @@ interface EnvironmentSection {
 type DeployTargetType = "hetzner-vps" | "cloudflare-pages"
 type DeployableProjectType = "app" | "static"
 
-interface HetznerVpsDeploySection {
-  readonly target: "hetzner-vps"
+interface BaseDeploySection {
   readonly secrets: ReadonlyArray<string>
+  readonly vps: string | null  // Override shared VPS hostname per env. null = shared default. Cloudflare ignores this.
+}
+
+interface HetznerVpsDeploySection extends BaseDeploySection {
+  readonly target: "hetzner-vps"
   readonly hetzner: HetznerDeployConfig
 }
 
-interface CloudflarePagesDeploySection {
+interface CloudflarePagesDeploySection extends BaseDeploySection {
   readonly target: "cloudflare-pages"
-  readonly secrets: ReadonlyArray<string>
 }
 
 type DeploySection = HetznerVpsDeploySection | CloudflarePagesDeploySection
@@ -153,15 +169,31 @@ Deploy section is only valid for `app` and `static` project types. For `package`
 | ----- | ---- | ------- | ----------- |
 | `target` | `"hetzner-vps" \| "cloudflare-pages"` | Inferred from type | Deploy target. `app` -> `hetzner-vps`, `static` -> `cloudflare-pages`. Can be overridden explicitly. |
 | `secrets` | `string[]` | `[]` | Secret names picked from GitHub Secrets at deploy time. |
+| `vps` | `string \| null` | `null` | Override the VPS hostname this project deploys onto. When `null`, the CLI resolves a shared default per environment (see `resolveVpsName`). Hetzner-only — Cloudflare ignores it. Used for projects that need a dedicated VPS (e.g. `monitoring` runs on its own internal VPS, not the shared one). |
 
 ### `[deploy.hetzner]` (required when target is `hetzner-vps`)
 
+| Field | Type | Required | Default | Description |
+| ----- | ---- | -------- | ------- | ----------- |
+| `server_type` | `string` | No | `"cx23"` | Hetzner Cloud server type (e.g. `cx23`, `cpx22`, `cax11`). NOTE: `cx22` is deprecated — use `cx23`. |
+| `location` | `string` | No | `"nbg1"` | Hetzner datacenter location (e.g. `nbg1`, `fsn1`) |
+
+Defaults live in `DEFAULT_HETZNER_CONFIG` (`config/types.ts`). When target is `hetzner-vps`, `project.domain` is also required (used for hostname convention).
+
+### `[services.r2]` (optional)
+
+Per-project R2 (Cloudflare Object Storage) buckets. The infra provisions one Cloudflare R2 bucket per declared alias, scoped per environment, plus a single API token (read+write) on every declared bucket. The runtime app reaches buckets by alias via env vars.
+
 | Field | Type | Required | Description |
 | ----- | ---- | -------- | ----------- |
-| `server_type` | `string` | Yes | Hetzner Cloud server type (e.g. `cpx22`, `cax11`) |
-| `location` | `string` | Yes | Hetzner datacenter location (e.g. `nbg1`, `fsn1`) |
+| `buckets` | `string[]` | Yes | Bucket aliases (kebab-case). Each alias is materialized as `<projectName>-<environment>-<alias>` and exposed as `R2_BUCKET_<ALIAS>` env var. |
 
-When target is `hetzner-vps`, `project.domain` is also required (used for hostname convention).
+Injected into the deployed runtime as:
+- `R2_ENDPOINT` (public)
+- `R2_BUCKET_<ALIAS>` per alias (public)
+- `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` (secret — routed via `DeployInput.secrets`, never `writeEnvVar`)
+
+See [r2-service.md](r2-service.md) for the full provisioning + runtime contract.
 
 ## CLI env vars
 

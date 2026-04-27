@@ -5,7 +5,7 @@ description: >-
   logos, and UI conventions for all NextNode front-end projects. Load when
   building UI, choosing colors/fonts, or placing logos in NextNode projects.
 user-invocable: true
-synced-at: brand-guidelines-v2.0-dec-2024
+synced-at: a755da5
 ---
 
 # NextNode Design System
@@ -37,6 +37,43 @@ Use the relevant sub-file for details:
 - [typography.md](typography.md) — font families, weights, sizes, and hierarchy
 - [logos.md](logos.md) — logo variants, assets kit, and usage rules
 
+## Two design surfaces
+
+NextNode currently runs **two distinct visual languages** — pick the right one for the project:
+
+| Surface | Used by | Tokens / Theme | Tone |
+|---------|---------|---------------|------|
+| **NextNode brand v2.0** | All client-facing sites + marketing surfaces | `@nextnode-solutions/standards/tailwind` (currently minimal — the brand theme primarily lives as conventions, not tokens) + `@nextnode-solutions/brand-assets` for logos | Teal primary, orange accent, dark navy `#141A30` for dark mode. **This is the brand.** |
+| **Navy (Lexington)** | `@nextnode-solutions/monitoring` only — the internal control-plane dashboard | `packages/monitoring/src/styles/tokens.css` — OKLCH `accent-*` (teal/mint) + `base-*` (off-white to slate), Inter / InterDisplay / JetBrains Mono fonts, layered shadows | Light theme, OKLCH palette, Navy foundation components (Button, Text, Wrapper, Kicker, Dots). **Internal tooling only — do not adopt for client work.** |
+
+When in doubt: **client project → brand v2.0**, **monitoring/internal admin UI → Navy**. They are not interchangeable. The brand theme is what NextNode *is*; Navy is a stylistic baseline borrowed for the dashboard's specific needs (information density, light theme, mono-heavy data display).
+
+For Navy specifics, see `packages/monitoring/CLAUDE.md` (in the @nextnode/core repo) — it documents the palette, component conventions, and the "stay flat white" content-area rule.
+
+## Brand assets package
+
+`@nextnode-solutions/brand-assets` ships every official logo, icon, and favicon as importable subpath assets — no need to copy SVGs into individual projects.
+
+Subpath exports:
+
+| Path | What it ships |
+|------|---------------|
+| `./icons/*` | Square icon variants (black/teal/white) + mini sizes + .png |
+| `./icons-text/*` | Icon + text-aligned variants |
+| `./logos-square/*` | Full square logo (black/teal/white + mini) |
+| `./logos-landscape/*` | Landscape logos — long + short variants in each color |
+| `./social/*` | Social avatars (avatar-light, avatar-dark) |
+| `./favicon/*` | favicon.svg, favicon.png, favicon-mini.png |
+
+Usage:
+
+```ts
+import logoTeal from '@nextnode-solutions/brand-assets/logos-square/logo-square-teal.svg'
+import faviconSvg from '@nextnode-solutions/brand-assets/favicon/favicon.svg'
+```
+
+Never copy these SVGs into a project — install the package and import. This guarantees a single source of truth for brand artwork across all NextNode sites.
+
 ## Core Identity
 
 - **Mission**: Custom, performant, maintainable digital solutions
@@ -64,3 +101,5 @@ Use the relevant sub-file for details:
 5. **Logo integrity** — Never modify gradient colors, deform, stretch, add effects, or use below minimum sizes. Import SVGs from `@nextnode-solutions/brand-assets`.
 6. **Font weights are prescribed** — Display: 600/700/800. Body: 400/500/600/700. Do not use weights outside these ranges.
 7. **Size hierarchy matters** — Display 48px, H1 36px, H2 28px, Body 16px, Small 14px. Follow this scale consistently.
+8. **Brand vs Navy is exclusive** — never mix brand v2.0 tokens with Navy tokens in the same surface. Client work uses brand. The internal monitoring dashboard uses Navy. Cross-pollination breaks both.
+9. **Logos always come from `@nextnode-solutions/brand-assets`** — never copy SVGs into project trees, never modify them. Bumping the brand-assets version is the single touchpoint when artwork changes.

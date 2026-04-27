@@ -2,7 +2,19 @@
 
 ## Workflows
 
-Three reusable workflows — callers choose one based on `type` (no runtime routing in YAML):
+Three reusable workflows + standalone ops workflows.
+
+**Reusable (called via `workflow_call` from caller repos)**:
+- `publish-package.yml` — `type=package`
+- `deploy.yml` — `type=app` (Hetzner VPS)
+- `deploy-static.yml` — `type=static` (Cloudflare Pages)
+
+**Standalone ops workflows (live in `NextNodeSolutions/core/.github/workflows/`)**:
+- `build-golden-image.yml` — `workflow_dispatch`. Triggers the `build-golden-image` CLI command. See [golden-image.md](golden-image.md).
+- `teardown-vps.yml` — `workflow_dispatch`. Tears down a Hetzner VPS (server + DNS + state).
+- `teardown-pages.yml` — `workflow_dispatch`. Tears down a Cloudflare Pages project (project + domains + R2 if any).
+
+Callers choose one of the three deploy workflows based on `type` (no runtime routing in YAML):
 
 ### `publish-package.yml` (type=package)
 

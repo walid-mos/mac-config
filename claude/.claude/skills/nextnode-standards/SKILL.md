@@ -2,10 +2,11 @@
 name: nextnode-standards
 description: >-
   How to use @nextnode-solutions/standards in NextNode projects. Covers all
-  exported configs: oxlint, oxfmt, TypeScript, tsdown, Vitest, commitlint,
-  lint-staged, semantic-release, editorconfig, npmrc, and Tailwind theme.
+  exported configs: oxlint, oxfmt, TypeScript, tsdown, Vitest (backend +
+  frontend + astro), commitlint, lint-staged, semantic-release, editorconfig,
+  npmrc, and Tailwind theme.
 user-invocable: true
-synced-at: 1027421
+synced-at: a755da5
 ---
 
 # @nextnode-solutions/standards
@@ -41,10 +42,22 @@ Use the relevant sub-file for details:
 - [oxfmt.md](oxfmt.md) — formatting settings and import sorting
 - [typescript.md](typescript.md) — TypeScript configs (library, Next.js, Astro)
 - [tsdown.md](tsdown.md) — bundler config base for publishable packages
-- [vitest.md](vitest.md) — test configs (backend, frontend)
+- [vitest.md](vitest.md) — test configs (backend, frontend, **astro**)
 - [commitlint.md](commitlint.md) — commit message format and rules
 - [lint-staged.md](lint-staged.md) — pre-commit hook commands
 - [tailwind.md](tailwind.md) — Tailwind theme, editorconfig, npmrc
+
+### Vitest export paths
+
+Three vitest base configs ship — pick by project type:
+
+| Export | When to use |
+|--------|-------------|
+| `@nextnode-solutions/standards/vitest/backend` | Node libraries (logger, infrastructure, email-manager) |
+| `@nextnode-solutions/standards/vitest/frontend` | Browser/React projects |
+| `@nextnode-solutions/standards/vitest/astro` | Astro projects (uses `getViteConfig` under the hood) |
+
+There is also a types-only `@nextnode-solutions/standards/vitest/vite-plugin` for projects that need Vitest's type augmentation without bringing in the Vite runtime config.
 
 ### semantic-release
 

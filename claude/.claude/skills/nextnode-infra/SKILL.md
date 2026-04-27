@@ -5,12 +5,25 @@ description: >-
   with standards, logger, and infrastructure conventions. Dispatches to
   sub-skills per package.
 user-invocable: true
-synced-at: 50e2bbd
+synced-at: a755da5
 ---
 
 # NextNode Core Monorepo
 
 `@nextnode/core` — pnpm workspaces + Turborepo, ESM only, Node >=24.
+
+## Packages
+
+| Package | Type | Purpose |
+|---------|------|---------|
+| `@nextnode-solutions/standards` | config | oxlint, oxfmt, TypeScript, Tailwind, Vitest, commitlint, lint-staged, semantic-release, tsdown configs |
+| `@nextnode-solutions/logger` | library | Zero-dep TS logger, transports (console + HTTP), testing utilities |
+| `@nextnode-solutions/email-manager` | library | Template-first email sending (React Email + Resend), Result-pattern API |
+| `@nextnode-solutions/brand-assets` | static | SVG/PNG logos, icons, favicons, social avatars (subpath wildcard exports) |
+| `@nextnode-solutions/infrastructure` | CLI (private) | Config-driven CI/CD CLI — never published, consumed from monorepo by Actions |
+| `@nextnode-solutions/monitoring` | app (private) | Internal Astro 5 dashboard at `monitoring.nextnode.fr`, Tailscale-only, Navy design language |
+
+All publishable packages use **tsdown** (no tsup remaining). All run on Node >=24, pnpm 10.11.0, ESM-only.
 
 ## Company context
 
@@ -94,7 +107,11 @@ For every `@nextnode-solutions/*` dep in `package.json`, compare the **installed
 - [ ] GitHub workflow calls the correct reusable workflow from `NextNodeSolutions/core` — `deploy-static.yml` for Astro/Cloudflare-Pages sites (auto-provisions per-env Pages project + custom domains + DNS), `deploy.yml` for Hetzner VPS containerized apps (runs `plan → quality → provision → dns → build-image → deploy`, pushes to GHCR, SSH-deploys to the VPS), `publish-package.yml` for packages
 - [ ] For `type=app` (Hetzner): `Dockerfile` at root, minimal `docker-compose.yml` with `services.app.build.context: .` (no `image:`/`ports:`/`env_file:`/`restart:`), app respects `$PORT` (12-factor). See `/nextnode-deploy` → `hetzner-caller.md` for the full caller convention.
 - [ ] Monorepo: per-package workflow with `paths:` filter + `filter` in nextnode.toml
-- [ ] `SITE_URL` is **never hardcoded** — Astro `astro.config.ts` MUST set `site: process.env.SITE_URL` (same for any other framework that needs a canonical URL). The infrastructure pipeline auto-computes and injects `SITE_URL` at build + runtime via `computeDeployEnv`; hardcoding a domain breaks dev/prod URL resolution and bypasses the config-as-code flow.
+- [ ] `SITE_URL` is **never hardcoded** — Astro `astro.config.ts` MUST set `site: process.env.SITE_URL` (same for any other framework that needs a canonical URL). The infrastructure pipeline auto-computes and injects `SITE_URL` at build + runtime via the target's `contributeEnv()`; hardcoding a domain breaks dev/prod URL resolution and bypasses the config-as-code flow.
+
+#### Backing services (if used)
+- [ ] R2 buckets declared in `[services.r2] buckets = ["uploads", ...]` (alias names, kebab-case)
+- [ ] App reads bucket names via `R2_BUCKET_<ALIAS>` env vars + creds via `R2_ENDPOINT` + `R2_ACCESS_KEY_ID` + `R2_SECRET_ACCESS_KEY` (provisioned and injected by infra; never hardcoded)
 
 #### Logger (if used)
 - [ ] `@nextnode-solutions/logger` imported (not `console.log`)

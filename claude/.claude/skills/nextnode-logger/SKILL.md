@@ -5,7 +5,7 @@ description: >-
   API, child loggers, transports (console, HTTP), formatters, testing utilities,
   and integration patterns.
 user-invocable: true
-synced-at: 18a32b3
+synced-at: a755da5
 ---
 
 # @nextnode-solutions/logger

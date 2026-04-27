@@ -1,20 +1,47 @@
 # Deploy Environment Variables
 
-Each `DeployTarget` owns its deploy env via the `computeDeployEnv()` method on the interface. The CLI command calls `target.computeDeployEnv(projectName)`, writes the result to `$GITHUB_ENV`, then passes it to `target.deploy()`.
+Each `DeployTarget` owns its deploy env via the `contributeEnv()` method on the interface. The CLI command calls `target.contributeEnv(projectName)`, merges its result with every backing service's `ServiceEnv` and the user-declared secrets via `mergeServiceEnvs`, narrows the merged public Record into a `DeployEnv` via `buildDeployEnv()`, writes the public half to `$GITHUB_ENV`, then passes the narrowed env to `target.deploy()`.
 
-## DeployTarget.computeDeployEnv
+## DeployTarget.contributeEnv
 
 ```typescript
+interface ServiceEnv {
+  readonly public: Readonly<Record<string, string>>
+  readonly secret: Readonly<Record<string, string>>
+}
+
+interface TargetEnv extends ServiceEnv {
+  readonly public: Readonly<Record<string, string>> & {
+    readonly SITE_URL: string  // required — every app needs it at build + runtime
+  }
+}
+
 interface DeployEnv {
   readonly SITE_URL: string
   readonly [key: string]: string
 }
 
 // On the DeployTarget interface:
-computeDeployEnv(projectName: string): DeployEnv | Promise<DeployEnv>
+contributeEnv(projectName: string): TargetEnv | Promise<TargetEnv>
 ```
 
 Returns `T | Promise<T>` so sync impls (Hetzner — pure config arithmetic) stay sync, while async impls (Cloudflare — API lookup for `*.pages.dev` subdomain) return a Promise. Callers `await` either way.
+
+The `{public, secret}` shape mirrors a backing-service `ServiceEnv` so targets and services merge through the same primitive (`mergeServiceEnvs`) — one collision detector for both. Two contributors claiming the same key throws.
+
+## buildDeployEnv
+
+```typescript
+function buildDeployEnv(values: Readonly<Record<string, string>>): DeployEnv {
+  const siteUrl = values['SITE_URL']
+  if (!siteUrl) {
+    throw new Error('SITE_URL missing — every DeployTarget must put it in contributeEnv().public')
+  }
+  return { ...values, SITE_URL: siteUrl }
+}
+```
+
+Narrows the merged `Record<string, string>` into a `DeployEnv`. Throws when SITE_URL is missing — that means a target skipped its contract obligation, which is a wiring bug, not a runtime condition.
 
 ## Cloudflare Pages env
 
@@ -25,21 +52,13 @@ Two mechanisms:
 
 ## Hetzner VPS env
 
-`computeDeployEnv` is synchronous — SITE_URL is `https://{resolveDeployDomain(domain, environment)}`. No API call needed.
+`contributeEnv` is synchronous — SITE_URL is `https://{resolveDeployDomain(domain, environment)}`. No API call needed.
 
-Runtime env is written as a `.env` file on the VPS via SSH, containing `SITE_URL`, `PORT`, and all declared secrets. Docker Compose loads it automatically.
+Runtime env is written as a `.env` file on the VPS via SSH, containing `SITE_URL`, `PORT`, and all declared secrets + service-secret env. Docker Compose loads it automatically.
 
 ## SITE_URL computation
 
-`computeDeployEnv()` in `domain/deploy/env.ts`:
-
-```typescript
-function computeSiteUrl({ projectType, environment, domain, pagesProjectName }: DeployEnvInput): string {
-  if (domain) return `https://${resolveDeployDomain(domain, environment)}`
-  if (projectType === 'static') return `https://${pagesProjectName}.pages.dev`
-  throw new Error(`${projectType} projects require a domain for SITE_URL`)
-}
-```
+The Hetzner target's `contributeEnv` builds SITE_URL synchronously via `resolveDeployDomain(domain, environment)`. The Cloudflare target needs an API lookup for the live `*.pages.dev` subdomain when no custom domain is configured, so its `contributeEnv` returns a Promise.
 
 Uses `AppEnvironment` (not `PipelineEnvironment`) — the `'none'` guard is in the command layer.
 

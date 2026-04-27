@@ -42,6 +42,7 @@ alias gstp="git stash pop"
 alias grs="git restore --staged"
 
 # Worktrees
+alias ws="wt spawn"
 alias wtn="wt new"
 alias wts="wt switch"
 alias wtl="wt list"

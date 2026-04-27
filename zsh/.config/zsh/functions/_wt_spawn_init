@@ -1,0 +1,14 @@
+#!/bin/zsh
+# Helper invoked by `wt spawn` inside a freshly-spawned cmux workspace.
+# Runs `pnpm install` in the background and surfaces failures via macOS notification.
+emulate -L zsh
+
+local log="$1"
+local workspace="$2"
+
+[ -f pnpm-lock.yaml ] || return 0
+command -v pnpm >/dev/null || return 0
+
+if ! pnpm install >"$log" 2>&1; then
+    osascript -e "display notification \"pnpm install failed in ${workspace} — see ${log}\" with title \"wt spawn\""
+fi

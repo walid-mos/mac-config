@@ -259,6 +259,53 @@ wt_new() {
     fi
 }
 
+# Spawn a worktree + a cmux workspace running claude in it
+wt_spawn() {
+    local branch_name=""
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -*) echo "❌ Unknown option: $1"; return 1 ;;
+            *) branch_name="$1"; shift ;;
+        esac
+    done
+
+    if [ -z "$branch_name" ]; then
+        echo "❌ Branch name required"
+        echo "Usage: wt spawn <branch-name>"
+        return 1
+    fi
+
+    if ! command_exists cmux; then
+        echo "❌ cmux is required. Install it from https://cmux.dev"
+        return 1
+    fi
+
+    local project=$(get_project_name)
+    local normalized_project=$(normalize_name "$project")
+    local normalized_branch=$(normalize_name "$branch_name")
+    local worktree_path="${WORKTREES_BASE}/${normalized_project}-${normalized_branch}"
+
+    if [ ! -d "$worktree_path" ]; then
+        # Run in a subshell so wt_new's `cd` doesn't leak into the caller's shell.
+        ( wt_new "$branch_name" -y ) || return 1
+    else
+        echo "✅ Worktree already exists: $worktree_path"
+    fi
+
+    local workspace_name=$(echo "$branch_name" | awk -F'/' '{for(i=1;i<=NF;i++){$i=toupper(substr($i,1,1)) substr($i,2)} OFS=" - "; $1=$1; print}')
+
+    # Background `pnpm install` via the autoloaded `_wt_spawn_init` helper.
+    # Errors surface via a macOS notification; full log lives in /tmp so the
+    # worktree stays clean. `clear` + `( ... & )` keep the cmux pane tidy
+    # (no neofetch leftover, no job-control notifications).
+    local pnpm_log="/tmp/wt-spawn-${normalized_project}-${normalized_branch}-pnpm.log"
+    local cmd="clear; ( _wt_spawn_init ${(q)pnpm_log} ${(q)workspace_name} & ) ; claude"
+
+    echo "🚀 Spawning cmux workspace: $workspace_name"
+    cmux new-workspace --name "$workspace_name" --cwd "$worktree_path" --command "$cmd"
+}
+
 # Switch to existing worktree
 wt_switch() {
     local target_branch="$1"
@@ -729,6 +776,7 @@ wt_help() {
     echo ""
     echo "COMMANDS:"
     echo "    new <branch> [-y]       Create new worktree for branch"
+    echo "    spawn <branch>          Create worktree + cmux workspace + claude (and pnpm i in bg if pnpm-lock.yaml)"
     echo "    switch [branch]         Switch to existing worktree (interactive without args)"
     echo "    list                    List all worktrees for current project"
     echo "    status                  Show git status for all worktrees"
@@ -742,6 +790,7 @@ wt_help() {
     echo "EXAMPLES:"
     echo "    wt new feature-auth              Create worktree for branch 'feature-auth'"
     echo "    wt new feature-auth -y           Create worktree, auto-confirm (for scripts/CI)"
+    echo "    wt spawn feature-auth            Create worktree + cmux workspace running claude"
     echo "    wt switch                        Interactive worktree selection"
     echo "    wt switch feature-auth           Direct switch (already non-interactive)"
     echo "    wt list                          List all worktrees"
@@ -756,6 +805,7 @@ wt_help() {
     echo "    Format: {project-name}-{branch-name}"
     echo ""
     echo "ALIASES:"
+    echo "    ws     Alias for 'wt spawn'"
     echo "    wtn    Alias for 'wt new'"
     echo "    wts    Alias for 'wt switch'"
     echo "    wtl    Alias for 'wt list'"
@@ -787,6 +837,13 @@ case "$command" in
             return 1
         fi
         wt_new "$@"
+        ;;
+    spawn)
+        if ! is_git_repo; then
+            echo "❌ Not in a git repository"
+            return 1
+        fi
+        wt_spawn "$@"
         ;;
     switch)
         if ! validate_dependencies; then

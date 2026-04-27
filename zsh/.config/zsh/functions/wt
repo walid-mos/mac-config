@@ -6,12 +6,6 @@
 
 # Remove any existing aliases to avoid conflicts
 unalias wt 2>/dev/null
-unalias wtn 2>/dev/null
-unalias wts 2>/dev/null
-unalias wtl 2>/dev/null
-unalias wtd 2>/dev/null
-unalias wtc 2>/dev/null
-unalias wtp 2>/dev/null
 
 # ============================================================================
 # CONSTANTS AND CONFIGURATION
@@ -765,9 +759,9 @@ wt_help() {
     echo "    wtn    Alias for 'wt new'"
     echo "    wts    Alias for 'wt switch'"
     echo "    wtl    Alias for 'wt list'"
-    echo "    wtd    Alias for 'wt status'"
     echo "    wtc    Alias for 'wt clean'"
     echo "    wtp    Alias for 'wt prune'"
+    echo "    wtst   Alias for 'wt status'"
     echo ""
     echo "REQUIREMENTS:"
     echo "    - Git repository"
@@ -853,16 +847,5 @@ esac
 
 # Capture exit code BEFORE alias definitions (function defs reset $? to 0).
 : ${_wt_rc:=$?}
-
-# ============================================================================
-# CONVENIENCE ALIASES (as functions)
-# ============================================================================
-
-wtn() { wt new "$@"; }
-wts() { wt switch "$@"; }
-wtl() { wt list "$@"; }
-wtd() { wt status "$@"; }
-wtc() { wt clean "$@"; }
-wtp() { wt prune "$@"; }
 
 return $_wt_rc

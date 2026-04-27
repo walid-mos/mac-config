@@ -42,3 +42,16 @@ node_modules/
 
 # Languages: built from source (nested git repos)
 languages/.config/languages/ols/
+
+# Colima: ignore runtime data inside the stow package (only version _templates/)
+colima/.config/colima/_lima/
+colima/.config/colima/_store/
+colima/.config/colima/default/
+colima/.config/colima/ssh_config
+colima/.config/colima/docker.sock
+
+# Docker CLI: ignore runtime data inside the stow package (only version config.json)
+docker/.docker/.token_seed
+docker/.docker/.token_seed.lock
+docker/.docker/buildx/
+docker/.docker/contexts/

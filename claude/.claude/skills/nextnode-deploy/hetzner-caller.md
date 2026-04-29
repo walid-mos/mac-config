@@ -48,7 +48,7 @@ Declaring these in the caller compose duplicates infra-owned concerns and will c
 | `ports:` | Host port is computed by `computeHostPort(environment)` and wired to Caddy on the VPS |
 | `env_file:` / `environment:` | `.env` is generated on the VPS from injected vars + `[deploy].secrets` |
 | `restart:` | Prod compose on the VPS always uses `restart: unless-stopped` |
-| `volumes:` | Not supported today (stateless containers only) |
+| `volumes:` (compose) | Declared in `nextnode.toml` via `[deploy.volumes]` so the infra owns naming, lifecycle, and teardown semantics — see Persistent volumes below |
 
 ## Runtime contract (the container)
 
@@ -59,6 +59,61 @@ The infra injects these env vars into the container's `.env` on the VPS (see `ad
 - One var per secret declared in `[deploy].secrets`
 
 **The app MUST respect the `$PORT` env var (12-factor).** Node/Astro/Express/Fastify/Next all do this by default — `process.env.PORT` resolves to `3000` at runtime and the app binds correctly. The infra then maps host `127.0.0.1:<computeHostPort>` → container `:3000`, and Caddy reverse-proxies onto the host port. No value is hardcoded in caller code.
+
+## Persistent volumes
+
+Containers can mount Docker named volumes for state that must survive a redeploy
+(SQLite db, cache directory, generated assets, etc.). Declare them in
+`nextnode.toml` — never in the caller's `docker-compose.yml`.
+
+```toml
+[deploy.volumes]
+data  = "/var/lib/app"
+cache = "/var/cache/app"
+```
+
+The infra renders this into the prod compose on the VPS:
+
+```yaml
+services:
+    app:
+        # ...image, env_file, ports injected by infra...
+        volumes:
+            - data:/var/lib/app
+            - cache:/var/cache/app
+volumes:
+    data: {}
+    cache: {}
+```
+
+Each alias becomes a Docker named volume managed by the Docker daemon under
+`/var/lib/docker/volumes/<silo>_<alias>/`. Aliases are lowercase alphanumeric
+and the mount path must be absolute.
+
+### Lifecycle
+
+- **Redeploys preserve volumes.** A new image release re-uses the existing
+  volumes — that's the whole point.
+- **Teardown preserves volumes by default.** `infra teardown` keeps the named
+  volumes intact unless the caller passes the explicit opt-in to wipe them.
+- **Volumes are tied to one VPS.** They are NOT replicated and NOT a backup.
+  Losing the VPS loses the volume.
+
+### Volumes are the hot cache, not the durability layer
+
+In the NextNode topology, **R2 is the durable source of truth** for any data the
+app must not lose. Local VPS SSD (where Docker named volumes live) is an
+ephemeral hot cache: fast, included with the VPS, but rebuildable from R2 on
+demand. See `docs/infra-topology.md` for the full split — the relevant rule:
+
+- **Source of truth → R2** (Postgres WAL, dumps, uploaded files, etc.)
+- **Hot working set → Docker named volume on the VPS local SSD**
+- Hetzner Block Volumes are **not** used by default
+
+Wiring the R2-backed durability (WAL-G, restic, custom dump-and-push) is a
+separate concern owned by the app — out of scope of `[deploy.volumes]`. This
+section only declares the local cache mount; the app is responsible for keeping
+R2 in sync if the data must survive a VPS loss.
 
 ## Caller workflow files
 

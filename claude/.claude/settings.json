@@ -91,7 +91,8 @@
         "*.crates.io",
         "*.astro.build",
         "*.playwright.dev",
-        "*.googleapis.com"
+        "*.googleapis.com",
+        "*.linear.app"
       ],
       "allowLocalBinding": true
     },

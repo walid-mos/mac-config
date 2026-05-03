@@ -8,7 +8,7 @@
 
   // === App ===
   "app": {
-    "appearance": "system",
+    "appearance": "light",
     "appIcon": "light",
     "newWorkspacePlacement": "afterCurrent",
     "focusPaneOnFirstClick": true,

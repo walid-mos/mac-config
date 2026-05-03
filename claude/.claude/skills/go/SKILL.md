@@ -33,11 +33,12 @@ The user paces the work. `/go next` is the explicit "validate the last and start
 
 `plan.md` uses three states for each task line:
 
-| Marker | Meaning                                                                        |
-|--------|--------------------------------------------------------------------------------|
-| `[ ]`  | Not started.                                                                   |
-| `[~]`  | Implemented + committed + pushed; Linear is **In Progress**, awaiting user validation. |
-| `[x]`  | User validated the dev on the previous `/go next`; Linear is **Done + archived**. |
+| Marker        | Meaning                                                                        |
+|---------------|--------------------------------------------------------------------------------|
+| `[ ]`         | Not started.                                                                   |
+| `[ ] ⚠ ... — <reason>` | Blocked. Skipped by `/go next` and `goloop` until unblocked. Linear stays unstarted (or whatever state the user moves it to). |
+| `[~]`         | Implemented + committed + pushed; Linear is **In Progress**, awaiting user validation. |
+| `[x]`         | User validated the dev on the previous `/go next`; Linear is **Done + archived**. |
 
 A task moves `[ ]` → `[~]` at the end of the `/go next` that ships it, then `[~]` → `[x]` at the *start* of the following `/go next` (after the user has validated). The user's act of running `/go next` again is the validation signal.
 
@@ -205,12 +206,13 @@ Then STOP. No chaining, no auto-loop. The user's next `/go next` call is the val
 
 ### Phase 3 — Pick the first unstarted task (`[ ]`)
 
-1. Parse `plan.md`, find the first line matching `^- \[ \] <IDENTIFIER> \[P\d+-\d+\] .*$`.
+1. Parse `plan.md`, find the first line matching `^- \[ \] <IDENTIFIER> \[P\d+-\d+\] .*$` **that does NOT start with `- [ ] ⚠ `** (blocked tasks are skipped, see Rule 14).
 2. Extract the identifier (e.g. `NEXT-123`).
 3. Look up the matching entry in `tasks.json` by identifier — that gives the issue UUID, full description, step, etc.
-4. If no `[ ]` tasks remain:
-   - If Phase 2 closed a `[~]` task → tell the user the phase is **complete** (last task validated, `/go` for the next phase) and STOP.
-   - If Phase 2 was a no-op too → the phase was already complete; remind the user and STOP.
+4. If no pickable `[ ]` tasks remain:
+   - If at least one `- [ ] ⚠ ` blocked task is left → tell the user the phase is **stalled on blocked tasks**, list them with their reasons, and STOP. Do not declare the phase complete.
+   - Else if Phase 2 closed a `[~]` task → tell the user the phase is **complete** (last task validated, `/go` for the next phase) and STOP.
+   - Else (Phase 2 was a no-op too) → the phase was already complete; remind the user and STOP.
 
 ### Phase 4 — Mark In Progress in Linear
 
@@ -315,3 +317,4 @@ Both scripts read `LINEAR_API_KEY` from env, reject `Bearer ` prefix, use `urlli
 11. **Push after every commit.** Phase 8 push is mandatory. If the push fails, do NOT tick the plan to `[~]` and do NOT mark Linear In Progress as "shipped" — the task is not done from the user's POV until the commit is on the remote.
 12. **Mandatory `Closes <ID>` trailer.** Linear's GitHub integration relies on it for auto-close on merge. Without the trailer, the Linear `completed` state we set in Phase 2 will look detached from history.
 13. **A `/go` task NEVER touches a Claude skill.** If a task's `WHERE` resolves to `~/.claude/skills/...` or `~/.stow_repository/claude/.claude/skills/...`, the issue is a `/backlog` bug — refuse to implement, surface to the user, and propose canceling the Linear issue. Skills are personal tooling in a separate repo (`mac-config`) and must never be deliverables of a NextNode project. The only acceptable place to refresh skills mid-flow is **after a phase fully closes**, as a side-task done out of band (no Linear issue, no plan tick) and only when the user explicitly asks.
+14. **Blocked tasks (`- [ ] ⚠ ... — <reason>`) are skipped, not picked.** Phase 3 must scan for the first `[ ]` line that does NOT start with `- [ ] ⚠ `. The same skip applies to `goloop`'s next-task banner. A blocked task remains in the plan as a visible reminder; only the user can unblock it (edit the line back to plain `- [ ] ` or close the Linear issue). Never auto-retry a blocked task by stripping the `⚠` yourself — the block is a signal, not a bug to paper over.

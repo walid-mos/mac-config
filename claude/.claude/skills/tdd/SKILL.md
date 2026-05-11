@@ -2,301 +2,95 @@
 name: tdd
 user-invocable: true
 description: >-
-  Test-driven development with red-green-refactor loop. Use when the user wants
-  to build features or fix bugs using TDD, mentions "red-green-refactor", wants
-  test-first development, or says "TDD". Enforces strict vertical slicing: one
-  test, one implementation, repeat. Complements the "Testing Best Practices"
-  and language-specific testing skills - load those too. This skill governs
-  the WORKFLOW and MINDSET, not the test syntax.
+  Test-driven development for bug fixes and new features. Use when the user
+  wants to fix a bug "with TDD", says "reproduce the bug as a test first",
+  mentions "red-green-refactor", or runs `/tdd`. Enforces strict vertical
+  slicing: one failing test, one fix, all green, repeat. Complements `/test`
+  (assertion rules) and language-specific testing skills (load those too).
+  This skill owns the WORKFLOW; `/test` owns the test quality.
 ---
 
-# Test-Driven Development - Mandatory Rules
+# Test-Driven Development
 
-You are working in TDD mode. Every line of production code MUST be justified by a failing test. Follow the rules below without exception.
+Every line of production code MUST be justified by a failing test. The `/test` skill governs test quality; this skill governs the rhythm.
 
-This skill governs **how you work** (the cycle, the discipline, the design). It does NOT replace the "Testing Best Practices" skill - both apply simultaneously.
+## Primary use case — bug fixing
 
----
+The highest-leverage TDD loop is bug repair:
 
-## Philosophy
+1. **Reproduce as a test** — write a test that calls the buggy public API and asserts the correct behavior. Run it. It MUST fail with the observed bug (a real assertion mismatch matching the user's report — not a compile error, not "function not found").
+2. **Fix** — change production code until the new test passes. All other tests must stay green.
+3. **Expand** — if the bug hints at adjacent untested behavior (same edge class, same code path), add one more failing test, then fix. Repeat until coverage matches the bug surface.
+4. **Refactor under green** — once green, clean up the production code AND the new tests.
 
-**Core principle**: Tests verify behavior through public interfaces, not implementation details. Code can change entirely; tests shouldn't.
+A bug fix without a reproducing test is a bug fix that will silently regress. The test IS the deliverable, not the patch.
 
-**Good tests** are integration-style: they exercise real code paths through public APIs. They describe _what_ the system does, not _how_ it does it. A good test reads like a specification - "user can checkout with valid cart" tells you exactly what capability exists. These tests survive refactors because they don't care about internal structure.
+## The cycle — RED / GREEN / REFACTOR
 
-**Bad tests** are coupled to implementation. They mock internal collaborators, test private methods, or verify through external means (like querying a database directly instead of using the interface). The warning sign: your test breaks when you refactor, but behavior hasn't changed. If you rename an internal function and tests fail, those tests were testing implementation, not behavior.
+**RED**: write ONE test for behavior the code does not yet support (feature) or does incorrectly (bug). Run it. See a real **assertion failure**. Compile/import errors are NOT a valid red phase.
 
-See [mocking.md](mocking.md) for mockability design patterns.
+**GREEN**: write real production code to pass the failing test — not a stub, not a hardcoded value. Run ALL tests. Everything must stay green.
 
----
+**REFACTOR**: with all tests green, improve design without changing behavior. Refactor production code AND test code. Run tests after every refactor step; if anything goes red, undo and take a smaller step.
 
-## THE CYCLE - Red / Green / Refactor
+**Never refactor while RED.**
 
-### Phase 1 - RED: Write a Failing Test
-
-Write ONE test that describes a behavior the code does not yet support. Run it. **It MUST fail.** If it passes, either the behavior already exists (delete the test or rethink) or the test is broken (fix it).
-
-**Rules:**
-- The test asserts on the PUBLIC API - inputs and outputs. Not internals.
-- The test name describes the behavior: `should reject negative amounts`, not `test1`.
-- You MUST see a real **assertion failure**. Compile/import errors are NOT a valid red phase.
-
-### Phase 2 - GREEN: Make It Pass
-
-Write production code that makes the failing test pass. The implementation should be correct and intentional - not a placeholder.
-
-**Rules:**
-- Do NOT write code that no test requires. If no test is failing, you have no reason to write production code.
-- Write a real, working implementation. Not a stub, not a hardcoded return value.
-- Do NOT refactor here. Get to green, then refactor.
-- Run ALL tests, not just the new one. Everything must stay green.
-
-### Phase 3 - REFACTOR: Clean Up Under Green Tests
-
-With all tests passing, improve the code's design without changing behavior.
-
-**Rules:**
-- Refactor ONLY when tests are green. **Never refactor while RED.**
-- Remove duplication. Extract constants, helpers, abstractions.
-- Deepen modules - move complexity behind simple interfaces.
-- Apply SOLID principles where natural.
-- Consider what new code reveals about existing code.
-- Run tests after EVERY refactor step. If anything goes red, undo and take a smaller step.
-- Refactor BOTH production code AND test code. Tests are code - they deserve the same quality.
-
----
-
-## Anti-Pattern: Horizontal Slices
-
-**FORBIDDEN: Writing all tests first, then all implementation.** This is "horizontal slicing" - treating RED as "write all tests" and GREEN as "write all code."
-
-This produces crap tests:
-
-- Tests written in bulk test _imagined_ behavior, not _actual_ behavior
-- You end up testing the _shape_ of things (data structures, function signatures) rather than user-facing behavior
-- Tests become insensitive to real changes - they pass when behavior breaks, fail when behavior is fine
-- You outrun your headlights, committing to test structure before understanding the implementation
+## Vertical slicing only
 
 ```
-// FORBIDDEN (horizontal)
-RED:   test1, test2, test3, test4, test5
-GREEN: impl1, impl2, impl3, impl4, impl5
+// FORBIDDEN (horizontal — tests imagined behavior, outruns your headlights)
+RED:   test1, test2, test3, test4
+GREEN: impl1, impl2, impl3, impl4
 
-// MANDATORY (vertical - tracer bullets)
-RED→GREEN: test1→impl1
-RED→GREEN: test2→impl2
-RED→GREEN: test3→impl3
+// MANDATORY (vertical — each test responds to what the previous cycle taught)
+RED→GREEN→REFACTOR: test1 + impl1
+RED→GREEN→REFACTOR: test2 + impl2
 ```
 
-**Each test responds to what you learned from the previous cycle.** Because you just wrote the code, you know exactly what behavior matters and how to verify it.
+Writing all tests upfront tests the *shape* you imagine, not the behavior that actually matters. Each cycle should respond to what you just learned.
 
----
+## Communicating the cycle
 
-## Workflow
+State the phase at every step:
 
-### 1. Planning
+> RED — `should reject negative amounts`. Running... FAILS (asserts `amount > 0`, got `-5`)
+> GREEN — adding validation. Running... PASSES
+> REFACTOR — extracting `validateAmount` helper. Running... still PASSES
+> RED — next: `should reject zero` ...
 
-Before writing any code:
+The transparency lets the user catch deviations from the cycle.
 
-- [ ] Confirm with user what interface changes are needed
-- [ ] Confirm with user which behaviors to test (prioritize)
-- [ ] Identify opportunities for deep modules (see [deep-modules.md](deep-modules.md))
-- [ ] Design interfaces for testability (see [interface-design.md](interface-design.md))
-- [ ] List the behaviors to test (not implementation steps)
-- [ ] Get user approval on the plan
+## Anti-patterns
 
-Ask: "What should the public interface look like? Which behaviors are most important to test?"
+1. **Test-after** — writing production code first then tests, claiming TDD. If the code already exists, you're writing regression tests, not TDD. Be honest.
+2. **The Guru Test** — one massive test exercising the whole feature. Break into small ones, each driving one behavior.
+3. **Testing implementation, not behavior** — spying on internal functions, asserting which algorithm was called. Test through the public API. Full rules in `/test`.
+4. **Testing private methods** — if a private method is complex enough to need its own tests, extract it into its own module with a public API.
+5. **Skipping refactor** — every green is a refactor opportunity. Skipping accumulates rot.
+6. **Refactoring while red** — a failing test means stop the structural change, finish the current cycle first.
+7. **Mocking internal collaborators** — mock at system boundaries only (network, FS, time, randomness). See `/test` mocking rules.
 
-**You can't test everything.** Confirm with the user exactly which behaviors matter most. Focus testing effort on critical paths and complex logic, not every possible edge case.
+## When TDD doesn't fit
 
-### 2. Tracer Bullet
+Be explicit about skipping rather than silently abandoning:
 
-Write ONE test that confirms ONE thing about the system:
+- **Spike / prototype** — don't know WHAT to build yet → spike, throw away, then TDD the real thing.
+- **Pure UI layout / styling** — visual output resists meaningful assertion.
+- **One-line glue / generated code** — nothing to test.
 
-```
-RED:   Write test for first behavior → test fails
-GREEN: Write real implementation to pass → test passes
-```
+## Design for testability
 
-This is your tracer bullet - proves the path works end-to-end.
+When a bug fix or new test forces you to redesign for testability, the load-bearing patterns are in sub-files:
 
-### 3. Incremental Loop
+- [interface-design.md](interface-design.md) — accept dependencies, return results not side effects, separate decisions from effects (functional core / imperative shell).
+- [deep-modules.md](deep-modules.md) — small interface + deep implementation (Ousterhout).
+- [mocking.md](mocking.md) — SDK-style interfaces vs generic fetchers.
 
-For each remaining behavior:
-
-```
-RED:   Write next test → fails
-GREEN: Implementation to pass → passes
-REFACTOR: Clean up what you just wrote
-```
-
-Rules:
-- One test at a time
-- Only enough code to pass current test
-- Don't anticipate future tests
-- Keep tests focused on observable behavior
-
-### 4. Final Refactor
-
-After all behaviors are covered, look for refactor candidates across the whole codebase touched. See [refactoring.md](refactoring.md).
-
----
-
-## TDD ANTI-PATTERNS - EXPLICITLY FORBIDDEN
-
-### 1. Horizontal Slicing (Write All Tests First)
-
-FORBIDDEN: Writing all tests before any production code. Already covered above - the single most important rule.
-
-### 2. Test-After (Pretending It's TDD)
-
-FORBIDDEN: Writing production code first and tests after, then claiming TDD.
-
-If the code already exists, you're writing regression tests - which is fine, but it's not TDD. Don't pretend.
-
-### 3. The Guru Test
-
-FORBIDDEN: Writing a massive test that exercises the entire feature at once.
-
-```
-// FORBIDDEN - one test tries to cover everything
-it("processes a full order", () => {
-  const user = createUser(...)
-  const cart = addToCart(user, ...)
-  applyDiscount(cart, ...)
-  const order = checkout(cart)
-  processPayment(order)
-  sendConfirmation(order)
-  expect(order.status).toBe("confirmed")
-  expect(user.orders).toHaveLength(1)
-  expect(emailService.sent).toHaveLength(1)
-})
-```
-
-Break this into many small tests, each driving one piece of functionality.
-
-### 4. Testing Implementation, Not Behavior
-
-FORBIDDEN: Coupling tests to internal structure.
-
-```
-// FORBIDDEN - testing HOW
-it("uses quicksort algorithm", () => {
-  const spy = vi.spyOn(internals, "quicksort")
-  sort([3, 1, 2])
-  expect(spy).toHaveBeenCalled()
-})
-
-// MANDATORY - testing WHAT
-it("returns elements in ascending order", () => {
-  expect(sort([3, 1, 2])).toEqual([1, 2, 3])
-})
-```
-
-### 5. Testing Private Methods
-
-FORBIDDEN: Reaching into internals to test private implementation details.
-
-```
-// FORBIDDEN
-it("_parseToken returns decoded payload", () => {
-  expect(auth._parseToken(token)).toEqual(payload)
-})
-
-// MANDATORY - test through the public API
-it("authenticates valid tokens", () => {
-  expect(auth.authenticate(validToken)).toEqual({ userId: 1 })
-})
-```
-
-If a private method is complex enough to need its own tests, extract it into its own module with a public API.
-
-### 6. Skipping Refactor
-
-FORBIDDEN: Going from green straight to the next red without considering refactoring.
-
-If you skip refactor consistently, the codebase rots. Every cycle includes a refactoring evaluation - even if the conclusion is "nothing to improve right now."
-
-### 7. Refactoring While Red
-
-FORBIDDEN: Attempting to improve code while a test is failing.
-
-```
-// FORBIDDEN workflow:
-// 1. Write test (RED)
-// 2. Start implementing
-// 3. "Oh, I should rename this function while I'm here"
-// 4. Now 3 tests are broken and you don't know why
-
-// MANDATORY workflow:
-// 1. Write test (RED)
-// 2. Make it pass (GREEN)
-// 3. NOW rename, restructure, clean up (REFACTOR)
-```
-
-### 8. Mocking Internal Collaborators
-
-FORBIDDEN: Mocking your own code unless it has side effects at system boundaries.
-
-See [mocking.md](mocking.md) for full rules.
-
----
-
-## COMMUNICATING THE CYCLE
-
-When working in TDD mode, ALWAYS communicate which phase you're in:
-
-```
-RED - Writing test: "should return 0 for empty string"
-Running test... FAILS ✓
-
-GREEN - Implementing countWords
-Running test... PASSES ✓
-
-REFACTOR - Extracting constant, improving name
-Running test... still PASSES ✓
-
-RED - Next test: "should handle multiple spaces between words"
-```
-
-This transparency helps the user follow the TDD rhythm and catch deviations.
-
----
-
-## WHEN TDD DOESN'T FIT
-
-TDD is not always the right tool. Be honest about it:
-
-- **Spike/prototype exploration**: When you don't know WHAT to build yet, spike first, throw the code away, then TDD the real thing.
-- **Pure UI layout/styling**: Visual output is hard to assert meaningfully.
-- **Trivial glue code**: One-line delegation functions that just wire things together.
-- **Generated code**: Don't TDD code that's generated by tools.
-
-When you skip TDD, be explicit about WHY. Never silently abandon the cycle.
-
----
-
-## Checklist Per Cycle
+## Per-cycle checklist
 
 - [ ] Test describes behavior, not implementation
 - [ ] Test uses public interface only
-- [ ] Test would survive internal refactor
-- [ ] Code is a real implementation, not a placeholder
+- [ ] Test would survive an internal refactor
+- [ ] Implementation is real, not a placeholder
 - [ ] No speculative features added
-- [ ] Refactoring considered before next RED
-
----
-
-## Quick Reference
-
-| Principle | Rule |
-|---|---|
-| Production code without a failing test | FORBIDDEN |
-| Writing multiple tests before implementing | FORBIDDEN - vertical slicing only |
-| Refactoring with a failing test | FORBIDDEN |
-| Skipping the refactor phase | FORBIDDEN |
-| Testing private methods | FORBIDDEN - test public API |
-| Mocking internal collaborators | FORBIDDEN - mock at boundaries only |
-| Testing implementation instead of behavior | FORBIDDEN |
-| Ugly code in green phase | ALLOWED - refactor phase cleans it |
-| Deleting tests that no longer add value | ALLOWED - after refactoring merges behaviors |
+- [ ] All tests green before next RED

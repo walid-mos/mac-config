@@ -1,41 +1,21 @@
-# Deep Modules
+# Deep modules
 
-From "A Philosophy of Software Design" (John Ousterhout):
+From Ousterhout's *A Philosophy of Software Design*:
 
-**Deep module** = small interface + lots of implementation
+**Deep module** = small interface + lots of implementation. Few public methods with simple params; complex logic hidden inside.
 
-```
-┌─────────────────────┐
-│   Small Interface   │  ← Few methods, simple params
-├─────────────────────┤
-│                     │
-│                     │
-│  Deep Implementation│  ← Complex logic hidden
-│                     │
-│                     │
-└─────────────────────┘
-```
+**Shallow module** = large interface + thin implementation. Many methods, complex params, little hidden — usually a pass-through.
 
-**Shallow module** = large interface + little implementation (AVOID)
-
-```
-┌─────────────────────────────────┐
-│       Large Interface           │  ← Many methods, complex params
-├─────────────────────────────────┤
-│  Thin Implementation            │  ← Just passes through
-└─────────────────────────────────┘
-```
-
-## Why This Matters for TDD
+## Why this matters for TDD
 
 Deep modules are naturally testable:
-- Small interface = fewer tests needed to cover the contract
-- Deep implementation = high value per test (each test exercises a lot of real logic)
-- Simple params = simple test setup
+- Small interface → fewer tests cover the contract.
+- Deep implementation → each test exercises a lot of real logic (high value per test).
+- Simple params → simple test setup.
 
-Shallow modules produce test suites that are large, shallow, and brittle - many tests, each covering almost nothing.
+Shallow modules produce test suites that are large and brittle: many tests, each covering almost nothing, all coupled to the shape of the interface.
 
-## When Designing Interfaces, Ask:
+## When designing, ask
 
 - Can I reduce the number of methods?
 - Can I simplify the parameters?

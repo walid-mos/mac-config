@@ -4,7 +4,7 @@ Shared vCPU servers run on multi-tenant hosts. Best price/performance for worklo
 
 All prices in **EUR, VAT excluded**. European locations (Germany / Finland). Verified **2026-04-10**.
 
-## CX — Intel/AMD shared vCPU (x86)
+## CX - Intel/AMD shared vCPU (x86)
 
 Most cost-efficient line. Intel or AMD processors depending on availability.
 
@@ -15,7 +15,7 @@ Most cost-efficient line. Intel or AMD processors depending on availability.
 | CX43 | 8 | 16 GB | 160 GB | 20 TB | €0.019 | €11.99 |
 | CX53 | 16 | 32 GB | 320 GB | 20 TB | €0.036 | €22.49 |
 
-## CPX — AMD EPYC shared vCPU (x86)
+## CPX - AMD EPYC shared vCPU (x86)
 
 Higher base clock speeds, AMD EPYC processors. Better for CPU-bound workloads than CX.
 
@@ -27,7 +27,7 @@ Higher base clock speeds, AMD EPYC processors. Better for CPU-bound workloads th
 | CPX52 | 12 | 24 GB | 480 GB | 20 TB | €0.059 | €36.49 |
 | CPX62 | 16 | 32 GB | 640 GB | 20 TB | €0.081 | €50.49 |
 
-## CAX — Ampere Altra shared vCPU (Arm64)
+## CAX - Ampere Altra shared vCPU (Arm64)
 
 Arm-based. Best price/performance ratio for ARM-compatible workloads.
 
@@ -51,6 +51,6 @@ Arm-based. Best price/performance ratio for ARM-compatible workloads.
 ## Notes
 
 - All shared-vCPU servers include 20 TB of traffic per month
-- Traffic overages and exact rates are NOT in this skill — check the Hetzner website
+- Traffic overages and exact rates are NOT in this skill - check the Hetzner website
 - Storage is bundled with the plan; you cannot add extra local SSD (use Volumes separately)
 - Dual-stack (IPv4 + IPv6) is included; IPv4-only and IPv6-only options exist with different pricing (not documented here)

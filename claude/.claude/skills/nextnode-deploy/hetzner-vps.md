@@ -19,7 +19,7 @@ The old monolithic `HetznerVpsTarget` was split into focused modules in `adapter
 
 | Module | Responsibility |
 |--------|---------------|
-| `target.ts` | `HetznerVpsTarget` — implements `DeployTarget`, orchestrates the workflow |
+| `target.ts` | `HetznerVpsTarget` - implements `DeployTarget`, orchestrates the workflow |
 | `ensure-infra.ts` | High-level provision orchestrator: handles fresh provision vs. resume from saved state |
 | `provision-vps.ts` | VPS creation via hcloud API + Tailscale join + firewall setup |
 | `converge-vps.ts` | Post-boot convergence: waits for cloud-init, syncs Caddy/Vector config via SSH |
@@ -27,7 +27,7 @@ The old monolithic `HetznerVpsTarget` was split into focused modules in `adapter
 | `hcloud-client.ts` | Typed HTTP client for Hetzner Cloud API |
 | `hcloud-state.ts` | R2-backed state persistence with ETag-based optimistic locking |
 | `hcloud-firewall.ts` | Firewall CRUD helpers |
-| `ssh-session.ts` | SSH2 wrapper — one connection per operation, retry logic |
+| `ssh-session.ts` | SSH2 wrapper - one connection per operation, retry logic |
 | `derive-public-key.ts` | Derives SSH public key from base64-encoded private key |
 
 ## Phase-based state
@@ -38,7 +38,7 @@ State is stored in the `nextnode-state` R2 bucket under key `{projectName}/{envi
 
 ## R2 bootstrap vs runtime
 
-Two R2 paths — separated by privilege level:
+Two R2 paths - separated by privilege level:
 
 | Path | Used by | What it does | Privilege needed |
 |------|---------|-------------|-----------------|
@@ -66,7 +66,7 @@ All Hetzner-specific business decisions live in `domain/hetzner/`:
 
 ### DNS records (`dns-records.ts`)
 
-`computeVpsDnsRecords(input)` — returns desired Cloudflare A records:
+`computeVpsDnsRecords(input)` - returns desired Cloudflare A records:
 
 - **Internal**: Single A record → `tailnetIp` (CGNAT range, never proxied)
 - **Public production**: A record → `publicIp` (proxied via Cloudflare CDN, TTL=1)
@@ -74,7 +74,7 @@ All Hetzner-specific business decisions live in `domain/hetzner/`:
 
 ### Firewall rules (`firewall-rules.ts`)
 
-`computeFirewallRules(internal)` — returns Hetzner Cloud firewall rule array:
+`computeFirewallRules(internal)` - returns Hetzner Cloud firewall rule array:
 
 - **Internal**: SSH only (port 22)
 - **Public**: HTTP (80) + HTTPS (443) + SSH (22)
@@ -83,27 +83,27 @@ UFW on the VPS further restricts SSH to the tailscale0 interface in both modes.
 
 ### Caddy config (`caddy-for-project.ts`)
 
-`buildCaddyForProject(input)` — high-level orchestrator:
+`buildCaddyForProject(input)` - high-level orchestrator:
 
 - Routes to `buildCaddyConfig()` (public, ACME via R2 cert storage) or `buildInternalCaddyConfig()` (internal TLS)
 - Configures reverse proxy to `localhost:{hostPort}`
 
 ### Vector config (`vector-config.ts`)
 
-`selectVectorConfig(input)` — conditional log agent setup:
+`selectVectorConfig(input)` - conditional log agent setup:
 
 - Returns `{ vectorToml, vectorEnv }` if `vlUrl` (log sink) is available
-- Returns `undefined` values if no sink — Vector is not provisioned
+- Returns `undefined` values if no sink - Vector is not provisioned
 
 ### Cloud-init (`cloud-init.ts`)
 
-`renderCloudInit(input)` — generates complete cloud-init YAML (see section above)
+`renderCloudInit(input)` - generates complete cloud-init YAML (see section above)
 
 ## Step summaries
 
 Two pure formatters produce Markdown tables for GitHub Actions step summaries:
 
-- `buildProvisionSummary(result)` — server ID, type, location, IPs, duration
-- `buildDeploySummary(result)` — URL, image ref, target, duration
+- `buildProvisionSummary(result)` - server ID, type, location, IPs, duration
+- `buildDeploySummary(result)` - URL, image ref, target, duration
 
 Written to `GITHUB_STEP_SUMMARY` by the provision and deploy commands.

@@ -1,19 +1,20 @@
 ---
 name: tdd
+user-invocable: true
 description: >-
   Test-driven development with red-green-refactor loop. Use when the user wants
   to build features or fix bugs using TDD, mentions "red-green-refactor", wants
   test-first development, or says "TDD". Enforces strict vertical slicing: one
   test, one implementation, repeat. Complements the "Testing Best Practices"
-  and language-specific testing skills — load those too. This skill governs
+  and language-specific testing skills - load those too. This skill governs
   the WORKFLOW and MINDSET, not the test syntax.
 ---
 
-# Test-Driven Development — Mandatory Rules
+# Test-Driven Development - Mandatory Rules
 
 You are working in TDD mode. Every line of production code MUST be justified by a failing test. Follow the rules below without exception.
 
-This skill governs **how you work** (the cycle, the discipline, the design). It does NOT replace the "Testing Best Practices" skill — both apply simultaneously.
+This skill governs **how you work** (the cycle, the discipline, the design). It does NOT replace the "Testing Best Practices" skill - both apply simultaneously.
 
 ---
 
@@ -21,7 +22,7 @@ This skill governs **how you work** (the cycle, the discipline, the design). It 
 
 **Core principle**: Tests verify behavior through public interfaces, not implementation details. Code can change entirely; tests shouldn't.
 
-**Good tests** are integration-style: they exercise real code paths through public APIs. They describe _what_ the system does, not _how_ it does it. A good test reads like a specification — "user can checkout with valid cart" tells you exactly what capability exists. These tests survive refactors because they don't care about internal structure.
+**Good tests** are integration-style: they exercise real code paths through public APIs. They describe _what_ the system does, not _how_ it does it. A good test reads like a specification - "user can checkout with valid cart" tells you exactly what capability exists. These tests survive refactors because they don't care about internal structure.
 
 **Bad tests** are coupled to implementation. They mock internal collaborators, test private methods, or verify through external means (like querying a database directly instead of using the interface). The warning sign: your test breaks when you refactor, but behavior hasn't changed. If you rename an internal function and tests fail, those tests were testing implementation, not behavior.
 
@@ -29,20 +30,20 @@ See [mocking.md](mocking.md) for mockability design patterns.
 
 ---
 
-## THE CYCLE — Red / Green / Refactor
+## THE CYCLE - Red / Green / Refactor
 
-### Phase 1 — RED: Write a Failing Test
+### Phase 1 - RED: Write a Failing Test
 
 Write ONE test that describes a behavior the code does not yet support. Run it. **It MUST fail.** If it passes, either the behavior already exists (delete the test or rethink) or the test is broken (fix it).
 
 **Rules:**
-- The test asserts on the PUBLIC API — inputs and outputs. Not internals.
+- The test asserts on the PUBLIC API - inputs and outputs. Not internals.
 - The test name describes the behavior: `should reject negative amounts`, not `test1`.
 - You MUST see a real **assertion failure**. Compile/import errors are NOT a valid red phase.
 
-### Phase 2 — GREEN: Make It Pass
+### Phase 2 - GREEN: Make It Pass
 
-Write production code that makes the failing test pass. The implementation should be correct and intentional — not a placeholder.
+Write production code that makes the failing test pass. The implementation should be correct and intentional - not a placeholder.
 
 **Rules:**
 - Do NOT write code that no test requires. If no test is failing, you have no reason to write production code.
@@ -50,30 +51,30 @@ Write production code that makes the failing test pass. The implementation shoul
 - Do NOT refactor here. Get to green, then refactor.
 - Run ALL tests, not just the new one. Everything must stay green.
 
-### Phase 3 — REFACTOR: Clean Up Under Green Tests
+### Phase 3 - REFACTOR: Clean Up Under Green Tests
 
 With all tests passing, improve the code's design without changing behavior.
 
 **Rules:**
 - Refactor ONLY when tests are green. **Never refactor while RED.**
 - Remove duplication. Extract constants, helpers, abstractions.
-- Deepen modules — move complexity behind simple interfaces.
+- Deepen modules - move complexity behind simple interfaces.
 - Apply SOLID principles where natural.
 - Consider what new code reveals about existing code.
 - Run tests after EVERY refactor step. If anything goes red, undo and take a smaller step.
-- Refactor BOTH production code AND test code. Tests are code — they deserve the same quality.
+- Refactor BOTH production code AND test code. Tests are code - they deserve the same quality.
 
 ---
 
 ## Anti-Pattern: Horizontal Slices
 
-**FORBIDDEN: Writing all tests first, then all implementation.** This is "horizontal slicing" — treating RED as "write all tests" and GREEN as "write all code."
+**FORBIDDEN: Writing all tests first, then all implementation.** This is "horizontal slicing" - treating RED as "write all tests" and GREEN as "write all code."
 
 This produces crap tests:
 
 - Tests written in bulk test _imagined_ behavior, not _actual_ behavior
 - You end up testing the _shape_ of things (data structures, function signatures) rather than user-facing behavior
-- Tests become insensitive to real changes — they pass when behavior breaks, fail when behavior is fine
+- Tests become insensitive to real changes - they pass when behavior breaks, fail when behavior is fine
 - You outrun your headlights, committing to test structure before understanding the implementation
 
 ```
@@ -81,7 +82,7 @@ This produces crap tests:
 RED:   test1, test2, test3, test4, test5
 GREEN: impl1, impl2, impl3, impl4, impl5
 
-// MANDATORY (vertical — tracer bullets)
+// MANDATORY (vertical - tracer bullets)
 RED→GREEN: test1→impl1
 RED→GREEN: test2→impl2
 RED→GREEN: test3→impl3
@@ -117,7 +118,7 @@ RED:   Write test for first behavior → test fails
 GREEN: Write real implementation to pass → test passes
 ```
 
-This is your tracer bullet — proves the path works end-to-end.
+This is your tracer bullet - proves the path works end-to-end.
 
 ### 3. Incremental Loop
 
@@ -141,24 +142,24 @@ After all behaviors are covered, look for refactor candidates across the whole c
 
 ---
 
-## TDD ANTI-PATTERNS — EXPLICITLY FORBIDDEN
+## TDD ANTI-PATTERNS - EXPLICITLY FORBIDDEN
 
 ### 1. Horizontal Slicing (Write All Tests First)
 
-FORBIDDEN: Writing all tests before any production code. Already covered above — the single most important rule.
+FORBIDDEN: Writing all tests before any production code. Already covered above - the single most important rule.
 
 ### 2. Test-After (Pretending It's TDD)
 
 FORBIDDEN: Writing production code first and tests after, then claiming TDD.
 
-If the code already exists, you're writing regression tests — which is fine, but it's not TDD. Don't pretend.
+If the code already exists, you're writing regression tests - which is fine, but it's not TDD. Don't pretend.
 
 ### 3. The Guru Test
 
 FORBIDDEN: Writing a massive test that exercises the entire feature at once.
 
 ```
-// FORBIDDEN — one test tries to cover everything
+// FORBIDDEN - one test tries to cover everything
 it("processes a full order", () => {
   const user = createUser(...)
   const cart = addToCart(user, ...)
@@ -179,14 +180,14 @@ Break this into many small tests, each driving one piece of functionality.
 FORBIDDEN: Coupling tests to internal structure.
 
 ```
-// FORBIDDEN — testing HOW
+// FORBIDDEN - testing HOW
 it("uses quicksort algorithm", () => {
   const spy = vi.spyOn(internals, "quicksort")
   sort([3, 1, 2])
   expect(spy).toHaveBeenCalled()
 })
 
-// MANDATORY — testing WHAT
+// MANDATORY - testing WHAT
 it("returns elements in ascending order", () => {
   expect(sort([3, 1, 2])).toEqual([1, 2, 3])
 })
@@ -202,7 +203,7 @@ it("_parseToken returns decoded payload", () => {
   expect(auth._parseToken(token)).toEqual(payload)
 })
 
-// MANDATORY — test through the public API
+// MANDATORY - test through the public API
 it("authenticates valid tokens", () => {
   expect(auth.authenticate(validToken)).toEqual({ userId: 1 })
 })
@@ -214,7 +215,7 @@ If a private method is complex enough to need its own tests, extract it into its
 
 FORBIDDEN: Going from green straight to the next red without considering refactoring.
 
-If you skip refactor consistently, the codebase rots. Every cycle includes a refactoring evaluation — even if the conclusion is "nothing to improve right now."
+If you skip refactor consistently, the codebase rots. Every cycle includes a refactoring evaluation - even if the conclusion is "nothing to improve right now."
 
 ### 7. Refactoring While Red
 
@@ -246,16 +247,16 @@ See [mocking.md](mocking.md) for full rules.
 When working in TDD mode, ALWAYS communicate which phase you're in:
 
 ```
-RED — Writing test: "should return 0 for empty string"
+RED - Writing test: "should return 0 for empty string"
 Running test... FAILS ✓
 
-GREEN — Implementing countWords
+GREEN - Implementing countWords
 Running test... PASSES ✓
 
-REFACTOR — Extracting constant, improving name
+REFACTOR - Extracting constant, improving name
 Running test... still PASSES ✓
 
-RED — Next test: "should handle multiple spaces between words"
+RED - Next test: "should handle multiple spaces between words"
 ```
 
 This transparency helps the user follow the TDD rhythm and catch deviations.
@@ -291,11 +292,11 @@ When you skip TDD, be explicit about WHY. Never silently abandon the cycle.
 | Principle | Rule |
 |---|---|
 | Production code without a failing test | FORBIDDEN |
-| Writing multiple tests before implementing | FORBIDDEN — vertical slicing only |
+| Writing multiple tests before implementing | FORBIDDEN - vertical slicing only |
 | Refactoring with a failing test | FORBIDDEN |
 | Skipping the refactor phase | FORBIDDEN |
-| Testing private methods | FORBIDDEN — test public API |
-| Mocking internal collaborators | FORBIDDEN — mock at boundaries only |
+| Testing private methods | FORBIDDEN - test public API |
+| Mocking internal collaborators | FORBIDDEN - mock at boundaries only |
 | Testing implementation instead of behavior | FORBIDDEN |
-| Ugly code in green phase | ALLOWED — refactor phase cleans it |
-| Deleting tests that no longer add value | ALLOWED — after refactoring merges behaviors |
+| Ugly code in green phase | ALLOWED - refactor phase cleans it |
+| Deleting tests that no longer add value | ALLOWED - after refactoring merges behaviors |

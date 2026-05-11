@@ -2,7 +2,7 @@
 
 ## Rules of Hooks (Non-Negotiable)
 
-1. Only call hooks at the **top level** — never inside loops, conditions, or nested functions
+1. Only call hooks at the **top level** - never inside loops, conditions, or nested functions
 2. Only call hooks from React function components or custom hooks
 
 ## Never Suppress exhaustive-deps
@@ -14,7 +14,7 @@ useEffect(() => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [])
 
-// MANDATORY — fix the code, not the linter
+// MANDATORY - fix the code, not the linter
 useEffect(() => {
   fetchData(userId)
 }, [userId])
@@ -35,12 +35,12 @@ When an Effect has too many dependencies, work through this in order:
 ## Custom Hooks
 
 - Names MUST start with `use` + capital letter
-- Functions that don't call hooks MUST NOT start with `use` — use `get`, `create`, `calculate`
-- Custom hooks share **stateful logic**, NOT state — each call gets independent state
+- Functions that don't call hooks MUST NOT start with `use` - use `get`, `create`, `calculate`
+- Custom hooks share **stateful logic**, NOT state - each call gets independent state
 - Extract when: logic is duplicated, or an Effect's intent becomes clearer when named
 
 ```tsx
-// GOOD — clear intent, reusable
+// GOOD - clear intent, reusable
 function useDebounce<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value)
   useEffect(() => {
@@ -51,10 +51,10 @@ function useDebounce<T>(value: T, delayMs: number): T {
 }
 ```
 
-## Lifecycle Wrappers — FORBIDDEN
+## Lifecycle Wrappers - FORBIDDEN
 
 ```tsx
-// FORBIDDEN — all of these
+// FORBIDDEN - all of these
 function useMount(fn: () => void) { useEffect(fn, []) }
 function useEffectOnce(fn: () => void) { useEffect(fn, []) }
 function useUpdateEffect(fn, deps) { /* skip first render */ }

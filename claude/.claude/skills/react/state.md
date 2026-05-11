@@ -1,6 +1,6 @@
 # State Design
 
-## Minimal State — If Derivable, Not State
+## Minimal State - If Derivable, Not State
 
 For each piece of data, if ANY is true it's NOT state:
 1. Unchanged over time --> Constant
@@ -8,13 +8,13 @@ For each piece of data, if ANY is true it's NOT state:
 3. Computable from state/props --> Derived value
 
 ```tsx
-// FORBIDDEN — redundant state
+// FORBIDDEN - redundant state
 const [items, setItems] = useState<Item[]>([])
 const [itemCount, setItemCount] = useState(0)
 const [hasItems, setHasItems] = useState(false)
 const [selectedItem, setSelectedItem] = useState<Item | null>(null)
 
-// MANDATORY — single source of truth
+// MANDATORY - single source of truth
 const [items, setItems] = useState<Item[]>([])
 const [selectedId, setSelectedId] = useState<string | null>(null)
 
@@ -23,17 +23,17 @@ const hasItems = items.length > 0
 const selectedItem = items.find(i => i.id === selectedId) ?? null
 ```
 
-## Immutable Updates — Always
+## Immutable Updates - Always
 
 ```tsx
-// FORBIDDEN — mutates state
+// FORBIDDEN - mutates state
 items.push(item)
 setItems(items) // same reference, React skips re-render
 
 // MANDATORY
 setItems([...items, item])
 
-// FORBIDDEN — mutates nested state
+// FORBIDDEN - mutates nested state
 const user = users.find(u => u.id === id)
 user.name = newName
 setUsers([...users])
@@ -66,16 +66,16 @@ Use `useReducer` when state updates span multiple fields across multiple handler
 dispatch({ type: "item_added", item })
 dispatch({ type: "filter_changed", filter })
 
-// BAD — actions are just setters
+// BAD - actions are just setters
 dispatch({ type: "SET_ITEMS", payload: newItems })
 ```
 
 Reducer rules:
-- Must be pure — no side effects
+- Must be pure - no side effects
 - One action = one user interaction
 - Default case must throw: `default: throw new Error(`Unknown action: ${action.type}`)`
 
-## State Management — Jotai is Preferred
+## State Management - Jotai is Preferred
 
 For state that needs to be shared across distant components (beyond simple lifting), **Jotai** with atoms is the preferred solution. See [jotai.md](jotai.md) for patterns and best practices.
 

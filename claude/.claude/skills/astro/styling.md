@@ -20,7 +20,7 @@ Escape scoping for a full style block:
 
 ```astro
 <style is:global>
-  /* Applies globally — use sparingly */
+  /* Applies globally - use sparingly */
   body { margin: 0; }
 </style>
 ```
@@ -34,7 +34,7 @@ Target global selectors within a scoped block:
   /* Scoped to this component */
   .wrapper { padding: 1rem; }
 
-  /* Global — targets children rendered by framework components or <slot> content */
+  /* Global - targets children rendered by framework components or <slot> content */
   .wrapper :global(h2) { color: blue; }
 </style>
 ```
@@ -63,7 +63,7 @@ const isActive = true
 
 Accepts: strings, `{ class: boolean }` objects, arrays (flattened). `undefined`, `null`, `false` are ignored.
 
-## `define:vars` — CSS Custom Properties from Frontmatter
+## `define:vars` - CSS Custom Properties from Frontmatter
 
 Pass server-side values to CSS:
 

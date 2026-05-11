@@ -23,7 +23,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 ## Mocking with `vi`
 
-### `vi.mock()` — Module Mocking
+### `vi.mock()` - Module Mocking
 
 - `vi.mock()` is **hoisted** to the top of the file. It runs before all imports regardless of where you write it.
 - Always use `vi.mock()` with a **factory function** when you need custom behavior. The bare `vi.mock("./module")` auto-mocks everything, which over-mocks.
@@ -52,7 +52,7 @@ vi.mock("./api", () => ({
 }));
 ```
 
-### `vi.spyOn()` — Prefer Over `vi.mock()` When Possible
+### `vi.spyOn()` - Prefer Over `vi.mock()` When Possible
 
 - Use `vi.spyOn()` to observe calls while keeping the real implementation:
 
@@ -64,7 +64,7 @@ expect(spy).toHaveBeenCalledWith(userData);
 
 - Always call `spy.mockRestore()` in `afterEach`, or use `vi.restoreAllMocks()`.
 
-### Mock Cleanup — MANDATORY
+### Mock Cleanup - MANDATORY
 
 ```ts
 afterEach(() => {
@@ -110,22 +110,22 @@ it("debounces calls", () => {
 ### Testing Promises
 
 ```ts
-// CORRECT — always await
+// CORRECT - always await
 it("fetches user", async () => {
   const user = await getUser(1);
   expect(user.name).toBe("Alice");
 });
 
-// CORRECT — testing rejections
+// CORRECT - testing rejections
 it("rejects on invalid id", async () => {
   await expect(getUser(-1)).rejects.toThrow(ValidationError);
 });
 ```
 
-### Common Async Pitfall — FORBIDDEN
+### Common Async Pitfall - FORBIDDEN
 
 ```ts
-// FORBIDDEN — missing await, test always passes
+// FORBIDDEN - missing await, test always passes
 it("fetches user", () => {
   expect(getUser(1)).resolves.toBeDefined(); // no await!
 });
@@ -160,7 +160,7 @@ it("returns a string", () => {
 });
 ```
 
-Don't abuse this — only use type tests when the type contract is part of the public API.
+Don't abuse this - only use type tests when the type contract is part of the public API.
 
 ## Snapshot Rules
 
@@ -169,11 +169,11 @@ Don't abuse this — only use type tests when the type contract is part of the p
 - **Never snapshot large objects, API responses, or error messages.** Assert on specific fields instead.
 - If you write a snapshot test, verify the snapshot content makes sense. Don't blindly accept generated snapshots.
 
-## Vitest Anti-Patterns — FORBIDDEN
+## Vitest Anti-Patterns - FORBIDDEN
 
 ### 1. Over-mocking with bare `vi.mock()`
 ```ts
-// FORBIDDEN — auto-mocks everything, tests become meaningless
+// FORBIDDEN - auto-mocks everything, tests become meaningless
 vi.mock("./userService");
 vi.mock("./database");
 vi.mock("./logger");
@@ -181,7 +181,7 @@ vi.mock("./logger");
 
 ### 2. Mocking What You're Testing
 ```ts
-// FORBIDDEN — you're testing a mock, not the real code
+// FORBIDDEN - you're testing a mock, not the real code
 vi.mock("./calculator");
 import { add } from "./calculator";
 it("adds", () => {
@@ -192,7 +192,7 @@ it("adds", () => {
 
 ### 3. Missing `await` on Async Assertions
 ```ts
-// FORBIDDEN — passes even if the promise rejects
+// FORBIDDEN - passes even if the promise rejects
 it("works", () => {
   expect(asyncFn()).resolves.toBe(value); // NOT awaited
 });
@@ -200,7 +200,7 @@ it("works", () => {
 
 ### 4. Timer Leaks
 ```ts
-// FORBIDDEN — no cleanup
+// FORBIDDEN - no cleanup
 beforeEach(() => {
   vi.useFakeTimers();
 });
@@ -209,34 +209,21 @@ beforeEach(() => {
 
 ### 5. Ignoring `mockRestore`
 ```ts
-// FORBIDDEN — spy leaks to next test
+// FORBIDDEN - spy leaks to next test
 const spy = vi.spyOn(console, "error").mockImplementation(() => {});
 // Missing: afterEach cleanup
 ```
 
-### 6. Manual `throw` / `try`-`catch` Instead of `expect` Matchers
-FORBIDDEN: Hand-rolling error plumbing with `throw new Error("should have thrown")` or `try`/`catch` wrappers. Vitest ships matchers for every error-assertion case — use them. Tests should never contain a manual `throw` or early `return`; the `expect` assertions carry all failure signals.
+### 6. Error Assertions - Use Vitest Matchers
+
+The universal ban on manual `throw` / early `return` lives in the `test` skill (anti-pattern #8). The Vitest-specific matchers are:
 
 ```ts
-// FORBIDDEN — manual try/catch + throw
-it("throws on invalid id", async () => {
-  try {
-    await getUser(-1);
-    throw new Error("should have thrown");
-  } catch (e) {
-    expect(e).toBeInstanceOf(ValidationError);
-  }
-});
+// CORRECT - async rejection
+await expect(getUser(-1)).rejects.toThrow(ValidationError);
 
-// CORRECT — let `expect` do the work
-it("throws on invalid id", async () => {
-  await expect(getUser(-1)).rejects.toThrow(ValidationError);
-});
-
-// CORRECT — sync version
-it("throws on invalid config", () => {
-  expect(() => parseConfig("")).toThrow(ConfigError);
-});
+// CORRECT - sync throw
+expect(() => parseConfig("")).toThrow(ConfigError);
 ```
 
 When you genuinely need to inspect a dynamic field on the caught error, use `expect.unreachable()` so the test still fails if the code doesn't throw:
@@ -262,7 +249,7 @@ type ParseConfigResult =
   | { readonly ok: true; readonly config: NextNodeConfig }
   | { readonly ok: false; readonly errors: readonly string[] };
 
-// FORBIDDEN — `if (...) return` is a vacuous-pass trap
+// FORBIDDEN - `if (...) return` is a vacuous-pass trap
 it("rejects invalid config", () => {
   const result = parseConfig(bad);
   expect(result.ok).toBe(false);
@@ -270,7 +257,7 @@ it("rejects invalid config", () => {
   expect(result.errors).toContain("missing name");
 });
 
-// PREFERRED — one whole-shape assertion, no narrowing gymnastics
+// PREFERRED - one whole-shape assertion, no narrowing gymnastics
 it("rejects invalid config", () => {
   expect(parseConfig(bad)).toEqual({
     ok: false,
@@ -278,7 +265,7 @@ it("rejects invalid config", () => {
   });
 });
 
-// ACCEPTABLE — use expect.unreachable when you need field-specific matchers
+// ACCEPTABLE - use expect.unreachable when you need field-specific matchers
 it("rejects invalid config", () => {
   const result = parseConfig(bad);
   if (result.ok) {
@@ -292,7 +279,7 @@ it("rejects invalid config", () => {
 
 Default to the single `toEqual` whole-shape assertion. Reach for `expect.unreachable()` only when you genuinely need multiple matchers on different fields of the narrowed variant.
 
-## Astro — Container API
+## Astro - Container API
 
 When testing Astro components (`.astro` files) or API endpoints, use the Astro Container API with Vitest. Covers `renderToString`, `renderToResponse`, props, slots, locals, params, framework renderers, and endpoints.
 
@@ -301,7 +288,7 @@ See [astro.md](astro.md) for full guide.
 ## File Naming and Location
 
 - Co-locate test files next to source: `src/utils/parser.ts` -> `src/utils/parser.test.ts`
-- Unless the project has an existing convention (e.g., `__tests__/` directory) — always follow existing conventions.
+- Unless the project has an existing convention (e.g., `__tests__/` directory) - always follow existing conventions.
 
 ## Running Tests
 

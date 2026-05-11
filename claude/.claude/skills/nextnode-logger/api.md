@@ -42,10 +42,10 @@ authLogger.debug('Token check')   // -> silenced (minLevel is warn)
 ```
 
 Child config options:
-- `scope` — override the parent scope
-- `prefix` — override the parent prefix
-- `minLevel` — override the parent min level
-- `requestId` — override the parent request ID
+- `scope` - override the parent scope
+- `prefix` - override the parent prefix
+- `minLevel` - override the parent min level
+- `requestId` - override the parent request ID
 
 Everything else (transports, environment, silent, includeLocation) is inherited.
 

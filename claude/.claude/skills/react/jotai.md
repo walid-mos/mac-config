@@ -1,4 +1,4 @@
-# Jotai — Preferred State Management
+# Jotai - Preferred State Management
 
 Jotai is the preferred solution for shared state beyond simple prop passing. Use it whenever state needs to be shared across distant components.
 
@@ -21,18 +21,18 @@ Jotai is the preferred solution for shared state beyond simple prop passing. Use
 
 ## Atom Types
 
-### Primitive — independent leaf state
+### Primitive - independent leaf state
 ```tsx
 const countAtom = atom(0)
 const nameAtom = atom("hello")
 ```
 
-### Derived (read-only) — computed from other atoms
+### Derived (read-only) - computed from other atoms
 ```tsx
 const doubledAtom = atom((get) => get(countAtom) * 2)
 ```
 
-### Action (write-only) — encapsulate mutations
+### Action (write-only) - encapsulate mutations
 ```tsx
 const incrementAtom = atom(null, (_get, set) => {
   set(countAtom, (prev) => prev + 1)
@@ -41,7 +41,7 @@ const incrementAtom = atom(null, (_get, set) => {
 
 Prefer **separate action atoms** over a single reducer with switch. Better code splitting, clearer intent.
 
-### Read-Write — bidirectional derived state
+### Read-Write - bidirectional derived state
 ```tsx
 const celsiusAtom = atom(0)
 const fahrenheitAtom = atom(
@@ -52,13 +52,13 @@ const fahrenheitAtom = atom(
 
 ---
 
-## Encapsulation — Hide Base Atoms
+## Encapsulation - Hide Base Atoms
 
 ```tsx
-// NOT exported — internal
+// NOT exported - internal
 const baseAtom = atom(0)
 
-// Exported — controlled interface
+// Exported - controlled interface
 export const countAtom = atom((get) => get(baseAtom))
 export const incAtom = atom(null, (_get, set) => set(baseAtom, (p) => p + 1))
 export const decAtom = atom(null, (_get, set) => set(baseAtom, (p) => p - 1))
@@ -73,10 +73,10 @@ Consumers cannot mutate base state directly. This is the Jotai equivalent of a m
 ### Use `useSetAtom` for write-only components
 
 ```tsx
-// BAD — subscribes to reads, re-renders on every change
+// BAD - subscribes to reads, re-renders on every change
 const [, setValue] = useAtom(valueAtom)
 
-// GOOD — no subscription, no re-render
+// GOOD - no subscription, no re-render
 const setValue = useSetAtom(valueAtom)
 ```
 
@@ -126,7 +126,7 @@ const userAtom = atom(async (get, { signal }) => {
 })
 ```
 
-- Async atoms **suspend** by default — needs `<Suspense>` boundary
+- Async atoms **suspend** by default - needs `<Suspense>` boundary
 - Use `signal` for automatic cancellation of stale requests
 - Use `loadable()` to avoid Suspense: returns `{ state, data?, error? }`
 - Use `unwrap()` for sync fallback with "show stale while loading"
@@ -147,7 +147,7 @@ Cross-tab sync is built in. Supports `localStorage`, `sessionStorage`, custom st
 
 ## TypeScript
 
-- **Let types be inferred** — `atom(0)` infers `PrimitiveAtom<number>`
+- **Let types be inferred** - `atom(0)` infers `PrimitiveAtom<number>`
 - **Annotate write params explicitly** when inference is insufficient
 - **Explicit type when nullable:** `atom<number | null>(null)`
 - **Functions in atoms must be wrapped:** `atom({ callback: (n: number) => n * 2 })` (Jotai can't distinguish stored functions from getters)
@@ -163,7 +163,7 @@ Cross-tab sync is built in. Supports `localStorage`, `sessionStorage`, custom st
 | `const [, set] = useAtom(x)` | Subscribes to reads unnecessarily | `useSetAtom(x)` |
 | One component reading 5+ unrelated atoms | Re-renders on any change | Split into focused sub-components |
 | Heavy computation in derived read | Recomputes on every dep change | Compute in action atom, store result |
-| Forgetting `atomFamily` cleanup | Memory leak — cached params persist | Call `.remove(param)` |
+| Forgetting `atomFamily` cleanup | Memory leak - cached params persist | Call `.remove(param)` |
 | `set()` on `atomWithDefault` then expecting dep updates | Getter stops running after override | Call `RESET` to restore computed behavior |
 
 ---
@@ -194,6 +194,6 @@ Always wrap in `<Provider>` in tests for isolated state. Use `useHydrateAtoms` t
 
 ## Debugging
 
-- `countAtom.debugLabel = "count"` — use SWC plugin `@swc-jotai/debug-label` to auto-label
+- `countAtom.debugLabel = "count"` - use SWC plugin `@swc-jotai/debug-label` to auto-label
 - `useAtomsDevtools()` for Redux DevTools integration (values, deps, time-travel)
 - `freezeAtom()` in dev to catch accidental mutations via `Object.freeze`

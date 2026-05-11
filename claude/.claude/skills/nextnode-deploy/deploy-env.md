@@ -12,7 +12,7 @@ interface ServiceEnv {
 
 interface TargetEnv extends ServiceEnv {
   readonly public: Readonly<Record<string, string>> & {
-    readonly SITE_URL: string  // required — every app needs it at build + runtime
+    readonly SITE_URL: string  // required - every app needs it at build + runtime
   }
 }
 
@@ -25,9 +25,9 @@ interface DeployEnv {
 contributeEnv(projectName: string): TargetEnv | Promise<TargetEnv>
 ```
 
-Returns `T | Promise<T>` so sync impls (Hetzner — pure config arithmetic) stay sync, while async impls (Cloudflare — API lookup for `*.pages.dev` subdomain) return a Promise. Callers `await` either way.
+Returns `T | Promise<T>` so sync impls (Hetzner - pure config arithmetic) stay sync, while async impls (Cloudflare - API lookup for `*.pages.dev` subdomain) return a Promise. Callers `await` either way.
 
-The `{public, secret}` shape mirrors a backing-service `ServiceEnv` so targets and services merge through the same primitive (`mergeServiceEnvs`) — one collision detector for both. Two contributors claiming the same key throws.
+The `{public, secret}` shape mirrors a backing-service `ServiceEnv` so targets and services merge through the same primitive (`mergeServiceEnvs`) - one collision detector for both. Two contributors claiming the same key throws.
 
 ## buildDeployEnv
 
@@ -35,24 +35,24 @@ The `{public, secret}` shape mirrors a backing-service `ServiceEnv` so targets a
 function buildDeployEnv(values: Readonly<Record<string, string>>): DeployEnv {
   const siteUrl = values['SITE_URL']
   if (!siteUrl) {
-    throw new Error('SITE_URL missing — every DeployTarget must put it in contributeEnv().public')
+    throw new Error('SITE_URL missing - every DeployTarget must put it in contributeEnv().public')
   }
   return { ...values, SITE_URL: siteUrl }
 }
 ```
 
-Narrows the merged `Record<string, string>` into a `DeployEnv`. Throws when SITE_URL is missing — that means a target skipped its contract obligation, which is a wiring bug, not a runtime condition.
+Narrows the merged `Record<string, string>` into a `DeployEnv`. Throws when SITE_URL is missing - that means a target skipped its contract obligation, which is a wiring bug, not a runtime condition.
 
 ## Cloudflare Pages env
 
 Two mechanisms:
 
 1. **Build time**: `computeDeployEnv` writes `SITE_URL` to `$GITHUB_ENV` so `pnpm build` sees `import.meta.env.SITE_URL`
-2. **Runtime**: `sync-pages-env` PATCHes the Pages project env vars via API — computed values as `plain_text`, secrets from `[deploy].secrets` as `secret_text`
+2. **Runtime**: `sync-pages-env` PATCHes the Pages project env vars via API - computed values as `plain_text`, secrets from `[deploy].secrets` as `secret_text`
 
 ## Hetzner VPS env
 
-`contributeEnv` is synchronous — SITE_URL is `https://{resolveDeployDomain(domain, environment)}`. No API call needed.
+`contributeEnv` is synchronous - SITE_URL is `https://{resolveDeployDomain(domain, environment)}`. No API call needed.
 
 Runtime env is written as a `.env` file on the VPS via SSH, containing `SITE_URL`, `PORT`, and all declared secrets + service-secret env. Docker Compose loads it automatically.
 
@@ -60,11 +60,11 @@ Runtime env is written as a `.env` file on the VPS via SSH, containing `SITE_URL
 
 The Hetzner target's `contributeEnv` builds SITE_URL synchronously via `resolveDeployDomain(domain, environment)`. The Cloudflare target needs an API lookup for the live `*.pages.dev` subdomain when no custom domain is configured, so its `contributeEnv` returns a Promise.
 
-Uses `AppEnvironment` (not `PipelineEnvironment`) — the `'none'` guard is in the command layer.
+Uses `AppEnvironment` (not `PipelineEnvironment`) - the `'none'` guard is in the command layer.
 
 ## Dev subdomain convention
 
-`resolveDeployDomain()` in `domain/deploy-domain.ts` — single source of truth:
+`resolveDeployDomain()` in `domain/deploy-domain.ts` - single source of truth:
 
 ```typescript
 export function resolveDeployDomain(domain: string, environment: AppEnvironment): string {
@@ -113,4 +113,4 @@ PATCH /accounts/{accountId}/pages/projects/{projectName}
 
 Only pushes to `production` deployment config (preview is not used for static sites).
 
-PATCH merges with existing env vars — keys not in the payload are left untouched.
+PATCH merges with existing env vars - keys not in the payload are left untouched.

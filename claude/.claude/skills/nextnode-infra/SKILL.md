@@ -10,7 +10,7 @@ synced-at: a755da5
 
 # NextNode Core Monorepo
 
-`@nextnode/core` — pnpm workspaces + Turborepo, ESM only, Node >=24.
+`@nextnode/core` - pnpm workspaces + Turborepo, ESM only, Node >=24.
 
 ## Packages
 
@@ -20,23 +20,10 @@ synced-at: a755da5
 | `@nextnode-solutions/logger` | library | Zero-dep TS logger, transports (console + HTTP), testing utilities |
 | `@nextnode-solutions/email-manager` | library | Template-first email sending (React Email + Resend), Result-pattern API |
 | `@nextnode-solutions/brand-assets` | static | SVG/PNG logos, icons, favicons, social avatars (subpath wildcard exports) |
-| `@nextnode-solutions/infrastructure` | CLI (private) | Config-driven CI/CD CLI — never published, consumed from monorepo by Actions |
+| `@nextnode-solutions/infrastructure` | CLI (private) | Config-driven CI/CD CLI - never published, consumed from monorepo by Actions |
 | `@nextnode-solutions/monitoring` | app (private) | Internal Astro 5 dashboard at `monitoring.nextnode.fr`, Tailscale-only, Navy design language |
 
 All publishable packages use **tsdown** (no tsup remaining). All run on Node >=24, pnpm 10.11.0, ESM-only.
-
-## Company context
-
-NextNode is the user's consulting business. Keep this in mind when suggesting architecture, packaging, or tooling trade-offs.
-
-- **Owner**: freelance software engineer growing NextNode into a structured agency
-- **Tech stack**: Node.js, Astro, React
-- **Target clientele**: French PME/ETI (SMBs and mid-caps)
-- **Product positioning**: externalized CTO — owns the full IT scope, small projects to large ones
-- **Freelance clients** (personal, billed outside NextNode): large enterprises — Hermès, Certigo, Allianz Trade. These inform quality standards but are not the NextNode target.
-- **Current NextNode clients**: early-stage, low-stakes work (florist, friend's static site). Not representative of the target — the business is in a ramp-up phase.
-
-**How to apply**: favor solutions that scale from solo-operator to small-team delivery, prioritize developer-ergonomics and reusability across client projects, and pitch recommendations at a PME/ETI budget and maturity level (not enterprise, not toy project).
 
 ## Arguments
 
@@ -50,7 +37,7 @@ NextNode is the user's consulting business. Keep this in mind when suggesting ar
 
 ### When called without argument: compliance audit
 
-1. **Read the project** — `package.json`, config files, `nextnode.toml`, existing imports
+1. **Read the project** - `package.json`, config files, `nextnode.toml`, existing imports
 2. **Run the checklist** below against the project state
 3. **Present the results** as a table: item, status (pass/missing/misconfigured), detail
 4. **Ask the user**:
@@ -66,48 +53,28 @@ NextNode is the user's consulting business. Keep this in mind when suggesting ar
 - [ ] `package.json` has `"type": "module"`
 - [ ] `engines.node` >= 24
 
-#### NextNode package versions (MANDATORY — check first)
-For every `@nextnode-solutions/*` dep in `package.json`, compare the **installed** version (from `pnpm-lock.yaml` or `node_modules/<pkg>/package.json`) against the **latest** on npm via `npm view <pkg> version`. Flag any mismatch as **outdated**, even if the package.json range (`^1.5.1`) would allow the newer version — what matters is what's actually installed.
+#### NextNode package versions (MANDATORY - check first)
+For every `@nextnode-solutions/*` dep in `package.json`, compare the **installed** version (from `pnpm-lock.yaml` or `node_modules/<pkg>/package.json`) against the **latest** on npm via `npm view <pkg> version`. Flag any mismatch as **outdated**, even if the package.json range (`^1.5.1`) would allow the newer version - what matters is what's actually installed.
 
-- [ ] `@nextnode-solutions/standards` — installed version == npm latest
-- [ ] `@nextnode-solutions/logger` — installed version == npm latest
-- [ ] `@nextnode-solutions/infrastructure` — installed version == npm latest (if used)
-- [ ] Any other `@nextnode-solutions/*` dep — installed version == npm latest
+- [ ] `@nextnode-solutions/standards` - installed version == npm latest
+- [ ] `@nextnode-solutions/logger` - installed version == npm latest
+- [ ] `@nextnode-solutions/infrastructure` - installed version == npm latest (if used)
+- [ ] Any other `@nextnode-solutions/*` dep - installed version == npm latest
 
-**Why**: NextNode packages evolve fast and older versions carry real bugs. Example: `@nextnode-solutions/standards@1.5.1` exports `./oxlint` as a raw JSON file, which breaks under Node 22.12+ without `with { type: 'json' }` import attribute — fixed in 1.9.x where the export is a JS module. Outdated installs = CI failures that don't reproduce locally. Recent projects especially should never be more than a minor behind.
+**Why**: NextNode packages evolve fast and older versions carry real bugs. Example: `@nextnode-solutions/standards@1.5.1` exports `./oxlint` as a raw JSON file, which breaks under Node 22.12+ without `with { type: 'json' }` import attribute - fixed in 1.9.x where the export is a JS module. Outdated installs = CI failures that don't reproduce locally. Recent projects especially should never be more than a minor behind.
 
 **How to resolve**: `pnpm update <pkg>` (or `pnpm update @nextnode-solutions/*` for all).
 
-#### Standards (`@nextnode-solutions/standards`)
-- [ ] Installed as devDependency
-- [ ] `oxlint` and `oxfmt` installed as devDependencies
-- [ ] `oxlint.config.ts` exists and extends `@nextnode-solutions/standards/oxlint` (requires oxlint >=1.58.0)
-- [ ] `oxfmt.config.ts` exists and extends `@nextnode-solutions/standards/oxfmt` (requires oxfmt >=0.43.0)
-- [ ] `tsconfig.json` exists and extends one of `standards/typescript/{library,nextjs,astro}`
-- [ ] Scripts: `lint` (oxlint), `format` (oxfmt --write .), `format:check` (oxfmt --check .), `type-check` (tsc --noEmit)
-
-#### Testing (if applicable)
-- [ ] `vitest` installed as devDependency
-- [ ] `vitest.config.ts` composes the base via `mergeConfig(baseConfig, defineConfig({...}))` where `baseConfig` is imported from `@nextnode-solutions/standards/vitest/{backend,frontend}`
-- [ ] Script: `test` (vitest run)
-
-#### Commit conventions (if applicable)
-- [ ] `@commitlint/cli` + `@commitlint/config-conventional` installed
-- [ ] `commitlint.config.js` imports from `standards/commitlint`
-- [ ] `husky` + `lint-staged` installed
-- [ ] `lint-staged.config.js` imports from `standards/lint-staged`
-
-#### Publishing (if `type=package`)
-- [ ] `.releaserc.json` extends both `semantic-release-monorepo` and `@nextnode-solutions/standards/semantic-release`, with a `tagFormat` per package
-- [ ] `nextnode.toml` has `[package]` section with `access` (+ optional `canary_on_label`)
+#### Standards / Testing / Commits / Publishing
+For the detailed setup of `@nextnode-solutions/standards` (oxlint, oxfmt, TypeScript, vitest, commitlint, lint-staged, semantic-release configs and their required scripts), see `/nextnode-standards` "Complete project setup checklist". Audit ALL items from that checklist as part of compliance.
 
 #### CI/CD
 - [ ] `nextnode.toml` exists with `[project]` section (name + type + optional `internal`)
 - [ ] `project.internal` set to `true` for VPS apps reachable only via Tailscale (defaults to `false`). Controls DNS (tailnet IP vs. public), firewall (tailscale0-only vs. open HTTP/S), Caddy cert strategy, and UFW rules. See `/nextnode-deploy` for details.
-- [ ] GitHub workflow calls the correct reusable workflow from `NextNodeSolutions/core` — `deploy-static.yml` for Astro/Cloudflare-Pages sites (auto-provisions per-env Pages project + custom domains + DNS), `deploy.yml` for Hetzner VPS containerized apps (runs `plan → quality → provision → dns → build-image → deploy`, pushes to GHCR, SSH-deploys to the VPS), `publish-package.yml` for packages
+- [ ] GitHub workflow calls the correct reusable workflow from `NextNodeSolutions/core` - `deploy-static.yml` for Astro/Cloudflare-Pages sites (auto-provisions per-env Pages project + custom domains + DNS), `deploy.yml` for Hetzner VPS containerized apps (runs `plan → quality → provision → dns → build-image → deploy`, pushes to GHCR, SSH-deploys to the VPS), `publish-package.yml` for packages
 - [ ] For `type=app` (Hetzner): `Dockerfile` at root, minimal `docker-compose.yml` with `services.app.build.context: .` (no `image:`/`ports:`/`env_file:`/`restart:`), app respects `$PORT` (12-factor). See `/nextnode-deploy` → `hetzner-caller.md` for the full caller convention.
 - [ ] Monorepo: per-package workflow with `paths:` filter + `filter` in nextnode.toml
-- [ ] `SITE_URL` is **never hardcoded** — Astro `astro.config.ts` MUST set `site: process.env.SITE_URL` (same for any other framework that needs a canonical URL). The infrastructure pipeline auto-computes and injects `SITE_URL` at build + runtime via the target's `contributeEnv()`; hardcoding a domain breaks dev/prod URL resolution and bypasses the config-as-code flow.
+- [ ] `SITE_URL` is **never hardcoded** - Astro `astro.config.ts` MUST set `site: process.env.SITE_URL` (same for any other framework that needs a canonical URL). The infrastructure pipeline auto-computes and injects `SITE_URL` at build + runtime via the target's `contributeEnv()`; hardcoding a domain breaks dev/prod URL resolution and bypasses the config-as-code flow.
 
 #### Backing services (if used)
 - [ ] R2 buckets declared in `[services.r2] buckets = ["uploads", ...]` (alias names, kebab-case)
@@ -142,10 +109,10 @@ Redirect immediately:
 
 ## Rules
 
-1. **pnpm only** — never npm or yarn
-2. **ESM only** — `import`, not `require`
-3. **Standards first** — every project MUST use `@nextnode-solutions/standards`
-4. **Config-driven** — behavior from `nextnode.toml`, not hardcoded
-5. **Always check NextNode package freshness** — before any audit or CI debug, run `npm view <pkg> version` for each installed `@nextnode-solutions/*` package and compare against the installed version. Outdated NextNode packages are the #1 cause of CI-only failures that don't reproduce locally.
-6. **`SITE_URL` is infra-owned, never hardcoded** — the deploy pipeline (`computeDeployEnv`) generates `SITE_URL` from `nextnode.toml` domain + environment and injects it at build and runtime. Frameworks that need a canonical URL (Astro `site`, sitemap generators, etc.) MUST read `process.env.SITE_URL` (or `import.meta.env.SITE_URL`). Hardcoding a literal domain breaks dev/prod resolution and is a compliance violation.
-7. **Dates go through Temporal, never `Date` or date libraries** — for any date/time code in a NextNode project, use TC39 Temporal via `@js-temporal/polyfill`. BAN `date-fns`, `luxon`, `dayjs`, `moment`, and raw `Date` arithmetic for new code. Reason: Temporal is the standardized future native JS API — when Node exposes it stable, the polyfill is stripped with zero code change; other libraries are legacy ergonomics that will be superseded. Cost: ~40 kB polyfill, SSR/server-only, acceptable for every NextNode project. Install per-package: `pnpm add @js-temporal/polyfill`. Use `Temporal.Instant.from(iso)`, `Temporal.PlainDate`, `.since()`, `.total('minute'|'hour'|'day')`, `.toZonedDateTimeISO('UTC').toPlainDate()` instead of `new Date()`, `Date.now()` math, or `getTime()` subtraction. `Date.now()` remains acceptable only as a raw epoch-ms source passed into Temporal (`Temporal.Instant.fromEpochMilliseconds(Date.now())`).
+1. **pnpm only** - never npm or yarn
+2. **ESM only** - `import`, not `require`
+3. **Standards first** - every project MUST use `@nextnode-solutions/standards`
+4. **Config-driven** - behavior from `nextnode.toml`, not hardcoded
+5. **Always check NextNode package freshness** - before any audit or CI debug, run `npm view <pkg> version` for each installed `@nextnode-solutions/*` package and compare against the installed version. Outdated NextNode packages are the #1 cause of CI-only failures that don't reproduce locally.
+6. **`SITE_URL` is infra-owned, never hardcoded** - the deploy pipeline (`computeDeployEnv`) generates `SITE_URL` from `nextnode.toml` domain + environment and injects it at build and runtime. Frameworks that need a canonical URL (Astro `site`, sitemap generators, etc.) MUST read `process.env.SITE_URL` (or `import.meta.env.SITE_URL`). Hardcoding a literal domain breaks dev/prod resolution and is a compliance violation.
+7. **Dates go through Temporal, never `Date` or date libraries** - for any date/time code in a NextNode project, use TC39 Temporal via `@js-temporal/polyfill`. BAN `date-fns`, `luxon`, `dayjs`, `moment`, and raw `Date` arithmetic for new code. Reason: Temporal is the standardized future native JS API - when Node exposes it stable, the polyfill is stripped with zero code change; other libraries are legacy ergonomics that will be superseded. Cost: ~40 kB polyfill, SSR/server-only, acceptable for every NextNode project. Install per-package: `pnpm add @js-temporal/polyfill`. Use `Temporal.Instant.from(iso)`, `Temporal.PlainDate`, `.since()`, `.total('minute'|'hour'|'day')`, `.toZonedDateTimeISO('UTC').toPlainDate()` instead of `new Date()`, `Date.now()` math, or `getTime()` subtraction. `Date.now()` remains acceptable only as a raw epoch-ms source passed into Temporal (`Temporal.Instant.fromEpochMilliseconds(Date.now())`).

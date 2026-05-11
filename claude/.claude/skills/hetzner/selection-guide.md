@@ -1,4 +1,4 @@
-# Selection Guide — Pick the Right Hetzner Server
+# Selection Guide - Pick the Right Hetzner Server
 
 How to match a workload to a Hetzner Cloud server line and size.
 
@@ -14,7 +14,7 @@ All prices EUR, VAT excluded. Verified 2026-04-10.
    - Yes (proprietary software, specific Docker images, Windows VMs) → **CX or CPX**
    - No (Go, Rust, modern Node, Python, standard containers) → **CAX (cheapest by €/vCPU)**
 
-3. **x86 shared — CX or CPX?**
+3. **x86 shared - CX or CPX?**
    - Budget-first, regular web app → **CX** (Intel/AMD, cheapest)
    - CPU-bound (builds, compilation, image/video processing) → **CPX** (AMD EPYC, higher base clock)
 
@@ -39,17 +39,17 @@ All prices EUR, VAT excluded. Verified 2026-04-10.
 
 ## Sizing principles
 
-1. **Start smaller than you think** — Hetzner lets you resize upward. Don't over-provision on day one.
-2. **Resize up when RAM headroom < 15%** — that's the practical trigger, not CPU.
-3. **Disk is sticky** — when you resize up, disk grows with the plan but cannot shrink. Plan accordingly.
-4. **Scale out past CCX43** — when a single CCX43 (16 vCPU / 64 GB) is saturated, add a second server before jumping to CCX53. Scaling out is cheaper and gives HA.
-5. **Use Volumes for growing data** — local SSD is bundled with the server; use Hetzner Volumes (not priced here) when data outgrows it.
-6. **Arm first for new projects** — if the stack supports Arm (most modern stacks do), default to CAX for 30–50% savings vs CX/CPX at equivalent specs.
+1. **Start smaller than you think** - Hetzner lets you resize upward. Don't over-provision on day one.
+2. **Resize up when RAM headroom < 15%** - that's the practical trigger, not CPU.
+3. **Disk is sticky** - when you resize up, disk grows with the plan but cannot shrink. Plan accordingly.
+4. **Scale out past CCX43** - when a single CCX43 (16 vCPU / 64 GB) is saturated, add a second server before jumping to CCX53. Scaling out is cheaper and gives HA.
+5. **Use Volumes for growing data** - local SSD is bundled with the server; use Hetzner Volumes (not priced here) when data outgrows it.
+6. **Arm first for new projects** - if the stack supports Arm (most modern stacks do), default to CAX for 30–50% savings vs CX/CPX at equivalent specs.
 
 ## Anti-patterns to flag
 
-- Recommending **CX/CPX/CAX for a production database** — use CCX instead. Shared vCPU can degrade DB p99 latency unpredictably.
-- Recommending **CCX for a low-traffic web app** — overkill, wastes 3–4x the budget. Start on CX or CAX.
-- Assuming **CX = CPX** — CPX costs ~2x more per €/vCPU and delivers higher raw performance; not interchangeable on price.
-- Recommending **x86 (CX/CPX) when CAX would work** — leaves 30%+ savings on the table for no reason on modern stacks.
-- Treating **RAM as the primary scaling axis on CCX** — CCX is priced for dedicated CPU; if you only need more RAM, a shared line is more efficient.
+- Recommending **CX/CPX/CAX for a production database** - use CCX instead. Shared vCPU can degrade DB p99 latency unpredictably.
+- Recommending **CCX for a low-traffic web app** - overkill, wastes 3–4x the budget. Start on CX or CAX.
+- Assuming **CX = CPX** - CPX costs ~2x more per €/vCPU and delivers higher raw performance; not interchangeable on price.
+- Recommending **x86 (CX/CPX) when CAX would work** - leaves 30%+ savings on the table for no reason on modern stacks.
+- Treating **RAM as the primary scaling axis on CCX** - CCX is priced for dedicated CPU; if you only need more RAM, a shared line is more efficient.

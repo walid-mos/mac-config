@@ -1,8 +1,8 @@
 # Config: Vitest (Testing)
 
 **Export paths**:
-- `@nextnode-solutions/standards/vitest/backend` — Node.js environment
-- `@nextnode-solutions/standards/vitest/frontend` — jsdom environment
+- `@nextnode-solutions/standards/vitest/backend` - Node.js environment
+- `@nextnode-solutions/standards/vitest/frontend` - jsdom environment
 
 ## Project setup
 

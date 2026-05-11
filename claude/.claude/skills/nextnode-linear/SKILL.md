@@ -16,9 +16,9 @@ Conventions for using Linear in NextNode Solutions: where work lives, how it's o
 ## Arguments
 
 - No argument: full overview, decision tree, and rules
-- `rules`: detailed rules with examples — see [rules.md](rules.md)
-- `workspace`: live workspace map (teams, projects, repos) — see [workspace.md](workspace.md)
-- `api`: GraphQL API patterns and escaping gotchas — see [api.md](api.md)
+- `rules`: detailed rules with examples - see [rules.md](rules.md)
+- `workspace`: live workspace map (teams, projects, repos) - see [workspace.md](workspace.md)
+- `api`: GraphQL API patterns and escaping gotchas - see [api.md](api.md)
 
 ## Instructions
 
@@ -36,7 +36,7 @@ Before creating anything in Linear, answer this:
 |-----------------------------------------|-------------------------------------------------------|
 | Code work tied to a repo                | Issue in the project tied to that repo                |
 | Multi-repo coordination                 | Linear Initiative grouping projects                   |
-| Process / Claude Code automation        | Skill (`~/.claude/skills/`) or hook — NEVER Linear    |
+| Process / Claude Code automation        | Skill (`~/.claude/skills/`) or hook - NEVER Linear    |
 | One-shot setup task within a project    | First issue `[P0-01]` of that project                 |
 | Cross-cutting one-shot admin task       | Orphan issue (no project) or issue in nearest project |
 | New tangible non-code deliverable       | New project (rule 1.b applies)                        |
@@ -45,13 +45,13 @@ Never create a Linear project just to track meta workflow. If it doesn't ship a 
 
 ## Core rules (summary)
 
-1. **Project creation** — every project ties to a GitHub repo OR a tangible non-code deliverable. Nothing else.
-2. **Atomicity** — every issue = one PR, one concept, verifiable alone. No "and"/"et"/"+".
-3. **Phase naming** — use `[P{N}-{step}]` prefix for phased work (e.g., `[P3-04]`).
-4. **Project naming** — `NextNode <X>` for platform/tooling/infra; raw name for products and clients.
-5. **No MCP** — talk to Linear via direct GraphQL + curl. The MCP server is too heavy for a single-purpose integration.
-6. **Visual identity** — every project MUST set `icon` + `color` on creation, matching its domain (see Rule 9).
-7. **Detached bulk runs** — any bulk operation > ~10 mutations OR > ~2 minutes MUST run detached (`nohup … &`), never inline as a `Bash` tool call Claude waits on (see Rule 10). Inline waits cross the 5-minute prompt-cache TTL and re-bill the entire conversation context — the single biggest token-burn pattern with this skill.
+1. **Project creation** - every project ties to a GitHub repo OR a tangible non-code deliverable. Nothing else.
+2. **Atomicity** - every issue = one PR, one concept, verifiable alone. No "and"/"et"/"+".
+3. **Phase naming** - use `[P{N}-{step}]` prefix for phased work (e.g., `[P3-04]`).
+4. **Project naming** - `NextNode <X>` for platform/tooling/infra; raw name for products and clients.
+5. **No MCP** - talk to Linear via direct GraphQL + curl. The MCP server is too heavy for a single-purpose integration.
+6. **Visual identity** - every project MUST set `icon` + `color` on creation, matching its domain (see Rule 9).
+7. **Detached bulk runs** - any bulk operation > ~10 mutations OR > ~2 minutes MUST run detached (`nohup … &`), never inline as a `Bash` tool call Claude waits on (see Rule 10). Inline waits cross the 5-minute prompt-cache TTL and re-bill the entire conversation context - the single biggest token-burn pattern with this skill.
 
 Detailed examples and edge cases: [rules.md](rules.md).
 
@@ -60,9 +60,9 @@ Detailed examples and edge cases: [rules.md](rules.md).
 Org: **Nextnode Solutions** (urlKey: `nextnode`)
 
 Teams:
-- **SAS** (SaaS) — products
-- **INT** (Internal) — platform / tooling / infrastructure
-- **CLI** (Clients) — client work
+- **SAS** (SaaS) - products
+- **INT** (Internal) - platform / tooling / infrastructure
+- **CLI** (Clients) - client work
 
 12 projects active across the 3 teams. Full mapping with IDs in [workspace.md](workspace.md).
 
@@ -77,22 +77,16 @@ curl -s -X POST https://api.linear.app/graphql \
   -d '{"query":"{ viewer { name email } }"}' | jq
 ```
 
-NEVER prefix the auth header with `Bearer ` — Linear personal API keys reject Bearer.
+NEVER prefix the auth header with `Bearer ` - Linear personal API keys reject Bearer.
 
-For complex mutations (multi-line strings, accents, batch operations), use the Python helper pattern in [api.md](api.md). DO NOT build mutation strings via bash heredocs — the `!` in `String!` triggers shell history expansion.
-
-## Common mistakes (do not repeat)
-
-- Creating a project to track meta workflow (e.g., "Backlog Reconstruction") — that is a skill or a parent issue, not a project.
-- Using `Authorization: Bearer $KEY` — Linear rejects Bearer for personal keys.
-- Using GraphQL typed variables `$input: ProjectCreateInput!` inside a heredoc — zsh consumes the `!`.
+For complex mutations (multi-line strings, accents, batch operations), use the Python helper pattern in [api.md](api.md). DO NOT build mutation strings via bash heredocs - the `!` in `String!` triggers shell history expansion.
 
 ## Rules
 
 (See also: [rules.md](rules.md) for full detail with FORBIDDEN/MANDATORY examples.)
 
 1. Before creating a project, ask: "Is there a tangible artifact at the end? Is it tied to a GitHub repo or a real-world deliverable?" If no to both → it is not a project.
-2. Issue titles must be atomic. Reject any title containing "and"/"et"/"+" — split into multiple issues.
+2. Issue titles must be atomic. Reject any title containing "and"/"et"/"+" - split into multiple issues.
 3. Phased work uses the `[P{N}-{step}] ` prefix. Numbering is per-project, not workspace-wide. Use `[P0-XX]` for setup tasks.
 4. Platform/tooling/infra projects use `NextNode <X>` naming. Products and clients use raw names.
 5. Talk to Linear via direct GraphQL (curl). Do NOT install or rely on a Linear MCP server.
@@ -103,12 +97,12 @@ For complex mutations (multi-line strings, accents, batch operations), use the P
 
     | Domain                   | Icon                    | Color     |
     |--------------------------|-------------------------|-----------|
-    | INT — Packages           | `:package:`             | `#6366F1` |
-    | INT — Internal app       | `:bar_chart:`           | `#0EA5E9` |
-    | INT — CI / Infrastructure | `:gear:`               | `#14B8A6` |
-    | SAS — SaaS / Product     | `:rocket:`              | `#A855F7` |
-    | CLI — Client deliverable | `:bust_in_silhouette:`  | `#F97316` |
+    | INT - Packages           | `:package:`             | `#6366F1` |
+    | INT - Internal app       | `:bar_chart:`           | `#0EA5E9` |
+    | INT - CI / Infrastructure | `:gear:`               | `#14B8A6` |
+    | SAS - SaaS / Product     | `:rocket:`              | `#A855F7` |
+    | CLI - Client deliverable | `:bust_in_silhouette:`  | `#F97316` |
 
-    Same icon + same color across all projects of the same domain — visual scanning beats per-project decoration. See [rules.md](rules.md) Rule 9 for the full mapping and FORBIDDEN/MANDATORY examples.
+    Same icon + same color across all projects of the same domain - visual scanning beats per-project decoration. See [rules.md](rules.md) Rule 9 for the full mapping and FORBIDDEN/MANDATORY examples.
 
-10. Bulk runs (>10 mutations OR >2 minutes) MUST be executed detached (`nohup script.py > log 2>&1 &`), never inline as a Bash tool call Claude waits on. Inline waits cross the 5-minute prompt-cache TTL and re-bill the entire conversation context — easily $10+ per turn on a 700k-token session. Hand control back to the user with `tail -50 log` for status checks. The script MUST be idempotent (skip items already on Linear by querying server state). See [rules.md](rules.md) Rule 10 for FORBIDDEN/MANDATORY examples and [api.md](api.md) for the launch pattern.
+10. Bulk runs (>10 mutations OR >2 minutes) MUST be executed detached (`nohup script.py > log 2>&1 &`), never inline as a Bash tool call Claude waits on. Inline waits cross the 5-minute prompt-cache TTL and re-bill the entire conversation context - easily $10+ per turn on a 700k-token session. Hand control back to the user with `tail -50 log` for status checks. The script MUST be idempotent (skip items already on Linear by querying server state). See [rules.md](rules.md) Rule 10 for FORBIDDEN/MANDATORY examples and [api.md](api.md) for the launch pattern.

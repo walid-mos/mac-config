@@ -2,7 +2,7 @@
 
 ## Islands Architecture
 
-Astro ships zero JavaScript by default. Interactive UI components are "islands" — isolated, hydrated components in a sea of static HTML. Only add JavaScript where interactivity is needed.
+Astro ships zero JavaScript by default. Interactive UI components are "islands" - isolated, hydrated components in a sea of static HTML. Only add JavaScript where interactivity is needed.
 
 ## Client Directives
 
@@ -26,13 +26,13 @@ Client directives control when and how a UI framework component (React, Vue, Sve
 <!-- Hydrate on mobile only -->
 <MobileMenu client:media="(max-width: 768px)" />
 
-<!-- Skip SSR entirely — client-only rendering -->
+<!-- Skip SSR entirely - client-only rendering -->
 <BrowserOnlyWidget client:only="react" />
 ```
 
 ### Rules
 
-- **Astro components never need client directives** — they are always static HTML.
+- **Astro components never need client directives** - they are always static HTML.
 - Only UI framework components (React, Vue, Svelte, Solid, etc.) accept `client:*`.
 - Prefer `client:visible` or `client:idle` over `client:load` to reduce initial JS.
 - `client:only` requires the framework name as a string value and skips server rendering entirely.
@@ -68,7 +68,7 @@ The component renders on the server asynchronously and replaces the fallback whe
 
 ```astro
 <script is:inline>
-  // NOT bundled — injected raw into the HTML
+  // NOT bundled - injected raw into the HTML
   // No import support, no TypeScript
   console.log('inline')
 </script>
@@ -78,7 +78,7 @@ Use `is:inline` only for third-party snippets that must be injected verbatim (an
 
 ### Passing data from server to client
 
-Use `data-*` attributes — there is no direct frontmatter-to-script bridge:
+Use `data-*` attributes - there is no direct frontmatter-to-script bridge:
 
 ```astro
 ---

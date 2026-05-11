@@ -12,7 +12,7 @@ The NN symbol is two fused N letters rendered as a **single SVG path** with a un
 
 | Variant | Usage |
 |---|---|
-| Teal | Default — favicons, app icons, watermarks |
+| Teal | Default - favicons, app icons, watermarks |
 | White | Dark backgrounds |
 | Black | Print (B&W), high-contrast contexts |
 
@@ -61,7 +61,7 @@ import iconTextTeal from '@nextnode-solutions/brand-assets/icons-text/icon-text-
 // Square logos (400x400)
 import logoSquare from '@nextnode-solutions/brand-assets/logos-square/logo-square-teal.svg'
 
-// Landscape logos (500x100) — full + short variants
+// Landscape logos (500x100) - full + short variants
 import logoFull from '@nextnode-solutions/brand-assets/logos-landscape/logo-landscape-teal.svg'
 import logoShort from '@nextnode-solutions/brand-assets/logos-landscape/logo-landscape-teal-short.svg'
 
@@ -84,7 +84,7 @@ PNG variants are also available (replace `.svg` with `.png` or `-mini.png`).
 | `./logos-square/*` | teal, white, black | SVG, PNG, PNG mini |
 | `./logos-landscape/*` | teal, white, black + short | SVG, PNG, PNG mini |
 | `./social/*` | dark, light | SVG, PNG |
-| `./favicon/*` | — | SVG, PNG, PNG mini |
+| `./favicon/*` | - | SVG, PNG, PNG mini |
 
 ## Minimum Sizes
 
@@ -99,7 +99,7 @@ PNG variants are also available (replace `.svg` with `.png` or `-mini.png`).
 
 Maintain a 25% clear space around the logo (25% of the logo's width/height on all sides).
 
-## Usage Rules — DO
+## Usage Rules - DO
 
 - Use original SVG files from the assets kit
 - Respect the 25% protection zone
@@ -107,7 +107,7 @@ Maintain a 25% clear space around the logo (25% of the logo's width/height on al
 - Maintain original proportions
 - Use Black variant for B&W print
 
-## Usage Rules — DO NOT
+## Usage Rules - DO NOT
 
 - Modify gradient colors
 - Deform or stretch the logo

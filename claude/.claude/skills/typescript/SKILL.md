@@ -8,24 +8,24 @@ description: >-
   type-safe patterns throughout.
 ---
 
-# TypeScript Best Practices — Mandatory Rules
+# TypeScript Best Practices - Mandatory Rules
 
 These rules apply to ALL TypeScript code you write or modify. No exceptions. No negotiations. No "just this once".
 
 ---
 
-## RULE 0 — ABSOLUTE BANS (HIGHEST PRIORITY)
+## RULE 0 - ABSOLUTE BANS (HIGHEST PRIORITY)
 
 These two rules override everything else. Violating them is a critical failure.
 
-### `any` is FORBIDDEN — ZERO TOLERANCE
+### `any` is FORBIDDEN - ZERO TOLERANCE
 
 The keyword `any` MUST NEVER appear in our TypeScript code. Not in types, not in generics, not in function signatures, not in catch blocks, not in utility types, not anywhere.
 
 **No excuse is valid.** There is always a better type.
 
 ```typescript
-// FORBIDDEN — every single one of these
+// FORBIDDEN - every single one of these
 let x: any
 function foo(data: any): any
 const bar = value as any
@@ -40,7 +40,7 @@ Promise<any>
 
 | Situation | Use this |
 |---|---|
-| Unknown data shape | `unknown` — then narrow with type guards |
+| Unknown data shape | `unknown` - then narrow with type guards |
 | Any object | `Record<string, unknown>` |
 | Any function | `(...args: unknown[]) => unknown` |
 | Catch block | `catch (e: unknown)` then `if (e instanceof Error)` |
@@ -50,7 +50,7 @@ Promise<any>
 
 If a third-party type leaks `any` into our code, wrap it in a typed function that inputs/outputs proper types.
 
-### `as` type assertions are FORBIDDEN — except `as const`
+### `as` type assertions are FORBIDDEN - except `as const`
 
 The `as` keyword for type assertions is BANNED. It is a lie to the compiler. It bypasses type-checking. It hides bugs.
 
@@ -61,7 +61,7 @@ const el = document.getElementById("foo") as HTMLInputElement
 const value = response.data as string[]
 const config = {} as Config
 
-// ALLOWED — as const is the only valid use
+// ALLOWED - as const is the only valid use
 const ROLES = ["admin", "user", "guest"] as const
 const CONFIG = { retries: 3, timeout: 5000 } as const
 ```
@@ -76,67 +76,67 @@ const CONFIG = { retries: 3, timeout: 5000 } as const
 | Discriminated unions | Check the discriminant field: `if (result.type === "success")` |
 | Const assertions | `as const` is fine and encouraged |
 
-If you feel the need to write `as`, it means the types are wrong — fix the types, don't lie to the compiler.
+If you feel the need to write `as`, it means the types are wrong - fix the types, don't lie to the compiler.
 
 ---
 
-## Type Inference — Let TypeScript Work
+## Type Inference - Let TypeScript Work
 
 - **Do NOT annotate when TypeScript infers correctly.** Don't write `const x: number = 5` or `const arr: string[] = ["a", "b"]`. TypeScript knows.
-- **DO annotate function signatures.** Parameters and return types should be explicit — this is documentation and a contract.
+- **DO annotate function signatures.** Parameters and return types should be explicit - this is documentation and a contract.
 - **DO annotate when inference is too broad.** If TypeScript infers `string` but you need a specific literal union, annotate it.
 
 ```typescript
-// BAD — redundant annotation
+// BAD - redundant annotation
 const count: number = items.length
 const name: string = user.name
 const doubled: number[] = nums.map(n => n * 2)
 
-// GOOD — let inference work
+// GOOD - let inference work
 const count = items.length
 const name = user.name
 const doubled = nums.map(n => n * 2)
 
-// GOOD — explicit function signatures
+// GOOD - explicit function signatures
 function getUser(id: string): Promise<User> { ... }
 
-// GOOD — inference is too broad without annotation
+// GOOD - inference is too broad without annotation
 const status: "active" | "inactive" = computeStatus()
 ```
 
 ## Strict Null Handling
 
 - **Prefer null checks, early returns, `??`, and `?.` over `!`** in most cases.
-- **Prefer type-system fixes over `!`** when one exists — non-empty tuples (`[T, ...Array<T>]`), discriminated unions, type guards, or proper narrowing are all better than asserting.
+- **Prefer type-system fixes over `!`** when one exists - non-empty tuples (`[T, ...Array<T>]`), discriminated unions, type guards, or proper narrowing are all better than asserting.
 - **`!` is acceptable** when the non-null condition is guaranteed by surrounding logic but TypeScript's control flow can't see it. The bar is provability: you (or a reviewer) can point to the exact runtime check or invariant that makes it safe. Common cases TS can't follow: `Map.has() + Map.get()`, `arr.find()` after a length/match guarantee, async boundaries, and test assertions like `expect(x).toBeDefined()`.
 - **`!` is NOT acceptable** as a lazy shortcut to skip null handling. If you can't articulate the proof in one sentence, you don't have one.
-- Note: `if (!x) throw …` narrows `x` automatically — you don't need `!` after it. Reach for `!` only when narrowing isn't available.
+- Note: `if (!x) throw …` narrows `x` automatically - you don't need `!` after it. Reach for `!` only when narrowing isn't available.
 
 ```typescript
-// BAD — lazy, no guarantee user exists
+// BAD - lazy, no guarantee user exists
 const name = user!.name
 
-// BAD — narrowing already works, the bang is noise
+// BAD - narrowing already works, the bang is noise
 if (!user) throw new Error("User not found")
 const name = user!.name // just write user.name
 
-// GOOD — handle it
+// GOOD - handle it
 if (!user) throw new Error("User not found")
 const name = user.name
 
 // GOOD
 const name = user?.name ?? "Unknown"
 
-// ACCEPTABLE — TS doesn't connect .has() and .get()
+// ACCEPTABLE - TS doesn't connect .has() and .get()
 if (map.has(key)) {
   const value = map.get(key)!
 }
 
-// ACCEPTABLE — .find() returns T | undefined even when we know it matches
+// ACCEPTABLE - .find() returns T | undefined even when we know it matches
 const admin = users.find(u => u.role === "admin")!
-//            ^^ requires a real guarantee (e.g. seed data) — otherwise handle undefined
+//            ^^ requires a real guarantee (e.g. seed data) - otherwise handle undefined
 
-// ACCEPTABLE in tests — expect().toBeDefined() doesn't narrow types
+// ACCEPTABLE in tests - expect().toBeDefined() doesn't narrow types
 const result = parseConfig(input)
 expect(result).toBeDefined()
 expect(result!.host).toBe("localhost")
@@ -153,7 +153,7 @@ When a type-system fix is available (e.g. typing a Map's values as `[T, ...Array
 // PREFERRED
 type Role = "admin" | "user" | "guest"
 
-// PREFERRED — when you need runtime access to values
+// PREFERRED - when you need runtime access to values
 const ROLES = ["admin", "user", "guest"] as const
 type Role = (typeof ROLES)[number]
 
@@ -166,14 +166,14 @@ enum Role { Admin, User, Guest }
 Use discriminated unions instead of optional fields or type assertions.
 
 ```typescript
-// BAD — unclear which fields exist
+// BAD - unclear which fields exist
 type Result = {
   success?: boolean
   data?: Data
   error?: Error
 }
 
-// GOOD — the compiler enforces correctness
+// GOOD - the compiler enforces correctness
 type Result =
   | { type: "success"; data: Data }
   | { type: "error"; error: Error }
@@ -183,20 +183,20 @@ type Result =
 
 - Use generics when a function/type genuinely works with multiple types.
 - Always constrain generics: `<T extends Base>` not just `<T>`.
-- Don't use generics for single-type functions — just use the concrete type.
+- Don't use generics for single-type functions - just use the concrete type.
 
 ```typescript
-// BAD — generic for no reason
+// BAD - generic for no reason
 function getName<T extends { name: string }>(obj: T): string {
   return obj.name
 }
 
-// GOOD — just use the concrete type
+// GOOD - just use the concrete type
 function getName(obj: { name: string }): string {
   return obj.name
 }
 
-// GOOD — generic is justified (preserves input type)
+// GOOD - generic is justified (preserves input type)
 function pick<T, K extends keyof T>(obj: T, keys: K[]): Pick<T, K> {
   // ...
 }
@@ -217,7 +217,7 @@ function isUser(value: unknown): value is User {
   )
 }
 
-// Usage — no `as` needed
+// Usage - no `as` needed
 const data: unknown = await response.json()
 if (isUser(data)) {
   // data is User here, fully typed
@@ -241,7 +241,7 @@ Use built-in utility types instead of reinventing the wheel:
 
 ## Imports
 
-- Use `import type` for type-only imports — this ensures they're erased at runtime and prevents circular dependency issues.
+- Use `import type` for type-only imports - this ensures they're erased at runtime and prevents circular dependency issues.
 
 ```typescript
 import type { User } from "./types"

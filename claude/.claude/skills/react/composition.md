@@ -3,11 +3,11 @@
 ## Compose, Don't Configure
 
 ```tsx
-// FORBIDDEN — god-component with prop explosion
+// FORBIDDEN - god-component with prop explosion
 function Card({ title, subtitle, icon, iconSize, iconColor, body,
   footer, footerAlign, variant, bordered, ... }) { ... }
 
-// MANDATORY — composable building blocks
+// MANDATORY - composable building blocks
 function Card({ children }: { children: ReactNode }) {
   return <div className="card">{children}</div>
 }
@@ -39,12 +39,12 @@ function CardHeader({ children }: { children: ReactNode }) {
 ## Composition Eliminates Prop Drilling
 
 ```tsx
-// BAD — drilling `user` through 3 layers just for an avatar
+// BAD - drilling `user` through 3 layers just for an avatar
 function Page({ user }) { return <Layout user={user} /> }
 function Layout({ user }) { return <Sidebar user={user} /> }
 function Sidebar({ user }) { return <Avatar url={user.avatarUrl} /> }
 
-// GOOD — compose at the top
+// GOOD - compose at the top
 function Page({ user }) {
   return (
     <Layout>
@@ -58,10 +58,10 @@ function Page({ user }) {
 
 ## SOLID Applied to React
 
-### S — Single Responsibility: One Component = One Job
+### S - Single Responsibility: One Component = One Job
 
 ```tsx
-// FORBIDDEN — fetches data AND renders list AND handles pagination
+// FORBIDDEN - fetches data AND renders list AND handles pagination
 function UserDashboard() {
   const [users, setUsers] = useState([])
   const [page, setPage] = useState(1)
@@ -74,7 +74,7 @@ function UserDashboard() {
   )
 }
 
-// MANDATORY — separated concerns
+// MANDATORY - separated concerns
 function UserDashboard() {
   const { users, page, nextPage } = useUsers()
   return (
@@ -86,13 +86,13 @@ function UserDashboard() {
 }
 ```
 
-### O — Open/Closed: Extend via composition
+### O - Open/Closed: Extend via composition
 
 ```tsx
-// BAD — every variant requires modifying this component
+// BAD - every variant requires modifying this component
 function Button({ variant }: { variant: "primary" | "danger" | "ghost" }) { ... }
 
-// GOOD — compose specialized buttons
+// GOOD - compose specialized buttons
 function Button({ className, children, ...props }: ButtonProps) {
   return <button className={`btn ${className}`} {...props}>{children}</button>
 }
@@ -101,25 +101,25 @@ function DangerButton(props: ButtonProps) {
 }
 ```
 
-### I — Interface Segregation: Minimal props
+### I - Interface Segregation: Minimal props
 
 ```tsx
-// FORBIDDEN — receives entire User but only uses name
+// FORBIDDEN - receives entire User but only uses name
 function ListItem({ user }: { user: User }) { return <li>{user.name}</li> }
 
-// MANDATORY — only what it needs
+// MANDATORY - only what it needs
 function ListItem({ name }: { name: string }) { return <li>{name}</li> }
 ```
 
-### D — Dependency Inversion: Data via props, not hard-coupled fetches
+### D - Dependency Inversion: Data via props, not hard-coupled fetches
 
 ```tsx
-// BAD — hard-coupled to a specific fetch strategy
+// BAD - hard-coupled to a specific fetch strategy
 function UserProfile({ userId }: { userId: string }) {
   const user = useSWR(`/api/users/${userId}`, fetcher)
   // rendering + fetching coupled
 }
 
-// GOOD — pure rendering, data is the caller's concern
+// GOOD - pure rendering, data is the caller's concern
 function UserProfile({ user }: { user: User }) { ... }
 ```

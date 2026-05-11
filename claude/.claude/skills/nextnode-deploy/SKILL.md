@@ -18,7 +18,7 @@ Config-driven CI/CD CLI for NextNode projects. Reads `nextnode.toml`, runs quali
 
 ## Instructions
 
-Always read the actual code before answering — start with `packages/infrastructure/src/` and `packages/infrastructure/CLAUDE.md`.
+Always read the actual code before answering - start with `packages/infrastructure/src/` and `packages/infrastructure/CLAUDE.md`.
 
 ## CLI commands
 
@@ -41,113 +41,7 @@ Commands are registered in `index.ts` in three maps: `PLAN_COMMANDS`, `DEPLOY_CO
 
 ## Folder structure
 
-```
-src/
-  index.ts                          — Command registry + argv dispatch
-  cli/
-    env.ts                          — requireEnv, getEnv
-    secrets.ts                      — parseAllSecrets, pickSecrets
-    deploy/
-      create-target.ts              — Factory: config + env → DeployTarget
-      provision.command.ts          — target.ensureInfra() + step summary
-      deploy.command.ts             — Merge target+services+secrets envs, target.deploy()
-      dns.command.ts                — target.reconcileDns()
-      teardown.command.ts           — target.teardown()
-      teardown-guard.command.ts     — Validate teardown preconditions
-      seo-guard.command.ts          — SEO guard injection
-      compute-image-ref.command.ts  — Compute GHCR ref → GITHUB_OUTPUT
-    pipeline/
-      plan.command.ts               — Plan + quality matrix
-      prod-gate.command.ts          — Dev pipeline check
-      publish-result.command.ts     — SR output parsing
-    hetzner/
-      build-golden-image.command.ts — Golden-image builder orchestrator
-      recover.command.ts            — Recover/rebuild VPS state from labels
-      converge.ts                   — Shared post-boot convergence helpers
-  domain/                            — Pure logic. NO IO, NO env, NO logger
-    environment.ts                  — AppEnvironment, PipelineEnvironment, resolveEnvironment
-    deploy/
-      target.ts                     — DeployTarget interface, DeployEnv, TargetEnv, DeployInput, ProvisionResult
-      domain.ts                     — resolveDeployDomain (single source for dev subdomain)
-      image-ref.ts                  — parseImageRef
-      seo-guard.ts                  — computeSeoGuardFiles (pure)
-      teardown-result.ts            — TeardownResult shape
-      teardown-target.ts            — TeardownTarget enum
-      verify-teardown-confirmation.ts — Teardown safety check
-      resource-outcome.ts           — VpsResourceOutcome, PagesResourceOutcome
-      execute-handlers.ts           — Per-target deploy handler routing
-      summary-renderer.ts           — Markdown summary renderer
-      deploy-summary.ts             — buildDeploySummary
-      provision-summary.ts          — buildProvisionSummary
-      teardown-summary.ts           — buildTeardownSummary
-    services/                       — Provider-agnostic backing services (NEW)
-      service.ts                    — ServiceEnv interface (public, secret), mergeServiceEnvs
-      r2.ts                         — R2BucketBinding, R2ServiceState, buildR2ServiceEnv (see [r2-service.md](r2-service.md))
-    cloudflare/
-      dns-records.ts                — computeDnsRecords (CNAME for Pages)
-      pages-domains.ts              — computePagesDomains (pure)
-      pages-project-name.ts         — computePagesProjectName (pure)
-      managed-resources.ts          — Pages resource type tags
-      r2/
-        addressing.ts               — computeR2Endpoint, computeR2Host
-        credentials.ts              — deriveR2Credentials (CF token → S3 creds via SHA256)
-        token-policy.ts             — buildR2TokenPolicy
-        runtime-config.ts           — R2 runtime config types
-        caddy-binding.ts            — Pages project R2 binding mapping
-    hetzner/
-      caddy-config.ts               — Caddy JSON config types
-      build-caddy-config.ts         — buildCaddyConfig + buildInternalCaddyConfig (pure)
-      cloud-init.ts                 — renderCloudInit (deploy user, UFW, tailscale)
-      dns-records.ts                — computeVpsDnsRecords (A records, internal-aware)
-      firewall-rules.ts             — computeFirewallRules (internal-aware)
-      vector-config.ts, vector-env.ts, vector-toml.ts — Vector config & env
-      env-silo.ts, compute-silo.ts  — EnvSilo type + computeSilo (pure)
-      compose-env.ts                — formatComposeEnv (KEY=val serializer)
-      compose-file.ts               — renderComposeFile (docker-compose generation)
-      managed-resources.ts          — Hetzner resource type tags + label keys
-      orphans.ts                    — Detect orphan servers/resources
-      golden-image.ts               — Golden image fingerprint, label keys (see [golden-image.md](golden-image.md))
-      golden-image-summary.ts       — Build golden-image step summary
-      select-golden-image.ts        — Pick newest matching snapshot
-      resolve-vps-name.ts           — Resolve shared VPS hostname per env
-      caddy-env.ts                  — Caddy ACME env (R2 cert storage)
-    pipeline/
-      prod-gate.ts                  — findDevRun, evaluateDevRun
-      quality-matrix.ts             — buildQualityMatrix, hasProdGate
-      publish-result.ts             — parseSemanticReleaseOutput
-    aws/                            — Pure SigV4 helpers (used by R2 verify)
-    storage/, http/, dns/, tailnet/  — Supporting pure domains
-  adapters/                          — IO boundary
-    cloudflare/
-      target.ts                     — CloudflarePagesTarget (DeployTarget impl)
-      pages-project.ts              — provisionProject
-      pages-domains.ts, pages-dns.ts — Reconciliation
-      accounts.ts                   — resolveAccountId
-      permission-groups.ts          — resolveR2PermissionGroupIds
-      r2/
-        buckets.ts                  — ensureR2Bucket
-        tokens.ts                   — createR2Token
-    hetzner/
-      target.ts                     — HetznerVpsTarget (DeployTarget impl)
-      hcloud-client.ts              — Typed HTTP client to Hetzner Cloud API
-      hcloud-state.ts               — R2 state persistence with ETag locking
-      ssh-session.ts                — ssh2 wrapper, one connection per op
-      api/                          — Image, network, firewall, server, ssh-key endpoints
-      provision/                    — build-golden-image.ts (Dockerfile + SSH provisioning), cloud-init wiring, security setup
-      constants.ts                  — Labels, MAX_GOLDEN_IMAGE_SNAPSHOTS
-    r2/
-      client.ts                     — S3 SDK wrapper for state + certs + service buckets
-      verify-credentials.ts         — SigV4 handshake (R2 credential self-heal)
-    github/
-      api.ts                        — fetchWorkflowRuns
-      plan-outputs.ts               — writePlanOutputs
-      env.ts                        — writeOutput, writeSummary
-    build-output/                   — inject-files (SEO guard)
-  config/                           — nextnode.toml schema + loader (see [config.md](config.md))
-    validators/, providers/         — Per-target validation
-```
-
-See `packages/infrastructure/CLAUDE.md` for the strict layer import rules — domain MUST be pure (no IO, no env, no logger), adapters never make business decisions, CLI orchestrates.
+See [structure.md](structure.md) for the full annotated tree of `src/cli/`, `src/domain/`, `src/adapters/`, and `src/config/`. The strict layer import rules (domain pure, adapters never decide, CLI orchestrates) live in `packages/infrastructure/CLAUDE.md`.
 
 ## Config: nextnode.toml
 
@@ -162,7 +56,7 @@ interface DeployTarget {
   readonly name: string
 
   // Contribute the env this target owns (always SITE_URL, plus target keys).
-  // Returns a {public, secret} ServiceEnv shape. Sync OR async — Hetzner is
+  // Returns a {public, secret} ServiceEnv shape. Sync OR async - Hetzner is
   // pure config arithmetic, Cloudflare looks up the live *.pages.dev
   // subdomain. Orchestrator merges with services + secrets via mergeServiceEnvs.
   contributeEnv(projectName: string): TargetEnv | Promise<TargetEnv>
@@ -187,7 +81,7 @@ interface DeployTarget {
 
 interface TargetEnv extends ServiceEnv {
   readonly public: Readonly<Record<string, string>> & {
-    readonly SITE_URL: string         // required — every app needs it
+    readonly SITE_URL: string         // required - every app needs it
   }
 }
 
@@ -203,7 +97,7 @@ interface DeployInput {
 }
 ```
 
-Zero SSH/Docker/hcloud/Caddy leak in public types. `contributeEnv` returns `{public, secret}` so a target can claim env keys on the same channel as a backing service — both flow through `mergeServiceEnvs`, which throws on key collisions (no silent overwrites). `buildDeployEnv()` narrows the merged public Record into a `DeployEnv`, throwing if SITE_URL is missing (= a target skipped its `contributeEnv` obligation, which is a wiring bug).
+Zero SSH/Docker/hcloud/Caddy leak in public types. `contributeEnv` returns `{public, secret}` so a target can claim env keys on the same channel as a backing service - both flow through `mergeServiceEnvs`, which throws on key collisions (no silent overwrites). `buildDeployEnv()` narrows the merged public Record into a `DeployEnv`, throwing if SITE_URL is missing (= a target skipped its `contributeEnv` obligation, which is a wiring bug).
 
 Implemented targets: `CloudflarePagesTarget` (static sites) and `HetznerVpsTarget` (containerized apps). Multi-service compose is not supported yet (single `app` service hardcoded).
 
@@ -211,7 +105,7 @@ See [hetzner-vps.md](hetzner-vps.md) for the Hetzner VPS architecture deep-dive.
 
 ## Backing services
 
-Pluggable per-service abstraction in `domain/services/`. Each service contributes a `{public, secret}` env block, just like a `DeployTarget` — they merge through the same primitive (`mergeServiceEnvs`) with collision detection. Today the only registered service is **R2** (Cloudflare object storage), declared per-project in `[services.r2] buckets = [...]`.
+Pluggable per-service abstraction in `domain/services/`. Each service contributes a `{public, secret}` env block, just like a `DeployTarget` - they merge through the same primitive (`mergeServiceEnvs`) with collision detection. Today the only registered service is **R2** (Cloudflare object storage), declared per-project in `[services.r2] buckets = [...]`.
 
 See [r2-service.md](r2-service.md) for R2 provisioning, naming, env vars, and the credential split (CF API token derives S3 keys via SHA256).
 
@@ -219,9 +113,9 @@ See [r2-service.md](r2-service.md) for R2 provisioning, naming, env vars, and th
 
 Prevents search engine indexing of non-production deploys. Runs after `pnpm build`, before Cloudflare Pages deploy.
 
-- **Domain**: `computeSeoGuardFiles(environment)` — returns `_headers` (X-Robots-Tag: noindex) + `robots.txt` (Disallow: /) for non-prod, empty array for prod
-- **Adapter**: `injectFiles(buildDirectory, files)` — writes files to build output
-- **CLI**: `seoGuardCommand` — orchestrates domain + adapter, reads `BUILD_DIRECTORY` env var
+- **Domain**: `computeSeoGuardFiles(environment)` - returns `_headers` (X-Robots-Tag: noindex) + `robots.txt` (Disallow: /) for non-prod, empty array for prod
+- **Adapter**: `injectFiles(buildDirectory, files)` - writes files to build output
+- **CLI**: `seoGuardCommand` - orchestrates domain + adapter, reads `BUILD_DIRECTORY` env var
 
 ## Prod gate
 
@@ -273,18 +167,18 @@ jobs:
 
 ## Rules
 
-1. **Check the code, not assumptions** — only reference features that exist in source
-2. **Callers choose their workflow by `type`** — `package` -> `publish-package.yml`, `app` -> `deploy.yml`, `static` -> `deploy-static.yml`
-3. **One caller file per environment** — deploy workflows take `environment: development | production` input
-4. **prod-gate lives in the quality matrix** — added as a task when `environment=production` AND `config.environment.development=true`
-5. **`resolveDeployDomain` is the single source of truth** for dev subdomain convention — never inline `dev.{domain}`
-6. **`[deploy].secrets` lists secret NAMES** — same name on GitHub and Cloudflare, no prefix transformation
-7. **SITE_URL is always auto-computed** — every DeployTarget MUST put SITE_URL in `contributeEnv().public`. The orchestrator narrows the merged env via `buildDeployEnv()` and throws if it's missing — that means a target skipped its obligation, which is a wiring bug
-8. **Correct GitHub triggers per project type** — `type=package`: `release: [published]`. `type=static` / `type=app`: `workflow_dispatch` for prod, `push: branches: [main]` for dev
-9. **Single source of truth for all defaults** — every config default lives in `config/types.ts` as a named constant (`DEFAULT_HETZNER_CONFIG = { serverType: 'cx23', location: 'nbg1' }`, `DEFAULT_R2_STATE_BUCKET = 'nextnode-state'`, etc.). Validators import these constants — they never define their own inline defaults.
-10. **No defaults for non-applicable concepts** — if a concept doesn't apply to a project type, there must be NO default for it
-11. **DeployTarget hides provider details** — no SSH/Docker/hcloud/Caddy in public types. Adding a new provider = new adapter, zero CLI change
-12. **SEO guard is infrastructure-level** — individual sites never handle their own noindex logic
-13. **Backing services compose like targets** — every service contributes a `{public, secret}` `ServiceEnv`; targets and services merge through `mergeServiceEnvs`. Two services claiming the same env key throws (collision = bug, not silent overwrite). Add a new service: extend `SERVICE_NAMES` in `config/types.ts`, add its `ServiceConfigByName` entry, write a pure builder in `domain/services/<name>.ts`, register adapter wiring.
-14. **Strict layer rules apply** — domain is 100% pure (no IO/env/logger), adapters never make business decisions, CLI orchestrates. See `packages/infrastructure/CLAUDE.md` for the full enforcement table.
-15. **Golden images are fingerprinted, not versioned** — the builder hashes the relevant config (Docker version pin, base image SKU, init script) into a deterministic fingerprint, labels the snapshot, and reuses it. Bumping a pin invalidates the fingerprint and triggers a rebuild on next provision. Old snapshots are pruned to `MAX_GOLDEN_IMAGE_SNAPSHOTS`.
+1. **Check the code, not assumptions** - only reference features that exist in source
+2. **Callers choose their workflow by `type`** - `package` -> `publish-package.yml`, `app` -> `deploy.yml`, `static` -> `deploy-static.yml`
+3. **One caller file per environment** - deploy workflows take `environment: development | production` input
+4. **prod-gate lives in the quality matrix** - added as a task when `environment=production` AND `config.environment.development=true`
+5. **`resolveDeployDomain` is the single source of truth** for dev subdomain convention - never inline `dev.{domain}`
+6. **`[deploy].secrets` lists secret NAMES** - same name on GitHub and Cloudflare, no prefix transformation
+7. **SITE_URL is always auto-computed** - every DeployTarget MUST put SITE_URL in `contributeEnv().public`. The orchestrator narrows the merged env via `buildDeployEnv()` and throws if it's missing - that means a target skipped its obligation, which is a wiring bug
+8. **Correct GitHub triggers per project type** - `type=package`: `release: [published]`. `type=static` / `type=app`: `workflow_dispatch` for prod, `push: branches: [main]` for dev
+9. **Single source of truth for all defaults** - every config default lives in `config/types.ts` as a named constant (`DEFAULT_HETZNER_CONFIG = { serverType: 'cx23', location: 'nbg1' }`, `DEFAULT_R2_STATE_BUCKET = 'nextnode-state'`, etc.). Validators import these constants - they never define their own inline defaults.
+10. **No defaults for non-applicable concepts** - if a concept doesn't apply to a project type, there must be NO default for it
+11. **DeployTarget hides provider details** - no SSH/Docker/hcloud/Caddy in public types. Adding a new provider = new adapter, zero CLI change
+12. **SEO guard is infrastructure-level** - individual sites never handle their own noindex logic
+13. **Backing services compose like targets** - every service contributes a `{public, secret}` `ServiceEnv`; targets and services merge through `mergeServiceEnvs`. Two services claiming the same env key throws (collision = bug, not silent overwrite). Add a new service: extend `SERVICE_NAMES` in `config/types.ts`, add its `ServiceConfigByName` entry, write a pure builder in `domain/services/<name>.ts`, register adapter wiring.
+14. **Strict layer rules apply** - domain is 100% pure (no IO/env/logger), adapters never make business decisions, CLI orchestrates. See `packages/infrastructure/CLAUDE.md` for the full enforcement table.
+15. **Golden images are fingerprinted, not versioned** - the builder hashes the relevant config (Docker version pin, base image SKU, init script) into a deterministic fingerprint, labels the snapshot, and reuses it. Bumping a pin invalidates the fingerprint and triggers a rebuild on next provision. Old snapshots are pruned to `MAX_GOLDEN_IMAGE_SNAPSHOTS`.

@@ -1,10 +1,16 @@
 ---
 name: allow
-description: Add or remove tool permissions in settings.json
 user-invocable: true
+description: >-
+  Add or remove tool permissions in Claude Code settings.json (allow/deny
+  lists). Use when the user runs `/allow`, says "allow npm", "allow this
+  command", "deny rm -rf", or after pasting a Claude permission prompt to
+  approve/deny it. Supports manual patterns (tool names, MCP servers,
+  WebFetch domains), paste mode (copy a permission prompt directly), and
+  bypass mode (manage security heuristic auto-approvals).
 ---
 
-# Allow — Permission Management
+# Allow - Permission Management
 
 ## Step 1: Handle empty input
 
@@ -46,7 +52,7 @@ Look at the raw `$ARGUMENTS` text:
 
 ## Domain extraction
 
-When resolving a domain (from a pasted `Host:` line, a `domain`/`host` input, or a `webfetch <domain>` input), always extract the **root domain** — strip subdomains.
+When resolving a domain (from a pasted `Host:` line, a `domain`/`host` input, or a `webfetch <domain>` input), always extract the **root domain** - strip subdomains.
 
 Rules:
 1. Split the hostname by `.`
@@ -67,7 +73,7 @@ Examples:
 
 Apply this extraction to `WebFetch(domain:...)` patterns. For `sandbox.network.allowedDomains` entries, use the **wildcard format**: `*.<rootDomain>` (e.g. `*.github.com`, `*.npmjs.org`). This covers the root domain and all its subdomains in a single entry.
 
-## Step 4: Read and update settings.json
+## Step 3: Read and update settings.json
 
 After resolving a pattern from paste or manual mode, apply it:
 
@@ -86,7 +92,7 @@ After resolving a pattern from paste or manual mode, apply it:
 6. Add the pattern to the target list.
 7. Write the updated JSON back to `~/.claude/settings.json` with 2-space indentation.
 
-## Step 5: Confirm
+## Step 4: Confirm
 
 Print a confirmation message:
 
@@ -98,6 +104,6 @@ Added "<pattern>" to permissions.<list> in ~/.claude/settings.json
 
 - Do NOT ask the user for confirmation before writing. Just do it.
 - Do NOT explain what you're doing step by step. Just parse, resolve, write, and confirm.
-- Do NOT modify any other keys in settings.json — only touch `permissions`.
+- Do NOT modify any other keys in settings.json - only touch `permissions`.
 - If you can't resolve the input, print a clear error with suggestions.
 - Output ONLY the final confirmation line (or error/usage help). No other text.

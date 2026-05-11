@@ -8,13 +8,21 @@ description: >-
   practices. Must be used alongside the language-agnostic "coding" skill.
 ---
 
-# JavaScript Best Practices — Mandatory Rules
+# JavaScript Best Practices - Mandatory Rules
 
 These rules apply to ALL JavaScript code you write or modify. They build on top of the language-agnostic coding rules, which also apply.
 
+## Deep-dive references
+
+For detailed examples and decision trees, consult these sub-files when relevant:
+
+- [async.md](async.md) - async/await, Promise.all vs allSettled, fire-and-forget rules
+- [arrays.md](arrays.md) - declarative methods, `.some`/`.every`, `Map`/`Set` over plain objects
+- [error-handling.md](error-handling.md) - fetch status checks, custom error classes
+
 ---
 
-## RULE 0 — ABSOLUTE BANS
+## RULE 0 - ABSOLUTE BANS
 
 ### `var` is FORBIDDEN
 
@@ -45,13 +53,13 @@ if (value === null || value === undefined) // or: value == null is the ONLY tole
 if (status !== "active")
 ```
 
-**The single exception:** `value == null` (checks both `null` and `undefined`) is tolerated because it's a well-known JS idiom, but `value === null || value === undefined` or `value == null` — pick one and be consistent in the project.
+**The single exception:** `value == null` (checks both `null` and `undefined`) is tolerated because it's a well-known JS idiom, but `value === null || value === undefined` or `value == null` - pick one and be consistent in the project.
 
 ### `eval()`, `with`, `arguments` object are FORBIDDEN
 
-- `eval()` — security hole, performance killer. Never.
-- `with` — scoping chaos. Never.
-- `arguments` — use rest parameters (`...args`) instead.
+- `eval()` - security hole, performance killer. Never.
+- `with` - scoping chaos. Never.
+- `arguments` - use rest parameters (`...args`) instead.
 
 ---
 
@@ -66,16 +74,9 @@ if (status !== "active")
 // AVOID
 const name = user.name
 const email = user.email
-const role = user.role
 
 // PREFERRED
-const { name, email, role } = user
-
-// AVOID
-const first = items[0]
-const second = items[1]
-
-// PREFERRED
+const { name, email } = user
 const [first, second] = items
 ```
 
@@ -104,14 +105,11 @@ Use template literals even for single interpolations. String concatenation with 
 ```js
 // FORBIDDEN
 items.map(function(item) { return item.id })
-setTimeout(function() { doStuff() }, 100)
 
 // MANDATORY
 items.map(item => item.id)
-setTimeout(() => doStuff(), 100)
 
-// GOOD — top-level named function
-function processOrder(order) { ... }
+// GOOD - top-level named function
 export function calculateTax(amount, rate) { ... }
 ```
 
@@ -126,145 +124,27 @@ const getIds = (items) => items.map(i => i.id)
 
 ---
 
-## Array Methods Over Loops
+## Arrays, Iteration, Map and Set
 
-Prefer declarative array methods over imperative loops when transforming data.
+See [arrays.md](arrays.md) for examples and decision rules. Quick summary:
 
-```js
-// AVOID — imperative
-const active = []
-for (const user of users) {
-  if (user.isActive) {
-    active.push(user.name)
-  }
-}
-
-// PREFERRED — declarative pipeline
-const active = users
-  .filter(u => u.isActive)
-  .map(u => u.name)
-```
-
-**When to use `for...of` instead:**
-- When you need `break` / `continue` / early exit (can't do that with `.forEach`)
-- When you need `await` inside the loop body (sequential async processing)
-- When performance matters on very large arrays (avoids intermediate allocations)
-
-### Prefer `.some()` and `.every()` over `for...of` for boolean checks
-
-When the loop's only purpose is to test whether *any* or *all* elements match a condition, use `.some()` / `.every()`. They express intent, return a boolean directly, and short-circuit on the first decisive match — no manual `break` or flag variable needed.
-
-```js
-// AVOID — imperative search with flag + break
-let hasAdmin = false
-for (const user of users) {
-  if (user.role === "admin") {
-    hasAdmin = true
-    break
-  }
-}
-
-// MANDATORY
-const hasAdmin = users.some(u => u.role === "admin")
-
-// AVOID
-let allValid = true
-for (const item of items) {
-  if (!item.isValid) {
-    allValid = false
-    break
-  }
-}
-
-// MANDATORY
-const allValid = items.every(i => i.isValid)
-```
-
-Keep `for...of` only when the loop body does real work beyond a boolean test (side effects, `await`, accumulating non-boolean state).
-
-**FORBIDDEN:** `for...in` on arrays. It iterates over keys (strings), not values, and includes inherited properties.
-
-```js
-// FORBIDDEN on arrays
-for (const i in items) { ... }
-
-// CORRECT
-for (const item of items) { ... }
-```
+- Prefer `.filter`/`.map`/`.reduce` pipelines over imperative loops.
+- Use `for...of` when you need `break`/`continue`/`await` or to avoid intermediate allocations.
+- Use `.some()` / `.every()` for boolean any/all checks - never a manual loop with flag + break.
+- **FORBIDDEN:** `for...in` on arrays.
+- Use `Map` for key-value stores with dynamic keys, `Set` for unique values - not plain objects/arrays.
 
 ---
 
 ## Async / Await
 
-### Always use `async/await` over `.then()` chains
+See [async.md](async.md) for the full decision tree. Quick summary:
 
-```js
-// FORBIDDEN
-function getUser(id) {
-  return fetch(`/api/users/${id}`)
-    .then(res => res.json())
-    .then(data => data.user)
-    .catch(err => { throw err })
-}
-
-// MANDATORY
-async function getUser(id) {
-  const res = await fetch(`/api/users/${id}`)
-  const data = await res.json()
-  return data.user
-}
-```
-
-### Parallelize independent async operations
-
-Never run independent async operations sequentially. Choose the right concurrency strategy:
-
-| Strategy | When to use | Behavior |
-|---|---|---|
-| `Promise.allSettled` | **Default choice** - best-effort, every result matters | Runs all, never short-circuits, returns status per promise |
-| `Promise.all` | Fail-fast - one failure should abort the whole batch | Rejects on first failure, other results lost |
-| `for...of` with `await` | Sequential ordering required, or race conditions are a concern | One at a time, full control |
-
-```js
-// FORBIDDEN — sequential when they could be parallel
-const users = await fetchUsers()
-const orders = await fetchOrders()
-const products = await fetchProducts()
-
-// PREFERRED — best-effort parallel (all results visible)
-const results = await Promise.allSettled([
-  fetchUsers(),
-  fetchOrders(),
-  fetchProducts(),
-])
-// inspect results[i].status === "fulfilled" | "rejected"
-
-// ACCEPTABLE — fail-fast parallel (when any failure is fatal)
-const [users, orders, products] = await Promise.all([
-  fetchUsers(),
-  fetchOrders(),
-  fetchProducts(),
-])
-
-// ACCEPTABLE — sequential (when order matters or shared resource)
-for (const cmd of commands) {
-  await session.exec(cmd) // each command depends on the previous
-}
-```
-
-**Decision rule:** start with `Promise.allSettled`. Move to `Promise.all` only when a single failure makes the entire batch useless. Use sequential `for...of` only when operations must run in order or share a resource that doesn't support concurrency.
-
-### Never fire-and-forget
-
-```js
-// FORBIDDEN — unhandled promise
-doAsyncThing()
-
-// MANDATORY — handle the result or error
-await doAsyncThing()
-// or if intentionally detached:
-doAsyncThing().catch(handleError)
-```
+- Always `async/await`, never `.then()` chains.
+- **Default concurrency:** `Promise.allSettled` for independent operations.
+- `Promise.all` only when one failure should abort the batch.
+- Sequential `for...of` + `await` only when order matters or a shared resource forbids concurrency.
+- Never fire-and-forget: `await` the call or attach `.catch(handleError)`.
 
 ---
 
@@ -273,7 +153,6 @@ doAsyncThing().catch(handleError)
 ### Spread for shallow copies
 
 ```js
-// GOOD
 const updated = { ...user, name: "new name" }
 const copy = [...items]
 ```
@@ -281,7 +160,7 @@ const copy = [...items]
 ### Use `structuredClone` for deep copies
 
 ```js
-// FORBIDDEN — JSON roundtrip loses dates, functions, undefined, etc.
+// FORBIDDEN - JSON roundtrip loses dates, functions, undefined, etc.
 const deep = JSON.parse(JSON.stringify(obj))
 
 // MANDATORY
@@ -291,50 +170,20 @@ const deep = structuredClone(obj)
 ### Optional chaining and nullish coalescing
 
 ```js
-// AVOID — verbose null checks
+// AVOID - verbose null checks
 const city = user && user.address && user.address.city
 
 // MANDATORY
 const city = user?.address?.city
 
-// AVOID — falsy-tripped fallback
+// AVOID - falsy-tripped fallback
 const port = config.port || 3000 // BUG: port 0 is valid but falsy
 
-// MANDATORY — nullish coalescing
+// MANDATORY - nullish coalescing
 const port = config.port ?? 3000
 ```
 
 **Rule:** use `||` only for booleans. For everything else, use `??` to avoid the falsy trap (`0`, `""`, `false` are valid values).
-
----
-
-## Map and Set Over Plain Objects
-
-When using an object purely as a key-value store (especially with dynamic keys), use `Map`. When tracking unique values, use `Set`.
-
-```js
-// AVOID — object as map
-const counts = {}
-for (const item of items) {
-  counts[item] = (counts[item] || 0) + 1
-}
-
-// PREFERRED
-const counts = new Map()
-for (const item of items) {
-  counts.set(item, (counts.get(item) ?? 0) + 1)
-}
-
-// AVOID — array for unique values
-const seen = []
-if (!seen.includes(item)) seen.push(item)
-
-// PREFERRED
-const seen = new Set()
-seen.add(item)
-```
-
-`Map` advantages: any key type, guaranteed order, `.size`, no prototype pollution, better performance for frequent add/delete.
 
 ---
 
@@ -356,33 +205,11 @@ export function calculateTax(amount, rate) { ... }
 
 ## Error Handling (JS-Specific)
 
-### Check response status on fetch
+See [error-handling.md](error-handling.md) for examples. Quick summary:
 
-`fetch` does NOT throw on HTTP errors (4xx, 5xx). You MUST check manually.
-
-```js
-// FORBIDDEN — silent failure on 404/500
-const data = await fetch(url).then(r => r.json())
-
-// MANDATORY
-const res = await fetch(url)
-if (!res.ok) {
-  throw new Error(`Fetch failed: ${res.status} ${res.statusText}`)
-}
-const data = await res.json()
-```
-
-### Use custom error classes for domain errors
-
-```js
-class ValidationError extends Error {
-  constructor(field, message) {
-    super(message)
-    this.name = "ValidationError"
-    this.field = field
-  }
-}
-```
+- `fetch` does NOT throw on 4xx/5xx - check `res.ok` manually.
+- Use custom error classes (`class ValidationError extends Error`) for domain errors.
+- For language-agnostic error principles, see the `coding` skill (RULE 1, RULE 11).
 
 ---
 
@@ -397,24 +224,20 @@ NEVER embed non-JS content (TOML, JSON, YAML, HTML, XML, SQL, CSS, etc.) as hard
 **Only exception**: Very short strings (1-2 lines max) where a separate file would be overkill (e.g., a one-line parser test).
 
 ```js
-// FORBIDDEN — inline TOML in template literal
+// FORBIDDEN - inline TOML in template literal
 const path = writeTOML(`
 [project]
 name = "my-app"
 type = "app"
-
-[scripts]
-lint = "lint"
-test = "test"
 `)
 
-// CORRECT — fixture file: fixtures/minimal-config.toml
+// CORRECT - fixture file: fixtures/minimal-config.toml
 const path = writeTOML(readFixture("minimal-config.toml"))
 ```
 
 ---
 
-## Forbidden Patterns — Quick Reference
+## Forbidden Patterns - Quick Reference
 
 | Pattern | Verdict | Instead |
 |---|---|---|

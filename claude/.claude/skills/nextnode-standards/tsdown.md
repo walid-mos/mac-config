@@ -1,4 +1,4 @@
-# tsdown — Bundler config
+# tsdown - Bundler config
 
 **Export path**: `@nextnode-solutions/standards/tsdown`
 
@@ -16,10 +16,10 @@ Shared base config for [tsdown](https://tsdown.dev), used by all publishable Nex
 }
 ```
 
-- `format: ['esm']` — NextNode is ESM-only.
-- `fixedExtension: false` — output `.js`/`.d.ts` (not tsdown's default `.mjs`/`.d.mts`) so `package.json` exports stay clean. Requires `"type": "module"` in the consumer.
-- `target: 'es2023'` — matches the TypeScript library tsconfig.
-- `treeshake: true`, `clean: true` — tsdown defaults made explicit.
+- `format: ['esm']` - NextNode is ESM-only.
+- `fixedExtension: false` - output `.js`/`.d.ts` (not tsdown's default `.mjs`/`.d.mts`) so `package.json` exports stay clean. Requires `"type": "module"` in the consumer.
+- `target: 'es2023'` - matches the TypeScript library tsconfig.
+- `treeshake: true`, `clean: true` - tsdown defaults made explicit.
 
 ## Usage
 
@@ -36,9 +36,9 @@ export default defineConfig({
 ```
 
 Always spread `baseConfig` first, then add per-package fields:
-- `entry` — required, maps to `package.json` exports
-- `dts: true` — required for publishable libs
-- `minify`, `sourcemap`, `outDir` — optional overrides
+- `entry` - required, maps to `package.json` exports
+- `dts: true` - required for publishable libs
+- `minify`, `sourcemap`, `outDir` - optional overrides
 
 ## Multi-entry example
 
@@ -89,6 +89,6 @@ tsup is in maintenance mode and has an unfixed bug ([#1388](https://github.com/e
 
 ## Gotchas
 
-- **`splitting: false` is not supported** — code splitting is always on in tsdown. With single-entry packages this is a no-op (nothing to split).
-- **`external` is deprecated** — use `deps: { neverBundle: [...] }` if you need to force-externalize, but peer dependencies are auto-externalized so usually you don't need to specify anything.
-- **`fixedExtension: false` requires `"type": "module"`** — if your `package.json` doesn't have it, tsdown will refuse and fall back to `.mjs`.
+- **`splitting: false` is not supported** - code splitting is always on in tsdown. With single-entry packages this is a no-op (nothing to split).
+- **`external` is deprecated** - use `deps: { neverBundle: [...] }` if you need to force-externalize, but peer dependencies are auto-externalized so usually you don't need to specify anything.
+- **`fixedExtension: false` requires `"type": "module"`** - if your `package.json` doesn't have it, tsdown will refuse and fall back to `.mjs`.

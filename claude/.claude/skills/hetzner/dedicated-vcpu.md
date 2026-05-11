@@ -1,10 +1,10 @@
 # Dedicated vCPU Line (CCX)
 
-CCX servers have dedicated AMD EPYC cores — no CPU oversubscription. Use for workloads that need predictable, sustained performance: production databases, high-traffic apps, CPU-intensive batch jobs, and anything with SLA commitments.
+CCX servers have dedicated AMD EPYC cores - no CPU oversubscription. Use for workloads that need predictable, sustained performance: production databases, high-traffic apps, CPU-intensive batch jobs, and anything with SLA commitments.
 
 All prices in **EUR, VAT excluded**. European locations (Germany / Finland). Verified **2026-04-10**.
 
-## CCX — AMD EPYC dedicated vCPU (x86)
+## CCX - AMD EPYC dedicated vCPU (x86)
 
 | Name | vCPU | RAM | SSD | Traffic | Price/h | Price/mo |
 |---|---|---|---|---|---|---|
@@ -23,7 +23,7 @@ All prices in **EUR, VAT excluded**. European locations (Germany / Finland). Ver
 - Any workload where "noisy neighbor" impact is unacceptable
 - Game servers that require consistent per-tick CPU budget
 
-## CCX vs shared — the decision rule
+## CCX vs shared - the decision rule
 
 | Signal | Go CCX | Stay on shared (CX/CPX/CAX) |
 |---|---|---|
@@ -45,10 +45,10 @@ All prices in **EUR, VAT excluded**. European locations (Germany / Finland). Ver
 | CCX53 | 32 | 128 GB | €249.99 | €7.81 | €1.95 |
 | CCX63 | 48 | 192 GB | €374.49 | €7.80 | €1.95 |
 
-CCX pricing is essentially linear at ~€7.80/vCPU/mo — no volume discount across sizes. Pick the size that matches your workload; stacking multiple CCX13 doesn't save money over one larger CCX.
+CCX pricing is essentially linear at ~€7.80/vCPU/mo - no volume discount across sizes. Pick the size that matches your workload; stacking multiple CCX13 doesn't save money over one larger CCX.
 
 ## Notes
 
 - Traffic allowance grows with server size (20 → 60 TB)
 - Dedicated vCPU = one physical core per vCPU, not hyperthreaded half-cores
-- CCX63 is currently the largest documented CCX SKU — larger dedicated needs may require Hetzner's dedicated server (AX/EX) lines, which are NOT in this skill
+- CCX63 is currently the largest documented CCX SKU - larger dedicated needs may require Hetzner's dedicated server (AX/EX) lines, which are NOT in this skill

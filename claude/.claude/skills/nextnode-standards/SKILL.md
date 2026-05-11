@@ -11,7 +11,7 @@ synced-at: a755da5
 
 # @nextnode-solutions/standards
 
-Centralized development standards for all NextNode projects. This is a **config-only** package — no runtime code, no build step. It exports configuration files that projects extend.
+Centralized development standards for all NextNode projects. This is a **config-only** package - no runtime code, no build step. It exports configuration files that projects extend.
 
 ## Arguments
 
@@ -29,27 +29,27 @@ Centralized development standards for all NextNode projects. This is a **config-
 
 ### Phase 1: Read the project
 
-1. Read `package.json` — check if `@nextnode-solutions/standards` is installed and which configs are in use
+1. Read `package.json` - check if `@nextnode-solutions/standards` is installed and which configs are in use
 2. Read existing config files (`oxlint.config.ts`, `oxfmt.config.ts`, `tsconfig.json`, `vitest.config.ts`, etc.)
-3. Identify gaps — missing or misconfigured standards
+3. Identify gaps - missing or misconfigured standards
 
 ### Phase 2: Provide guidance
 
 Based on the argument, explain the specific config. If no argument, do a full audit of the project's standards compliance.
 
 Use the relevant sub-file for details:
-- [oxlint.md](oxlint.md) — linting rules and overrides
-- [oxfmt.md](oxfmt.md) — formatting settings and import sorting
-- [typescript.md](typescript.md) — TypeScript configs (library, Next.js, Astro)
-- [tsdown.md](tsdown.md) — bundler config base for publishable packages
-- [vitest.md](vitest.md) — test configs (backend, frontend, **astro**)
-- [commitlint.md](commitlint.md) — commit message format and rules
-- [lint-staged.md](lint-staged.md) — pre-commit hook commands
-- [tailwind.md](tailwind.md) — Tailwind theme, editorconfig, npmrc
+- [oxlint.md](oxlint.md) - linting rules and overrides
+- [oxfmt.md](oxfmt.md) - formatting settings and import sorting
+- [typescript.md](typescript.md) - TypeScript configs (library, Next.js, Astro)
+- [tsdown.md](tsdown.md) - bundler config base for publishable packages
+- [vitest.md](vitest.md) - test configs (backend, frontend, **astro**)
+- [commitlint.md](commitlint.md) - commit message format and rules
+- [lint-staged.md](lint-staged.md) - pre-commit hook commands
+- [tailwind.md](tailwind.md) - Tailwind theme, editorconfig, npmrc
 
 ### Vitest export paths
 
-Three vitest base configs ship — pick by project type:
+Three vitest base configs ship - pick by project type:
 
 | Export | When to use |
 |--------|-------------|
@@ -63,7 +63,7 @@ There is also a types-only `@nextnode-solutions/standards/vitest/vite-plugin` fo
 
 **Export path**: `@nextnode-solutions/standards/semantic-release`
 
-Shared config for semantic-release in monorepo packages. The standards package ships `@semantic-release/git`, `@semantic-release/github`, and `semantic-release-monorepo` as transitive `dependencies` — consumers only need `semantic-release` itself.
+Shared config for semantic-release in monorepo packages. The standards package ships `@semantic-release/git`, `@semantic-release/github`, and `semantic-release-monorepo` as transitive `dependencies` - consumers only need `semantic-release` itself.
 
 ```json
 // .releaserc.json
@@ -125,15 +125,15 @@ And these package.json fields:
 }
 ```
 
-**`packageManager` is required** — The NextNode CI pipeline (`pnpm/action-setup`) reads the pnpm version from this field. Without it, the pipeline will fail. Always pin to an exact version (e.g. `pnpm@10.11.0`), never a range or major-only.
+**`packageManager` is required** - The NextNode CI pipeline (`pnpm/action-setup`) reads the pnpm version from this field. Without it, the pipeline will fail. Always pin to an exact version (e.g. `pnpm@10.11.0`), never a range or major-only.
 
 ## Rules
 
-1. **Never override core rules** — Only add project-specific overrides. Never weaken `no-explicit-any`, `eqeqeq`, `strict`, etc.
-2. **Tabs, not spaces** — oxfmt enforces tabs. Configure your editor accordingly.
-3. **No semicolons** — The codebase uses no-semicolon style.
-4. **Single quotes** — Except in JSX where double quotes are used.
-5. **Import sorting is automatic** — Don't manually sort imports. oxfmt handles it.
-6. **Type imports must be separate** — Use `import type { Foo }` not `import { type Foo }`.
-7. **Astro projects: run `astro check` as part of Definition of Done** — oxlint does not catch TypeScript type errors in `.astro` files. For any Astro project, the sanitization pipeline MUST include both `pnpm run lint` (oxlint) AND `pnpm astro check`. A task is not done until both pass.
-8. **Exclude `vitest.config.ts` from tsconfig** — `vitest.config.ts` uses `getViteConfig` (Astro) or Vite's `defineConfig`, which only types the `test` property via Vitest's type augmentation (`/// <reference types="vitest/config" />`). `astro check` and `tsc` don't resolve this augmentation, causing a `ts(2353)` error. Since TypeScript does NOT inherit `exclude` from extended tsconfigs (only `compilerOptions` are merged), every project must add `"exclude": ["vitest.config.ts"]` in its own `tsconfig.json`.
+1. **Never override core rules** - Only add project-specific overrides. Never weaken `no-explicit-any`, `eqeqeq`, `strict`, etc.
+2. **Tabs, not spaces** - oxfmt enforces tabs. Configure your editor accordingly.
+3. **No semicolons** - The codebase uses no-semicolon style.
+4. **Single quotes** - Except in JSX where double quotes are used.
+5. **Import sorting is automatic** - Don't manually sort imports. oxfmt handles it.
+6. **Type imports must be separate** - Use `import type { Foo }` not `import { type Foo }`.
+7. **Astro projects: run `astro check` as part of Definition of Done** - oxlint does not catch TypeScript type errors in `.astro` files. For any Astro project, the sanitization pipeline MUST include both `pnpm run lint` (oxlint) AND `pnpm astro check`. A task is not done until both pass.
+8. **Exclude `vitest.config.ts` from tsconfig** - `vitest.config.ts` uses `getViteConfig` (Astro) or Vite's `defineConfig`, which only types the `test` property via Vitest's type augmentation (`/// <reference types="vitest/config" />`). `astro check` and `tsc` don't resolve this augmentation, causing a `ts(2353)` error. Since TypeScript does NOT inherit `exclude` from extended tsconfigs (only `compilerOptions` are merged), every project must add `"exclude": ["vitest.config.ts"]` in its own `tsconfig.json`.

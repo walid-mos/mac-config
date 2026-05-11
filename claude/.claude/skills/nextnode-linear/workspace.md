@@ -1,6 +1,6 @@
 # Workspace map
 
-Live state of the NextNode Solutions Linear workspace. **This file gets stale** — refresh it with the recipe at the bottom whenever projects, teams, or initiatives change.
+Live state of the NextNode Solutions Linear workspace. **This file gets stale** - refresh it with the recipe at the bottom whenever projects, teams, or initiatives change.
 
 ## Organization
 
@@ -18,7 +18,7 @@ Live state of the NextNode Solutions Linear workspace. **This file gets stale** 
 
 ## Projects (12 active)
 
-### SaaS team (SAS) — products
+### SaaS team (SAS) - products
 
 | Project          | Repo                                  | Project ID                              |
 |------------------|---------------------------------------|------------------------------------------|
@@ -27,7 +27,7 @@ Live state of the NextNode Solutions Linear workspace. **This file gets stale** 
 | Kicked           | `NextNodeSolutions/kicked`            | `46dba6bc-867a-4ee5-bfca-b4dca19e001a`   |
 | Adiffi           | `NextNodeSolutions/adiffi`            | `d8d92f90-2af1-4b90-b36b-da4e08c3c405`   |
 
-### Internal team (INT) — `core` monorepo packages
+### Internal team (INT) - `core` monorepo packages
 
 All 6 are packages within `NextNodeSolutions/core` at path `packages/<name>`. Grouped under the `NextNode Core` Initiative.
 
@@ -40,7 +40,7 @@ All 6 are packages within `NextNodeSolutions/core` at path `packages/<name>`. Gr
 | NextNode Brand Assets   | `packages/brand-assets`    | `57923f31-165c-447b-8a05-873b83ce1bc1`   |
 | NextNode Email Manager  | `packages/email-manager`   | `26013c75-a9e8-41e9-9108-ad4cd2bfd0b1`   |
 
-### Clients team (CLI) — client deliverables
+### Clients team (CLI) - client deliverables
 
 | Project              | Repo                                    | Project ID                              |
 |----------------------|-----------------------------------------|------------------------------------------|

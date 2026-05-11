@@ -59,16 +59,16 @@ Use this when most routes need server rendering (authenticated apps, dynamic das
 | Mostly server, some static pages | `server` + adapter | `prerender = true` on static pages |
 | Fully dynamic app | `server` + adapter | none |
 
-## Common Mistake — `output: 'hybrid'`
+## Common Mistake - `output: 'hybrid'`
 
 ```ts
-// FORBIDDEN — hybrid was removed in Astro 5
+// FORBIDDEN - hybrid was removed in Astro 5
 export default defineConfig({
   output: 'hybrid',
   adapter: cloudflare(),
 })
 
-// MANDATORY — use static + per-route prerender = false
+// MANDATORY - use static + per-route prerender = false
 export default defineConfig({
   output: 'static',
   adapter: cloudflare(),

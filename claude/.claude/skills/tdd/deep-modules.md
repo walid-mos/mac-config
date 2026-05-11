@@ -33,7 +33,7 @@ Deep modules are naturally testable:
 - Deep implementation = high value per test (each test exercises a lot of real logic)
 - Simple params = simple test setup
 
-Shallow modules produce test suites that are large, shallow, and brittle — many tests, each covering almost nothing.
+Shallow modules produce test suites that are large, shallow, and brittle - many tests, each covering almost nothing.
 
 ## When Designing Interfaces, Ask:
 

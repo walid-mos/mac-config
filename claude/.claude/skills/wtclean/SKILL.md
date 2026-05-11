@@ -3,15 +3,15 @@ name: wtclean
 description: >-
   Cleanly remove the current git worktree AND its local branch, then close
   the cmux workspace it was running in. Run from inside a worktree-spawned
-  cmux workspace (typically created by `/wt`). Hard-refuses on protected
-  branches (main, master, develop, dev, prod, production, staging, release)
-  and on the primary worktree.
+  cmux workspace (typically created by the `wt` zsh function). Hard-refuses
+  on protected branches (main, master, develop, dev, prod, production,
+  staging, release) and on the primary worktree.
 user-invocable: true
 ---
 
 # Clean Worktree + Branch + Close cmux Workspace
 
-Counterpart to `/wt`. In one shot: removes the current worktree directory, deletes the local branch, and closes the cmux workspace. The branch is **always** deleted — the user is tired of dangling branches piling up. Hard-refuses on protected branches and on the primary worktree.
+Counterpart to the `wt` zsh function. In one shot: removes the current worktree directory, deletes the local branch, and closes the cmux workspace. The branch is **always** deleted - the user is tired of dangling branches piling up. Hard-refuses on protected branches and on the primary worktree.
 
 ## Arguments
 
@@ -21,15 +21,15 @@ None. Always operates on the current cwd's worktree, current branch, and current
 
 There are two macOS/Claude Code quirks the implementation has to dodge:
 
-1. **Path case-canonicalization mismatch.** macOS HFS+/APFS is case-insensitive but case-preserving. `git rev-parse --show-toplevel` returns the cwd-cased path, while `git worktree list --porcelain` returns the path git stored when the worktree was created — the two strings can differ in case (e.g. `Development` vs `development`). `git worktree remove <path>` does an exact-string match and rejects the wrong-cased argument. **Always use the path from `git worktree list --porcelain`, never from `rev-parse --show-toplevel`.**
+1. **Path case-canonicalization mismatch.** macOS HFS+/APFS is case-insensitive but case-preserving. `git rev-parse --show-toplevel` returns the cwd-cased path, while `git worktree list --porcelain` returns the path git stored when the worktree was created - the two strings can differ in case (e.g. `Development` vs `development`). `git worktree remove <path>` does an exact-string match and rejects the wrong-cased argument. **Always use the path from `git worktree list --porcelain`, never from `rev-parse --show-toplevel`.**
 
-2. **Post-deletion cwd lockout.** Once `git worktree remove` deletes the directory, the persistent shell's cwd no longer exists. Claude Code's Bash tool refuses subsequent calls with `Path X does not exist` because its pre-flight cwd check fails. **All destructive ops MUST happen inside a single Bash call** chained with `&&` — once the directory is gone, you cannot run another Bash command from this session.
+2. **Post-deletion cwd lockout.** Once `git worktree remove` deletes the directory, the persistent shell's cwd no longer exists. Claude Code's Bash tool refuses subsequent calls with `Path X does not exist` because its pre-flight cwd check fails. **All destructive ops MUST happen inside a single Bash call** chained with `&&` - once the directory is gone, you cannot run another Bash command from this session.
 
-Also: **do not use `cd /tmp` or any `cd` outside the worktree.** The user's hook environment may interfere, and we don't need it — `git -C <path>` and `cmux` (a binary talking to a Unix socket) both work regardless of cwd.
+Also: **do not use `cd /tmp` or any `cd` outside the worktree.** The user's hook environment may interfere, and we don't need it - `git -C <path>` and `cmux` (a binary talking to a Unix socket) both work regardless of cwd.
 
 ## Instructions
 
-### Step 1 — Pre-flight (single Bash call, no side effects)
+### Step 1 - Pre-flight (single Bash call, no side effects)
 
 ```bash
 branch=$(git rev-parse --abbrev-ref HEAD) && \
@@ -69,7 +69,7 @@ If `preflight=ok` and `dirty_status:` has lines → dirty, go to Step 2.
 
 If output contains `REFUSE:` → stop, report to user, do nothing.
 
-### Step 2 — Dirty worktree (interactive confirm)
+### Step 2 - Dirty worktree (interactive confirm)
 
 When `git status --porcelain` returned non-empty:
 
@@ -82,9 +82,9 @@ When `git status --porcelain` returned non-empty:
 
 For a clean worktree, `force_flag=""`.
 
-### Step 3 — Destructive sequence (single Bash call, MUST be atomic)
+### Step 3 - Destructive sequence (single Bash call, MUST be atomic)
 
-This is the only Bash call that performs destruction. Because the cwd will become invalid after the worktree is removed, **chain everything with `&&` in ONE call** — you cannot rely on running another Bash command afterward.
+This is the only Bash call that performs destruction. Because the cwd will become invalid after the worktree is removed, **chain everything with `&&` in ONE call** - you cannot rely on running another Bash command afterward.
 
 ```bash
 git -C "$main_repo" worktree remove $force_flag "$wt_path" && \
@@ -96,7 +96,7 @@ git -C "$main_repo" worktree remove $force_flag "$wt_path" && \
     fi }
 ```
 
-Substitute the actual values for `$main_repo`, `$wt_path`, `$branch`, `$force_flag`, `$CMUX_WORKSPACE_ID` from Step 1 — do not rely on shell variable persistence across Bash calls.
+Substitute the actual values for `$main_repo`, `$wt_path`, `$branch`, `$force_flag`, `$CMUX_WORKSPACE_ID` from Step 1 - do not rely on shell variable persistence across Bash calls.
 
 If `git branch -D` fails because the branch was already gone (deleted-on-remote and pruned), that's fine; you can swallow that one with `|| true` on the branch-delete step:
 
@@ -114,7 +114,7 @@ git -C "$main_repo" worktree remove $force_flag "$wt_path" && \
 
 1. **Protected branches are hard-refused.** `main`, `master`, `develop`, `dev`, `prod`, `production`, `staging`, `release`, `HEAD`. No flag overrides this.
 2. **Primary worktree is hard-refused.** Compared via `git worktree list --porcelain` (first entry).
-3. **Branch is always deleted.** No "keep branch" flag — that's the whole point of this skill.
+3. **Branch is always deleted.** No "keep branch" flag - that's the whole point of this skill.
 4. **Use git's canonical wt path** from `git worktree list --porcelain`, NOT `git rev-parse --show-toplevel`. macOS case mismatches will silently break the removal otherwise.
 5. **All destructive ops in one Bash call**, chained with `&&`. Splitting into multiple calls wedges the session once the worktree directory is deleted.
 6. **No `cd` outside the worktree** anywhere. Use `git -C` and absolute paths; cmux doesn't care about cwd.

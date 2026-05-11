@@ -15,7 +15,7 @@
 | `notebook` or `notebookedit` | `NotebookEdit` |
 | `webfetch` or `web fetch` | `WebFetch(*)` |
 | `webfetch <domain>` or `web fetch <domain>` | Extract root domain (see [SKILL.md](SKILL.md)) -> `WebFetch(domain:<rootDomain>)` |
-| `domain <domain>` or `host <domain>` | Extract root domain (see [SKILL.md](SKILL.md)) -> `WebFetch(domain:<rootDomain>)` — also add `*.<rootDomain>` to `sandbox.network.allowedDomains` |
+| `domain <domain>` or `host <domain>` | Extract root domain (see [SKILL.md](SKILL.md)) -> `WebFetch(domain:<rootDomain>)` - also add `*.<rootDomain>` to `sandbox.network.allowedDomains` |
 | `websearch` or `web search` | `WebSearch(*)` |
 | `skill` | `Skill` |
 | `task` | `Task` |
@@ -27,8 +27,8 @@
 | `edit <path>` | `Edit(<resolved-path>/**)` |
 | `read <path>` | `Read(<resolved-path>/**)` |
 | `write <path>` | `Write(<resolved-path>/**)` |
-| `context7` or `mcp context7` | Discover via MCP discovery — see [mcp-discovery.md](mcp-discovery.md) |
-| `mcp <name>` | Discover via MCP discovery — see [mcp-discovery.md](mcp-discovery.md) |
+| `context7` or `mcp context7` | Discover via MCP discovery - see [mcp-discovery.md](mcp-discovery.md) |
+| `mcp <name>` | Discover via MCP discovery - see [mcp-discovery.md](mcp-discovery.md) |
 | Anything starting with `mcp__` | Strip last segment after `__` -> `<prefix>__*` |
 
 Path resolution: Replace `~` with `/Users/walid`. If the path doesn't end with `**`, append `/**`.

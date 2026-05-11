@@ -5,14 +5,14 @@
 Three reusable workflows + standalone ops workflows.
 
 **Reusable (called via `workflow_call` from caller repos)**:
-- `publish-package.yml` — `type=package`
-- `deploy.yml` — `type=app` (Hetzner VPS)
-- `deploy-static.yml` — `type=static` (Cloudflare Pages)
+- `publish-package.yml` - `type=package`
+- `deploy.yml` - `type=app` (Hetzner VPS)
+- `deploy-static.yml` - `type=static` (Cloudflare Pages)
 
 **Standalone ops workflows (live in `NextNodeSolutions/core/.github/workflows/`)**:
-- `build-golden-image.yml` — `workflow_dispatch`. Triggers the `build-golden-image` CLI command. See [golden-image.md](golden-image.md).
-- `teardown-vps.yml` — `workflow_dispatch`. Tears down a Hetzner VPS (server + DNS + state).
-- `teardown-pages.yml` — `workflow_dispatch`. Tears down a Cloudflare Pages project (project + domains + R2 if any).
+- `build-golden-image.yml` - `workflow_dispatch`. Triggers the `build-golden-image` CLI command. See [golden-image.md](golden-image.md).
+- `teardown-vps.yml` - `workflow_dispatch`. Tears down a Hetzner VPS (server + DNS + state).
+- `teardown-pages.yml` - `workflow_dispatch`. Tears down a Cloudflare Pages project (project + domains + R2 if any).
 
 Callers choose one of the three deploy workflows based on `type` (no runtime routing in YAML):
 
@@ -26,9 +26,9 @@ plan -> quality (matrix) -> publish (semantic-release)
 - Uses `semantic-release` via `pnpm exec` (plugins come from `@nextnode-solutions/standards` deps)
 - After publish: runs `publish-result` command to parse output and write summary
 - Requires `NEXTNODE_APP_ID`, `NEXTNODE_APP_PRIVATE_KEY`, `NPM_TOKEN` secrets
-- Does NOT pass `PIPELINE_ENVIRONMENT` — the CLI auto-resolves environment to `'none'` when `type=package`
+- Does NOT pass `PIPELINE_ENVIRONMENT` - the CLI auto-resolves environment to `'none'` when `type=package`
 
-### `deploy.yml` (type=app — Hetzner VPS)
+### `deploy.yml` (type=app - Hetzner VPS)
 
 ```
 plan ---+--- quality (matrix with prod-gate if prod)
@@ -54,14 +54,14 @@ Jobs:
 |-----|-----------|-------------|
 | `plan` | -- | Parse config, output quality matrix + project_name + has_prod_gate + has_domain |
 | `quality` | plan | Run lint/test/prod-gate matrix |
-| `provision` | plan + quality | `node src/index.ts provision` — ensure Hetzner VPS, Tailscale join, firewall, convergence (Caddy/Vector) |
-| `dns` | plan + quality + provision | `node src/index.ts dns` — reconcile Cloudflare DNS A records. **Only runs if `has_domain == 'true'`** |
+| `provision` | plan + quality | `node src/index.ts provision` - ensure Hetzner VPS, Tailscale join, firewall, convergence (Caddy/Vector) |
+| `dns` | plan + quality + provision | `node src/index.ts dns` - reconcile Cloudflare DNS A records. **Only runs if `has_domain == 'true'`** |
 | `build-image` | plan + quality | `compute-image-ref` CLI + `docker/bake-action@v6` (targets `app`, push to GHCR, GHA cache) |
-| `deploy` | plan + provision + build-image | `node src/index.ts deploy` — SSH to VPS, write .env, docker compose pull + up, reload Caddy |
+| `deploy` | plan + provision + build-image | `node src/index.ts deploy` - SSH to VPS, write .env, docker compose pull + up, reload Caddy |
 
 Permissions (declared at workflow level): `contents: read`, `actions: read`, `packages: write` (GHCR push).
 
-Secrets (all live at the **GitHub org level** on `NextNodeSolutions` — callers only need `secrets: inherit`, no per-repo configuration):
+Secrets (all live at the **GitHub org level** on `NextNodeSolutions` - callers only need `secrets: inherit`, no per-repo configuration):
 
 - `HETZNER_API_TOKEN`
 - `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET` (Tailscale OAuth for runner + VPS join)
@@ -70,17 +70,17 @@ Secrets (all live at the **GitHub org level** on `NextNodeSolutions` — callers
 - `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` (self-healed by `ensureR2Setup` and re-published as org secrets on rotation)
 - `NEXTNODE_APP_ID`, `NEXTNODE_APP_PRIVATE_KEY` (GitHub App for minting `GH_TOKEN` in provision)
 
-**Tailscale**: Both `provision` and `deploy` jobs connect the CI runner to the tailnet via `tailscale/github-action@v4` with OAuth credentials. SSH to the VPS goes through the tailnet IP — never the public IP.
+**Tailscale**: Both `provision` and `deploy` jobs connect the CI runner to the tailnet via `tailscale/github-action@v4` with OAuth credentials. SSH to the VPS goes through the tailnet IP - never the public IP.
 
-**Image ref flow**: `build-image` job runs `node src/index.ts compute-image-ref` to write `image_ref` to `GITHUB_OUTPUT`. Value is then injected into `docker/bake-action` via `set: app.tags=<ref>` and forwarded to the `deploy` job as `IMAGE_REF` env var. This is the single source of truth — projects never reference `ghcr.io/…` in their own code.
+**Image ref flow**: `build-image` job runs `node src/index.ts compute-image-ref` to write `image_ref` to `GITHUB_OUTPUT`. Value is then injected into `docker/bake-action` via `set: app.tags=<ref>` and forwarded to the `deploy` job as `IMAGE_REF` env var. This is the single source of truth - projects never reference `ghcr.io/…` in their own code.
 
 **DNS reconciliation**: The `dns` job runs after provision and creates/updates Cloudflare A records. Internal projects get an A record pointing to the Tailscale CGNAT IP (unproxied). Public projects get an A record pointing to the VPS public IP (proxied in production, unproxied in development).
 
-**Multi-service is NOT supported** — compose generation hardcodes a single service named `app`. The `build-image` job also targets only `app`. Caller projects are mono-service today; multi-service is a future extension.
+**Multi-service is NOT supported** - compose generation hardcodes a single service named `app`. The `build-image` job also targets only `app`. Caller projects are mono-service today; multi-service is a future extension.
 
 See [hetzner-caller.md](hetzner-caller.md) for the caller-side project convention (docker-compose.yml shape, Dockerfile, forbidden keys).
 
-### `deploy-static.yml` (type=static — Cloudflare Pages)
+### `deploy-static.yml` (type=static - Cloudflare Pages)
 
 ```
 plan ---+--- quality (matrix with prod-gate if prod)
@@ -119,7 +119,7 @@ Plan outputs:
 
 ## The `environment` input
 
-Both `deploy.yml` and `deploy-static.yml` are generic — the caller invokes them twice (once per env) from two thin caller-repo workflows:
+Both `deploy.yml` and `deploy-static.yml` are generic - the caller invokes them twice (once per env) from two thin caller-repo workflows:
 
 ```yaml
 # caller-repo/.github/workflows/deploy-dev.yml

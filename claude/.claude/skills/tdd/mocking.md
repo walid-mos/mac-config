@@ -7,12 +7,12 @@ Core mocking rules (what to mock, what not to mock, justification) are in the **
 Create specific functions for each external operation instead of one generic function with conditional logic.
 
 ```
-// GOOD — each function has one shape, easy to mock
+// GOOD - each function has one shape, easy to mock
 async function fetchUser(id) { ... }
 async function createOrder(data) { ... }
 async function chargeCard(amount) { ... }
 
-// BAD — generic fetcher with conditional logic
+// BAD - generic fetcher with conditional logic
 async function apiCall(method, path, data) { ... }
 ```
 
@@ -24,4 +24,4 @@ The SDK approach means:
 
 ## Also See
 
-- [interface-design.md](interface-design.md) — dependency injection, pure return values, small surface area
+- [interface-design.md](interface-design.md) - dependency injection, pure return values, small surface area

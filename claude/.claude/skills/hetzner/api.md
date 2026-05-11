@@ -1,10 +1,10 @@
-# Hetzner Cloud API — Live Pricing & Availability
+# Hetzner Cloud API - Live Pricing & Availability
 
 The skill tables are hand-verified snapshots. For authoritative, real-time data use the Hetzner Cloud API. Treat the API as the source of truth when a price might be stale, when the user provisions outside EU, or when a SKU is missing from the tables.
 
 ## Authentication
 
-All endpoints require a Bearer token — even read-only catalog endpoints. Obtain one at:
+All endpoints require a Bearer token - even read-only catalog endpoints. Obtain one at:
 **Hetzner Cloud Console → project → Security → API Tokens → Read**
 
 A **Read** token is sufficient for everything in this file. No Write token is ever needed for pricing lookups.
@@ -53,7 +53,7 @@ curl -s -H "Authorization: Bearer $HETZNER_API_KEY_READ" \
   | jq '.pricing.server_types[] | select(.name=="<sku>") | .prices[] | select(.location=="fsn1")'
 ```
 
-## Response shape — key fields
+## Response shape - key fields
 
 ```jsonc
 // /v1/server_types → .server_types[]
@@ -81,7 +81,7 @@ curl -s -H "Authorization: Bearer $HETZNER_API_KEY_READ" \
 ```
 
 Notes:
-- `vat_rate` at `/v1/pricing` is `"0.000000"` by default — `gross == net` unless the account has VAT configured. Always surface prices as **VAT excluded** regardless.
+- `vat_rate` at `/v1/pricing` is `"0.000000"` by default - `gross == net` unless the account has VAT configured. Always surface prices as **VAT excluded** regardless.
 - `included_traffic` is bytes (e.g. `21990232555520` = 20 TiB).
 - Deprecation is reported **per location**, not globally. A SKU can be deprecated in fsn1 but still `available: true` in ash.
 
@@ -96,7 +96,7 @@ Notes:
 | `hil` | Hillsboro, OR | US-West |
 | `sin` | Singapore | APAC |
 
-**EU locations are cheapest.** US locations (`ash`, `hil`) run ~25% above EU on most SKUs. `sin` runs ~2× EU and has **only 2 TB included traffic** (vs 20 TB in EU) plus €7.40/TB overage. Skill tables document **EU prices only** — if the user provisions in US or APAC, quote via the API instead of the tables.
+**EU locations are cheapest.** US locations (`ash`, `hil`) run ~25% above EU on most SKUs. `sin` runs ~2× EU and has **only 2 TB included traffic** (vs 20 TB in EU) plus €7.40/TB overage. Skill tables document **EU prices only** - if the user provisions in US or APAC, quote via the API instead of the tables.
 
 ## When to use the API vs the tables
 
@@ -107,4 +107,4 @@ Notes:
 | User targets `ash`, `hil`, or `sin` | **API** (tables are EU-only) |
 | User mentions a SKU not in the tables | **API** to check if it exists / is deprecated |
 | Automating a cost estimate in CI | **API** (with a project Read token in secrets) |
-| User asks about volumes, LBs, floating IPs, traffic overage | **API** `/pricing` — tables don't cover these |
+| User asks about volumes, LBs, floating IPs, traffic overage | **API** `/pricing` - tables don't cover these |

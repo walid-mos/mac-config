@@ -8,7 +8,7 @@ Manages heuristic bypass patterns in `~/.claude/hooks/heuristic-patterns.txt`.
 {
   "command_substitution": {
     "regex": "\\$\\(",
-    "comment": "\"Contains command_substitution\" — $() syntax"
+    "comment": "\"Contains command_substitution\" - $() syntax"
   },
   "brace_obfuscation": {
     "regex": "\\{[^}]*['\"]",
@@ -20,7 +20,7 @@ Manages heuristic bypass patterns in `~/.claude/hooks/heuristic-patterns.txt`.
   },
   "heredoc": {
     "regex": "<<-?\\s*\\\\?['\"]?\\w+",
-    "comment": "\"Contains heredoc\" — <<EOF syntax"
+    "comment": "\"Contains heredoc\" - <<EOF syntax"
   },
   "quoted_flags": {
     "regex": "\\s--?\\w+=(['\"])",
@@ -57,7 +57,7 @@ Manages heuristic bypass patterns in `~/.claude/hooks/heuristic-patterns.txt`.
    <regex>
    ```
 6. Print `Added bypass "<name>" to heuristic-patterns.txt`
-7. STOP — do NOT continue to Step 4.
+7. STOP - do NOT continue to Step 4.
 
 ### Add custom (`/allow bypass custom "<regex>"`)
 

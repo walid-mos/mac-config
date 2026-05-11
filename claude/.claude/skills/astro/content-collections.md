@@ -52,13 +52,13 @@ Always import `z` from `astro/zod`, not from `zod` directly. Astro bundles its o
 // MANDATORY
 import { z } from 'astro/zod'
 
-// FORBIDDEN — version conflict risk
+// FORBIDDEN - version conflict risk
 import { z } from 'zod'
 ```
 
 ## Querying Collections
 
-### `getCollection()` — all entries
+### `getCollection()` - all entries
 
 ```astro
 ---
@@ -71,7 +71,7 @@ const published = await getCollection('blog', ({ data }) => !data.draft)
 ---
 ```
 
-### `getEntry()` — single entry by ID
+### `getEntry()` - single entry by ID
 
 ```astro
 ---

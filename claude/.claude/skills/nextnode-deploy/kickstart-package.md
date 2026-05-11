@@ -62,8 +62,8 @@ Critical fields for publishing:
 ```
 
 **Key points**:
-- `version` is always `0.0.0-development` — semantic-release bumps it on publish
-- `files` controls what goes to npm — only include `dist` (or `src` for config packages like standards)
+- `version` is always `0.0.0-development` - semantic-release bumps it on publish
+- `files` controls what goes to npm - only include `dist` (or `src` for config packages like standards)
 - `publishConfig.access: "public"` is required for scoped public packages
 - Use `workspace:*` for internal deps (`@nextnode-solutions/standards`)
 - `sideEffects: false` enables tree-shaking for consumers
@@ -80,7 +80,7 @@ If the package exports raw source files (like `standards`):
   },
   "scripts": {
     "build": "echo 'No build step needed for config package'",
-    "test": "echo 'Configuration package — no tests needed'"
+    "test": "echo 'Configuration package - no tests needed'"
   }
 }
 ```
@@ -127,7 +127,7 @@ The `filter` field is used by turbo in CI: `pnpm turbo run build --filter=@nextn
 | `@semantic-release/git` | Commit updated `package.json`, tag with `[skip ci]` |
 | `@semantic-release/github` | Create GitHub release |
 
-The `tagFormat` is critical in a monorepo — each package needs a unique tag prefix to avoid collisions.
+The `tagFormat` is critical in a monorepo - each package needs a unique tag prefix to avoid collisions.
 
 ## 4. tsconfig.json
 
@@ -164,7 +164,7 @@ export default defineConfig({
 })
 ```
 
-The base provides: `format: ['esm']`, `fixedExtension: false`, `target: 'es2023'`, `treeshake: true`, `clean: true`. Override only what your package needs. `fixedExtension: false` (in the base) makes output use `.js`/`.d.ts` instead of tsdown's default `.mjs`/`.d.mts`, matching `package.json` exports — requires `"type": "module"`.
+The base provides: `format: ['esm']`, `fixedExtension: false`, `target: 'es2023'`, `treeshake: true`, `clean: true`. Override only what your package needs. `fixedExtension: false` (in the base) makes output use `.js`/`.d.ts` instead of tsdown's default `.mjs`/`.d.mts`, matching `package.json` exports - requires `"type": "module"`.
 
 Each key in `entry` maps to an export in `package.json`. Example with multiple entry points:
 
@@ -273,7 +273,7 @@ jobs:
     secrets: inherit
 ```
 
-This is the only file needed — it delegates to the shared `publish-package.yml` reusable workflow.
+This is the only file needed - it delegates to the shared `publish-package.yml` reusable workflow.
 
 ## Pipeline flow
 

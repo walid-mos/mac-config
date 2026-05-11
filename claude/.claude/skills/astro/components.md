@@ -4,8 +4,8 @@
 
 Every `.astro` file is a component. Two sections separated by a code fence (`---`):
 
-1. **Frontmatter** (top) — runs on the server at build/request time. Imports, data fetching, variable declarations.
-2. **Template** (bottom) — HTML output with embedded JS expressions.
+1. **Frontmatter** (top) - runs on the server at build/request time. Imports, data fetching, variable declarations.
+2. **Template** (bottom) - HTML output with embedded JS expressions.
 
 ```astro
 ---
@@ -37,7 +37,7 @@ const { title, description } = Astro.props
 {description && <p>{description}</p>}
 ```
 
-Always destructure `Astro.props` — never reference `Astro.props.x` in the template.
+Always destructure `Astro.props` - never reference `Astro.props.x` in the template.
 
 ## Slots
 
@@ -130,7 +130,7 @@ Accepts: strings, objects (`{ className: boolean }`), arrays (flattened), `Set`,
 
 ## `set:html` Directive
 
-Inject raw HTML. Equivalent to `innerHTML` — **never use with untrusted input** (XSS risk):
+Inject raw HTML. Equivalent to `innerHTML` - **never use with untrusted input** (XSS risk):
 
 ```astro
 ---
@@ -181,4 +181,4 @@ import Button from './Button.astro'
 </Card>
 ```
 
-Keep components small and single-purpose. Extract repeated markup into components — even for static HTML with no props.
+Keep components small and single-purpose. Extract repeated markup into components - even for static HTML with no props.

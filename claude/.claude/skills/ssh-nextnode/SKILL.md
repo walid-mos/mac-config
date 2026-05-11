@@ -23,10 +23,10 @@ Connect to a NextNode VPS via SSH with the mandatory credentials.
 - `command` (optional): Command to execute remotely. If omitted, suggest the interactive connection command.
 
 Examples:
-- `/ssh-nextnode` — Resolve VPS from current project and show connection command
-- `/ssh-nextnode docker ps` — Run `docker ps` on the current project's VPS
-- `/ssh-nextnode myapp` — Resolve VPS for `myapp` project
-- `/ssh-nextnode myapp docker logs -f backend` — Run command on myapp's VPS
+- `/ssh-nextnode` - Resolve VPS from current project and show connection command
+- `/ssh-nextnode docker ps` - Run `docker ps` on the current project's VPS
+- `/ssh-nextnode myapp` - Resolve VPS for `myapp` project
+- `/ssh-nextnode myapp docker logs -f backend` - Run command on myapp's VPS
 
 ## Instructions
 

@@ -10,30 +10,30 @@ description: >-
   skill and the appropriate language skill (javascript or typescript).
 ---
 
-# React Best Practices — Mandatory Rules
+# React Best Practices - Mandatory Rules
 
-These rules apply to ALL React code you write or modify. No exceptions. React is deceptively simple — writing correct, maintainable React requires discipline.
+These rules apply to ALL React code you write or modify. No exceptions. React is deceptively simple - writing correct, maintainable React requires discipline.
 
 ---
 
-## RULE 0 — COMPOSITION IS EVERYTHING (HIGHEST PRIORITY)
+## RULE 0 - COMPOSITION IS EVERYTHING (HIGHEST PRIORITY)
 
 This is the single most important rule in React. **Composition over inheritance. Composition over configuration. Composition over prop drilling.**
 
-React's power comes from composing small, focused pieces. Every time you reach for inheritance, a god-component, or a prop explosion — you're fighting the framework.
+React's power comes from composing small, focused pieces. Every time you reach for inheritance, a god-component, or a prop explosion - you're fighting the framework.
 
 - Use `children` and render slots, NOT config props
 - Reduce prop drilling with composition BEFORE reaching for Jotai or Context
-- Class inheritance for components is FORBIDDEN — always compose
-- SOLID principles apply to components — see [composition.md](composition.md) for rules and examples
+- Class inheritance for components is FORBIDDEN - always compose
+- SOLID principles apply to components - see [composition.md](composition.md) for rules and examples
 
 ---
 
-## RULE 1 — YOU DO NOT NEED useEffect (Most of the Time)
+## RULE 1 - YOU DO NOT NEED useEffect (Most of the Time)
 
 Effects are an **escape hatch** to synchronize with **external systems** (browser APIs, third-party widgets, network subscriptions). If there's no external system, you almost certainly don't need an Effect.
 
-**The decision rule — ask: "Why does this code run?"**
+**The decision rule - ask: "Why does this code run?"**
 - User interaction happened --> **Event handler**
 - Component displayed --> **Effect** (maybe)
 - Computed value from state/props --> **Calculate during render**
@@ -44,7 +44,7 @@ All cases with FORBIDDEN/MANDATORY examples in [effects.md](effects.md).
 
 ---
 
-## RULE 2 — COMPONENT PURITY
+## RULE 2 - COMPONENT PURITY
 
 React assumes every component is a **pure function**: same props + state + context = same JSX.
 
@@ -53,16 +53,16 @@ React assumes every component is a **pure function**: same props + state + conte
 **During render, ALLOWED:** local mutation (creating and mutating objects within the same render).
 
 ```tsx
-// ALLOWED — new array, not mutating props
+// ALLOWED - new array, not mutating props
 const sorted = [...todos].sort((a, b) => a.date - b.date)
 
-// FORBIDDEN — mutates the input
+// FORBIDDEN - mutates the input
 todos.sort((a, b) => a.date - b.date)
 ```
 
 ---
 
-## RULE 3 — STATE DESIGN
+## RULE 3 - STATE DESIGN
 
 For each piece of data, if ANY is true it's NOT state:
 1. Unchanged over time --> Constant
@@ -73,30 +73,30 @@ Full rules on minimal state, immutable updates, reducers, and controlled compone
 
 ---
 
-## RULE 4 — HOOKS DISCIPLINE
+## RULE 4 - HOOKS DISCIPLINE
 
-- Only call hooks at the **top level** — never inside loops, conditions, or nested functions
-- **Never suppress `exhaustive-deps` linter** — fix the code, not the linter
+- Only call hooks at the **top level** - never inside loops, conditions, or nested functions
+- **Never suppress `exhaustive-deps` linter** - fix the code, not the linter
 - Lifecycle wrappers (`useMount`, `useEffectOnce`) are FORBIDDEN
-- Custom hooks share **stateful logic**, not state — each call gets independent state
+- Custom hooks share **stateful logic**, not state - each call gets independent state
 
 Full rules and dependency removal checklist in [hooks.md](hooks.md).
 
 ---
 
-## RULE 5 — COMPONENT DESIGN AND DATA FLOW
+## RULE 5 - COMPONENT DESIGN AND DATA FLOW
 
 - Data flows **down** via props. Events flow **up** via callbacks. Non-negotiable.
 - >5 props and growing = split the component or use composition
 - Lists must have **stable, unique keys** (no index on dynamic lists)
-- **Jotai atoms** for shared state across distant components — see [jotai.md](jotai.md)
-- Context is almost never needed — only for sub-tree scoping (e.g. theme section). Jotai is preferred for everything else.
+- **Jotai atoms** for shared state across distant components - see [jotai.md](jotai.md)
+- Context is almost never needed - only for sub-tree scoping (e.g. theme section). Jotai is preferred for everything else.
 
 Full patterns in [patterns.md](patterns.md).
 
 ---
 
-## Quick Reference — Forbidden vs Mandatory
+## Quick Reference - Forbidden vs Mandatory
 
 | Pattern | Verdict | Instead |
 |---|---|---|

@@ -1,19 +1,19 @@
 # Hetzner Caller Convention
 
-What a project repo (the caller) must provide to deploy via `deploy.yml` to a Hetzner VPS. Covers only the Hetzner-caller specifics — the `nextnode.toml` schema lives in [config.md](config.md), the pipeline shape in [pipeline.md](pipeline.md).
+What a project repo (the caller) must provide to deploy via `deploy.yml` to a Hetzner VPS. Covers only the Hetzner-caller specifics - the `nextnode.toml` schema lives in [config.md](config.md), the pipeline shape in [pipeline.md](pipeline.md).
 
 ## Files in the caller repo
 
 Three files, all at the project root:
 
-1. **`Dockerfile`** — container build definition
-2. **`docker-compose.yml`** — minimal build descriptor (see below)
-3. **`nextnode.toml`** — with `type = "app"`, `[deploy]` and `[deploy.hetzner]` sections (schema in [config.md](config.md))
+1. **`Dockerfile`** - container build definition
+2. **`docker-compose.yml`** - minimal build descriptor (see below)
+3. **`nextnode.toml`** - with `type = "app"`, `[deploy]` and `[deploy.hetzner]` sections (schema in [config.md](config.md))
 
 Plus two workflow files under `.github/workflows/`:
 
-- **`deploy-dev.yml`** — triggers on push to `main`
-- **`deploy-prod.yml`** — `workflow_dispatch` only (manual)
+- **`deploy-dev.yml`** - triggers on push to `main`
+- **`deploy-prod.yml`** - `workflow_dispatch` only (manual)
 
 ## `docker-compose.yml`
 
@@ -44,11 +44,11 @@ Declaring these in the caller compose duplicates infra-owned concerns and will c
 
 | Forbidden key | Reason |
 |---------------|--------|
-| `image:` | Injected by `docker/bake-action` via `set: app.tags=<ref>` — tag comes from `computeImageRef` |
+| `image:` | Injected by `docker/bake-action` via `set: app.tags=<ref>` - tag comes from `computeImageRef` |
 | `ports:` | Host port is computed by `computeHostPort(environment)` and wired to Caddy on the VPS |
 | `env_file:` / `environment:` | `.env` is generated on the VPS from injected vars + `[deploy].secrets` |
 | `restart:` | Prod compose on the VPS always uses `restart: unless-stopped` |
-| `volumes:` (compose) | Declared in `nextnode.toml` via `[deploy.volumes]` so the infra owns naming, lifecycle, and teardown semantics — see Persistent volumes below |
+| `volumes:` (compose) | Declared in `nextnode.toml` via `[deploy.volumes]` so the infra owns naming, lifecycle, and teardown semantics - see Persistent volumes below |
 
 ## Runtime contract (the container)
 
@@ -58,13 +58,13 @@ The infra injects these env vars into the container's `.env` on the VPS (see `ad
 - `SITE_URL=https://<domain or dev.domain>` (from `resolveDeployDomain`)
 - One var per secret declared in `[deploy].secrets`
 
-**The app MUST respect the `$PORT` env var (12-factor).** Node/Astro/Express/Fastify/Next all do this by default — `process.env.PORT` resolves to `3000` at runtime and the app binds correctly. The infra then maps host `127.0.0.1:<computeHostPort>` → container `:3000`, and Caddy reverse-proxies onto the host port. No value is hardcoded in caller code.
+**The app MUST respect the `$PORT` env var (12-factor).** Node/Astro/Express/Fastify/Next all do this by default - `process.env.PORT` resolves to `3000` at runtime and the app binds correctly. The infra then maps host `127.0.0.1:<computeHostPort>` → container `:3000`, and Caddy reverse-proxies onto the host port. No value is hardcoded in caller code.
 
 ## Persistent volumes
 
 Containers can mount Docker named volumes for state that must survive a redeploy
 (SQLite db, cache directory, generated assets, etc.). Declare them in
-`nextnode.toml` — never in the caller's `docker-compose.yml`.
+`nextnode.toml` - never in the caller's `docker-compose.yml`.
 
 ```toml
 [deploy.volumes]
@@ -93,7 +93,7 @@ and the mount path must be absolute.
 ### Lifecycle
 
 - **Redeploys preserve volumes.** A new image release re-uses the existing
-  volumes — that's the whole point.
+  volumes - that's the whole point.
 - **Teardown preserves volumes by default.** `infra teardown` keeps the named
   volumes intact unless the caller passes the explicit opt-in to wipe them.
 - **Volumes are tied to one VPS.** They are NOT replicated and NOT a backup.
@@ -104,14 +104,14 @@ and the mount path must be absolute.
 In the NextNode topology, **R2 is the durable source of truth** for any data the
 app must not lose. Local VPS SSD (where Docker named volumes live) is an
 ephemeral hot cache: fast, included with the VPS, but rebuildable from R2 on
-demand. See `docs/infra-topology.md` for the full split — the relevant rule:
+demand. See `docs/infra-topology.md` for the full split - the relevant rule:
 
 - **Source of truth → R2** (Postgres WAL, dumps, uploaded files, etc.)
 - **Hot working set → Docker named volume on the VPS local SSD**
 - Hetzner Block Volumes are **not** used by default
 
 Wiring the R2-backed durability (WAL-G, restic, custom dump-and-push) is a
-separate concern owned by the app — out of scope of `[deploy.volumes]`. This
+separate concern owned by the app - out of scope of `[deploy.volumes]`. This
 section only declares the local cache mount; the app is responsible for keeping
 R2 in sync if the data must survive a VPS loss.
 
@@ -144,7 +144,7 @@ jobs:
         secrets: inherit
 ```
 
-`secrets: inherit` is MANDATORY. All infra secrets (`HETZNER_API_TOKEN`, `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET`, `DEPLOY_SSH_PRIVATE_KEY_B64`, `CLOUDFLARE_*`, `R2_*`, `NEXTNODE_APP_ID`, `NEXTNODE_APP_PRIVATE_KEY`) live at the `NextNodeSolutions` GitHub org level — no per-repo setup needed. App-specific secrets declared in `[deploy].secrets` must also exist at the org level with the same name.
+`secrets: inherit` is MANDATORY. All infra secrets (`HETZNER_API_TOKEN`, `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET`, `DEPLOY_SSH_PRIVATE_KEY_B64`, `CLOUDFLARE_*`, `R2_*`, `NEXTNODE_APP_ID`, `NEXTNODE_APP_PRIVATE_KEY`) live at the `NextNodeSolutions` GitHub org level - no per-repo setup needed. App-specific secrets declared in `[deploy].secrets` must also exist at the org level with the same name.
 
 ## Dockerfile example (Node 24)
 
@@ -175,7 +175,7 @@ CMD ["node", "dist/server.js"]
 
 ## Monorepo callers
 
-When the caller is a workspace package inside a Turborepo monorepo (e.g. `packages/monitoring` in `@nextnode/core`), the Dockerfile pattern is **provider-agnostic** — same image runs on Hetzner, Render, ECS, Scaleway, Fly. That pattern lives in its own skill:
+When the caller is a workspace package inside a Turborepo monorepo (e.g. `packages/monitoring` in `@nextnode/core`), the Dockerfile pattern is **provider-agnostic** - same image runs on Hetzner, Render, ECS, Scaleway, Fly. That pattern lives in its own skill:
 
 → See **[/turborepo](../turborepo/SKILL.md)** for the canonical `turbo prune --docker` Dockerfile, layer-caching breakdown, anti-patterns (legacy `pnpm deploy` + `inject-workspace-packages`), and migration checklist.
 
@@ -191,13 +191,13 @@ Computed by `computeImageRef({ repository, sha })` in `domain/deploy/image-ref.t
 
 Example: `NextNodeSolutions/Core` @ `abc1234567890…` -> `ghcr.io/nextnodesolutions/core:sha-abc1234`
 
-The `compute-image-ref` standalone CLI command is the single source of truth — any other ref string constructed by hand is a bug.
+The `compute-image-ref` standalone CLI command is the single source of truth - any other ref string constructed by hand is a bug.
 
 ## Local dev
 
 `docker compose build && docker compose up` works without modification. Compose assigns a local default image name when `image:` is absent. In CI, bake's `set` overrides the tag with the GHCR ref.
 
-## Definition of Done — pre-flight smoke test
+## Definition of Done - pre-flight smoke test
 
 Before pushing a commit that triggers `deploy.yml`, run the end-to-end docker smoke test from the package directory and confirm the container actually serves on `$PORT`. CI takes 5+ minutes per round-trip; the local loop catches the same failures in seconds.
 
@@ -217,15 +217,15 @@ What this catches that a green `pnpm build` does NOT:
 - **Workspace dep `dist/` not built.** Caught by Rule 6 already (topological filter), but the smoke test confirms every consumer resolves at runtime, not just at build time.
 - **Wrong working directory or entry path.** The Dockerfile's `WORKDIR` and `CMD` must match what `pnpm deploy` actually outputs. The smoke test surfaces this immediately.
 
-A green smoke test is mandatory before pushing — treat it like `pnpm test` for deploys.
+A green smoke test is mandatory before pushing - treat it like `pnpm test` for deploys.
 
 ## Rules
 
-1. **Service name is `app`** — hardcoded end-to-end (bake target, VPS compose, Caddy upstream). Multi-service is not supported today.
-2. **No `image:` in the caller compose** — bake injects it.
-3. **Respect `$PORT`** — read `process.env.PORT` (12-factor). Infra sets it to 3000. Never hardcode a listening port in the app.
-4. **Everything non-build-related is infra-owned** — ports, env vars, restart policy, volumes all belong to the infra layer.
-5. **Image naming is centralized** — `computeImageRef` is the only normalizer. Never reconstruct `ghcr.io/...:sha-...` by hand.
-6. **Monorepo callers delegate the Dockerfile build strategy to `/turborepo`** — the `turbo prune --docker` pattern is provider-agnostic and lives in its own skill. The Hetzner caller only owns the runtime contract (port 3000, service name `app`, infra-owned compose keys).
-7. **Smoke-test `docker build && docker run` locally before pushing a deploy** — Definition of Done for any change that triggers `deploy.yml`. The local loop catches `MODULE_NOT_FOUND`, wrong `HOST` binding, broken `CMD` paths, and crash-loops in seconds. Pushing without it burns 5+ minutes of CI per failed iteration.
-8. **Smoke-test `docker compose build && docker compose up` locally before pushing a deploy** — Definition of Done for any change that triggers `deploy.yml`. The local loop catches `MODULE_NOT_FOUND` (missing `dist/` in the published bundle), wrong `HOST` binding, broken `CMD` paths, and crash-loops in seconds. Pushing without it burns 5+ minutes of CI per failed iteration. See the pre-flight section above.
+1. **Service name is `app`** - hardcoded end-to-end (bake target, VPS compose, Caddy upstream). Multi-service is not supported today.
+2. **No `image:` in the caller compose** - bake injects it.
+3. **Respect `$PORT`** - read `process.env.PORT` (12-factor). Infra sets it to 3000. Never hardcode a listening port in the app.
+4. **Everything non-build-related is infra-owned** - ports, env vars, restart policy, volumes all belong to the infra layer.
+5. **Image naming is centralized** - `computeImageRef` is the only normalizer. Never reconstruct `ghcr.io/...:sha-...` by hand.
+6. **Monorepo callers delegate the Dockerfile build strategy to `/turborepo`** - the `turbo prune --docker` pattern is provider-agnostic and lives in its own skill. The Hetzner caller only owns the runtime contract (port 3000, service name `app`, infra-owned compose keys).
+7. **Smoke-test `docker build && docker run` locally before pushing a deploy** - Definition of Done for any change that triggers `deploy.yml`. The local loop catches `MODULE_NOT_FOUND`, wrong `HOST` binding, broken `CMD` paths, and crash-loops in seconds. Pushing without it burns 5+ minutes of CI per failed iteration.
+8. **Smoke-test `docker compose build && docker compose up` locally before pushing a deploy** - Definition of Done for any change that triggers `deploy.yml`. The local loop catches `MODULE_NOT_FOUND` (missing `dist/` in the published bundle), wrong `HOST` binding, broken `CMD` paths, and crash-loops in seconds. Pushing without it burns 5+ minutes of CI per failed iteration. See the pre-flight section above.

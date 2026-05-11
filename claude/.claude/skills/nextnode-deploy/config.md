@@ -102,7 +102,7 @@ interface HetznerDeployConfig {
   readonly location: string
 }
 
-// Narrowed config types — discriminated by target
+// Narrowed config types - discriminated by target
 interface HetznerDeployableConfig extends NextNodeConfig {
   readonly project: ProjectSection & { readonly type: DeployableProjectType; readonly domain: string }
   readonly deploy: HetznerVpsDeploySection
@@ -169,13 +169,13 @@ Deploy section is only valid for `app` and `static` project types. For `package`
 | ----- | ---- | ------- | ----------- |
 | `target` | `"hetzner-vps" \| "cloudflare-pages"` | Inferred from type | Deploy target. `app` -> `hetzner-vps`, `static` -> `cloudflare-pages`. Can be overridden explicitly. |
 | `secrets` | `string[]` | `[]` | Secret names picked from GitHub Secrets at deploy time. |
-| `vps` | `string \| null` | `null` | Override the VPS hostname this project deploys onto. When `null`, the CLI resolves a shared default per environment (see `resolveVpsName`). Hetzner-only — Cloudflare ignores it. Used for projects that need a dedicated VPS (e.g. `monitoring` runs on its own internal VPS, not the shared one). |
+| `vps` | `string \| null` | `null` | Override the VPS hostname this project deploys onto. When `null`, the CLI resolves a shared default per environment (see `resolveVpsName`). Hetzner-only - Cloudflare ignores it. Used for projects that need a dedicated VPS (e.g. `monitoring` runs on its own internal VPS, not the shared one). |
 
 ### `[deploy.hetzner]` (required when target is `hetzner-vps`)
 
 | Field | Type | Required | Default | Description |
 | ----- | ---- | -------- | ------- | ----------- |
-| `server_type` | `string` | No | `"cx23"` | Hetzner Cloud server type (e.g. `cx23`, `cpx22`, `cax11`). NOTE: `cx22` is deprecated — use `cx23`. |
+| `server_type` | `string` | No | `"cx23"` | Hetzner Cloud server type (e.g. `cx23`, `cpx22`, `cax11`). NOTE: `cx22` is deprecated - use `cx23`. |
 | `location` | `string` | No | `"nbg1"` | Hetzner datacenter location (e.g. `nbg1`, `fsn1`) |
 
 Defaults live in `DEFAULT_HETZNER_CONFIG` (`config/types.ts`). When target is `hetzner-vps`, `project.domain` is also required (used for hostname convention).
@@ -191,7 +191,7 @@ Per-project R2 (Cloudflare Object Storage) buckets. The infra provisions one Clo
 Injected into the deployed runtime as:
 - `R2_ENDPOINT` (public)
 - `R2_BUCKET_<ALIAS>` per alias (public)
-- `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` (secret — routed via `DeployInput.secrets`, never `writeEnvVar`)
+- `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` (secret - routed via `DeployInput.secrets`, never `writeEnvVar`)
 
 See [r2-service.md](r2-service.md) for the full provisioning + runtime contract.
 

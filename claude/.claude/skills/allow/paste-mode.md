@@ -25,8 +25,8 @@ ToolName [subtype]
 
 Parse it:
 1. Check if the first word is `deny` or `blacklist` -> target list = `deny`, consume that word. Otherwise target list = `allow`.
-2. Find the tool line — the first non-empty, non-deny/blacklist line. Extract the tool name (first word). Ignore subtypes like "command" after it.
-3. Find the first indented line (3+ leading spaces) — this is the specific command/path. Trim whitespace.
+2. Find the tool line - the first non-empty, non-deny/blacklist line. Extract the tool name (first word). Ignore subtypes like "command" after it.
+3. Find the first indented line (3+ leading spaces) - this is the specific command/path. Trim whitespace.
 4. Resolve to a pattern:
 
 | Tool | Resolution |

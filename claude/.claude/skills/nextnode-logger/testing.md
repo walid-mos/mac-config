@@ -8,7 +8,7 @@ import { createSpyLogger, createMockLogger, createNoopLogger } from '@nextnode-s
 
 ## Spy logger
 
-Returns a `SpyLogger` directly — records all log calls with query methods:
+Returns a `SpyLogger` directly - records all log calls with query methods:
 
 ```typescript
 const spy = createSpyLogger()
@@ -57,7 +57,7 @@ const mockLogger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(
 
 ## Noop logger
 
-Silent logger that discards everything — satisfies a `Logger` dependency with no output:
+Silent logger that discards everything - satisfies a `Logger` dependency with no output:
 
 ```typescript
 const logger = createNoopLogger()

@@ -4,7 +4,7 @@ Per-project Cloudflare R2 (object storage) buckets, modeled as a backing service
 
 ## Why a separate "service" layer
 
-R2 is the first registered backing service, but the layer is generic. Every service contributes a `{public, secret}` `ServiceEnv` block, and they merge through the same `mergeServiceEnvs` primitive that the `DeployTarget` uses for `contributeEnv()`. Two services claiming the same env key throws — collision is a bug, not a silent overwrite.
+R2 is the first registered backing service, but the layer is generic. Every service contributes a `{public, secret}` `ServiceEnv` block, and they merge through the same `mergeServiceEnvs` primitive that the `DeployTarget` uses for `contributeEnv()`. Two services claiming the same env key throws - collision is a bug, not a silent overwrite.
 
 Adding a new backing service (D1, KV, Postgres, …) is a pattern, not a one-off:
 
@@ -45,9 +45,9 @@ Endpoint computation lives in `domain/cloudflare/r2/addressing.ts` (`computeR2En
 For each declared bucket alias, the provisioner:
 
 1. Resolves the canonical bucket name via `computeR2BucketName`.
-2. Calls `ensureR2Bucket` (`adapters/cloudflare/r2/buckets.ts`) — idempotent, creates if absent.
+2. Calls `ensureR2Bucket` (`adapters/cloudflare/r2/buckets.ts`) - idempotent, creates if absent.
 3. Builds an R2 token policy via `buildR2TokenPolicy` (read+write on every declared bucket).
-4. Calls `createR2Token` (`adapters/cloudflare/r2/tokens.ts`) — POST `/user/tokens`. Returns the CF API token value.
+4. Calls `createR2Token` (`adapters/cloudflare/r2/tokens.ts`) - POST `/user/tokens`. Returns the CF API token value.
 5. Derives S3-compatible access key + secret key from the CF token via SHA256 (`deriveR2Credentials` in `domain/cloudflare/r2/credentials.ts`).
 6. Persists the resulting `R2ServiceState` to the infra state R2 bucket (`nextnode-state`) under `services/r2/{projectName}/{environment}.json`.
 
@@ -65,14 +65,14 @@ interface R2BucketBinding {
 }
 ```
 
-**Two R2 paths — separated by privilege level**:
+**Two R2 paths - separated by privilege level**:
 
 | Path | Used by | What it does | Privilege needed |
 |------|---------|-------------|-----------------|
 | `domain/services/r2.ts` + `adapters/cloudflare/r2/*` | `provision` | Create buckets, mint token, derive S3 creds, persist state | Cloudflare API token with R2 admin |
 | `adapters/r2/client.ts` + `verify-credentials.ts` | `deploy` | Read state from infra R2, verify via SigV4 handshake, hand to runtime | None (creds already in state) |
 
-Deploy never needs CF admin privileges — it just consumes what provision wrote.
+Deploy never needs CF admin privileges - it just consumes what provision wrote.
 
 ## Runtime contract (deploy command)
 
@@ -94,7 +94,7 @@ function buildR2ServiceEnv(state: R2ServiceState): ServiceEnv {
 }
 ```
 
-The deploy orchestrator merges this with the `DeployTarget.contributeEnv()` and the user's `[deploy].secrets` via `mergeServiceEnvs` — the public channel goes through `GITHUB_ENV` (visible in workflow log file), the secret channel routes through `DeployInput.secrets` (never logged, written into the VPS `.env` file via SSH or pushed into the Pages env vars as `secret_text`).
+The deploy orchestrator merges this with the `DeployTarget.contributeEnv()` and the user's `[deploy].secrets` via `mergeServiceEnvs` - the public channel goes through `GITHUB_ENV` (visible in workflow log file), the secret channel routes through `DeployInput.secrets` (never logged, written into the VPS `.env` file via SSH or pushed into the Pages env vars as `secret_text`).
 
 ## App code
 
@@ -117,7 +117,7 @@ await s3.send(new PutObjectCommand({
 }))
 ```
 
-Bucket aliases are stable (the env var name doesn't change between environments). Bucket names DO change per environment — code never references the materialized name directly.
+Bucket aliases are stable (the env var name doesn't change between environments). Bucket names DO change per environment - code never references the materialized name directly.
 
 ## Teardown
 
@@ -131,9 +131,9 @@ Bucket aliases are stable (the env var name doesn't change between environments)
 
 ## Rules
 
-1. **Bucket naming is centralized** — only `computeR2BucketName` constructs `<project>-<env>-<alias>`. Never hand-build the string.
-2. **Aliases are kebab-case** — the env var key derives via uppercase + `-` → `_`. `R2_BUCKET_USER_UPLOADS` comes from alias `user-uploads`.
-3. **Credentials are derived, not stored upstream** — the CF API token returned by `createR2Token` is hashed via SHA256 to produce the S3 secret key. The CF token itself is **NOT** persisted in state — only the derived S3 key pair.
-4. **State lives in infra R2, not per-project** — every project's R2 service state is a JSON object in the `nextnode-state` bucket. The deploy job reads it back via S3 SDK; the app never reads it directly.
-5. **Public vs secret channels are non-negotiable** — bucket names + endpoint flow through `GITHUB_ENV` (public). Access keys flow through `DeployInput.secrets` (secret). Never put a secret on the public channel — `mergeServiceEnvs` enforces the partition but the rule is "credentials live in the secret half".
-6. **Adding a new service follows the pattern** — `SERVICE_NAMES` + `ServiceConfigByName` + `SERVICE_REQUIRES_INFRA_STORAGE` + `domain/services/<name>.ts` builder + adapter wiring. TypeScript will surface every site that needs to handle the new service.
+1. **Bucket naming is centralized** - only `computeR2BucketName` constructs `<project>-<env>-<alias>`. Never hand-build the string.
+2. **Aliases are kebab-case** - the env var key derives via uppercase + `-` → `_`. `R2_BUCKET_USER_UPLOADS` comes from alias `user-uploads`.
+3. **Credentials are derived, not stored upstream** - the CF API token returned by `createR2Token` is hashed via SHA256 to produce the S3 secret key. The CF token itself is **NOT** persisted in state - only the derived S3 key pair.
+4. **State lives in infra R2, not per-project** - every project's R2 service state is a JSON object in the `nextnode-state` bucket. The deploy job reads it back via S3 SDK; the app never reads it directly.
+5. **Public vs secret channels are non-negotiable** - bucket names + endpoint flow through `GITHUB_ENV` (public). Access keys flow through `DeployInput.secrets` (secret). Never put a secret on the public channel - `mergeServiceEnvs` enforces the partition but the rule is "credentials live in the secret half".
+6. **Adding a new service follows the pattern** - `SERVICE_NAMES` + `ServiceConfigByName` + `SERVICE_REQUIRES_INFRA_STORAGE` + `domain/services/<name>.ts` builder + adapter wiring. TypeScript will surface every site that needs to handle the new service.

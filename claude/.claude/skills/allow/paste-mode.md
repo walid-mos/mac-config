@@ -6,7 +6,7 @@ The pasted text may be one of two formats:
 
 If the pasted text contains "Network request outside of sandbox" or "Host:" followed by a domain, this is a **sandbox network prompt**. Parse it:
 1. Extract the hostname from the `Host:` line (e.g. `api.github.com`).
-2. **Extract root domain** using the domain extraction rule in [overview.md](overview.md) (e.g. `api.github.com` -> `github.com`).
+2. **Extract root domain** using the domain extraction rule in [SKILL.md](SKILL.md) (e.g. `api.github.com` -> `github.com`).
 3. Target list = `allow` (unless prefixed with deny/blacklist).
 4. Resolve to pattern: `WebFetch(domain:<rootDomain>)`
 5. **Additionally**: read `~/.claude/settings.json` and check if `sandbox.network.allowedDomains` exists. If the wildcard domain `*.<rootDomain>` (or `"*"`) is NOT already in the array, add `*.<rootDomain>` to `allowedDomains`. This covers both the tool permission and sandbox network layers.

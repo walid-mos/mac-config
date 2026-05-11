@@ -1,3 +1,9 @@
+---
+name: allow
+description: Add or remove tool permissions in settings.json
+user-invocable: true
+---
+
 # Allow — Permission Management
 
 ## Step 1: Handle empty input

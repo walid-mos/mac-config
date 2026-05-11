@@ -12,10 +12,7 @@ Jotai is the preferred solution for shared state beyond simple prop passing. Use
 
 ## When to Use What
 
-- Local UI state (toggle, form input) --> `useState`
-- Complex local state (multi-field, many handlers) --> `useReducer`
-- Sub-tree scoped state (form, theme section) --> Context (rare)
-- Shared state across distant components --> **Jotai atoms**
+See SKILL.md `## State management` for the full decision table - reach for Jotai whenever state needs to be shared across distant components.
 
 ---
 

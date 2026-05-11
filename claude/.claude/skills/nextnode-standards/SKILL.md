@@ -20,13 +20,10 @@ Centralized development standards for all NextNode projects. This is a **config-
 
 - No argument: full setup guide
 - `oxlint`: linting config details
-- `oxfmt`: formatting config details
 - `typescript`: TypeScript config details
 - `tsdown`: bundler config details (for publishable packages)
 - `vitest`: test config details
-- `commitlint`: commit message config
-- `lint-staged`: pre-commit hooks config
-- `tailwind`: Tailwind theme
+- `configs`: smaller configs (commitlint, lint-staged, oxfmt, Tailwind, editorconfig, npmrc)
 
 ## Instructions
 
@@ -42,13 +39,10 @@ Based on the argument, explain the specific config. If no argument, do a full au
 
 Use the relevant sub-file for details:
 - [oxlint.md](oxlint.md) - linting rules and overrides
-- [oxfmt.md](oxfmt.md) - formatting settings and import sorting
 - [typescript.md](typescript.md) - TypeScript configs (library, Next.js, Astro)
 - [tsdown.md](tsdown.md) - bundler config base for publishable packages
 - [vitest.md](vitest.md) - test configs (backend, frontend, **astro**)
-- [commitlint.md](commitlint.md) - commit message format and rules
-- [lint-staged.md](lint-staged.md) - pre-commit hook commands
-- [tailwind.md](tailwind.md) - Tailwind theme, editorconfig, npmrc
+- [configs.md](configs.md) - smaller configs: commitlint, lint-staged, oxfmt, Tailwind theme, editorconfig, .npmrc
 
 ### Vitest export paths
 

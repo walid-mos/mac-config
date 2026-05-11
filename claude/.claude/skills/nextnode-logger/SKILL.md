@@ -14,14 +14,6 @@ synced-at: a755da5
 
 A lightweight, zero-dependency TypeScript logging library for NextNode projects. Features scope-based organization, environment-aware formatting, pluggable transports, and runtime detection (Node.js, browser, webworker).
 
-## Arguments
-
-- No argument: full usage guide
-- `api`: Logger class API reference
-- `transports`: console and HTTP transports
-- `testing`: spy/mock/noop loggers for tests
-- `setup`: installation and configuration in a project
-
 ## Instructions
 
 ### Phase 1: Read the project
@@ -32,14 +24,12 @@ A lightweight, zero-dependency TypeScript logging library for NextNode projects.
 
 ### Phase 2: Provide guidance
 
-Based on the argument and current project state, explain the relevant part of the logger API. Always show concrete code examples.
+Based on the current project state, explain the relevant part of the logger API. Always show concrete code examples.
 
 Use the relevant sub-file for details:
-- [setup.md](setup.md) - Installation, entry points
 - [api.md](api.md) - Logger creation, config, child loggers, log objects, disposal, types
 - [transports.md](transports.md) - ConsoleTransport, HttpTransport, formatters, utilities
 - [testing.md](testing.md) - Spy, mock, and noop loggers for tests
-- [patterns.md](patterns.md) - Per-request, module-scoped, and dependency injection patterns
 
 ---
 
@@ -65,6 +55,54 @@ logger.debug('Request payload', { details: { body } })
 | `error` | 3 | Something failed, needs attention |
 
 Logs below `minLevel` are silently dropped. Default: `debug` (all logs).
+
+## Setup
+
+```bash
+pnpm add @nextnode-solutions/logger
+```
+
+No peer dependencies. Zero runtime dependencies.
+
+The package has three entry points:
+
+| Import path | What it provides |
+|------------|-----------------|
+| `@nextnode-solutions/logger` | Core logger class, factory, default instance, formatters, types, utilities |
+| `@nextnode-solutions/logger/testing` | Spy logger, mock logger, noop logger for tests |
+| `@nextnode-solutions/logger/transports/http` | HTTP transport for log aggregation |
+
+## Patterns
+
+### Module-scoped logger
+
+```typescript
+import { createLogger } from '@nextnode-solutions/logger'
+
+const logger = createLogger({ scope: 'database' })
+
+export function query(sql: string): Result {
+  logger.debug('Executing query', { details: { sql } })
+  // ...
+}
+```
+
+### Per-request child logger (Express/Fastify)
+
+Create a child logger per request with the request ID, so all logs within the request inherit it without manual threading:
+
+```typescript
+import { createLogger, generateRequestId } from '@nextnode-solutions/logger'
+
+const appLogger = createLogger({ scope: 'api', environment: 'production' })
+
+app.use((req, res, next) => {
+  const requestId = req.headers['x-request-id'] as string ?? generateRequestId()
+  req.logger = appLogger.child({ requestId })
+  req.logger.info('Request received', { details: { method: req.method, url: req.url } })
+  next()
+})
+```
 
 ## Rules
 

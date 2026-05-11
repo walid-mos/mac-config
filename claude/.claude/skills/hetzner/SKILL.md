@@ -37,7 +37,7 @@ Verified pricing reference for Hetzner Cloud servers. **Always load this skill b
 
 ### Phase 2: Provide the answer
 
-- Pull numbers from [shared-vcpu.md](shared-vcpu.md) or [dedicated-vcpu.md](dedicated-vcpu.md)
+- Pull numbers from [pricing-tables.md](pricing-tables.md) (shared CX/CPX/CAX and dedicated CCX in one file)
 - When recommending, use [selection-guide.md](selection-guide.md) to match workload → server
 - Always quote: name, vCPU, RAM, SSD, traffic, hourly + monthly price
 - Always mention **"VAT excluded"** when quoting prices
@@ -60,7 +60,7 @@ Verified pricing reference for Hetzner Cloud servers. **Always load this skill b
 | CPX | CPX22 | 2 | 4 GB | 80 GB | 20 TB | €7.99 | €0.013 |
 | CCX | CCX13 | 2 | 8 GB | 80 GB | 20 TB | €15.99 | €0.026 |
 
-See [shared-vcpu.md](shared-vcpu.md) and [dedicated-vcpu.md](dedicated-vcpu.md) for full tables, and [selection-guide.md](selection-guide.md) for workload matching. For live verification, deprecated-SKU checks, or non-EU pricing, see [api.md](api.md).
+See [pricing-tables.md](pricing-tables.md) for full tables (shared + dedicated) and [selection-guide.md](selection-guide.md) for workload matching. For live verification, deprecated-SKU checks, or non-EU pricing, see [api.md](api.md).
 
 ## Rules
 

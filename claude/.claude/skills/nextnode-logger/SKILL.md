@@ -1,9 +1,11 @@
 ---
 name: nextnode-logger
 description: >-
-  How to use @nextnode-solutions/logger in NextNode projects. Covers the Logger
-  API, child loggers, transports (console, HTTP), formatters, testing utilities,
-  and integration patterns.
+  How to use @nextnode-solutions/logger in NextNode projects. Covers the
+  Logger API, child loggers, transports (console, HTTP), formatters, testing
+  utilities, and integration patterns. Load when @nextnode-solutions/logger
+  appears in package.json, when the user imports `createLogger`/`Logger` from
+  it, or when configuring logging in a NextNode project.
 user-invocable: true
 synced-at: a755da5
 ---

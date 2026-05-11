@@ -1,10 +1,12 @@
 ---
 name: nextnode-deploy
 description: >-
-  NextNode infrastructure package (@nextnode-solutions/infrastructure). Config
-  parsing, CI quality gates, Cloudflare Pages deploy, Hetzner VPS deploy,
-  golden image builder, R2 service abstraction, teardown flow, SEO guard,
-  prod gate, DeployTarget abstraction.
+  NextNode infrastructure package (@nextnode-solutions/infrastructure).
+  Config-driven CI/CD CLI: parses nextnode.toml, runs quality gates, deploys
+  to Cloudflare Pages or Hetzner VPS, manages golden images, R2 storage,
+  teardown, SEO guard, prod gate, DeployTarget abstraction. Load when working
+  in a repo containing nextnode.toml, when @nextnode-solutions/infrastructure
+  appears in package.json, or when the user mentions NextNode deploys.
 user-invocable: true
 synced-at: 55857e6
 ---

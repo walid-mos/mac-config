@@ -1,9 +1,13 @@
 ---
 name: nextnode-infra
 description: >-
-  NextNode core monorepo overview. Audits any NextNode project for compliance
-  with standards, logger, and infrastructure conventions. Dispatches to
-  sub-skills per package.
+  NextNode core monorepo overview and entry point. Audits any NextNode
+  project for compliance with standards, logger, and infrastructure
+  conventions, then dispatches to per-package sub-skills
+  (nextnode-standards, nextnode-logger, nextnode-deploy). Load when the user
+  asks to audit a NextNode project, when working in a repo of the GitHub
+  `NextNodeSolutions` org, or when any @nextnode-solutions/* package appears
+  in package.json.
 user-invocable: true
 synced-at: a755da5
 ---

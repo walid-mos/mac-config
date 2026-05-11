@@ -4,7 +4,10 @@ description: >-
   How to use @nextnode-solutions/standards in NextNode projects. Covers all
   exported configs: oxlint, oxfmt, TypeScript, tsdown, Vitest (backend +
   frontend + astro), commitlint, lint-staged, semantic-release, editorconfig,
-  npmrc, and Tailwind theme.
+  npmrc, and Tailwind theme. Load when @nextnode-solutions/standards appears
+  in package.json, when extending one of its configs (e.g. tsconfig
+  `extends`, vitest `import from`), or when configuring tooling in a
+  NextNode project.
 user-invocable: true
 synced-at: a755da5
 ---

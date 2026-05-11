@@ -1,8 +1,11 @@
 ---
 name: ssh-nextnode
 description: >-
-  SSH into a NextNode VPS using the correct credentials (deploy user + nextnode-ci key).
-  Resolves the target host from the project's nextnode.toml via Tailscale hostname.
+  SSH into a NextNode VPS using the correct credentials (deploy user +
+  nextnode-ci key). Resolves the target host from the project's
+  nextnode.toml via Tailscale hostname. Use when the user runs
+  `/ssh-nextnode`, asks to "ssh into the VPS", "connect to the production
+  server", or wants a shell on a NextNode-deployed Hetzner host.
 user-invocable: true
 ---
 

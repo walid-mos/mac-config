@@ -216,68 +216,15 @@ const spy = vi.spyOn(console, "error").mockImplementation(() => {});
 
 ### 6. Error Assertions - Use Vitest Matchers
 
-The universal ban on manual `throw` / early `return` lives in the `test` skill (anti-pattern #8). The Vitest-specific matchers are:
-
 ```ts
-// CORRECT - async rejection
+// async rejection
 await expect(getUser(-1)).rejects.toThrow(ValidationError);
 
-// CORRECT - sync throw
+// sync throw
 expect(() => parseConfig("")).toThrow(ConfigError);
 ```
 
-When you genuinely need to inspect a dynamic field on the caught error, use `expect.unreachable()` so the test still fails if the code doesn't throw:
-
-```ts
-it("rejects with detailed error", async () => {
-  try {
-    await build("no-src");
-    expect.unreachable("build should have thrown");
-  } catch (err) {
-    expect(err).toBeInstanceOf(BuildError);
-    expect((err as BuildError).code).toBe("MISSING_SRC");
-  }
-});
-```
-
-Pair this with `expect.assertions(n)` when a test has conditional branches, to guarantee the expected number of assertions actually ran.
-
-**Narrowing discriminated unions without `if (...) return`.** `expect.unreachable` is typed `(message?: string) => never`, which means calling it in one branch of an `if` narrows the TypeScript union for the code that follows. Use this to replace the banned `if (result.ok) return` narrowing trick:
-
-```ts
-type ParseConfigResult =
-  | { readonly ok: true; readonly config: NextNodeConfig }
-  | { readonly ok: false; readonly errors: readonly string[] };
-
-// FORBIDDEN - `if (...) return` is a vacuous-pass trap
-it("rejects invalid config", () => {
-  const result = parseConfig(bad);
-  expect(result.ok).toBe(false);
-  if (result.ok) return; // hides the real assertion if expect above is removed
-  expect(result.errors).toContain("missing name");
-});
-
-// PREFERRED - one whole-shape assertion, no narrowing gymnastics
-it("rejects invalid config", () => {
-  expect(parseConfig(bad)).toEqual({
-    ok: false,
-    errors: ["missing name"],
-  });
-});
-
-// ACCEPTABLE - use expect.unreachable when you need field-specific matchers
-it("rejects invalid config", () => {
-  const result = parseConfig(bad);
-  if (result.ok) {
-    expect.unreachable("parseConfig should have failed");
-  }
-  // TS now knows result.ok === false → result.errors is accessible
-  expect(result.errors).toContain("missing name");
-  expect(result.errors).toHaveLength(1);
-});
-```
-
-Default to the single `toEqual` whole-shape assertion. Reach for `expect.unreachable()` only when you genuinely need multiple matchers on different fields of the narrowed variant.
+See the `test` skill for the universal ban on manual `throw` / early `return` (anti-pattern #8) and the discriminated-union narrowing patterns (`expect.unreachable` + whole-shape `toEqual`).
 
 ## Astro - Container API
 

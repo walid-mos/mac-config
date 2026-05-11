@@ -27,27 +27,11 @@ Triggered manually via `.github/workflows/build-golden-image.yml` (`workflow_dis
 | `src/adapters/hetzner/provision/build-golden-image.ts` | Adapter | The actual build: spin up VPS, SSH-run install commands, snapshot, delete the VPS |
 | `src/adapters/hetzner/constants.ts` | Adapter | `MAX_GOLDEN_IMAGE_SNAPSHOTS`, label keys (`managed_by`, `infra_fingerprint`) |
 
-## Fingerprint
+## Fingerprint & build flow
 
-The fingerprint is a SHA256-derived string from a deterministic struct of "what would invalidate this image":
+Fingerprint is a SHA256 over the OS image SKU + Docker version pin + init script bytes (computed in `domain/hetzner/golden-image.ts`, pure and testable). Same inputs → same hash; any recipe change forces a rebuild.
 
-- Base Hetzner OS image SKU (e.g. `ubuntu-24.04`)
-- Docker version pin
-- Init script bytes (the literal SSH commands it runs)
-- Any other config that affects the snapshot's contents
-
-Computed in `domain/hetzner/golden-image.ts` - pure, testable. Two runs with identical inputs produce the same fingerprint; any change to the underlying recipe produces a new fingerprint and triggers a rebuild.
-
-## Build flow
-
-1. **Compute fingerprint** from current config.
-2. **Look up existing snapshots** labeled `managed_by=golden-image` AND `infra_fingerprint=<hash>` - if a match exists, exit early with "reusing snapshot".
-3. **Provision a builder VPS** - small SKU (cheap), public network, ephemeral SSH key.
-4. **SSH in, run install commands** - Docker via convenience script, base packages, system tweaks.
-5. **Snapshot the disk** via Hetzner API. Label the snapshot with `managed_by=golden-image` + `infra_fingerprint=<hash>` + a human-readable description.
-6. **Delete the builder VPS** + the ephemeral SSH key.
-7. **Prune old snapshots** beyond `MAX_GOLDEN_IMAGE_SNAPSHOTS` (oldest first), keeping the newest N.
-8. **Write step summary** with snapshot ID, fingerprint, build time, prune count.
+Build steps: compute fingerprint → match existing snapshots labeled `managed_by=golden-image` + `infra_fingerprint=<hash>` (reuse early) → otherwise provision ephemeral builder VPS → SSH-install Docker + base packages → snapshot + label → delete builder + key → prune past `MAX_GOLDEN_IMAGE_SNAPSHOTS` → write step summary.
 
 ## Consumption (provision command)
 

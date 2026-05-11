@@ -86,18 +86,6 @@ Without this, the `COPY . .` in `prepare` ships:
 - Host `.turbo` cache (irrelevant inside the image)
 - Host `dist/` from previous local builds (overwritten anyway, just wasted bytes + cache busting)
 
-## Layer cache: what actually invalidates what
-
-| Change in source | Stage rebuilt | `deps` cache hit? |
-|---|---|---|
-| `packages/app/src/foo.ts` | `build` only | ✅ |
-| `packages/app/package.json` (new dep) | `deps` + `build` | ❌ (intentional) |
-| `pnpm-lock.yaml` (any package) | `deps` + `build` | ❌ (intentional) |
-| `turbo.json` task definitions | `prepare` (re-runs prune) → cascade | ❌ |
-| `Dockerfile` (any line above `deps`) | `deps` + `build` | depends on which line |
-
-The big win vs the legacy `COPY packages/ . && pnpm install` pattern: in the legacy form, *every source edit* invalidated install. With prune, only manifest changes do.
-
 ## Anti-patterns
 
 ### `pnpm deploy` + `inject-workspace-packages=true`
@@ -127,18 +115,6 @@ Three problems:
 - Filter `@org/app...` ships `package.json`s of unrelated workspaces *if they share a parent path*, since pnpm filter graph doesn't prune the lockfile.
 - Bypasses turbo cache.
 
-### Building with `pnpm --filter` instead of `turbo`
-
-```dockerfile
-# ANTI-PATTERN inside a Turborepo - bypasses turbo cache
-RUN pnpm --filter @org/app... build
-
-# RIGHT - uses turbo's cache + ^build topology
-RUN pnpm exec turbo build --filter=@org/app
-```
-
-`pnpm --filter` works topologically (with the `...` operator) but knows nothing about turbo's cache. In CI this is a wasted opportunity, especially with remote cache configured.
-
 ## Smoke test
 
 Always test the image locally before pushing a commit that triggers CI deploy:
@@ -155,16 +131,6 @@ What this catches that `pnpm build` does NOT:
 - Wrong `WORKDIR` / `CMD` paths.
 - Runtime deps missing from `node_modules` because `pnpm install` was run with `--prod=false` then deps got pruned.
 - `HOST` binding issues (Astro + most Node SSR servers default to `localhost`/`127.0.0.1` which Docker port-mapping cannot reach - set `host: true` in framework config or `HOST=0.0.0.0` env var).
-
-## Migration checklist (legacy `pnpm deploy` → `turbo prune --docker`)
-
-1. Confirm the repo has `turbo.json` and the target's task pipeline is correct (`build` defined with `dependsOn: ["^build"]`).
-2. Add `node_modules`, `.turbo`, `dist`, `.git` to `.dockerignore`.
-3. Rewrite the Dockerfile per the reference above.
-4. Remove `inject-workspace-packages=true` from `.npmrc` (or `pnpm-workspace.yaml`).
-5. Run `pnpm install` once to regenerate symlinks (workspace deps go back to live symlinks - verify by `ls -la node_modules/@org/some-pkg` shows a symlink, not a directory).
-6. Smoke-test: `docker build` + `docker run` + curl.
-7. Verify type-check, lint, and tests still pass (workspace dep edits should now hot-propagate).
 
 ## Provider notes
 

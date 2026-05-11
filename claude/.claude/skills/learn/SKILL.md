@@ -83,31 +83,7 @@ Create a skill for a package or project that doesn't have one yet.
    - What non-obvious conventions exist?
    - What integration patterns matter most?
 
-3. **Plan the file structure** - decide how to split content across files.
-
-   SKILL.md is the entry point: overview, core workflow, essential concepts, rules. It references detail files for deep content. Follow the `react/` and `tdd/` patterns:
-
-   ```
-   skill-name/
-   ├── SKILL.md          # Entry point: overview, arguments, instructions, rules, quick reference
-   ├── api.md            # Full API reference (methods, signatures, options)
-   ├── patterns.md       # Usage patterns, integration examples, recipes
-   ├── types.md          # TypeScript interfaces and type definitions
-   └── <topic>.md        # One file per major domain concept
-   ```
-
-   **Splitting rules**:
-   - SKILL.md stays under ~200 lines - it's the map, not the territory
-   - Each reference file covers ONE topic in depth (one concept = one file)
-   - Reference from SKILL.md with `See [topic.md](topic.md)` links
-   - Every file has a clear, descriptive name - no `misc.md` or `other.md`
-   - Minimum 2 files (SKILL.md + at least one reference) for any non-trivial package
-
-   **Examples from existing skills**:
-   - `react/`: SKILL.md + composition.md, effects.md, state.md, hooks.md, patterns.md, jotai.md
-   - `tdd/`: SKILL.md + tests.md, mocking.md, deep-modules.md, interface-design.md, refactoring.md
-
-4. **Generate the files** - create `~/.stow_repository/claude/.claude/skills/<name>/`.
+3. **Generate the files** - create `~/.stow_repository/claude/.claude/skills/<name>/`. SKILL.md is the entry point (frontmatter + overview + rules); reference files hold deep content. See `## Skill Conventions` below for structure and quality bar.
 
    **SKILL.md frontmatter**:
    ```yaml
@@ -121,29 +97,7 @@ Create a skill for a package or project that doesn't have one yet.
    ---
    ```
 
-   **SKILL.md body** - the overview and navigation layer:
-   - Brief intro paragraph (what the package is, one sentence)
-   - `## Arguments` - what arguments the skill accepts
-   - `## Instructions` - Phase 1 (read project state), Phase 2 (provide guidance)
-   - `## Installation` - how to install
-   - Core concepts - summarize each topic with a link to its reference file
-   - `## Rules` - numbered, actionable guidelines at the end
-   - Quick reference table if applicable
-
-   **Reference files** - the detail layer:
-   - Full API reference with signatures, options, defaults, code examples
-   - Usage patterns with real-world examples
-   - Type definitions with all exported interfaces
-   - One file per major domain concept
-
-   **Quality bar**:
-   - Every line teaches something or enforces something - no filler
-   - Code examples use the correct language specifier
-   - Tables for comparisons and options
-   - Imperative voice ("Use X", not "You should use X")
-   - Cross-reference related skills with `/skill-name` notation
-
-5. **Record the sync point** - `synced-at` in frontmatter stores the HEAD commit of the project at generation time.
+4. **Record the sync point** - `synced-at` in frontmatter stores the HEAD commit of the project at generation time.
 
 ---
 
@@ -181,15 +135,8 @@ Sync an existing skill with codebase changes since it was last written.
 
 ## Skill Conventions
 
-Follow these rules when generating or editing skills:
-
 1. **Multi-file by default** - SKILL.md is the overview (~200 lines max), reference files hold the depth. One file per major concept. Only trivial skills (pure workflow like `interview`) can be single-file.
-2. **SKILL.md is the map** - summarize each topic in 3-5 lines, then link to the detail file with `See [topic.md](topic.md)`
-3. **Reference files are self-contained** - each file covers one topic fully, with code examples, tables, and explanations. A reader should not need to jump between files.
-4. **Frontmatter uses `>-`** for multiline descriptions
-5. **Imperative voice** - "Use X", "Configure Y", never "You should"
-6. **FORBIDDEN/MANDATORY** code examples for coding-rule skills
-7. **Tables** for comparisons, options, quick reference
-8. **Rules section at the end of SKILL.md** - numbered, actionable, specific
-9. **Cross-reference** other skills with `/skill-name`
-10. **`synced-at` in frontmatter** for package-documentation skills - always include it
+2. **SKILL.md is the map** - summarize each topic in 3-5 lines, then link to the detail file with `See [topic.md](topic.md)`. Reference files are self-contained.
+3. **Frontmatter uses `>-`** for multiline descriptions.
+4. **Rules section at the end of SKILL.md** - numbered, actionable, specific.
+5. **`synced-at` in frontmatter** for package-documentation skills - always include it.

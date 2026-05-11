@@ -40,21 +40,6 @@ items.map(item => <Item key={item.id} {...item} />)
 
 Index as key ONLY for static lists that never reorder, filter, or mutate.
 
-## Memoization - When It Matters
-
-**Don't prematurely memoize.** Only memoize when:
-- Child is wrapped in `React.memo`
-- Value is a hook dependency
-- Computation is genuinely expensive (>1ms)
-
-```tsx
-// AVOID - new object every render breaks memoized children
-<Map center={{ lat: 0, lng: 0 }} />
-
-// PREFERRED - stable reference when child is React.memo'd
-const center = useMemo(() => ({ lat: 0, lng: 0 }), [])
-```
-
 ## Context - Almost Never
 
 Context has structural problems: **every consumer re-renders when the value changes** (no granular selection), it pushes toward god-contexts, and providers create rigid hierarchies.

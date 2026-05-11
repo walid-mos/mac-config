@@ -142,36 +142,16 @@ expect(parseConfig(input)).toEqual({
 If the test legitimately needs different matchers per field (e.g. `toContain` on one, `toMatchObject` on another), use the framework's type-narrowing assertion helper (`expect.unreachable()` in Vitest) in the wrong branch - never a manual `return` or `throw`.
 
 ### 9. Inline File Generation Instead of Fixtures
-FORBIDDEN: Using `writeFileSync` to create test input files inline when the project has a fixtures directory. Use real fixture files - they're readable, reusable, and don't pollute tests with data construction noise.
+FORBIDDEN: Using `writeFileSync` to create test input files inline. Put input data (TOML, JSON, YAML) in `fixtures/` files with descriptive names and load via a helper:
 ```
-// FORBIDDEN - inline file generation
-writeFileSync(configFile, '[project]\nname = "my-site"\ntype = "static"\n')
-await myCommand()
-
-// FORBIDDEN - even worse: array join
-writeFileSync(configFile, ['[project]', 'name = "my-site"', 'type = "static"'].join('\n'))
-
-// CORRECT - use fixture files
-const FIXTURES = join(import.meta.dirname, '../config/fixtures')
 const fixture = (name: string): string => join(FIXTURES, name)
-
 vi.stubEnv('PIPELINE_CONFIG_FILE', fixture('static-with-domain.toml'))
-await myCommand()
 ```
-If a test needs input data that lives in files (config files, JSON, YAML, etc.), create a fixture file in the appropriate `fixtures/` directory. Each fixture has a descriptive name that documents the scenario it covers.
 
 ### 10. Generic Variable Names for Mock Data
-FORBIDDEN: Using meaningless names like `call`, `args`, `result`, or indexed access (`call[0]`, `call[1]`) when extracting data from mock calls. Always destructure into descriptive, domain-specific variable names.
+FORBIDDEN: `call`, `args`, `result`, or indexed access (`call[0]`) on mock calls. Destructure into domain-specific names:
 ```
-// FORBIDDEN - generic name, indexed access
-const call = mock.mock.lastCall
-if (!call) throw new Error('No calls recorded')
-return [String(call[0]), call[1]]
-
-// CORRECT - destructure into meaningful names
 const [url, init] = mock.mock.lastCall ?? []
-if (!url) throw new Error('No calls recorded')
-return [String(url), init]
 ```
 
 ## Test Isolation

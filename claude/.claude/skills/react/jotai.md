@@ -191,9 +191,3 @@ render(
 ```
 
 Always wrap in `<Provider>` in tests for isolated state. Use `useHydrateAtoms` to inject initial values.
-
-## Debugging
-
-- `countAtom.debugLabel = "count"` - use SWC plugin `@swc-jotai/debug-label` to auto-label
-- `useAtomsDevtools()` for Redux DevTools integration (values, deps, time-travel)
-- `freezeAtom()` in dev to catch accidental mutations via `Object.freeze`

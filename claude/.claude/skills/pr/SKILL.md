@@ -190,29 +190,8 @@ Output to the user:
 
 ## Rules
 
-1. **Never force-push.** If `git push` fails, stop and report. The user resolves divergence.
-2. **Never auto-rebase or auto-merge.** Even when behind base, only warn - let the user decide.
-3. **Never commit on the user's behalf.** Dirty tree → REFUSE. Stash/commit is the user's call.
-4. **Never edit history (`rebase -i`, `commit --amend`)** to clean fixup/WIP commits - refuse and tell the user.
-5. **Resolve the default branch from GitHub**, not by guessing `main`. Some repos use `master`, `develop`, or `trunk`.
-6. **Detect commit-message convention from history.** Don't impose Conventional Commits on a repo that doesn't use them.
-7. **Title hard-cap is 72 chars.** Never truncate a user-supplied `--title`; warn instead.
-8. **Test plan is non-negotiable.** Every PR body has at least one test-plan item, even if it's "Manually verified locally - no automated coverage exists."
-9. **One PR per branch.** If a PR already exists, never open a duplicate - print its URL and run the Existing-PR flow (AskUserQuestion: update body / update title+body / open in browser / nothing).
-10. **Skill never opens a PR from the base branch into itself.** Hard refuse.
-11. **No data exfiltration.** The body comes from local git context only - never include env vars, file contents outside the diff, or secrets.
-
-## Quick reference
-
-| Check | Hard refuse | Soft warn |
-|---|---|---|
-| Not in git repo / no `gh` / not authed | ✓ | |
-| On base branch | ✓ | |
-| Dirty working tree | ✓ | |
-| PR already open | ✓ (print URL) | |
-| Zero commits ahead of base | ✓ | |
-| Fixup/WIP/squash commits in range | ✓ | |
-| Branch behind base | | ✓ |
-| > 30 files or > 1000 line diff | | ✓ |
-| No tests touched in code change | | ✓ |
-| `--title` > 72 chars | | ✓ |
+1. **Resolve the default branch from GitHub**, not by guessing `main`. Some repos use `master`, `develop`, or `trunk`.
+2. **Detect commit-message convention from history.** Don't impose Conventional Commits on a repo that doesn't use them.
+3. **Title hard-cap is 72 chars.** Never truncate a user-supplied `--title`; warn instead.
+4. **Test plan is non-negotiable.** Every PR body has at least one test-plan item, even if it's "Manually verified locally - no automated coverage exists."
+5. **No data exfiltration.** The body comes from local git context only - never include env vars, file contents outside the diff, or secrets.

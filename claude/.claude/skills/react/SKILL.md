@@ -12,7 +12,7 @@ description: >-
 
 # React Best Practices - Mandatory Rules
 
-These rules apply to ALL React code you write or modify. No exceptions. React is deceptively simple - writing correct, maintainable React requires discipline.
+These rules apply to ALL React code you write or modify.
 
 ---
 

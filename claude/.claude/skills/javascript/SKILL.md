@@ -97,28 +97,11 @@ Use template literals even for single interpolations. String concatenation with 
 
 ## Arrow Functions
 
-- Use arrow functions for callbacks and lambdas.
-- Use function declarations for top-level/exported functions (they have hoisting and a name in stack traces).
-- **Never use `function` as a callback argument.**
+Use arrow functions for callbacks; use named function declarations at top level (hoisting + stack-trace names). Implicit return preferred for one-expression arrows.
 
 ```js
-// FORBIDDEN
-items.map(function(item) { return item.id })
-
-// MANDATORY
-items.map(item => item.id)
-
-// GOOD - top-level named function
-export function calculateTax(amount, rate) { ... }
-```
-
-Implicit return for one-expression arrows is preferred:
-```js
-// AVOID
-const getIds = (items) => { return items.map(i => i.id) }
-
-// PREFERRED
-const getIds = (items) => items.map(i => i.id)
+items.map(item => item.id)               // MANDATORY (not `function(item) { ... }`)
+export function calculateTax(a, r) { ... } // top-level named
 ```
 
 ---
@@ -209,30 +192,6 @@ See [error-handling.md](error-handling.md) for examples. Quick summary:
 - `fetch` does NOT throw on 4xx/5xx - check `res.ok` manually.
 - Use custom error classes (`class ValidationError extends Error`) for domain errors.
 - For language-agnostic error principles, see the `coding` skill (RULE 1, RULE 11).
-
----
-
-## No Inline Non-JS Content
-
-NEVER embed non-JS content (TOML, JSON, YAML, HTML, XML, SQL, CSS, etc.) as hardcoded multiline strings or template literals in JS/TS files.
-
-**In application code**: ALWAYS use separate files with the proper extension and load them (`fs.readFileSync`, `import`, etc.).
-
-**In tests**: Use separate fixture files in a `fixtures/` or `__fixtures__/` directory next to the test file. Load them with a helper.
-
-**Only exception**: Very short strings (1-2 lines max) where a separate file would be overkill (e.g., a one-line parser test).
-
-```js
-// FORBIDDEN - inline TOML in template literal
-const path = writeTOML(`
-[project]
-name = "my-app"
-type = "app"
-`)
-
-// CORRECT - fixture file: fixtures/minimal-config.toml
-const path = writeTOML(readFixture("minimal-config.toml"))
-```
 
 ---
 

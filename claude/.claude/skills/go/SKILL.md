@@ -12,18 +12,6 @@ description: >-
 
 # go
 
-Companion to `/backlog`. Where `/backlog` plans and creates the Linear issues, `/go` runs them.
-
-Two modes:
-
-| Invocation              | What it does                                                                |
-|-------------------------|-----------------------------------------------------------------------------|
-| `/go`                   | Setup mode - fetch open phases, ask which one, write `plan.md` + `tasks.json`, hand off. |
-| `/go <phase-number>`    | Setup mode for a specific phase number - skip the question.                 |
-| `/go next`              | Next mode - validate the previous task (Done + archive) if any, then start the next one (In Progress + implement + commit + push). One task per call, then STOP. |
-
-The user paces the work. `/go next` is the explicit "validate the last and start the next one" trigger; the skill never chains tasks on its own. That keeps per-task token cost on the user's terms (one `/go next` = one normal Claude turn, no marathon loops, cache stays warm between turns).
-
 ### Plan checkbox states
 
 `plan.md` uses three states for each task line:
@@ -36,22 +24,6 @@ The user paces the work. `/go next` is the explicit "validate the last and start
 | `[x]`         | User validated the dev on the previous `/go next`; Linear is **Done + archived**. |
 
 A task moves `[ ]` → `[~]` at the end of the `/go next` that ships it, then `[~]` → `[x]` at the *start* of the following `/go next` (after the user has validated). The user's act of running `/go next` again is the validation signal.
-
-## When to invoke
-
-- Setup mode: right after `/backlog` finished, or when starting the next phase of an existing backlog.
-- Next mode: whenever the user is ready to ship the next task in flight.
-
-DO NOT use for:
-- A single ad-hoc Linear issue without phase prefix.
-- Cross-project sweeps.
-- "Run the whole phase for me" - the user must call `/go next` explicitly per task; that's the contract.
-
-## Arguments
-
-- No argument → setup mode, ask which phase via `AskUserQuestion`.
-- `<phase-number>` (e.g. `1`, `2`) → setup mode, skip the question.
-- `next` → next-task execution mode.
 
 ---
 
@@ -225,10 +197,7 @@ Read the description (WHAT / WHY / WHERE / DONE WHEN) and execute. Stay strictly
 
 Run typecheck / tests / lint / build appropriate to the repo. If `/nextnode-standards` applies, run those exact commands. Do NOT skip verification on a "trivial" change.
 
-**Keep verification output small.** What matters is the pass/fail summary, not the per-test logs:
-- Vitest: pipe to `tail -40` (or use `--reporter=basic` / `--silent`) - the suite summary stays, the per-test `console.log` flood drops.
-- Lint/typecheck: usually concise enough; if a run prints hundreds of warnings, pipe through `tail -40` too.
-- A flooded verification step is the single biggest avoidable token cost in `/go next`. Don't dump 1000-line tool outputs into context just to read "all green" at the bottom.
+**Keep verification output small.** Pipe noisy runs through `tail -40` (or `--reporter=basic` / `--silent` for Vitest). Pass/fail summary is what matters.
 
 ### Phase 7 - Commit
 
@@ -279,37 +248,19 @@ If the task got blocked mid-implementation (waiting on input, ambiguous spec, de
 
 ## Bundled helpers
 
-### `fetch_phases.py <projectId> [--phase N]`
+- `fetch_phases.py <projectId> [--phase N]` - lists open issues grouped by `[P{N}-{step}]` prefix. `--phase N` narrows printed output to one phase.
+- `set_state.py <issueId> <state_type> [--archive]` - state_type ∈ `{backlog, unstarted, started, completed, canceled}`; `--archive` also calls `issueArchive`. Used by Phase 4 (`started`) and Phase 2 (`completed --archive`).
 
-Queries Linear for issues in the project where `state.type ∉ {completed, canceled}`. Parses `[P{N}-{step}]` prefixes, groups by phase, sorts. Outputs JSON. See file docstring for schema.
-
-`--phase N` filters the printed output to only that phase. Use it whenever the phase number is already known (e.g. `/go 3` → `--phase 3`) - it avoids dumping every other phase's full descriptions into context.
-
-### `set_state.py <issueId> <state_type> [--archive]`
-
-`<state_type>` ∈ `{backlog, unstarted, started, completed, canceled}`. Picks the canonical state of the matching type in the issue's team (preferring `In Progress` over siblings like `In Review`, `Done` over `Duplicate`, etc.) and calls `issueUpdate`. Exits 0 on success, 1 on failure.
-
-`--archive` (optional): after the state update, also call `issueArchive` so the issue leaves the workspace's active list immediately. `/go next` Phase 2 always passes this flag when closing a `[~]` task - the user wants completed tasks out of their active list right away, not on Linear's auto-archive delay.
-
-Used by `/go next` (Phase 4 with `started`, Phase 2 with `completed --archive`). Also callable manually from a terminal.
-
-Both scripts read `LINEAR_API_KEY` from env, reject `Bearer ` prefix, use `urllib` only (no `pip install`).
+Both read `LINEAR_API_KEY` (no `Bearer ` prefix), use `urllib` only.
 
 ---
 
 ## Rules
 
-1. **Setup mode stops at hand-off.** No per-task work, no implementation.
-2. **`/go next` does at most ONE close + ONE start per invocation.** Phase 2 closes a single `[~]`, Phase 3-9 starts a single `[ ]`. Never two starts. After Phase 10, STOP - let the user trigger the next one.
-3. **No auto-chaining.** Do not call `/go next` from within a `/go next` run, do not "since I'm here, also do the next one". The user types `/go next` again when ready; that is the contract that protects token cost.
-4. **The plan file + `tasks.json` are the source of truth.** Linear is the durable store; `plan.md` is the working checklist; `tasks.json` is the cached descriptions for `/go next`. Do not refetch Linear on `/go next` unless `tasks.json` is missing or corrupt.
-5. **All scratch in `/tmp/claude/go-<slug>-p<N>-<timestamp>/`.** Never under the repo, never under `~`.
-6. **Sanity-check cwd in `/go next`.** Slug mismatch → refuse, do not implement in the wrong repo.
-7. **Linear state syncs around the user's validation.** `started` BEFORE Phase 5 (implement). `completed --archive` happens at the START of the *next* `/go next` (Phase 2), once the user has had a chance to validate the dev. Archiving immediately is mandatory: the user tracks active task counts and Linear's auto-archive delay would pollute them. If any state call fails, stop and surface - never leave Linear out of sync with reality.
-8. **At most one `[~]` task at a time.** A `[~]` line means "implemented + pushed, waiting for user validation". Multiple `[~]` lines = bug; STOP and surface.
-9. **Atomicity is `/backlog`'s job.** Non-atomic task description encountered → stop, surface as backlog bug, do not paper over.
-10. **No half-commits on block.** If a task can't be completed cleanly, revert partial work and mark blocked in `plan.md`. Never commit a stub just to tick the box.
-11. **Push after every commit.** Phase 8 push is mandatory. If the push fails, do NOT tick the plan to `[~]` and do NOT mark Linear In Progress as "shipped" - the task is not done from the user's POV until the commit is on the remote.
-12. **Mandatory `Closes <ID>` trailer.** Linear's GitHub integration relies on it for auto-close on merge. Without the trailer, the Linear `completed` state we set in Phase 2 will look detached from history.
-13. **A `/go` task NEVER touches a Claude skill.** If a task's `WHERE` resolves to `~/.claude/skills/...` or `~/.stow_repository/claude/.claude/skills/...`, the issue is a `/backlog` bug - refuse to implement, surface to the user, and propose canceling the Linear issue. Skills are personal tooling in a separate repo (`mac-config`) and must never be deliverables of a NextNode project. The only acceptable place to refresh skills mid-flow is **after a phase fully closes**, as a side-task done out of band (no Linear issue, no plan tick) and only when the user explicitly asks.
-14. **Blocked tasks (`- [ ] ⚠ ... - <reason>`) are skipped, not picked.** Phase 3 must scan for the first `[ ]` line that does NOT start with `- [ ] ⚠ `. The same skip applies to `goloop`'s next-task banner. A blocked task remains in the plan as a visible reminder; only the user can unblock it (edit the line back to plain `- [ ] ` or close the Linear issue). Never auto-retry a blocked task by stripping the `⚠` yourself - the block is a signal, not a bug to paper over.
+1. **`/go next` does at most ONE close + ONE start per invocation.** Phase 2 closes a single `[~]`, Phase 3-9 starts a single `[ ]`. Never two starts. After Phase 10, STOP - let the user trigger the next one.
+2. **No auto-chaining.** Do not call `/go next` from within a `/go next` run. The user types `/go next` again when ready; that is the contract that protects token cost.
+3. **The plan file + `tasks.json` are the source of truth.** Linear is the durable store; `plan.md` is the working checklist; `tasks.json` is cached descriptions. Do not refetch Linear on `/go next` unless `tasks.json` is missing or corrupt.
+4. **Sanity-check cwd in `/go next`.** Slug mismatch → refuse, do not implement in the wrong repo. All scratch in `/tmp/claude/go-<slug>-p<N>-<timestamp>/`.
+5. **At most one `[~]` task at a time.** Multiple `[~]` lines = bug; STOP and surface. If any Linear state call fails, stop and surface - never leave Linear out of sync.
+6. **No half-commits on block.** If a task can't be completed cleanly, revert partial work and mark blocked in `plan.md`. Never commit a stub just to tick the box.
+7. **A `/go` task NEVER touches a Claude skill.** If a task's `WHERE` resolves to `~/.claude/skills/...` or `~/.stow_repository/claude/.claude/skills/...`, the issue is a `/backlog` bug - refuse to implement, surface to the user, propose canceling the Linear issue. Skills live in a separate repo (`mac-config`) and must never be NextNode deliverables.

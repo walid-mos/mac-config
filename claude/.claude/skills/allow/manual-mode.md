@@ -22,7 +22,7 @@
 | `plugin` or `plugins` | `Plugin:*` |
 | `bash <cmd>` (e.g. `bash git`) | `Bash(<cmd>:*)` |
 | `bash <cmd> <subcmd>` (e.g. `bash git commit`) | `Bash(<cmd> <subcmd> *)` |
-| Known CLI tools alone: `git`, `npm`, `npx`, `yarn`, `pnpm`, `bun`, `node`, `python`, `pip`, `docker`, `docker-compose`, `kubectl`, `terraform`, `make`, `cmake`, `cargo`, `go`, `rustup`, `brew`, `apt`, `curl`, `wget`, `ssh`, `scp`, `rsync`, `tar`, `zip`, `unzip`, `gh`, `aws`, `gcloud`, `az`, `helm`, `ruby`, `gem`, `bundle`, `mvn`, `gradle`, `dotnet`, `swift`, `flutter`, `dart`, `composer`, `php`, `perl`, `lua`, `zig`, `deno`, `esbuild`, `vite`, `tsc`, `eslint`, `prettier`, `jest`, `vitest`, `pytest`, `stow`, `rm`, `cat`, `ls`, `find`, `sed`, `awk`, `grep`, `rg`, `fd`, `jq`, `yq`, `bat`, `fzf`, `tmux` | `Bash(<tool>:*)` |
+| Any common CLI tool alone (e.g. `git`, `npm`, `docker`, `gh`, `curl`, `rm`, `jq`, ...) | `Bash(<tool>:*)` |
 | Two+ words matching CLI pattern (e.g. `rm -rf`, `docker compose`) | `Bash(<words> *)` |
 | `edit <path>` | `Edit(<resolved-path>/**)` |
 | `read <path>` | `Read(<resolved-path>/**)` |

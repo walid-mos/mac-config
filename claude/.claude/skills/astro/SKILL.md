@@ -15,14 +15,6 @@ synced-at: 3fbec5f3da69a242a9c400e13193e6dd593b8296
 
 These rules apply to ALL Astro code you write or modify. This skill targets **Astro 6** (latest major - tracks the latest release, not legacy lines). Most rules also apply unchanged to Astro 5, but assume 6 unless a rule says otherwise. When starting a new Astro project, install the latest major - never default to 5 just because tutorials still show it.
 
-**Astro 6 key breaking changes from 5** (check these when upgrading):
-- Minimum Node ≥ 22.12 (Node 18 / 20 dropped).
-- `import.meta.env` no longer auto-transforms to `process.env` - reference `process.env.X` explicitly when you need it.
-- Stabilized experimental flags - remove these from `experimental` if present: `csp`, `fonts`, `liveContentCollections`, `preserveScriptOrder`, `staticImportMetaEnv`, `headingIdCompat`, `failOnPrerenderConflict`.
-- Adapter major bumps: `@astrojs/node` v11, `@astrojs/cloudflare` v13, `@astrojs/vercel` v9.
-- `astro:build:setup` hook is now called once with all environments - remove the `target` parameter, use `vite.environments` instead.
-- `setAdapter` API: drop the deprecated `exports` and `args`, set `entrypointResolution: 'auto'`.
-
 ---
 
 ## RULE 1 - NO `hybrid` OUTPUT MODE
@@ -231,21 +223,7 @@ See [routing.md](routing.md) for file-based routing, dynamic routes, layouts, mi
 
 ---
 
-## RULE 13 - NEVER USE `set:html` WITH UNTRUSTED INPUT
-
-`set:html` injects raw HTML (equivalent to `innerHTML`). Using it with user input or external data is an XSS vulnerability. Use `set:text` for safe text rendering.
-
-```astro
-<!-- FORBIDDEN - XSS risk -->
-<div set:html={userInput} />
-
-<!-- MANDATORY - safe -->
-<div set:text={userInput} />
-```
-
----
-
-## RULE 14 - USE `getStaticPaths` FOR DYNAMIC ROUTES IN STATIC MODE
+## RULE 13 - USE `getStaticPaths` FOR DYNAMIC ROUTES IN STATIC MODE
 
 Dynamic routes (`[slug].astro`, `[...path].astro`) in `output: 'static'` require `getStaticPaths()` to define all possible paths at build time. Missing this causes build errors.
 
@@ -253,32 +231,18 @@ In `output: 'server'`, dynamic params come from `Astro.params` directly - no `ge
 
 ---
 
-## RULE 15 - UNION TYPES IN FRONTMATTER STAY ON ONE LINE
+## RULE 14 - UNION TYPES IN FRONTMATTER STAY ON ONE LINE
 
-Write TypeScript union types in `.astro` frontmatter on a **single line**. The esbuild-based TS-strip pass used by Astro 5 and 6 mishandles multi-line unions with leading pipes - it strips the `type X =` line but leaks the continuation `| 'x'` lines into compiled output, producing a runtime `Unexpected "|"` esbuild error.
+Write TypeScript union types in `.astro` frontmatter on a **single line**. The esbuild-based TS-strip pass leaks multi-line `| 'x'` continuations as raw output and crashes at runtime with `Unexpected "|"`.
 
 ```astro
 ---
-// FORBIDDEN - breaks at runtime with "Unexpected '|'"
-export type ButtonVariant =
-  | 'default'
-  | 'accent'
-  | 'muted'
-
-type Tag =
-  | 'a'
-  | 'p'
-  | 'span'
-
-// MANDATORY - single line
+// MANDATORY
 export type ButtonVariant = 'default' | 'accent' | 'muted'
-type Tag = 'a' | 'p' | 'span'
 ---
 ```
 
-This applies to every union in the frontmatter fence (`---`), including `type`, `export type`, and inline types inside `interface Props`. Prettier's default multi-line union formatting must be overridden for `.astro` files - either keep unions short enough to fit one line, or suppress the formatter on that line. Long unions also survive as a single line: do not split them for readability at the cost of breaking the build.
-
-`.ts`/`.tsx` files outside `.astro` are unaffected - this is specifically the Astro compiler's frontmatter extraction pipeline.
+Applies to all unions in the `---` fence (including `interface Props`). Override Prettier multi-line union formatting for `.astro` files. `.ts`/`.tsx` outside `.astro` is unaffected.
 
 ---
 

@@ -196,67 +196,27 @@ The same rule applies to `projectUpdate` when adopting an existing project that 
 
 ## Rule 10 - Detached execution for bulk operations
 
-Any bulk Linear run that issues **more than ~10 mutations** OR will take **more than ~2 minutes** MUST be executed detached from the Claude session - not inline as a `Bash` tool call that Claude waits on.
-
-### Why
-
-Inline bulk runs are the single biggest token-burn pattern with this skill:
-
-- Conversations late in a session carry 500k–900k tokens of context.
-- The Anthropic prompt cache has a **5-minute TTL**. A bash wait of 5+ minutes crosses it, so the next tool call re-bills the entire conversation as a cache miss.
-- Each retry, error stack, and `tee`/`tail` re-read piles into context, compounding the cost on every subsequent turn.
-
-A 6-minute inline `python3 … | tee … | tail -30` on a 700k-token conversation can cost $10+ per turn for the rest of the session.
+Bulk Linear runs (>10 mutations OR >2 minutes) MUST run detached. Inline waits that exceed the 5-minute prompt-cache TTL re-bill the full conversation context as a cache miss on every later turn - $10+ per turn at 700k tokens.
 
 ### FORBIDDEN
 
 ```bash
-# Long inline run - Claude blocks, cache evicts mid-run, every later turn re-bills full context
-python3 -u /tmp/claude/linear-rebuild/p2/run_resume.py 2>&1 \
-  | tee /tmp/claude/linear-rebuild/p2/resume.log \
-  | tail -60
-```
+# Long inline run - cache evicts, every later turn re-bills full context
+python3 -u run.py 2>&1 | tee run.log | tail -60
 
-```bash
-# Tight poll loop - same problem, plus extra round trips
-until grep -q "^Done - " /tmp/claude/linear-rebuild/p2/resume.log; do
-  sleep 5
-done
-tail -30 /tmp/claude/linear-rebuild/p2/resume.log
+# Poll loop has the same problem
+until grep -q "^Done" run.log; do sleep 5; done
 ```
 
 ### MANDATORY
 
 ```bash
-# 1. Write an idempotent script to disk (skips already-done items by querying Linear, not local state)
-# 2. Launch detached, return immediately
-nohup python3 -u /tmp/claude/linear-rebuild/p2/run_resume.py \
-  > /tmp/claude/linear-rebuild/p2/resume.log 2>&1 &
+# Write an idempotent script (queries server state, never trusts local memory)
+nohup python3 -u run.py > run.log 2>&1 &
 disown
 echo "Started PID $!"
 ```
 
-Then come back later with a single cheap check:
+Then hand off to the user: `tail -50 run.log` for status.
 
-```bash
-tail -50 /tmp/claude/linear-rebuild/p2/resume.log
-grep -c '^OK ' /tmp/claude/linear-rebuild/p2/resume.log
-```
-
-### Hand-off rule
-
-When the detached run will take longer than ~2 minutes, the assistant SHOULD hand control back to the user with a one-liner like:
-
-> Script lancé en détaché (PID 12345). Quand tu veux l'état : `tail -50 /tmp/claude/linear-rebuild/p2/resume.log`. Reviens me voir avec le résultat.
-
-Do NOT keep the conversation open polling - that is the exact pattern this rule forbids.
-
-### Idempotency requirement
-
-The detached script MUST:
-
-- Skip items already present on Linear (query server, do not trust local memory).
-- Log one structured line per item: `OK <id>`, `FAIL <id> <error>`, `SKIP <id> already exists`.
-- Re-run safely without creating duplicates (this is what makes hand-off + resume painless).
-
-Without idempotency, a partial failure forces Claude to re-load the whole state into context to figure out what to do next - defeating the point of detached execution.
+The script MUST log one structured line per item (`OK <id>`, `FAIL <id> <err>`, `SKIP <id> already exists`) and be re-runnable without duplicates. Without idempotency, partial failures force Claude to re-read state into context - defeating the point.

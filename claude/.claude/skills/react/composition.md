@@ -38,21 +38,7 @@ function CardHeader({ children }: { children: ReactNode }) {
 
 ## Composition Eliminates Prop Drilling
 
-```tsx
-// BAD - drilling `user` through 3 layers just for an avatar
-function Page({ user }) { return <Layout user={user} /> }
-function Layout({ user }) { return <Sidebar user={user} /> }
-function Sidebar({ user }) { return <Avatar url={user.avatarUrl} /> }
-
-// GOOD - compose at the top
-function Page({ user }) {
-  return (
-    <Layout>
-      <Sidebar><Avatar url={user.avatarUrl} /></Sidebar>
-    </Layout>
-  )
-}
-```
+Compose at the top (pass `<Avatar>` through `children`) instead of threading data through intermediate layers. See [patterns.md](patterns.md) for the data-flow rules.
 
 ---
 

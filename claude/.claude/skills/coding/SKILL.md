@@ -16,10 +16,10 @@ These rules apply to ALL code you write or modify, in every language. No excepti
 
 ## RULE 1 - Early Returns (Guard Clauses)
 
-Handle invalid/edge cases FIRST and return immediately. Never wrap the entire function body in an `if`.
+Handle invalid/edge cases FIRST and return immediately. Never wrap the entire function body in an `if`. Errors first, happy path last at natural indentation.
 
 ```
-// FORBIDDEN - the whole function is wrapped
+// FORBIDDEN
 function getDiscount(user) {
   if (user) {
     if (user.isActive) {
@@ -31,7 +31,7 @@ function getDiscount(user) {
   return 0
 }
 
-// MANDATORY - guard clauses at the top, happy path at natural indentation
+// MANDATORY
 function getDiscount(user) {
   if (!user) return 0
   if (!user.isActive) return 0
@@ -41,25 +41,7 @@ function getDiscount(user) {
 }
 ```
 
-**The rule is simple:** if you can exit early, exit early. The main logic should never be inside a conditional - it should be the natural continuation after all guards have passed.
-
-### Error-first ordering
-
-When a branch produces both a success and an error path, handle the **error first** and return early. The success/happy path comes last, at natural indentation.
-
-```
-// FORBIDDEN - success first, error dangling at the end
-if (result.success) {
-  return ok(result.data)
-}
-return error(result.error)
-
-// MANDATORY - error first, success is the natural continuation
-if (!result.success) {
-  return error(result.error)
-}
-return ok(result.data)
-```
+If you can exit early, exit early. The main logic should never be inside a conditional - it is the natural continuation after all guards pass.
 
 ---
 
@@ -109,9 +91,8 @@ function shipAvailableItems(items) {
 
 ## RULE 3 - Small, Focused Functions
 
-Each function does ONE thing. If you need "and" to describe what a function does, split it.
+Each function does ONE thing. If you need "and" to describe what a function does, split it. ~20 lines is a baseline; the real signal is mixing multiple things or abstraction levels.
 
-- **Keep functions short.** ~20 lines is a good baseline, but this is a guideline, not a hard limit - some functions legitimately need more. The real signal is: if the function is doing multiple distinct things or mixing abstraction levels, split it.
 - **Single level of abstraction.** Don't mix high-level orchestration with low-level details in the same function. A function should either call other functions (orchestrate) or do a small piece of work (implement) - not both.
 
 ```
@@ -286,22 +267,6 @@ Errors should be caught AS CLOSE to their source as possible and should produce 
 
 ---
 
-## RULE 12 - No Em Dashes
-
-Never use the em dash character `-` (U+2014). Use a regular hyphen `-` surrounded by spaces, or rephrase.
-
-```
-// FORBIDDEN
-This module handles auth - tokens, sessions, and refresh.
-
-// MANDATORY
-This module handles auth - tokens, sessions, and refresh.
-```
-
-This applies everywhere: code comments, strings, commit messages, documentation, and all text output.
-
----
-
 ## Quick Reference - Forbidden vs Mandatory
 
 | Pattern | Verdict | Instead |
@@ -318,3 +283,4 @@ This applies everywhere: code comments, strings, commit messages, documentation,
 | Negated boolean names | FORBIDDEN | Positive form |
 | Side effects in pure helpers | FORBIDDEN | Push IO to the edges |
 | Em dash character `-` (U+2014) | FORBIDDEN | Use `-` with spaces or rephrase |
+

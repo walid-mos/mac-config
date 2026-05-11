@@ -54,13 +54,6 @@ Look at the raw `$ARGUMENTS` text:
 
 When resolving a domain (from a pasted `Host:` line, a `domain`/`host` input, or a `webfetch <domain>` input), always extract the **root domain** - strip subdomains.
 
-Rules:
-1. Split the hostname by `.`
-2. If the second-to-last segment is a known compound TLD part (`co`, `com`, `org`, `net`, `gov`, `edu`, `ac`, `or`, `ne`, `go`), take the last **3** segments (e.g. `foo.co.uk` -> `foo.co.uk`)
-3. Otherwise take the last **2** segments (e.g. `api.github.com` -> `github.com`)
-4. If the hostname has only 2 segments or fewer, keep it as-is
-
-Examples:
 | Input | Extracted domain |
 |---|---|
 | `api.github.com` | `github.com` |

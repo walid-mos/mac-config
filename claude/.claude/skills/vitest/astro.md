@@ -137,41 +137,10 @@ container.addClientRenderer({
 - Add server renderers **before** client renderers.
 - Only add renderers for frameworks actually used by the component under test.
 
-## Best Practices
+## Astro-specific gotchas
 
-1. **One container per test** - create a fresh `AstroContainer` in each test to avoid state leakage between tests.
-2. **Assert on content, not on exact HTML** - use `toContain()` for text content. Astro's HTML output includes wrapper elements and attributes that are implementation details. Never snapshot full HTML output.
-3. **Test behavior through the render output** - pass different props/locals/params and assert the rendered HTML changes accordingly. This is the Astro equivalent of "test behavior, not implementation."
-4. **Keep container tests focused** - test one component per file. If a component composes children, test the children separately and test the parent with slots.
-5. **Use `renderToResponse` for endpoints, `renderToString` for components** - don't mix them up. Endpoints need `routeType: "endpoint"`.
-
-## Anti-Patterns - FORBIDDEN
-
-### 1. Using `defineConfig` from Vitest directly
-```ts
-// FORBIDDEN - .astro imports will fail
-import { defineConfig } from "vitest/config";
-```
-Always use `getViteConfig()` from `astro/config`.
-
-### 2. Reusing a single container across tests
-```ts
-// FORBIDDEN - state leaks between tests
-const container = await AstroContainer.create();
-
-test("first", async () => { /* uses shared container */ });
-test("second", async () => { /* contaminated by first */ });
-```
-
-### 3. Snapshotting raw HTML output
-```ts
-// FORBIDDEN - brittle, breaks on any Astro internal change
-expect(result).toMatchSnapshot();
-```
-Assert on specific content with `toContain()` instead.
-
-### 4. Forgetting `await` on container creation
-```ts
-// FORBIDDEN - container is a Promise, not a container
-const container = AstroContainer.create(); // missing await
-```
+- Always use `getViteConfig()` from `astro/config`, never `defineConfig` from `vitest/config` (`.astro` imports will fail).
+- One fresh `AstroContainer` per test (no shared container - state leaks).
+- `AstroContainer.create()` returns a Promise - `await` it.
+- Use `renderToResponse` for endpoints (`routeType: "endpoint"`), `renderToString` for components.
+- Assert on rendered content with `toContain()`; never snapshot full HTML.

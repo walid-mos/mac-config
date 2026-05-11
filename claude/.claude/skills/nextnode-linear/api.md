@@ -140,36 +140,15 @@ When the user says "hard delete", warn them about this 30-day trash window so th
 
 ## Bulk operations
 
-Linear allows around 10 parallel requests safely. For bulk operations (deleting many issues, creating many projects), use a worker pool of 8-10 with retry on transient failures.
+Linear safely handles ~10 parallel requests. For bulk runs, use a worker pool of 8-10 with retry. Bulk runs (>10 mutations OR >2 min) MUST be detached - see [rules.md](rules.md) Rule 10 for the full pattern.
 
-### Detach from Claude (Rule 10)
-
-For ANY bulk run that will issue more than ~10 mutations OR take more than ~2 minutes, the script MUST be executed **detached from the Claude session**. Running a multi-minute Python script inline as a `Bash` tool call burns tokens at scale: the conversation context (often 500k+ tokens late in a session) gets re-billed on every cache eviction, and a 5+ minute bash wait crosses the 5-minute prompt-cache TTL - the next tool call pays a full cache miss for the entire conversation.
-
-Pattern:
+Launch pattern:
 
 ```bash
-# Launch detached, write log to disk, exit immediately
-nohup python3 -u /tmp/claude/<task>/run.py \
-  > /tmp/claude/<task>/run.log 2>&1 &
+nohup python3 -u /tmp/claude/<task>/run.py > /tmp/claude/<task>/run.log 2>&1 &
 disown
 echo "Started PID $!"
 ```
-
-Then ONLY poll back via short, cheap commands:
-
-```bash
-# Quick state check - runs in <1s, returns ~50 lines max
-tail -50 /tmp/claude/<task>/run.log
-# Or summarized progress
-grep -c '^OK ' /tmp/claude/<task>/run.log
-```
-
-Hard rules for bulk runs:
-- The script MUST be **idempotent** (re-running it skips already-done items by checking server state, not local state).
-- The script MUST log structured progress lines (e.g. `OK <id>`, `FAIL <id> <error>`, `SKIP <id>`) so `tail`/`grep` give a useful summary without re-reading the whole log.
-- Claude MUST NOT `tee … | tail -N` an inline run for anything beyond ~10 items - that holds the bash tool open for the whole duration. Use `nohup … &` instead.
-- Claude MUST NOT poll in a tight loop with `sleep`-then-`tail`. Either fire a single check after a known-reasonable delay, or hand control back to the user with "lance `tail -50 …` quand tu veux la suite".
 
 ### Worker pools (inside the detached script)
 

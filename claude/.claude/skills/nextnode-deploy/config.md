@@ -197,66 +197,31 @@ See [r2-service.md](r2-service.md) for the full provisioning + runtime contract.
 
 ## CLI env vars
 
+### Hetzner commands (`provision`, `dns`, `deploy`)
+
+| Var | Required by | Description |
+| --- | ----------- | ----------- |
+| `PIPELINE_CONFIG_FILE` | all | Path to `nextnode.toml` |
+| `PIPELINE_ENVIRONMENT` | all | `"development"` or `"production"` (`plan` for non-package only) |
+| `HETZNER_API_TOKEN` | all | Hetzner Cloud API token (Full access) |
+| `DEPLOY_SSH_PRIVATE_KEY_B64` | all | Base64-encoded SSH private key for deploy user |
+| `CLOUDFLARE_API_TOKEN` | all | Cloudflare API token |
+| `CLOUDFLARE_ACCOUNT_ID` | all | Cloudflare account ID |
+| `R2_ACCESS_KEY_ID` | all | R2 S3-compatible access key |
+| `R2_SECRET_ACCESS_KEY` | all | R2 S3-compatible secret key |
+| `TAILSCALE_AUTH_KEY` | provision | Tailscale OAuth secret for VPS join |
+| `GH_TOKEN` | provision | GitHub App token (for org secret persistence) |
+| `IMAGE_REF` | deploy | Full GHCR image ref from build-image job |
+| `GHCR_TOKEN` | deploy | GitHub token for GHCR pull on VPS |
+| `ALL_SECRETS` | deploy (when `deploy.secrets` non-empty) | `toJSON(secrets)` from GitHub Actions |
+
+### Cloudflare Pages commands (`provision`, `dns`, `deploy`)
+
+Subset of above: `PIPELINE_CONFIG_FILE`, `PIPELINE_ENVIRONMENT`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, and `ALL_SECRETS` (deploy, when `deploy.secrets` non-empty).
+
 ### `plan` command
 
-| Var | Required | Description |
-| --- | -------- | ----------- |
-| `PIPELINE_CONFIG_FILE` | Yes | Path to `nextnode.toml` |
-| `PIPELINE_ENVIRONMENT` | For non-package | `"development"` or `"production"` |
-
-### `provision` command (Hetzner)
-
-| Var | Required | Description |
-| --- | -------- | ----------- |
-| `PIPELINE_CONFIG_FILE` | Yes | Path to `nextnode.toml` |
-| `PIPELINE_ENVIRONMENT` | Yes | `"development"` or `"production"` |
-| `HETZNER_API_TOKEN` | Yes | Hetzner Cloud API token (Full access) |
-| `DEPLOY_SSH_PRIVATE_KEY_B64` | Yes | Base64-encoded SSH private key for deploy user |
-| `TAILSCALE_AUTH_KEY` | Yes | Tailscale OAuth secret for VPS join |
-| `CLOUDFLARE_API_TOKEN` | Yes | Cloudflare API token |
-| `CLOUDFLARE_ACCOUNT_ID` | Yes | Cloudflare account ID |
-| `R2_ACCESS_KEY_ID` | Yes | R2 S3-compatible access key |
-| `R2_SECRET_ACCESS_KEY` | Yes | R2 S3-compatible secret key |
-| `GH_TOKEN` | Yes | GitHub App token (for org secret persistence) |
-
-### `dns` command (Hetzner)
-
-| Var | Required | Description |
-| --- | -------- | ----------- |
-| `PIPELINE_CONFIG_FILE` | Yes | Path to `nextnode.toml` |
-| `PIPELINE_ENVIRONMENT` | Yes | `"development"` or `"production"` |
-| `HETZNER_API_TOKEN` | Yes | Hetzner Cloud API token |
-| `DEPLOY_SSH_PRIVATE_KEY_B64` | Yes | Base64-encoded SSH private key |
-| `CLOUDFLARE_API_TOKEN` | Yes | Cloudflare API token |
-| `CLOUDFLARE_ACCOUNT_ID` | Yes | Cloudflare account ID |
-| `R2_ACCESS_KEY_ID` | Yes | R2 S3-compatible access key |
-| `R2_SECRET_ACCESS_KEY` | Yes | R2 S3-compatible secret key |
-
-### `deploy` command (Hetzner)
-
-| Var | Required | Description |
-| --- | -------- | ----------- |
-| `PIPELINE_CONFIG_FILE` | Yes | Path to `nextnode.toml` |
-| `PIPELINE_ENVIRONMENT` | Yes | `"development"` or `"production"` |
-| `HETZNER_API_TOKEN` | Yes | Hetzner Cloud API token |
-| `DEPLOY_SSH_PRIVATE_KEY_B64` | Yes | Base64-encoded SSH private key |
-| `CLOUDFLARE_API_TOKEN` | Yes | Cloudflare API token |
-| `CLOUDFLARE_ACCOUNT_ID` | Yes | Cloudflare account ID |
-| `R2_ACCESS_KEY_ID` | Yes | R2 S3-compatible access key |
-| `R2_SECRET_ACCESS_KEY` | Yes | R2 S3-compatible secret key |
-| `IMAGE_REF` | Yes | Full GHCR image ref from build-image job |
-| `GHCR_TOKEN` | Yes | GitHub token for GHCR pull on VPS |
-| `ALL_SECRETS` | When deploy.secrets non-empty | `toJSON(secrets)` from GitHub Actions |
-
-### `provision`, `deploy`, `dns` commands (Cloudflare Pages)
-
-| Var | Required | Description |
-| --- | -------- | ----------- |
-| `PIPELINE_CONFIG_FILE` | Yes | Path to `nextnode.toml` |
-| `PIPELINE_ENVIRONMENT` | For non-package | `"development"` or `"production"` |
-| `CLOUDFLARE_ACCOUNT_ID` | Yes | Cloudflare account ID |
-| `CLOUDFLARE_API_TOKEN` | Yes | Cloudflare API token |
-| `ALL_SECRETS` | When deploy.secrets non-empty | `toJSON(secrets)` from GitHub Actions |
+`PIPELINE_CONFIG_FILE` (required) + `PIPELINE_ENVIRONMENT` (required for non-package).
 
 ### `compute-image-ref` command
 

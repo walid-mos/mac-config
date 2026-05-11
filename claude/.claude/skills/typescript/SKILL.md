@@ -10,7 +10,7 @@ description: >-
 
 # TypeScript Best Practices - Mandatory Rules
 
-These rules apply to ALL TypeScript code you write or modify. No exceptions. No negotiations. No "just this once".
+These rules apply to ALL TypeScript code you write or modify.
 
 ---
 
@@ -106,43 +106,21 @@ const status: "active" | "inactive" = computeStatus()
 
 ## Strict Null Handling
 
-- **Prefer null checks, early returns, `??`, and `?.` over `!`** in most cases.
-- **Prefer type-system fixes over `!`** when one exists - non-empty tuples (`[T, ...Array<T>]`), discriminated unions, type guards, or proper narrowing are all better than asserting.
-- **`!` is acceptable** when the non-null condition is guaranteed by surrounding logic but TypeScript's control flow can't see it. The bar is provability: you (or a reviewer) can point to the exact runtime check or invariant that makes it safe. Common cases TS can't follow: `Map.has() + Map.get()`, `arr.find()` after a length/match guarantee, async boundaries, and test assertions like `expect(x).toBeDefined()`.
-- **`!` is NOT acceptable** as a lazy shortcut to skip null handling. If you can't articulate the proof in one sentence, you don't have one.
-- Note: `if (!x) throw …` narrows `x` automatically - you don't need `!` after it. Reach for `!` only when narrowing isn't available.
+Prefer null checks, early returns, `??`, and `?.` over `!`. Prefer type-system fixes (non-empty tuples, discriminated unions, type guards) when available. `!` is acceptable only when a runtime invariant guarantees non-null but TS can't see it (`Map.has()`+`Map.get()`, `expect().toBeDefined()`, etc.) - the bar is provability in one sentence. `if (!x) throw …` already narrows; no `!` needed after.
 
 ```typescript
-// BAD - lazy, no guarantee user exists
+// BAD - lazy
 const name = user!.name
 
-// BAD - narrowing already works, the bang is noise
-if (!user) throw new Error("User not found")
-const name = user!.name // just write user.name
-
-// GOOD - handle it
+// GOOD
 if (!user) throw new Error("User not found")
 const name = user.name
-
-// GOOD
-const name = user?.name ?? "Unknown"
 
 // ACCEPTABLE - TS doesn't connect .has() and .get()
 if (map.has(key)) {
   const value = map.get(key)!
 }
-
-// ACCEPTABLE - .find() returns T | undefined even when we know it matches
-const admin = users.find(u => u.role === "admin")!
-//            ^^ requires a real guarantee (e.g. seed data) - otherwise handle undefined
-
-// ACCEPTABLE in tests - expect().toBeDefined() doesn't narrow types
-const result = parseConfig(input)
-expect(result).toBeDefined()
-expect(result!.host).toBe("localhost")
 ```
-
-When a type-system fix is available (e.g. typing a Map's values as `[T, ...Array<T>]` so `arr[0]` is `T` not `T | undefined`), use it instead of sprinkling `!` at every read site.
 
 ## Unions Over Enums
 
@@ -224,20 +202,6 @@ if (isUser(data)) {
   console.log(data.email)
 }
 ```
-
-## Readonly by Default
-
-- Use `readonly` for properties that shouldn't change after creation.
-- Use `Readonly<T>`, `ReadonlyArray<T>`, `ReadonlyMap`, `ReadonlySet` for collections that shouldn't be mutated.
-- Prefer `as const` for literal objects/arrays that should be deeply readonly.
-
-## Utility Types
-
-Use built-in utility types instead of reinventing the wheel:
-
-- `Partial<T>`, `Required<T>`, `Pick<T, K>`, `Omit<T, K>`
-- `Record<K, V>`, `Exclude<T, U>`, `Extract<T, U>`
-- `NonNullable<T>`, `ReturnType<T>`, `Parameters<T>`
 
 ## Imports
 

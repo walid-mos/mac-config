@@ -180,37 +180,14 @@ Empty matrix -> skip sentinel (`{ id: 'skip', cmd: 'echo skipped' }`).
 
 ## SEO guard step
 
-Runs in the deploy job, after `pnpm build` and before wrangler pages deploy:
-
-```yaml
-- name: SEO guard
-  run: node src/index.ts seo-guard
-  working-directory: .infra/packages/infrastructure
-  env:
-      PIPELINE_CONFIG_FILE: ${{ github.workspace }}/${{ inputs.config_file }}
-      PIPELINE_ENVIRONMENT: ${{ inputs.environment }}
-      BUILD_DIRECTORY: ${{ github.workspace }}/${{ needs.plan.outputs.build_directory }}
-```
-
-For production: no-op. For development: injects `_headers` (X-Robots-Tag: noindex) and `robots.txt` (Disallow: /) into the build directory.
+Runs in the deploy job between `pnpm build` and `wrangler pages deploy` (working dir `.infra/packages/infrastructure`, env: `PIPELINE_CONFIG_FILE`, `PIPELINE_ENVIRONMENT`, `BUILD_DIRECTORY`). Production: no-op. Development: injects `_headers` (X-Robots-Tag: noindex) and `robots.txt` (Disallow: /).
 
 ## DNS reconciliation (dns job)
 
-Runs only when `has_domain == 'true'`. Reconciles CNAME records:
+Runs only when `has_domain == 'true'`. Reconciles CNAMEs (creates or updates, never deletes), zone lookup cached per root domain:
 - Production: `{domain}` + `redirect_domains` -> `{project}.pages.dev` (proxied, TTL=1)
 - Development: `dev.{domain}` -> `{project}-dev.pages.dev` (unproxied, TTL=300)
 
-Uses zone lookup caching per root domain. Creates or updates records, never deletes.
-
 ## Cloudflare Pages composite action
 
-Located at `.github/actions/deploy-cloudflare-pages/action.yml`. Runs `npx wrangler pages deploy`:
-
-| Input | Required | Description |
-| ----- | -------- | ----------- |
-| `directory` | Yes | Path to built static assets (e.g. `dist`) |
-| `project-name` | Yes | Cloudflare Pages project name |
-| `account-id` | Yes | Cloudflare account ID |
-| `api-token` | Yes | Cloudflare API token with Pages edit permission |
-
-Always deploys to `--branch=main` (both dev and prod projects use main as production branch).
+`.github/actions/deploy-cloudflare-pages/action.yml` wraps `npx wrangler pages deploy`. Required inputs: `directory`, `project-name`, `account-id`, `api-token`. Always deploys to `--branch=main` (dev and prod both treat main as production branch).

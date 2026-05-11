@@ -14,25 +14,11 @@ argument-hint: "[path to plan file]"
 
 # backlog
 
-Take a plan we just discussed → fan it out into an atomic Linear backlog, grouped by phase, on the right project. The model drafts the structured JSON; a bundled Python worker creates the issues idempotently in the background.
-
 This skill complements `/nextnode-linear` - it APPLIES those conventions (atomicity, `[P{N}-{step}]` phase prefix, project mapping, detached execution) to the specific workflow of "plan → backlog".
-
-## When to invoke
-
-- Right after a planning / interview / audit conversation that produced a numbered roadmap.
-- When the user says "envoie ça dans Linear", "génère les tâches", "découpe ce plan en issues".
-- When the user pastes or points at a plan file (`.md`, conversation excerpt, audit doc).
-
-DO NOT use for:
-- A single one-shot issue → just call `issueCreate` directly via `/nextnode-linear`.
-- Recurring task templates → not what Linear projects are for.
-- Cross-project initiatives → load `/nextnode-linear` and use `initiativeCreate` first.
-- **Anything under `~/.claude/skills/` or `~/.stow_repository/claude/.claude/skills/`** - Claude skills are personal tooling, not project deliverables. They never belong in a Linear backlog. See Rule 11.
 
 ## Arguments
 
-- `$ARGUMENTS` (optional) - path to a plan file (e.g. `/Users/.../plan.md`). If omitted, use the plan from the current conversation context.
+- `$ARGUMENTS` (optional) - path to a plan file. If omitted, use the plan from the current conversation context.
 
 ## Workflow
 
@@ -114,20 +100,6 @@ Write to `/tmp/claude/backlog-<slug>-<timestamp>/tasks.json` using the schema be
 }
 ```
 
-Schema rules:
-
-| Field | Required | Notes |
-|---|---|---|
-| `project_id` | yes | UUID from `workspace.md` |
-| `team_id` | yes | UUID matching the project's team |
-| `default_priority` | no | Linear int (0=none, 1=urgent, 2=high, 3=medium, 4=low). Default `3` |
-| `phases[].number` | yes | Integer phase number (≥ 0) |
-| `phases[].name` | yes | Short phase label, used in summary log only |
-| `phases[].tasks[].step` | yes | 2-digit zero-padded string (`"01"` … `"99"`) |
-| `phases[].tasks[].title` | yes | Atomic, imperative, NO `[P*]` prefix |
-| `phases[].tasks[].description` | yes | Multi-line markdown |
-| `phases[].tasks[].priority` | no | Overrides `default_priority` per task |
-
 After writing, **show the user a preview**:
 
 - `Project: <name> (id ...)` (resolved from workspace.md)
@@ -166,27 +138,10 @@ Then STOP. Do not poll, do not sleep-then-tail. The user comes back when ready.
 
 If the user comes back later asking "où ça en est", THEN run a single `tail -50 <log>` (cheap, returns instantly) - never a `sleep N && tail` chain.
 
-## How the worker (`create_issues.py`) behaves
-
-- **Idempotent by title**: queries Linear for issues in the target project, builds a set of existing titles (with `[P{N}-{step}] ` prefix), and skips any task whose generated title is already present. Re-runs are safe.
-- **Worker pool**: 8 concurrent threads (matches the rate limit headroom Linear gives personal API keys).
-- **Structured logs**: each task emits exactly one line:
-  - `OK <identifier> [P1-01] Add port allocator` - created
-  - `SKIP [P1-01] Add port allocator - already exists`
-  - `FAIL [P1-01] Add port allocator - <error>`
-- **Final line**: `Done - created=N skipped=M failed=K`. `grep -c '^OK '`, `grep -c '^FAIL '`, `grep '^Done'` give the user a sub-second status check.
-- **Exit code**: `0` if `failed=0`, else `1`. Useful for chaining other automation.
-
 ## Rules
 
-1. **Never push to Linear without confirmation.** Phase 4 generates JSON, Phase 5 needs the user's go. Skipping confirmation is a hard violation.
-2. **Always launch detached.** Even for a 5-task plan - the cost difference is negligible, the discipline avoids accidents on larger plans.
+1. **Never push to Linear without confirmation.** Phase 4 generates JSON, Phase 5 needs the user's go.
+2. **Always launch detached.** No inline polling. The user pings back for status; only then run `tail`.
 3. **Atomicity is non-negotiable.** No "and" / "et" / "+" / "puis" in titles. If you cannot describe the task in one imperative verb phrase, split it.
-4. **Phase numbers are integers ≥ 0.** `"P1.5"` and `"P1a"` are FORBIDDEN. If you need a sub-phase, it is actually a new phase - renumber.
-5. **Step indices are zero-padded 2-digit strings.** `"01"` not `1`, `"15"` not `"15 "`. The worker validates this.
-6. **Re-running with the same JSON is safe.** Idempotency by title means a partial failure can be resumed by re-launching the same script - no manual cleanup, no duplicates.
-7. **The temp dir lives at `/tmp/claude/backlog-<slug>-<timestamp>/`.** Never write under the project repo, never under `~`. Sandbox-safe and easy to clean up.
-8. **No inline polling.** After launching, hand off. The user pings back when they want a status; that is when (and only when) you run `tail`.
-9. **`LINEAR_API_KEY` is read from the environment by the worker.** Never inline it into the JSON, never log it, never echo it.
-10. **The worker is the single source of truth for the `[P{N}-{step}]` prefix.** Do NOT pre-prefix titles in the JSON - the worker formats them. This keeps the JSON re-usable and the prefix logic centralized.
-11. **NEVER create a Linear task that updates a Claude skill.** Anything whose `WHERE` points at `~/.claude/skills/...`, `~/.stow_repository/claude/.claude/skills/...`, or any other personal Claude tooling path is hard-banned from the backlog - these are personal dev tools, not deliverables of a NextNode package, and they live in a separate repo (`mac-config`) on a per-user dotfiles branch. If a planning conversation produces a "document this in the skill" item, drop it from the JSON entirely. At most, skill sync is a side-task `/go` may handle when closing a phase (out of band, never tracked in Linear). When in doubt, drop the task and tell the user "skill update skipped - out of scope for the backlog".
+4. **The worker is the single source of truth for the `[P{N}-{step}]` prefix.** Do NOT pre-prefix titles in the JSON. All scratch in `/tmp/claude/backlog-<slug>-<timestamp>/`.
+5. **NEVER create a Linear task that updates a Claude skill.** Anything whose `WHERE` points at `~/.claude/skills/...` or `~/.stow_repository/claude/.claude/skills/...` is hard-banned - personal tooling, lives in a separate repo (`mac-config`). Drop these tasks entirely.

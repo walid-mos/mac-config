@@ -99,11 +99,3 @@ UFW on the VPS further restricts SSH to the tailscale0 interface in both modes.
 
 `renderCloudInit(input)` - generates complete cloud-init YAML (see section above)
 
-## Step summaries
-
-Two pure formatters produce Markdown tables for GitHub Actions step summaries:
-
-- `buildProvisionSummary(result)` - server ID, type, location, IPs, duration
-- `buildDeploySummary(result)` - URL, image ref, target, duration
-
-Written to `GITHUB_STEP_SUMMARY` by the provision and deploy commands.

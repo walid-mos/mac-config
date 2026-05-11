@@ -146,32 +146,9 @@ jobs:
 
 `secrets: inherit` is MANDATORY. All infra secrets (`HETZNER_API_TOKEN`, `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET`, `DEPLOY_SSH_PRIVATE_KEY_B64`, `CLOUDFLARE_*`, `R2_*`, `NEXTNODE_APP_ID`, `NEXTNODE_APP_PRIVATE_KEY`) live at the `NextNodeSolutions` GitHub org level - no per-repo setup needed. App-specific secrets declared in `[deploy].secrets` must also exist at the org level with the same name.
 
-## Dockerfile example (Node 24)
+## Dockerfile
 
-Reference multi-stage build. Adapt to the specific framework, keep the port convention and the `:3000` expose.
-
-```dockerfile
-FROM node:24-alpine AS base
-WORKDIR /app
-RUN corepack enable pnpm
-
-FROM base AS deps
-COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
-
-FROM base AS build
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-RUN pnpm build
-
-FROM base AS runtime
-ENV NODE_ENV=production
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=build /app/dist ./dist
-COPY package.json ./
-EXPOSE 3000
-CMD ["node", "dist/server.js"]
-```
+See **[/turborepo](../turborepo/SKILL.md)** for the canonical multi-stage Dockerfile pattern (Rule 6 - provider-agnostic). Keep the port convention (`EXPOSE 3000`).
 
 ## Monorepo callers
 

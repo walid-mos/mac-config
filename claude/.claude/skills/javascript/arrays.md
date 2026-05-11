@@ -2,22 +2,7 @@
 
 ## Array Methods Over Loops
 
-Prefer declarative array methods over imperative loops when transforming data.
-
-```js
-// AVOID - imperative
-const active = []
-for (const user of users) {
-  if (user.isActive) {
-    active.push(user.name)
-  }
-}
-
-// PREFERRED - declarative pipeline
-const active = users
-  .filter(u => u.isActive)
-  .map(u => u.name)
-```
+Prefer declarative array methods (`.filter`/`.map`/`.reduce`) over imperative loops when transforming data. See `/coding` RULE 2 for the canonical pipeline-vs-nested-loop example.
 
 **When to use `for...of` instead:**
 - When you need `break` / `continue` / early exit (can't do that with `.forEach`)

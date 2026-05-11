@@ -96,20 +96,7 @@ function handlePlayCard(nextCard: Card) {
 }
 ```
 
-## Case 7: App Init - Module-Level
-
-```tsx
-// FORBIDDEN - runs twice in Strict Mode
-useEffect(() => { checkAuth(); loadStorage() }, [])
-
-// MANDATORY
-if (typeof window !== "undefined") {
-  checkAuth()
-  loadStorage()
-}
-```
-
-## Case 8: Data Passed to Parent - Fetch in Parent
+## Case 7: Data Passed to Parent - Fetch in Parent
 
 ```tsx
 // FORBIDDEN - child fetches and pushes up

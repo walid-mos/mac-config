@@ -2,10 +2,6 @@
 
 Logo system and usage rules. Based on Brand Guidelines v2.0 (December 2024).
 
-## Logo Concept
-
-The NN symbol is two fused N letters rendered as a **single SVG path** with a unified gradient. Three gradient variants exist (teal, white, black).
-
 ## Logo Variants
 
 ### Icons (symbol only)
@@ -86,31 +82,12 @@ PNG variants are also available (replace `.svg` with `.png` or `-mini.png`).
 | `./social/*` | dark, light | SVG, PNG |
 | `./favicon/*` | - | SVG, PNG, PNG mini |
 
-## Minimum Sizes
+## Minimum Sizes & Protection Zone
 
-| Context | Minimum Size |
-|---|---|
-| Favicon | 32x32px |
-| Social | 48x48px |
-| Header | 40px height |
-| Print | 15x15mm |
-
-## Protection Zone
-
-Maintain a 25% clear space around the logo (25% of the logo's width/height on all sides).
-
-## Usage Rules - DO
-
-- Use original SVG files from the assets kit
-- Respect the 25% protection zone
-- Choose the variant that matches the background contrast
-- Maintain original proportions
-- Use Black variant for B&W print
+Minimums: 32x32px favicon, 48x48px social, 40px header height, 15x15mm print. Maintain a 25% clear space around the logo on all sides.
 
 ## Usage Rules - DO NOT
 
 - Modify gradient colors
 - Deform or stretch the logo
 - Add effects (shadows, outlines, glows)
-- Place on low-contrast backgrounds
-- Use below the minimum size

@@ -28,15 +28,15 @@
       "Bash(awk:*)",
       "Bash(grep:*)",
       "Bash(cmux:*)",
-      "WebFetch(*)",
-      "WebSearch(*)",
       "mcp__claude_ai_Context7__*",
       "mcp__context7__*",
       "Read",
       "Grep",
       "Glob",
       "Edit",
-      "Write"
+      "Write",
+      "WebFetch",
+      "WebSearch"
     ],
     "deny": [
       "Bash(gh repo delete *)",
@@ -68,7 +68,8 @@
         "*.astro.build",
         "*.playwright.dev",
         "*.googleapis.com",
-        "*.linear.app"
+        "*.linear.app",
+        "*.datadoghq.com"
       ],
       "allowLocalBinding": true
     },

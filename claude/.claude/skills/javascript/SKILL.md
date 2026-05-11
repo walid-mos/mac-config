@@ -45,15 +45,14 @@ Always use `===` and `!==`. Loose equality has insane coercion rules that cause 
 
 ```js
 // FORBIDDEN
-if (value == null)
 if (status != "active")
 
 // MANDATORY
-if (value === null || value === undefined) // or: value == null is the ONLY tolerated exception
+if (value === null || value === undefined)
 if (status !== "active")
 ```
 
-**The single exception:** `value == null` (checks both `null` and `undefined`) is tolerated because it's a well-known JS idiom, but `value === null || value === undefined` or `value == null` - pick one and be consistent in the project.
+**Single tolerated exception:** `value == null` (matches both `null` and `undefined`) is a well-known idiom. Pick one form per project and stay consistent.
 
 ### `eval()`, `with`, `arguments` object are FORBIDDEN
 

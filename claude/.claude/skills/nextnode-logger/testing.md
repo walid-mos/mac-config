@@ -50,11 +50,6 @@ expect(mock.info.mock.calls).toHaveLength(1)
 expect(mock.info.mock.calls[0][0]).toBe('Expected message')
 ```
 
-For full vitest integration, create your own mocks instead:
-```typescript
-const mockLogger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), child: () => mockLogger }
-```
-
 ## Noop logger
 
 Silent logger that discards everything - satisfies a `Logger` dependency with no output:

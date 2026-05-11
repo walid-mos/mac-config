@@ -37,10 +37,10 @@ Examples:
 
 The VPS hostname in Tailscale is derived from the project config. Read `nextnode.toml` (current directory or provided project) and resolve:
 
-1. If `[server] name = "xxx"` is set → the VPS is a **shared VPS**, hostname = that `name` value (e.g. `shared-prod`, or the literal name).
-2. If no `server.name` → the VPS is **dedicated**, hostname = `project.name` from `[project]`.
+1. If `[deploy].vps = "xxx"` is set → use that value verbatim (pins to a dedicated VPS, e.g. `monitoring`).
+2. Otherwise → defaults per environment: `nn-prod` (production) or `nn-dev` (development).
 
-The resolved hostname is directly usable as a Tailscale host (e.g. `ssh deploy@myproject`).
+The resolved hostname is directly usable as a Tailscale host (e.g. `ssh deploy@nn-prod`).
 
 ### Phase 2: Connect
 

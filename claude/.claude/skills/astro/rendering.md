@@ -1,8 +1,8 @@
-# Rendering Modes in Astro 5
+# Rendering Modes in Astro 6
 
 ## The Two Output Modes
 
-Astro 5 has exactly two output modes. The `hybrid` mode from Astro 4 was removed.
+Astro has exactly two output modes. The `hybrid` mode from Astro 4 was removed.
 
 ### `output: 'static'` (default)
 

@@ -48,12 +48,13 @@ Critical fields for publishing:
   },
   "devDependencies": {
     "@nextnode-solutions/standards": "workspace:*",
-    "oxfmt": "^0.28.0",
-    "oxlint": "^1.43.0",
-    "tsdown": "^0.21.9",
-    "typescript": "^6",
-    "vitest": "^3"
+    "oxfmt": "<latest>",
+    "oxlint": "<latest>",
+    "tsdown": "<latest>",
+    "typescript": "<latest>",
+    "vitest": "<latest>"
   },
+  // Copy current versions from an existing package - hardcoding here goes stale fast.
   "engines": {
     "node": ">=24.0.0"
   },
@@ -178,7 +179,7 @@ entry: {
 
 This produces `dist/logger.js`, `dist/testing.js`, `dist/transports/http.js` with matching `.d.ts` files.
 
-**Why tsdown over tsup**: tsup is in maintenance mode and has an unfixed bug ([#1388](https://github.com/egoist/tsup/issues/1388)) where its DTS plugin injects `baseUrl: "."`, triggering TS5101 deprecation errors on TypeScript 6+. tsdown (same author) uses Rolldown + Oxc, is actively maintained, and avoids the issue. API is nearly drop-in compatible.
+(For the tsdown-vs-tsup rationale, see `/nextnode-standards` `tsdown` section.)
 
 ## 6. vitest.config.ts
 

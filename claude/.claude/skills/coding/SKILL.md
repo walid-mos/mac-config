@@ -12,6 +12,10 @@ description: >-
 
 These rules apply to ALL code you write or modify, in every language. No exceptions.
 
+## See also
+
+- [architecture.md](architecture.md) - Project-level architectural rules: no god objects, typed structures over positional data, dispatch tables over switch chains, explicit invariants and ownership, centralized cross-cutting namespaces, velocity-vs-progress signals. Load when designing or modifying structures across files, not just functions.
+
 ---
 
 ## RULE 1 - Early Returns (Guard Clauses)

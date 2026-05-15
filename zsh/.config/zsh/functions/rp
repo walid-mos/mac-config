@@ -1,0 +1,101 @@
+#!/bin/zsh
+# rp — Rich Plan server
+#
+# Serve an interactive plan.html locally, wait for the user's submission,
+# then exit. Plans live in `docs/interviews/<slug>/plan.html` at the repo root.
+# A single repo can hold many in-flight plans (one slug each).
+#
+# Usage: rp [<slug>|<path>] [--port <port>]
+#   No arg            → fzf-pick among `docs/interviews/*` in the cwd.
+#   <slug>            → serve `docs/interviews/<slug>/plan.html`.
+#   <path>            → serve that path (must start with `./` or `/`).
+
+rp() {
+	emulate -L zsh
+	setopt local_options pipe_fail
+
+	local target=""
+	local port="${RP_PORT:-7654}"
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--port)
+				port="$2"
+				shift 2
+				;;
+			-h|--help)
+				cat <<-EOF
+				rp — serve a rich plan locally and wait for the user's submission.
+
+				USAGE:
+				    rp [<slug>|<path>] [--port <port>]
+
+				ARGUMENTS:
+				    <slug>         Folder name under docs/interviews/ (e.g. 'auth-migration').
+				                   Serves docs/interviews/<slug>/plan.html.
+				    <path>         Explicit path (must start with './' or '/').
+				                   Serves <path>/plan.html.
+				    (no arg)       fzf-pick among existing docs/interviews/*/ in cwd.
+
+				OPTIONS:
+				    --port <port>  HTTP port (default: 7654, override with RP_PORT env).
+				                   Use 0 to let the OS pick a free port (URL printed on stdout).
+				    -h, --help     Show this help.
+
+				BEHAVIOR:
+				    Starts a Node HTTP server, opens plan.html in the default browser,
+				    blocks until the page POSTs JSON to /submit, writes submission.json
+				    next to plan.html, then exits.
+				EOF
+				return 0
+				;;
+			-*)
+				print -u2 "rp: unknown option: $1"
+				return 1
+				;;
+			*)
+				target="$1"
+				shift
+				;;
+		esac
+	done
+
+	local dir=""
+	if [[ -z "$target" ]]; then
+		if [[ ! -d "docs/interviews" ]]; then
+			print -u2 "rp: no docs/interviews/ directory in $(pwd)"
+			return 1
+		fi
+		if ! command -v fzf >/dev/null 2>&1; then
+			print -u2 "rp: fzf is required for interactive selection (brew install fzf) — or pass a slug"
+			return 1
+		fi
+		local slug
+		slug=$(ls -1 docs/interviews/ 2>/dev/null | fzf --prompt="rp · pick a plan: " --height=40% --border)
+		[[ -z "$slug" ]] && { print -u2 "rp: no plan selected"; return 1 }
+		dir="docs/interviews/$slug"
+	elif [[ "$target" == /* || "$target" == ./* || "$target" == ../* ]]; then
+		dir="${target%/}"
+	else
+		dir="docs/interviews/${target%/}"
+	fi
+
+	if [[ ! -f "$dir/plan.html" ]]; then
+		print -u2 "rp: no plan.html in $dir"
+		return 1
+	fi
+
+	if ! command -v node >/dev/null 2>&1; then
+		print -u2 "rp: node is required (managed via fnm — run 'fnm use default' or install node)"
+		return 1
+	fi
+
+	local server="${XDG_CONFIG_HOME:-$HOME/.config}/rp/server.mjs"
+	if [[ ! -f "$server" ]]; then
+		print -u2 "rp: server script not found at $server"
+		print -u2 "rp: run 'make rp' from the dotfiles repo"
+		return 1
+	fi
+
+	node "$server" "$port" "$dir"
+}

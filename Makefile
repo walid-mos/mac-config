@@ -1,8 +1,8 @@
 SHELL := /usr/bin/env bash
 STOW := stow -t $(HOME)
-PACKAGES := claude cmux colima docker ghostty languages nvim opencode rectangle starship zsh
+PACKAGES := claude cmux colima docker ghostty languages nvim opencode rectangle rp starship zsh
 
-.PHONY: help install all unstow restow $(PACKAGES) claude-post
+.PHONY: help install all unstow restow $(PACKAGES) claude-post rp-post
 
 help:
 	@echo "Targets:"
@@ -14,7 +14,7 @@ help:
 	@echo ""
 	@echo "Packages: $(PACKAGES)"
 
-install all: $(PACKAGES) claude-post
+install all: $(PACKAGES) claude-post rp-post
 
 unstow:
 	@for pkg in $(PACKAGES); do $(STOW) -D $$pkg; done
@@ -28,3 +28,7 @@ $(PACKAGES):
 claude-post:
 	@command -v claude >/dev/null || { echo "claude CLI not found, skipping MCP setup"; exit 0; }
 	@claude mcp add context7 -s user -- npx -y @upstash/context7-mcp@latest 2>/dev/null || echo "context7 already registered"
+
+rp-post:
+	@command -v node >/dev/null || { echo "node not found — install it (fnm install --lts) so 'rp' can serve plan.html"; exit 0; }
+	@echo "rp ready: \`rp <slug>\` will serve plan.html and wait for /submit"

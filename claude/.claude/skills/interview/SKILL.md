@@ -13,54 +13,31 @@ user-invocable: true
 
 # Interview
 
-Run in three phases. Do not skip phases.
+Three phases, all rendered as interactive HTML rounds served by `rp`. Discovery is round 0, grilling is rounds 1..N (multi-round, batched), closure is the final round. The chat is for short framing; every actual decision passes through the HTML loop.
 
-## 1. Discovery
+## Phases
 
-On invocation, restate the user's plan or design in your own words to confirm you understood it. Then enumerate the decision branches you see (architectural choices, scope cuts, sequencing, trade-offs) as a short bullet list. Ask the user to confirm or correct the tree before grilling.
+1. **Discovery** → see `./discovery.md`. Classify `change_kind`, enumerate branches, pre-prune by category, render `branches-tree`.
+2. **Grilling** → see `./grilling.md`. For each in-scope branch, batch questions to fill the six-field closure schema.
+3. **Closure** → see `./closure.md`. Six-field completeness check; promote to `docs/plans/` when sealed.
 
-## 2. Grilling
+All three phases use blocks from `plan-html` and the `rp` rich-mode loop — load `../plan-html/blocks.md` and `../plan-html/rich-mode.md` (plus `../plan-html/diagrams.md` for closure) as you enter each phase.
 
-Walk the tree depth-first, one branch at a time, one question at a time.
+## Slug and storage
 
-For each question:
-- State the question.
-- State your **recommended answer** with a one-sentence reason.
-- Surface the main trade-off.
-- Wait for the user's response.
+Layout owned by the **`project-docs`** skill — load it for the canonical layout, naming rules and conflict handling. The interview folder + state files (`plan.html`, `submission.json`, `state.json`, `.rp-url`) are defined there.
 
-Rules:
+On invocation, pick a kebab-case slug from the topic (e.g. `auth-middleware-migration`). Output goes to `./docs/interviews/<slug>/`. **`state.json` is the only memory of resolved cells across rounds — never lose it.** Read it before generating any round; write it after merging every submission.
+
+## Rules across phases
+
 - If a question can be answered by exploring the codebase, explore — never ask the user something you can verify yourself.
+- `state.json` is the source of truth between rounds. Always read it before generating a round.
+- Skipped questions get re-worded, not repeated. If the same question is skipped twice in a row, drop it and apply the recommended answer with a `Verification` note flagging it as Claude-defaulted.
 - Track resolved decisions internally as you go.
-- If the user backtracks, update the affected branch, do not restart the tree.
+- If the user backtracks via `Re-open`, update only the affected cell — never restart the tree.
+- **`change_kind` gates the question budget across all rounds, not just discovery.** If a grilling question would only make sense under a different `change_kind` (e.g. asking about a deprecation window when the plan is `additive-brownfield`), drop it. Don't smuggle retro-compat or migration concerns back in through the side door.
 
-## 3. Closure
+## Fallback
 
-When you estimate every branch is resolved, propose closure explicitly:
-
-> "I think the tree is resolved. Do you want me to generate the HTML deliverable, or is there a branch you want to dig further?"
-
-If the user wants more, return to Grilling. If they validate, generate the HTML and open it in the browser.
-
-## Output
-
-Write a single autonomous HTML file at `./docs/interview/<YYYY-MM-DD>-<topic-slug>.html`. Create the `docs/interview/` directory if it does not exist.
-
-After writing it, open it in Chrome via the `mcp__claude-in-chrome__navigate` tool with a `file://` URL when the extension is connected; otherwise fall back to `open` (macOS) or `xdg-open` (Linux) via Bash.
-
-### Sections (in order)
-
-1. **Header** — topic, date.
-2. **Context** — the problem in 2–4 short paragraphs, no fluff.
-3. **Resolved decisions** — one block per decision: the question, the retained option, alternatives discarded with their reason. Use a styled list or an inline SVG tree.
-4. **Risks & mitigations** — table.
-5. **Open questions** — only if a branch remained unresolved at closure. Omit the section if empty.
-6. **Next steps** — actionable checklist of implementation steps. Include a "Copy as backlog prompt" button that copies a prompt-ready summary to the clipboard (vanilla JS, no library).
-
-### Design constraints
-
-- Single file. No external assets, no CDN, no fonts. Inline CSS and JS only.
-- Mobile-responsive (CSS grid / flex).
-- Neutral system-font stack. One accent color, otherwise greys. Clarity over branding.
-- Code snippets in `<pre><code>` with a monospace stack.
-- No tracking, no analytics.
+If `rp` is unavailable (no Node, no browser), fall back to the static `plan-html` output at `./docs/interviews/<slug>/plan.html` (same folder as rich mode — just no live server) and run the phases in chat (Discovery → Grilling → Closure). The HTML loop is the preferred path; the chat fallback is for environments that can't serve.

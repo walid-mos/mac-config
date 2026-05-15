@@ -271,6 +271,58 @@ Errors should be caught AS CLOSE to their source as possible and should produce 
 
 ---
 
+## RULE 12 - Context Discipline (Grep Before Read)
+
+Most of an AI coding bill is paying for context that never gets used. Reading 2000-line files to fix 30 lines is the single biggest leak. Don't do it.
+
+**Mandatory habits:**
+- **Locate before opening.** Use `Grep` / `Glob` first to find the exact symbol, function, or filename. Only `Read` once you know which file and roughly which lines matter.
+- **Read targeted slices.** When a file is large (>500 lines) and you know the area, pass `offset` and `limit` to `Read`. Do NOT default to loading whole files.
+- **One file at a time, on demand.** Never pre-load 5 files "in case they're related". Open the next file only when the current one tells you to.
+- **Delegate breadth to Explore.** For "where is X defined / which files reference Y" across the repo, spawn the `Explore` subagent rather than running grep+Read in the main loop. Explore returns a digest; the main loop stays small.
+- **Don't re-read after editing.** `Edit` and `Write` are tracked. Reading a file you just changed to "verify" is pure waste - the tool would have errored if the change failed.
+
+```
+// FORBIDDEN - blind whole-file read for a small fix
+Read("/path/to/big-module.ts")            // 1800 lines, you need 20
+
+// MANDATORY - locate, then slice
+Grep("functionName", path="/path/to")     // returns file:line
+Read("/path/to/big-module.ts", offset=420, limit=60)
+```
+
+If you cannot articulate WHY you need to read a file right now, do not read it.
+
+---
+
+## RULE 13 - Model Routing on Subagent Calls
+
+The `Agent` tool accepts an optional `model` parameter (`"haiku" | "sonnet" | "opus"`). Use it. Running Opus on lint, lookup, or rename is paying premium for what Haiku nails.
+
+**Pass `model: "haiku"` explicitly when invoking Agent for:**
+- Read-only search / lookup (`Explore` agent, "where is X", "find references")
+- Mechanical edits (rename a symbol, fix a lint, tweak a log message, adjust formatting)
+- Status / introspection (`statusline-setup`, "what's the current git state")
+- Q&A about tooling (`claude-code-guide`, "how does hook X work")
+
+**Do NOT override (let it inherit) for:**
+- `general-purpose` multi-step work (research + edits + reasoning)
+- `Plan` (architect / design)
+- Code review, security review
+- Anything requiring cross-file reasoning, design tradeoffs, or correctness judgment
+
+**Rule of thumb:** if the task is "find / list / format / rename", it's a Haiku job. If it's "decide / design / reason / refactor across files", let the parent model handle it.
+
+```
+// MANDATORY - cheap lookup
+Agent({ subagent_type: "Explore", model: "haiku", prompt: "find every call site of fooBar across packages/" })
+
+// MANDATORY - no override, real work
+Agent({ subagent_type: "general-purpose", prompt: "refactor the auth flow to use the new session API" })
+```
+
+---
+
 ## Quick Reference - Forbidden vs Mandatory
 
 | Pattern | Verdict | Instead |
@@ -287,4 +339,9 @@ Errors should be caught AS CLOSE to their source as possible and should produce 
 | Negated boolean names | FORBIDDEN | Positive form |
 | Side effects in pure helpers | FORBIDDEN | Push IO to the edges |
 | Em dash character `-` (U+2014) | FORBIDDEN | Use `-` with spaces or rephrase |
+| `Read` whole file before locating area | FORBIDDEN | `Grep`/`Glob` first, then `Read` with `offset`/`limit` |
+| Pre-loading files "just in case" | FORBIDDEN | Open files on demand, one at a time |
+| Re-reading a file you just edited | FORBIDDEN | Trust the edit; tool would error on failure |
+| Default model for `Explore`/lookup `Agent` calls | FORBIDDEN | Pass `model: "haiku"` explicitly |
+| Overriding `model` on `general-purpose`/`Plan` | FORBIDDEN | Let it inherit the parent model |
 

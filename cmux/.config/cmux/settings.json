@@ -34,8 +34,8 @@
   // === Sidebar ===
   "sidebar": {
     "branchLayout": "vertical",
-    "openPortLinksInCmuxBrowser": true,
-    "openPullRequestLinksInCmuxBrowser": true,
+    "openPortLinksInCmuxBrowser": false,
+    "openPullRequestLinksInCmuxBrowser": false,
     "showLog": false,
     "showNotificationMessage": true,
     "showPorts": false,
@@ -59,8 +59,8 @@
   "browser": {
     "theme": "system",
     "defaultSearchEngine": "google",
-    "openTerminalLinksInCmuxBrowser": true,
-    "interceptTerminalOpenCommandInCmuxBrowser": true
+    "openTerminalLinksInCmuxBrowser": false,
+    "interceptTerminalOpenCommandInCmuxBrowser": false
   },
 
   // === Shortcuts ===

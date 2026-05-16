@@ -72,6 +72,50 @@ After writing `plan.html`:
 
 In addition to the shape-based composition (see `recipes.md`), every rich-mode HTML must include:
 
-- A persistent `Submit` button (sticky footer, always visible).
+- A persistent **approval gate** (sticky footer, always visible) — see below for the three-button contract.
 - At least one of: `decisions`, `open-questions`, `comments`, or `interactive-figure`. A rich-mode HTML with no actual interactivity is a smell — drop back to static mode.
 - A vanilla-JS controller that wires inputs → state object → POST. No frameworks.
+
+## Approval gate — three buttons, three contracts
+
+Replace the lone `Submit` button with three explicit choices in the sticky footer. Each maps to a different next-action contract for Claude. **Honor the contract literally** — improvising on one of these betrays the user's intent.
+
+```html
+<footer class="rp-gate">
+  <button id="rp-reject" class="rp-btn rp-btn-ghost">Reject</button>
+  <button id="rp-approve" class="rp-btn rp-btn-primary">Approve</button>
+  <button id="rp-approve-fast" class="rp-btn rp-btn-accent">Approve &amp; build</button>
+</footer>
+```
+
+Each button posts the same payload with one extra field:
+
+```js
+async function rpSubmit(mode /* 'approved' | 'approved_fast' | 'rejected' */) {
+  const payload = collectState()
+  payload.approval_mode = mode
+  const res = await fetch('/submit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) throw new Error('submit failed')
+  document.body.innerHTML = `<main style="padding:4rem;font-family:var(--np-sans)"><h1>✓ ${mode === 'rejected' ? 'Rejected' : 'Submitted'}</h1><p>Return to Claude — you can close this tab.</p></main>`
+}
+document.getElementById('rp-approve').onclick      = () => rpSubmit('approved')
+document.getElementById('rp-approve-fast').onclick = () => rpSubmit('approved_fast')
+document.getElementById('rp-reject').onclick       = () => rpSubmit('rejected')
+```
+
+### How Claude must react to `approval_mode`
+
+- **`"approved"`** — user wants a sanity check before code is touched.
+  1. Restate the plan back in chat, integrating their edits, comments, and answers. Be specific — quote their wording where they wrote something.
+  2. Wait for explicit go-ahead. "Yes", "go", "proceed", anything unambiguous works. Silence, ambiguity, or a follow-up question do **not** count as approval.
+  3. If they express doubt or ask for revisions, do not implement. Revise the plan or have a clarifying conversation.
+- **`"approved_fast"`** — power-user shortcut. **Do not restate. Do not ask "shall I proceed". Acknowledge briefly ("starting now") and begin implementation immediately.** Skipping is the user's explicit choice — restating betrays it.
+- **`"rejected"`** — do not implement. Acknowledge and ask what direction they want.
+
+### Why the gate matters
+
+It's a contract, not a courtesy. Skipping the restate on `"approved"` betrays the user's wish to deliberate; running it on `"approved_fast"` betrays their explicit choice to skip the safety check. The three buttons are also a UX nudge — the user picks the cadence they actually want before clicking, instead of having Claude guess.

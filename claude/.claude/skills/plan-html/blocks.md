@@ -24,7 +24,31 @@ Each block has a fixed semantic role and a default visual. Adapt the visual to t
 
   Include a `+ Ajouter une branche` button below the list. New branches auto-expand and focus the title field. A short `freeform` textarea below the add button captures contextual notes that don't fit a branch.
 
-- **questions** — grilling round of `/interview`. One card per pending question, organized by branch. Each card carries: question text, **recommended answer** (highlighted accent box), the one-sentence tradeoff, then the answer input. Input type matches the question: radio for multiple-choice (2–4 options provided), textarea for open-ended, always a `Skip · re-grill later` button as the third path. Submission feeds back as `answers: {<question-id>: {choice?, freetext?, skip?, note?}}`. Skipping a question signals "regenerate with refined wording in the next round" — never a final answer.
+- **questions** — grilling round of `/interview`. One card per pending question, organized by branch. Each card carries: question text, **recommended answer** (highlighted accent box), the one-sentence tradeoff, an optional **diagram** when the choice has a spatial / structural dimension, then the answer input. Always a `Skip · re-grill later` button as the third path. Submission feeds back as `answers: {<question-id>: {choice?, choices?, freetext?, skip?, note?}}`. Skipping a question signals "regenerate with refined wording in the next round" — never a final answer.
+
+  **Input type — pick the one that matches the question, never default to radio:**
+
+  - `radio` (single `choice`) → the options are **mutually exclusive** alternatives. "Which lib", "which approach", "which deployment target". The recommended answer is one option pre-selected.
+  - `checkbox` (multi `choices: string[]`) → the options are **orthogonal axes that combine**. "Which UX features do you want" (side-by-side + syntax + gutter + chrome-minimal), "which environments target this rollout", "which signals matter". The recommended answer is a **set** of pre-checked options + the bundled rationale. If the user can legitimately tick more than one, it's a checkbox — forcing a radio collapses real combinations into a fake single choice.
+  - `textarea` (`freetext`) → genuinely open-ended, no enumerable options. Use sparingly — most questions can be enumerated.
+
+  **Option count — content-driven, never padded:**
+
+  - Minimum 2 (less than 2 isn't a question, it's a confirmation — drop it).
+  - No fixed maximum. Radio: typically 2–5 distinct alternatives. Checkbox: up to 6–8 axes is fine (each is independent so cognitive load stays flat).
+  - **Never invent a 4th option to round out a list of 3.** A weak 4th option that no one would ever pick is worse than 3 sharp ones — it dilutes the recommended answer and signals laziness. If only 2 real options exist, ship 2.
+
+  **Per-question diagram (optional but encouraged when relevant):**
+
+  Use a primitive from `./diagrams.md` inside the card, between the recommended-answer box and the inputs. Pick the primitive whose shape matches the question:
+
+  - "X vs Y" UX or architecture comparisons → `.diag-compare` (two panes, mockup or layout per side).
+  - Side-by-side / inline / fullscreen layout choices → `mockup-tile` per option.
+  - Pipeline / flow / data-path choices → `.diag-flow`.
+  - Discriminated-union type choices (kind A vs kind B vs kind C, each with distinct fields) → `.diag-kinds`.
+  - Layered architecture choices (where does the logic live) → `.diag-stack`.
+
+  The bar is the same as for closure: *is text faster than a picture here?* For a UX choice ("side-by-side vs inline"), a diagram is almost always faster. Skip the diagram when the question is purely textual (naming, copy, ordering, yes/no on a non-spatial concept).
 
 - **resolved-summary** — read-only context shown at the top of grilling rounds 2..N. Compact list of `question → resolved answer` pairs, one per line. Each row has a `Re-open` link that flips the question back into the active `questions` block (rare; lets the user backtrack one cell without restarting the round). Omit in round 1.
 
@@ -35,8 +59,15 @@ Each block has a fixed semantic role and a default visual. Adapt the visual to t
   - **Compact sidebar**: 2-column grid (`grid-template-columns: 208px 1fr` — *narrow*, not 260+; nav rail, not reading column). Left = sticky sidebar (`position:sticky; top:0; height:100vh; overflow:auto`, ~12-px text, 5-px scrollbar) listing every decision grouped by theme, each link with a small 7-px completion dot (filled green = complete, hollow amber = missing field), plus links to Risks / Next steps and a `Cellules complètes X/N` progress bar. Right = main content. Collapse under 1024px (`display:none`).
   - **ScrollSpy**: `IntersectionObserver` on every `.decision` section + the major sections, highlighting the matching sidebar link as the user scrolls (`rootMargin: '-20% 0px -65% 0px'`). Without this the sidebar is dead weight.
   - **Decisions as sections, not cards**: each decision is an `<article class="decision">` separated by a thin `border-bottom: 1px solid var(--line-soft)` — no rounded card box. Anchor id `dec-<slug>`. Theme group is a `<div class="theme-block">` with anchor id `theme-<key>`.
-  - **Collapse-by-default — diagram + fact-preview, click for details**: by default each decision shows only `head + diagram + .fact-preview` (the Fact rendered as readable prose in a tinted-left-border block) + a `▸ Détails · 6 champs` toggle. The 6 textareas (`.fields-grid`) are `display:none` until the user clicks Détails — then `.fact-preview` hides and the 6 editable textareas appear. Toggle text becomes `▾ Réduire`. Track expanded ids in `state.expanded`. When the user edits the Fact textarea, sync the value back into `.fact-preview.textContent`. Without this collapse, ~12 decisions × 6 textareas of dense prose = unreadable page.
-  - **Per-decision afterthought textarea** (always visible, even when collapsed): a `<textarea class="decision-note" data-note="<decisionId>" placeholder="💬 Afterthought, question, doute pour Claude…">` sitting next to the Détails toggle in a `.decision-footer` flex row. Empty state: dashed `var(--line)` border, transparent bg — almost invisible. With content: accent-colored solid border + `var(--accent-tint)` bg + `has-value` class so it draws the eye. Auto-grow on input (cap ~200px). Persist in `state.notes` keyed by decision id. On submit, build `comments: [{target: decisionId, body: trim(note)}]` from non-empty notes and include it in the payload. This is the user's feedback channel back to Claude — they comment as they scan, Claude reads `submission.json` and either discusses or updates the plan. **Don't ship a closure without this.**
+  - **Collapse-by-default — diagram + fact-preview, click for details**: by default each decision shows only `head + diagram + .fact-preview` (the Fact rendered as readable prose in a tinted-left-border block) + a `▸ Détails · 6 champs` toggle. The 6 fields (`.fields-grid`) are `display:none` until the user clicks Détails — then `.fact-preview` hides and the 6 fields appear. Toggle text becomes `▾ Réduire`. Track expanded ids in `state.expanded`. When the user edits the Fact field, sync the value back into `.fact-preview.textContent`.
+  - **Field rendering — prose-first, never raw textareas in fixed boxes** (this is what makes the difference between a form and a deliverable):
+    - Each of the 6 fields renders as a `.field-prose` block — same visual language as `.fact-preview`: tinted left border (4px accent), generous padding (~12px 14px), readable line-height (1.5+), font-size matching the body prose. **No fixed height. No inner scroll. Ever.** The block grows with its content; if the prose is 8 lines, the block is 8 lines tall.
+    - Editable via `contenteditable="true"` on the prose block itself — *not* a `<textarea>` wrapper. Contenteditable grows naturally with content and inherits the prose typography, so reading and editing share the exact same visual. A textarea inside a fixed-height card is a smell — it crops the prose and forces the user to scroll inside a 100px box to read a 6-line Mechanism. **Never ship that.**
+    - Add a small `[F]` / `[M]` / `[E]` / `[R]` / `[O]` / `[V]` accent badge in front of each block as the field label (mono, uppercase, ~10px) so the six are scannable without a heavy `<label>` row above each.
+    - Hover state: `box-shadow: inset 0 0 0 1px var(--accent-tint)` so the user sees the block is editable. Focus state: solid 1px accent border + slight bg shift. No giant chrome.
+    - On `input`, persist into `state.decisions[decisionId][field]` (read via `el.textContent`). On submit, the `decisions` payload is built from this state — never from textarea values.
+    - Layout: 2-column CSS grid (`repeat(2, minmax(0, 1fr))`, ~16px gap) on wide screens, single column under 720px. The grid auto-rows to the *tallest* sibling per row — so paired fields (Fact/Mechanism, Edge/Rejected, Order/Verification) align even when one is shorter. Use `align-items: start` so a short field doesn't get padded to match a tall neighbour.
+  - **Per-decision afterthought textarea** (always visible, even when collapsed): a `<textarea class="decision-note" data-note="<decisionId>" placeholder="💬 Afterthought, question, doute pour Claude…">` sitting next to the Détails toggle in a `.decision-footer` flex row. Empty state: dashed `var(--line)` border, transparent bg — almost invisible. With content: accent-colored solid border + `var(--accent-tint)` bg + `has-value` class so it draws the eye. Auto-grow on input (cap ~200px). Persist in `state.notes` keyed by decision id. On submit, build `comments: [{target: decisionId, body: trim(note)}]` from non-empty notes and include it in the payload. This is the user's feedback channel back to Claude — they comment as they scan, Claude reads `submission.json` and either discusses or updates the plan. **Don't ship a closure without this.** (This one *is* a textarea because it's a true input field with placeholder semantics, not a prose block.)
   - **Diagram per decision when spatial info adds value** (most decisions in a closure benefit). See `diagrams.md`. Decisions where text already says everything (pure ordering, pure rejection rationale, "no rétrocompat") can skip the diagram — but the bar is "is text faster than a picture here?", and the answer is usually no.
 
 - **risk-grid** — 3-column grid: risk · severity badge (high/med/low) · mitigation. Not a `<table>` — use CSS grid for mobile.
@@ -45,7 +76,9 @@ Each block has a fixed semantic role and a default visual. Adapt the visual to t
 - **file-by-file** — collapsed `<details>` per file, each containing the why + the relevant hunk.
 - **review-focus** — small callout listing what the author wants the reviewer to focus on.
 - **open-questions** — left-bordered cards (accent), question + description + owner. Omit if empty.
-- **next-steps** — checklist with checkboxes, optional owners and dates. **Include a "Copy as backlog prompt" button** (vanilla JS, copies a clean prompt-ready summary).
+- **next-steps** — checklist with checkboxes, optional owners and dates. **Include a "Copy as backlog prompt" button** (vanilla JS).
+  - For the `Interview · closure` recipe, the button **copies the `backlog-bundle.json`** payload (the canonical handoff to `/backlog` — see `../interview/closure.md` § 5.b for the schema). Build the bundle in-page from the same state used to render the closure (decisions + change_kind + target hints + open_facts), `JSON.stringify` it, and write it to the clipboard. Label the button accordingly (e.g. `Copy backlog bundle (JSON)`).
+  - For all other recipes (plans, retros, audits…), the button copies a clean markdown summary prompt-ready for paste into `/backlog` — same legacy behavior.
 - **action-items** — same as `next-steps` but for retros.
 - **board** — drag-and-drop columns (Now / Next / Later / Cut, or whatever the data needs). Cards draggable between columns. Export-as-markdown button.
 - **mini-chart** — small inline SVG chart (bars or sparkline). No chart libraries.
@@ -54,3 +87,7 @@ Each block has a fixed semantic role and a default visual. Adapt the visual to t
 - **prose-columns** — long-form text in 1 or 2 columns (max-width 65ch per column).
 - **shipped / slipped** — two parallel lists with short rows and tags.
 - **export-button** — copy-to-clipboard button that emits a clean markdown or JSON version of the editable state. Mandatory for any block that lets the user edit (board, prompt-tuner, etc.).
+
+## Rich content primitives — see `./rich-blocks.md`
+
+`code-block`, `diff`, `file-tree`, `pill`, and `mermaid` are documented separately in `./rich-blocks.md`: drop-in HTML5 markup + the required CSS + the lazy loader for the two CDN libraries (highlight.js, Mermaid). Load that ref whenever the doc renders code, diffs, an impacted-files tree, semantic badges, or auto-laid-out flowcharts.

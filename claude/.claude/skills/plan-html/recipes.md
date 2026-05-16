@@ -6,7 +6,7 @@ Match the intent to a recipe. Each recipe is a **composition of blocks** from `b
 |---|---|
 | Implementation plan | `header` + `summary-strip` + `timeline` + `flow-diagram` (SVG) + `mockup-tile`* + `risk-grid` + `next-steps` |
 | Interview · discovery (round 0) | `header` + `context` + `branches-tree` |
-| Interview · grilling (rounds 1..N) | `header` + `resolved-summary`* + `questions` |
+| Interview · grilling (rounds 1..N) | `header` + `resolved-summary`* + `questions` (each card may embed a diagram primitive when the choice is spatial — see `diagrams.md`) |
 | Interview · closure (final) | `header` + `decisions` + `risk-grid` + `open-questions`* + `next-steps` |
 | Code review writeup | `header` + `tldr` + `annotated-diff` + `file-by-file` + `review-focus` |
 | Architecture audit | `header` + `module-map` (SVG) + `findings-grid` + `risk-grid` + `next-steps` |

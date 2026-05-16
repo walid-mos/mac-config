@@ -35,8 +35,9 @@ Do **not** load for: marketing pages, product UIs, demos, anything where HTML is
 ## Pipeline
 
 1. **Pick the shape** → read `./recipes.md` for the intent → recipe table.
-2. **Compose from the block library** → read `./blocks.md`. For any spatial content (most closure decisions, plans, audits), also read `./diagrams.md` for the `.diag-*` primitives.
-3. **If the artifact must round-trip through the user as typed data** (decisions, comments, tunable tokens) → read `./rich-mode.md` for the submission protocol, output path, and `rp` server loop. Otherwise stay in static mode.
+2. **Set up the visual scaffolding** → read `./themes.md` for the `--np-*` token vocabulary, the anti-FOUC `<head>` bootstrap, and the skip-zones list. Drop these into every HTML you generate; they are non-negotiable.
+3. **Compose from the block library** → read `./blocks.md`. For rich content (code, diffs, file trees, pills, Mermaid) → also read `./rich-blocks.md`. For custom-layout schemas (compare / stack / kinds / pool / timeline / inline SVG) → also read `./diagrams.md`.
+4. **If the artifact must round-trip through the user as typed data** (decisions, comments, tunable tokens) → read `./rich-mode.md` for the submission protocol, output path, three-button approval gate, and `rp` server loop. Otherwise stay in static mode.
 
 ## Layout
 
@@ -46,11 +47,15 @@ Do **not** load for: marketing pages, product UIs, demos, anything where HTML is
 - Mobile-first. Every grid collapses gracefully under 780px.
 - CSS Grid for any multi-column block. Flex only for single-axis layouts.
 
+### Visual scaffolding — see `./themes.md`
+
+Every doc shares the same baseline: `--np-*` CSS tokens (palette NextNode, light + dark values), an anti-FOUC inline `<script>` in `<head>` before the stylesheet, and a list of skip-zones the rich-mode runtime never auto-edits. Full token vocabulary, bootstrap script, and skip-zone list are in `./themes.md` — load it whenever you generate HTML. **Rule of thumb: no hex literal outside `:root` / `[data-theme="dark"]`. Everything else uses `var(--np-…)`.**
+
 ## Interactivity
 
 - **First-party vanilla JS is encouraged**, not banned. Drag-and-drop, filter chips, hover glossary, click-to-expand, copy buttons, slider-tuned animations — all welcome when the data justifies them.
 - **Every editable block ships an export button** (markdown or JSON to clipboard). The HTML is a loop back into the agent, not a dead end.
-- **No third-party scripts.** No analytics, no trackers, no CDN libraries. Inline only.
+- **CDN libraries — closed allowlist: `mermaid` and `highlight.js`.** Any other CDN is banned (no analytics, no trackers, no UI frameworks, no charting libs). Both are loaded *only when their target block is present in the page* — if there's no `<div class="mermaid">`, don't ship the Mermaid script. Pin a version (e.g. `mermaid@11`) and re-theme on `np:theme-change`.
 - **No console errors** when opening the file.
 
 ## Branding
@@ -90,5 +95,17 @@ Before declaring done:
 - For `Interview · closure`: every decision with any spatial / structural / sequential payload gets its own diagram (tree, flow, compare, kinds, pool, stack, timeline, or inline SVG). Plain six-field text with no schema is a smell — the reader should grasp each decision in 2s by glancing at the diagram before reading the cells.
 - Every editable block has an export button.
 - Brand colors and fonts correct (or opted-out consistently). No off-brand greys, no `#000000`, no pure white when on NextNode default.
-- Dark mode renders.
-- No console errors. No third-party scripts.
+- **No hex literal inside a component.** Colors / shadows / radii flow through `--np-*` tokens. A hardcoded `#0D9488` in a block is a bug, not a shortcut.
+- Dark mode renders. Anti-FOUC `<script>` is present and runs before the stylesheet.
+- No console errors. Third-party scripts limited to the closed allowlist (`mermaid`, `highlight.js`), loaded only when their target block exists.
+
+### Sanity-check — silent failure modes
+
+Re-scan the page once before serving. These are the six ways a plan looks fine but misbehaves once the user starts interacting. Catch each before wasting the user's attention.
+
+- **Section ids collide.** Two `<section>` whose `<h2>` slugifies to the same id — the runtime auto-appends `-2`, `-3` and any deep-link anchors break. Write `id="…"` explicitly on the `<section>` whenever you reference it from a sidebar / scrollspy / `<a href="#…">`.
+- **Editable vs static prose.** A `<p>` that holds a generated artefact or a quoted code excerpt — runtime makes it editable, which is almost never the intent. Move it into a skip-zone container (`<pre>`, `.diff`, `.mermaid`, etc.) or mark it `<p class="static">`. Conversely, an inert paragraph the user must be able to refine: it must live inside a `<section>` and not inside a skip-zone.
+- **Form name collisions.** Two `<form class="rich-question">` whose radios share the same `name` — the auto-derived question id collides and one answer overwrites the other. Use distinct `name`s, or set `data-question-id` explicitly. **Always pre-check exactly one radio per question** — without `checked`, no default lands in the submission.
+- **`<` and `>` inside `.diff` blocks.** Literal angle brackets in diff content get parsed as HTML and the diff breaks visually. Escape them (`&lt;` / `&gt;`) — *only* inside the diff content itself, not the surrounding markup.
+- **Invalid defaults in `rich-custom`.** A `<form class="rich-custom">` input with `required` / `pattern` / `min` / `max` whose default fails the constraint — user can never submit. Walk every form's initial state once and confirm it validates. Inputs without `name` drop silently from the submission; two custom forms sharing `data-custom-id` overwrite each other.
+- **Token discipline broken.** `grep -E '#[0-9A-Fa-f]{3,8}' plan.html` inside any `<style>` block other than `:root` / `[data-theme=…]` — every hit is a future dark-mode bug.

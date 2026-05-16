@@ -59,13 +59,77 @@ For each comment:
 
 Never silently drop a comment. Every afterthought is either resolved in chat, applied to the plan, or sent back through grilling — but always acknowledged.
 
-## 5. Promote to `docs/plans/`
+## 5. Promote and emit backlog bundle
 
-Once the closure is final (no blank cells, no unresolved afterthoughts), copy the final plan to the canonical plans location so it's discoverable outside the interview folder:
+Once the closure is final (no blank cells, no unresolved afterthoughts), do **two** things in order.
+
+### 5.a Copy the plan to `docs/plans/`
 
 ```
 mkdir -p docs/plans
 cp docs/interviews/<slug>/plan.html docs/plans/<YYYY-MM-DD>-<slug>.html
 ```
 
-The interview folder stays in place as historical state (rounds, submissions, `state.json`). The copy in `docs/plans/` is the authoritative implementation plan — that's what `/backlog`, code reviews, and future readers look at. Confirm in chat with a one-line summary and the path so the user can re-open it (e.g. via `rp <slug>`).
+The interview folder stays in place as historical state (rounds, submissions, `state.json`). The copy in `docs/plans/` is the authoritative implementation plan — that's what code reviews and future readers look at.
+
+### 5.b Emit `backlog-bundle.json`
+
+Pure transformation of `state.json` — no UI, no extra round. The bundle is the **canonical handoff** to `/backlog`. It carries the Decisions verbatim plus the metadata `/backlog` needs to skip its own discovery. **No phases, no tasks** — that's `/backlog`'s job, not the interview's.
+
+Write to:
+
+```
+docs/interviews/<slug>/backlog-bundle.json
+```
+
+Schema (JSON, one decision per object — `schema_version: "1"` is required, `/backlog` refuses unknown versions):
+
+```json
+{
+  "schema_version": "1",
+  "source": {
+    "kind": "interview",
+    "slug": "<slug>",
+    "change_kind": "<from state.json>"
+  },
+  "target": {
+    "linear_project_hint": "<best match from Decisions — empty string if unsure>",
+    "linear_team_hint": "<INT | SAS | CLI | empty string>",
+    "repo_path_hint": "<packages/X | apps/Y | empty string>"
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "theme": "<from state.json>",
+      "fact": "...",
+      "mechanism": "...",
+      "edge": "...",
+      "rejected": "...",
+      "order": "...",
+      "verification": "..."
+    }
+  ],
+  "open_facts": {
+    "<lower_snake_key>": "<value>"
+  },
+  "freeform": "<state.json freeform if any>"
+}
+```
+
+**Filling `target`** — scan the resolved Decisions for concrete repo/package mentions:
+
+- Mentions `packages/<x>` or `core/packages/<x>` → `repo_path_hint = "packages/<x>"`, `linear_project_hint = "NextNode <X>"`, `linear_team_hint = "INT"`.
+- Mentions a product (YSumAI, Kicked, Adiffi, NextNode Landing) → matching SAS project, `linear_team_hint = "SAS"`.
+- Mentions infra / deploy / CI / Hetzner / Cloudflare → `linear_project_hint = "NextNode Infrastructure"`, `linear_team_hint = "INT"`.
+- If genuinely ambiguous, leave the fields as empty strings — `/backlog` falls back to asking.
+
+**Filling `open_facts`** — capture facts surfaced during the interview that don't belong inside a Decision card. Typical entries: `apps_to_migrate: ["monitoring", "kicked"]`, `registry: "ghcr.io/nextnodesolutions"`, `reserved_names_source: "SERVICE_DEFINITIONS"`. Free-form key/value, lower-snake-case keys. Omit the key entirely if nothing matches.
+
+After writing, confirm in chat with a one-line summary including both artifacts:
+
+```
+Plan: docs/plans/<YYYY-MM-DD>-<slug>.html
+Bundle: docs/interviews/<slug>/backlog-bundle.json (N decisions)
+```
+
+The legacy markdown paste path (from the `next-steps` "Copy as backlog prompt" button) stays accepted by `/backlog` for plans with no interview origin — but for any closure produced here, the bundle is the canonical handoff.

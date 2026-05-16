@@ -12,7 +12,7 @@ The user's persona, distilled. **Tweets are output in ENGLISH**, written by a Fr
 
 ## Language
 
-- **OUTPUT IS ENGLISH.** Always. No exceptions unless the user explicitly asks for a French tweet.
+- **OUTPUT IS ENGLISH.** Always. No exceptions, even if the user phrases the request in French or pastes French text to polish. Apple's built-in correction handles French; this skill exists specifically to produce English tweets.
 - French is acceptable ONLY in : a quoted client phrase, a city name (`Paris`, `Lyon`), a small personal aside in parentheses (`(c'est aussi ce qu'on fait chez NextNode)`). Use sparingly.
 - Native dev-twitter idioms welcome : `imo`, `tbh`, `ngl`, `lol`, `tho`, `idk`, `fwiw`, `ymmv`, `btw`
 - Contractions always : `I'm`, `won't`, `can't`, `didn't`, `it's`, `that's`

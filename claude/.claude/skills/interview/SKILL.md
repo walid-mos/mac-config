@@ -13,13 +13,13 @@ user-invocable: true
 
 # Interview
 
-Three phases, all rendered as interactive HTML rounds served by `rp`. Discovery is round 0, grilling is rounds 1..N (multi-round, batched), closure is the final round. The chat is for short framing; every actual decision passes through the HTML loop.
+All work is rendered as interactive HTML rounds served by `rp`. The chat is for short framing; every actual decision passes through the HTML loop.
 
 ## Phases
 
-1. **Discovery** → see `./discovery.md`. Classify `change_kind`, enumerate branches, pre-prune by category, render `branches-tree`.
-2. **Grilling** → see `./grilling.md`. For each in-scope branch, batch questions to fill the six-field closure schema.
-3. **Closure** → see `./closure.md`. Six-field completeness check; promote to `docs/plans/` when sealed.
+1. **Discovery** (round 0) → see `./discovery.md`. Classify `change_kind`, enumerate branches, pre-prune by category, render `branches-tree`.
+2. **Grilling** (rounds 1..N, multi-round + batched) → see `./grilling.md`. For each in-scope branch, batch questions to fill the six-field closure schema.
+3. **Closure** (final round) → see `./closure.md`. Six-field completeness check; promote to `docs/plans/` when sealed.
 
 All three phases use blocks from `plan-html` and the `rp` rich-mode loop — load `../plan-html/blocks.md` and `../plan-html/rich-mode.md` (plus `../plan-html/diagrams.md` for closure) as you enter each phase.
 

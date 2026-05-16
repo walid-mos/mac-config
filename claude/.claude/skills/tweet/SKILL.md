@@ -69,18 +69,19 @@ Read `./voice.md`, `./formats.md`, `./algo.md`. The polish must respect them.
 
 Apply these transformations IN ORDER. Each one is conservative : fix only what's actually wrong.
 
-1. **Typos and spelling** : obvious misspellings, wrong word ("their" / "they're", "your" / "you're")
-2. **Grammar** : subject-verb agreement, prepositions, articles, tense consistency
-3. **Awkward phrasing** : idiom misuse, word order, French false-friends (`actually` for `currently`, `eventually` for `possibly`, `important` for `large`, etc.)
-4. **Capitalization** : capital first letter of the tweet, `I` capitalized, proper nouns capitalized
-5. **Em-dash removal** : if the user wrote `—`, replace with hyphen, comma, parentheses, or a line break. Always.
-6. **Banned expressions** : if a slop opener, hype emoji as content, or LLM-formal trope from `voice.md` is present, remove or rewrite it
-7. **Char budget** : if the post is over 280 chars, trim. Never silently truncate; if a cut changes meaning, flag it
+1. **Translate to English** : if the input is not already English, render it in natural dev-twitter English. Keep the voice (see `voice.md`), the structure, and any FR/EN code-switch tokens that are part of the persona. Do NOT formalize.
+2. **Typos and spelling** : obvious misspellings, wrong word ("their" / "they're", "your" / "you're")
+3. **Grammar** : subject-verb agreement, prepositions, articles, tense consistency
+4. **Awkward phrasing** : idiom misuse, word order, French false-friends (`actually` for `currently`, `eventually` for `possibly`, `important` for `large`, etc.)
+5. **Capitalization** : capital first letter of the tweet, `I` capitalized, proper nouns capitalized
+6. **Em-dash removal** : if the user wrote `—`, replace with hyphen, comma, parentheses, or a line break. Always.
+7. **Banned expressions** : if a slop opener, hype emoji as content, or LLM-formal trope from `voice.md` is present, remove or rewrite it
+8. **Char budget** : if the post is over 280 chars, trim. Never silently truncate; if a cut changes meaning, flag it
 
 **DO NOT** :
 
 - Reorganize the tweet
-- Add or remove content
+- Add or remove content (translation is not addition)
 - Change the angle, the message, or the punchline
 - Formalize the tone beyond fixing actual errors
 - Add new emojis, hashtags, or CTAs the user did not include
@@ -138,13 +139,9 @@ Show the 2 finalists verbatim, copy-paste ready, rationale collapsed below. No p
 
 If the user wants another pass, rerun `/tweet` with their feedback in `$ARGUMENTS`. Do not loop autonomously.
 
-## Hard rules (always)
+## Hard rules
 
-- **NEVER use the em-dash character (`—`).** Use a regular hyphen `-`, a comma, parentheses, or a line break. Non-negotiable.
-- Never add `🤖`, `#AI`, `#ChatGPT`, or any tool attribution
-- Zero hashtags by default. At most one if it's actively useful (rare)
-- Never end with "follow me", "follow for more", "stay tuned"
-- **Output is ENGLISH.** The user is French but writes for the global dev audience. Only output French if the user explicitly asks for it.
+See `./voice.md` § "Language" and § "Banned expressions". Em-dash, AI attribution, hashtags, pull-CTAs, French output : all forbidden, both modes. Single source of truth lives there.
 
 ## Storage
 

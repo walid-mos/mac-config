@@ -1,0 +1,151 @@
+---
+name: tweet
+description: >-
+  Draft a tweet or a thread in the user's voice from a session of dev work,
+  screenshots, or a free description. Spawns the `tweet-drafter` subagent
+  which drafts 5 candidates, self-critiques against voice/format/algo rules,
+  and returns 2 finalists ready to copy-paste. Use when the user runs
+  `/tweet`, says "fais-moi un tweet", "genere un thread", or shares a
+  screenshot of something they shipped and wants it published. Goal: build
+  the user's dev audience without sounding like a guru.
+user-invocable: true
+argument-hint: "corrige <text> | [--thread|--single] [topic or free description]"
+---
+
+# tweet
+
+This file is the entry point and the workflow. The doctrine lives in three companion files. Edit them, not the agent.
+
+## When to load
+
+- User runs `/tweet`
+- User says "fais-moi un tweet", "tweet ça", "genere un thread", "balance ça sur X"
+- User pastes a screenshot or describes what they just shipped and wants a tweet out of it
+
+Do NOT load for: rewriting a post the user already drafted (they iterate manually), LinkedIn content (different beast, different audience).
+
+## Companion files
+
+Always load all three before spawning the drafter:
+
+1. `./voice.md` : persona, FR/EN code-switch, banned and approved expressions
+2. `./formats.md` : single tweet structure, thread structure, hook library, char budgets
+3. `./algo.md` : X algorithm signals (dwell time, slop score, bookmark value)
+
+## Modes
+
+Two modes, detected from `$ARGUMENTS`:
+
+- **Polish mode** : `$ARGUMENTS` starts with `corrige`, `fix`, or `polish` (case-insensitive). Used when the user has already written a tweet (often a reply, sometimes a standalone) and wants the English cleaned up without losing their voice. Handled INLINE by the skill, no subagent spawn.
+- **Draft mode** (default) : anything else. Spawns the `tweet-drafter` subagent to produce 2 finalists from scratch.
+
+## Arguments
+
+`$ARGUMENTS` (optional):
+
+- `corrige <text>` / `fix <text>` / `polish <text>` : polish mode, the rest of the string is the tweet to correct
+- Free text (no prefix) : draft mode, the topic or the "voila ce que jai fait"
+- `--thread` : draft mode only, force a thread
+- `--single` : draft mode only, force a single tweet
+- Topic and flag can be combined in draft mode
+
+If `$ARGUMENTS` is empty, follow the input-resolution order in the draft-mode workflow below. **Never silently pull from older conversation turns.** The user typed `/tweet` deliberately; if they didn't say what to tweet, ask.
+
+## Polish-mode workflow
+
+Used when `$ARGUMENTS` starts with `corrige`, `fix`, or `polish`. Single-shot, no subagent.
+
+### Step 1 : parse the input
+
+Strip the `corrige` / `fix` / `polish` prefix from `$ARGUMENTS`. The rest is the text to polish.
+
+If the text is empty after stripping, ask : `colle le tweet a corriger`. Stop and wait.
+
+### Step 2 : load doctrine
+
+Read `./voice.md`, `./formats.md`, `./algo.md`. The polish must respect them.
+
+### Step 3 : polish inline
+
+Apply these transformations IN ORDER. Each one is conservative : fix only what's actually wrong.
+
+1. **Typos and spelling** : obvious misspellings, wrong word ("their" / "they're", "your" / "you're")
+2. **Grammar** : subject-verb agreement, prepositions, articles, tense consistency
+3. **Awkward phrasing** : idiom misuse, word order, French false-friends (`actually` for `currently`, `eventually` for `possibly`, `important` for `large`, etc.)
+4. **Capitalization** : capital first letter of the tweet, `I` capitalized, proper nouns capitalized
+5. **Em-dash removal** : if the user wrote `—`, replace with hyphen, comma, parentheses, or a line break. Always.
+6. **Banned expressions** : if a slop opener, hype emoji as content, or LLM-formal trope from `voice.md` is present, remove or rewrite it
+7. **Char budget** : if the post is over 280 chars, trim. Never silently truncate; if a cut changes meaning, flag it
+
+**DO NOT** :
+
+- Reorganize the tweet
+- Add or remove content
+- Change the angle, the message, or the punchline
+- Formalize the tone beyond fixing actual errors
+- Add new emojis, hashtags, or CTAs the user did not include
+- "Improve" voice tics that are intentional (line breaks, dev-twitter idioms `tbh` `ngl` `imo`, comma splices, contractions)
+
+### Step 4 : return
+
+Output format, verbatim, no preamble :
+
+```
+Original:
+<user's text exactly as pasted>
+
+Polished:
+<corrected version>
+
+Changes:
+- <fix 1, one line>
+- <fix 2>
+- ...
+```
+
+If the input has a genuine phrasing choice with two valid paths (rare), return both as `Polished 1` / `Polished 2` with separate change lists.
+
+If the input is already clean, return `Polished: (no changes needed)` and skip the Changes block. Do not invent fixes to look busy.
+
+## Draft-mode workflow
+
+### Phase 1 : resolve the input
+
+Walk this resolution order and STOP at the first hit. Do not combine sources.
+
+1. **`$ARGUMENTS` non-empty** → use it as the topic/description.
+2. **Screenshots attached to the current turn** → use them. If text is also present, combine with text.
+3. **Current session has a clear shipping signal** (the assistant just finished a refactor, a deploy, a feature, an audit in the immediate prior turns of THIS session): propose it explicitly to the user, e.g. `je crois que tu veux tweeter le swap eslint → oxlint qu'on vient de faire. tu confirmes ?`. Wait for confirmation. Never assume.
+4. **Nothing usable** → ask one open question : `qu'est-ce que tu veux tweeter ?`. Stop.
+
+Once the topic is resolved, also collect:
+
+- **Format hint** : `--thread`, `--single`, or `auto`
+- **Repo context** (only if explicitly relevant to the topic) : `git log --oneline -5`. Never spam diffs.
+
+### Phase 2 : spawn the drafter
+
+Spawn the `tweet-drafter` agent via the Agent tool with the bundle. The agent:
+
+1. Loads `voice.md`, `formats.md`, `algo.md`
+2. Drafts 5 candidates (varying angles)
+3. Self-critiques each against the rules
+4. Returns 2 finalists with a one-line rationale per
+
+### Phase 3 : present
+
+Show the 2 finalists verbatim, copy-paste ready, rationale collapsed below. No preamble.
+
+If the user wants another pass, rerun `/tweet` with their feedback in `$ARGUMENTS`. Do not loop autonomously.
+
+## Hard rules (always)
+
+- **NEVER use the em-dash character (`—`).** Use a regular hyphen `-`, a comma, parentheses, or a line break. Non-negotiable.
+- Never add `🤖`, `#AI`, `#ChatGPT`, or any tool attribution
+- Zero hashtags by default. At most one if it's actively useful (rare)
+- Never end with "follow me", "follow for more", "stay tuned"
+- **Output is ENGLISH.** The user is French but writes for the global dev audience. Only output French if the user explicitly asks for it.
+
+## Storage
+
+Tweets are ephemeral. Do not write them to disk unless the user asks. If asked, write to `./docs/notes/tweets/<YYYY-MM-DD>-<slug>.md` (one file per tweet/thread, final text + rationale).

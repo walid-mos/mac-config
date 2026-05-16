@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Session recap : /tweet skill + tweet-drafter agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #F8FAFC;
+  --bg-2: #ffffff;
+  --bg-3: #EEF2F6;
+  --text: #141A30;
+  --text-muted: #5B6478;
+  --accent: #0D9488;
+  --accent-tint: rgba(13, 148, 136, 0.10);
+  --highlight: #F97316;
+  --highlight-tint: rgba(249, 115, 22, 0.10);
+  --line: #D7DCE5;
+  --line-soft: #E8ECF2;
+  --danger: #DC2626;
+  --danger-tint: rgba(220, 38, 38, 0.10);
+  --success: #15803D;
+  --success-tint: rgba(21, 128, 61, 0.10);
+  --display: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --body: 'DM Sans', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141A30;
+    --bg-2: #1B2138;
+    --bg-3: #232B45;
+    --text: #F8FAFC;
+    --text-muted: #9AA3B6;
+    --accent: #2DD4BF;
+    --accent-tint: rgba(45, 212, 191, 0.14);
+    --highlight: #FB923C;
+    --highlight-tint: rgba(251, 146, 60, 0.14);
+    --line: #2E3854;
+    --line-soft: #232B45;
+    --danger: #F87171;
+    --danger-tint: rgba(248, 113, 113, 0.14);
+    --success: #4ADE80;
+    --success-tint: rgba(74, 222, 128, 0.14);
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: var(--body); line-height: 1.55; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 48px 32px 96px; }
+
+.eyebrow { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--accent); font-weight: 600; }
+h1 { font-family: var(--display); font-size: 38px; line-height: 1.15; margin: 8px 0 12px; font-weight: 800; letter-spacing: -0.02em; }
+.meta { color: var(--text-muted); font-size: 13px; margin-bottom: 22px; }
+.prompt-box { background: var(--bg-2); border-left: 3px solid var(--accent); padding: 12px 16px; border-radius: 4px; font-style: italic; color: var(--text-muted); font-size: 14px; max-width: 760px; }
+
+h2 { font-family: var(--display); font-size: 22px; margin: 56px 0 18px; font-weight: 700; letter-spacing: -0.01em; }
+h3 { font-family: var(--display); font-size: 16px; margin: 28px 0 10px; font-weight: 700; }
+
+.tldr { background: var(--accent-tint); border: 1px solid var(--accent); border-radius: 10px; padding: 18px 22px; margin: 24px 0 0; }
+.tldr p { margin: 0; font-size: 15px; }
+
+.strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 22px; }
+.strip .cell { background: var(--bg-2); border: 1px solid var(--line-soft); border-radius: 8px; padding: 12px 14px; }
+.strip .k { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.10em; color: var(--text-muted); margin-bottom: 4px; }
+.strip .v { font-family: var(--body); font-size: 14px; font-weight: 600; }
+.strip .v.mono { font-family: var(--mono); font-weight: 400; }
+.strip .v.accent { color: var(--accent); }
+
+.diagram { background: var(--bg-2); border: 1px solid var(--line-soft); border-radius: 12px; padding: 24px; margin: 18px 0; }
+.diagram-body { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 8px 0 16px; }
+.diagram-caption { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.10em; color: var(--text-muted); text-align: center; padding-top: 14px; border-top: 1px dashed var(--line); }
+
+.node { display: inline-flex; align-items: center; padding: 8px 14px; border-radius: 6px; font-family: var(--mono); font-size: 12px; background: var(--bg-3); color: var(--text); border: 1px solid var(--line); }
+.node.accent { background: var(--accent-tint); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.node.outline { background: transparent; border-style: dashed; }
+.node.muted { color: var(--text-muted); }
+.node.lg { font-size: 13px; padding: 10px 18px; }
+.node-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; }
+.node-group { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.arrow { display: inline-flex; align-items: center; height: 10px; width: 36px; color: var(--text-muted); position: relative; }
+.arrow.down { transform: rotate(90deg); }
+.arrow::before { content: ''; flex: 1; height: 1.5px; background: currentColor; }
+.arrow::after { content: ''; border-style: solid; border-width: 4px 0 4px 6px; border-color: transparent transparent transparent currentColor; margin-left: -1px; }
+.arrow.accent { color: var(--accent); }
+
+.decisions { display: flex; flex-direction: column; gap: 0; margin-top: 8px; }
+.decision { border-bottom: 1px solid var(--line-soft); padding: 28px 0; }
+.decision:last-child { border-bottom: none; }
+.decision-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 14px; flex-wrap: wrap; }
+.decision-num { font-family: var(--mono); font-size: 11px; color: var(--text-muted); background: var(--bg-3); padding: 3px 8px; border-radius: 4px; letter-spacing: 0.06em; }
+.decision-title { font-family: var(--display); font-size: 18px; font-weight: 700; }
+.fact-preview { background: var(--accent-tint); border-left: 4px solid var(--accent); padding: 12px 16px; border-radius: 4px; font-size: 14px; line-height: 1.55; }
+.fields-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 14px; align-items: start; }
+@media (max-width: 720px) { .fields-grid { grid-template-columns: 1fr; } }
+.field { background: var(--bg-2); border-left: 4px solid var(--line); padding: 10px 14px; border-radius: 4px; font-size: 13px; line-height: 1.55; }
+.field .lbl { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.10em; color: var(--accent); font-weight: 600; margin-bottom: 4px; }
+
+.grid-3 { display: grid; grid-template-columns: 2fr 100px 3fr; gap: 8px 14px; align-items: stretch; margin-top: 16px; }
+.grid-3 > div { background: var(--bg-2); border: 1px solid var(--line-soft); border-radius: 6px; padding: 10px 14px; font-size: 13px; }
+.grid-3 .head { background: transparent; border: none; border-bottom: 1px solid var(--line); border-radius: 0; font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.10em; color: var(--text-muted); padding: 4px 0; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+.badge.high { background: var(--danger-tint); color: var(--danger); }
+.badge.med { background: var(--highlight-tint); color: var(--highlight); }
+.badge.low { background: var(--accent-tint); color: var(--accent); }
+@media (max-width: 720px) { .grid-3 { grid-template-columns: 1fr; } }
+
+.next-steps { list-style: none; padding: 0; margin: 14px 0 0; }
+.next-steps li { background: var(--bg-2); border: 1px solid var(--line-soft); border-radius: 6px; padding: 10px 14px; margin-bottom: 8px; font-size: 14px; display: flex; gap: 12px; align-items: flex-start; }
+.next-steps .step-num { font-family: var(--mono); font-size: 11px; color: var(--accent); background: var(--accent-tint); padding: 2px 8px; border-radius: 4px; font-weight: 600; flex-shrink: 0; min-width: 28px; text-align: center; }
+.next-steps code { font-family: var(--mono); font-size: 12px; background: var(--bg-3); padding: 1px 6px; border-radius: 3px; }
+
+code, pre { font-family: var(--mono); }
+.inline-code { font-family: var(--mono); font-size: 13px; background: var(--bg-3); padding: 1px 6px; border-radius: 3px; color: var(--text); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="eyebrow">Session recap · skill + agent</div>
+  <h1>/tweet skill + tweet-drafter agent</h1>
+  <div class="meta">2026-05-16 · NextNode workflow · effort I3</div>
+  <div class="prompt-box">Automatiser la génération de tweets et threads en anglais à partir du travail dev quotidien, à partir d'une description libre ou de screenshots, dans la voix du user, sans hype ni guru.</div>
+
+  <h2>TLDR</h2>
+  <div class="tldr">
+    <p>Skill <span class="inline-code">/tweet</span> (doctrine éditable) + subagent <span class="inline-code">tweet-drafter</span> (boucle d'exécution avec auto-critique). Le skill résout l'input et délègue au subagent qui charge 3 fichiers de doctrine (voice, formats, algo), draft 5 candidats variés, score sur 5 axes, retourne 2 finalistes copy-paste ready. Tweets en <strong>anglais</strong>, capitalisation standard, <strong>em-dash banni</strong> à tous les niveaux du stack.</p>
+  </div>
+
+  <div class="strip">
+    <div class="cell"><div class="k">Effort</div><div class="v accent">I3</div></div>
+    <div class="cell"><div class="k">Fichiers créés</div><div class="v mono">5</div></div>
+    <div class="cell"><div class="k">Output</div><div class="v">English</div></div>
+    <div class="cell"><div class="k">Capitalisation</div><div class="v">Sentence-case</div></div>
+    <div class="cell"><div class="k">Em-dash</div><div class="v" style="color:var(--danger)">banned</div></div>
+    <div class="cell"><div class="k">Statut</div><div class="v accent">ready to stow</div></div>
+  </div>
+
+  <h2>Architecture</h2>
+  <div class="diagram">
+    <div class="diagram-body">
+      <div class="node-row">
+        <div class="node lg accent">/tweet (user input + screenshots)</div>
+      </div>
+      <span class="arrow down accent"></span>
+      <div class="node-row">
+        <div class="node lg">SKILL.md (resolve input + spawn)</div>
+      </div>
+      <div class="node-row" style="font-family: var(--mono); font-size: 11px; color: var(--text-muted); margin-top: -6px;">
+        reads doctrine ↓
+      </div>
+      <div class="node-row">
+        <div class="node">voice.md</div>
+        <div class="node">formats.md</div>
+        <div class="node">algo.md</div>
+      </div>
+      <span class="arrow down accent"></span>
+      <div class="node-row">
+        <div class="node lg accent">tweet-drafter agent</div>
+      </div>
+      <span class="arrow down"></span>
+      <div class="node-row">
+        <div class="node outline">draft 5 candidates</div>
+        <span class="arrow"></span>
+        <div class="node outline">score 5 axes</div>
+        <span class="arrow"></span>
+        <div class="node outline">kill &lt; 14/20</div>
+      </div>
+      <span class="arrow down accent"></span>
+      <div class="node-row">
+        <div class="node lg accent">return 2 finalists + rationale</div>
+      </div>
+    </div>
+    <div class="diagram-caption">Flow : input resolution → doctrine load → 5 angles → self-critique → 2 finalists</div>
+  </div>
+
+  <h3>Files written</h3>
+  <div class="strip" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+    <div class="cell"><div class="k">Skill entry</div><div class="v mono">~/.claude/skills/tweet/SKILL.md</div></div>
+    <div class="cell"><div class="k">Voice doctrine</div><div class="v mono">~/.claude/skills/tweet/voice.md</div></div>
+    <div class="cell"><div class="k">Format library</div><div class="v mono">~/.claude/skills/tweet/formats.md</div></div>
+    <div class="cell"><div class="k">Algo signals</div><div class="v mono">~/.claude/skills/tweet/algo.md</div></div>
+    <div class="cell"><div class="k">Subagent</div><div class="v mono">~/.claude/agents/tweet-drafter.md</div></div>
+  </div>
+
+  <h2>Decisions</h2>
+  <div class="decisions">
+
+    <article class="decision">
+      <div class="decision-head">
+        <span class="decision-num">D1</span>
+        <span class="decision-title">Skill + Agent (les deux)</span>
+      </div>
+      <div class="fact-preview">Split clair : skill = doctrine éditable en markdown (voice / formats / algo), agent = boucle d'exécution avec auto-critique. Pas un seul des deux, les deux.</div>
+      <div class="fields-grid">
+        <div class="field"><div class="lbl">Mechanism</div>Le skill résout l'input et spawn le subagent. Le subagent recharge les 3 fichiers de doctrine à chaque run, donc toute évolution de voix se propage sans toucher au prompt de l'agent.</div>
+        <div class="field"><div class="lbl">Edge</div>Skill appelable seul pour un draft brut. Agent appelable directement (sans /tweet) pour un one-shot.</div>
+        <div class="field"><div class="lbl">Rejected</div>Skill-only (pas d'itération), agent-only (les règles dérivent dans le prompt et ne sont plus éditables comme une doc).</div>
+        <div class="field"><div class="lbl">Verification</div>Le skill charge bien voice/formats/algo avant de spawn. L'agent refuse si un fichier doctrine manque.</div>
+      </div>
+    </article>
+
+    <article class="decision">
+      <div class="decision-head">
+        <span class="decision-num">D2</span>
+        <span class="decision-title">Output ENGLISH (pas français)</span>
+      </div>
+      <div class="fact-preview">Tweets sortent en anglais par défaut. Le user est français mais cible le public dev international. Français uniquement en aparté entre parenthèses si naturel.</div>
+      <div class="fields-grid">
+        <div class="field"><div class="lbl">Mechanism</div>Règle "OUTPUT IS ENGLISH" en tête de voice.md. Examples, hooks, banned/approved expressions tous réécrits en anglais. Override possible si user demande explicitement un tweet FR.</div>
+        <div class="field"><div class="lbl">Edge</div>Mots français OK en aparté entre parenthèses (ex : noms de villes, citation client), pas dans le body.</div>
+        <div class="field"><div class="lbl">Rejected</div>French-first (audience plafonnée), bilingue dans le même tweet (dilue la voix et le branding).</div>
+        <div class="field"><div class="lbl">Verification</div>Tous les good-examples de voice.md et formats.md sont en anglais. Hook patterns en anglais.</div>
+      </div>
+    </article>
+
+    <article class="decision">
+      <div class="decision-head">
+        <span class="decision-num">D3</span>
+        <span class="decision-title">Sentence-case (pas lowercase shitpost)</span>
+      </div>
+      <div class="fact-preview">Capitalisation standard : première lettre du tweet en majuscule, "I" en majuscule. Lowercase autorisé seulement en aparté casual ou one-liner punchline, jamais comme default.</div>
+      <div class="fields-grid">
+        <div class="field"><div class="lbl">Mechanism</div>Section "Style tics" de voice.md enforce sentence-case. Examples réécrits avec capitales correctes après le pushback du user en cours de session.</div>
+        <div class="field"><div class="lbl">Edge</div>Final period optionnel sur un tweet court punchy. Mandatory dans les threads ou dès qu'il y a 2+ phrases.</div>
+        <div class="field"><div class="lbl">Rejected</div>Lowercase first letter comme signature (lu comme négligé par les CTO de PME/ETI ciblés à terme, pas comme cool).</div>
+        <div class="field"><div class="lbl">Verification</div>Tous les good-examples capitalisent normalement. Refs (SpottedYou, Picaro_11) capitalisent normalement aussi.</div>
+      </div>
+    </article>
+
+    <article class="decision">
+      <div class="decision-head">
+        <span class="decision-num">D4</span>
+        <span class="decision-title">Input resolution explicite</span>
+      </div>
+      <div class="fact-preview">Ordre strict : <span class="inline-code">$ARGUMENTS</span> → screenshots du turn courant → proposition explicite basée sur la session courante avec confirmation → question ouverte. Jamais de scrape silencieux des turns précédents.</div>
+      <div class="fields-grid">
+        <div class="field"><div class="lbl">Mechanism</div>Phase 1 de SKILL.md walk l'ordre, stop au premier hit, ne combine jamais. L'agent reçoit un bundle pré-résolu et refuse si vide.</div>
+        <div class="field"><div class="lbl">Edge</div>Si la session a un signal "on vient de shipper X", proposer explicitement et attendre confirmation. Jamais d'assomption muette.</div>
+        <div class="field"><div class="lbl">Rejected</div>Fallback silencieux sur "last 1-3 user turns" (pioche du contenu sans rapport, invente du contexte, comportement opaque).</div>
+        <div class="field"><div class="lbl">Verification</div><span class="inline-code">/tweet</span> sans args et sans screenshot doit déclencher la proposal-ou-question, pas un guess.</div>
+      </div>
+    </article>
+
+    <article class="decision">
+      <div class="decision-head">
+        <span class="decision-num">D5</span>
+        <span class="decision-title">Em-dash hard ban</span>
+      </div>
+      <div class="fact-preview">Caractère <span class="inline-code">—</span> banni dans toute sortie. Remplaceurs autorisés : hyphen, virgule, parenthèses, retour à la ligne. Règle non-négociable.</div>
+      <div class="fields-grid">
+        <div class="field"><div class="lbl">Mechanism</div>Ban écrit dans : SKILL.md hard rules, voice.md banned expressions ("HARDEST BAN"), tweet-drafter.md hard bans, step 4 self-critique "HARD FAIL si em-dash → redraft".</div>
+        <div class="field"><div class="lbl">Edge</div>Em-dash toléré uniquement dans les énoncés de règle (qui doivent montrer le caractère) et dans les contre-exemples labellés "BAD" (qui montrent ce qu'il ne faut pas faire).</div>
+        <div class="field"><div class="lbl">Rejected</div>Allowing em-dash "avec parcimonie" (les LLMs en anglais en mettent partout, drift inévitable).</div>
+        <div class="field"><div class="lbl">Verification</div>Grep <span class="inline-code">—</span> dans <span class="inline-code">tweet/</span> retourne uniquement règles + BAD examples. Zéro dans les templates ou good examples.</div>
+      </div>
+    </article>
+
+    <article class="decision">
+      <div class="decision-head">
+        <span class="decision-num">D6</span>
+        <span class="decision-title">Boucle 5 → score → 2</span>
+      </div>
+      <div class="fact-preview">L'agent draft 5 angles distincts (outcome / lesson / cost / story / hot-take), score chaque candidat sur 5 axes (slop / dwell / bookmark / outrage / truth), kill ce qui passe sous le seuil, retourne les 2 meilleurs avec rationale d'une ligne.</div>
+      <div class="fields-grid">
+        <div class="field"><div class="lbl">Mechanism</div>Step 3 génère 5 angles forcés différents. Step 4 score 1-5 par axe, total /20. Kill si total &lt; 14 ou n'importe quel axe &lt; 3 ou em-dash présent ou specific inventé. Redraft si &lt; 2 survivent.</div>
+        <div class="field"><div class="lbl">Edge</div>Si input trop mince, retourner UN candidat labellé "best effort, need X" avec ask concret (nombre, screenshot, résultat). Jamais de slop pour atteindre 2.</div>
+        <div class="field"><div class="lbl">Rejected</div>Single-shot draft (pas d'itération), 3+ finalists (décision fatigue côté user, dilue le choix).</div>
+        <div class="field"><div class="lbl">Verification</div>Output format strict : exactement 2 blocs <span class="inline-code">=== FINALIST N ===</span> avec rationale d'une ligne. Tests : run /tweet avec un swap d'outil, vérifier que les 2 finalistes varient d'angle.</div>
+      </div>
+    </article>
+
+  </div>
+
+  <h2>Risks</h2>
+  <div class="grid-3">
+    <div class="head">Risk</div>
+    <div class="head">Severity</div>
+    <div class="head">Mitigation</div>
+
+    <div>Voice drift : les règles en markdown se contredisent au fil des éditions, le drafter produit des choses incohérentes.</div>
+    <div><span class="badge med">med</span></div>
+    <div>Re-lire voice.md complet une fois par mois. Si une règle est éditée, vérifier que les good-examples respectent encore.</div>
+
+    <div>Em-dash leak : un futur draft d'agent ou un edit de doctrine introduit un em-dash dans un template ou un good-example.</div>
+    <div><span class="badge high">high</span></div>
+    <div>Ajouter un hook PostToolUse sur Write/Edit qui grep <span class="inline-code">—</span> dans <span class="inline-code">skills/tweet/</span> et <span class="inline-code">agents/tweet-drafter.md</span>, alert si hors règles/BAD.</div>
+
+    <div>X algo changes : la doctrine algo.md vieillit, les signaux ne reflètent plus le scoring réel.</div>
+    <div><span class="badge low">low</span></div>
+    <div>Marquer algo.md avec la date de référence (mai 2026). Re-check tous les 6 mois ou quand X annonce un changement majeur.</div>
+
+    <div>Self-critique trop laxiste : le drafter retourne 2 finalistes faibles parce que le seuil 14/20 est trop bas.</div>
+    <div><span class="badge med">med</span></div>
+    <div>Après 2 semaines d'usage, regarder quels finalistes le user a réellement publiés vs ignorés. Ajuster le seuil ou les axes.</div>
+
+    <div>Hallucination de specifics : le drafter invente un nombre ou un outcome non présent dans l'input.</div>
+    <div><span class="badge high">high</span></div>
+    <div>Truth-check est déjà un axe de scoring avec HARD FAIL. Si une hallucination passe quand même, ajouter le cas exact en BAD example dans voice.md.</div>
+  </div>
+
+  <h2>Next steps</h2>
+  <ol class="next-steps">
+    <li><span class="step-num">1</span><div>Run <code>cd ~/.stow_repository &amp;&amp; make claude</code> pour stow le skill et créer le répertoire <code>~/.claude/agents/</code>.</div></li>
+    <li><span class="step-num">2</span><div>Reload Claude Code (nouvelle session) pour que <code>/tweet</code> apparaisse dans la liste de skills user-invocable.</div></li>
+    <li><span class="step-num">3</span><div>Test de smoke : <code>/tweet jai swap eslint pour oxlint sur le monorepo nextnode, lint complet passé de 38s a 1.2s, 3 regles custom a porter</code>. Vérifier que les 2 finalistes sont en anglais, capitalisés, sans em-dash, sans hashtag.</div></li>
+    <li><span class="step-num">4</span><div>Test avec screenshot : poster un screen d'un avant/après build time, lancer <code>/tweet</code>, vérifier que le drafter lit l'image et en sort un single tweet "before/after" propre.</div></li>
+    <li><span class="step-num">5</span><div>Premier tweet réel : publier un finaliste sur X. Tracker dwell time, bookmarks, replies sur 7 jours pour calibrer la doctrine.</div></li>
+    <li><span class="step-num">6</span><div>Itérer voice.md : si un finaliste a sonné faux, ajouter le cas concret en BAD example. Si un autre a très bien performé, ajouter le pattern en hook approuvé.</div></li>
+    <li><span class="step-num">7</span><div>Plus tard (V8 facultatif) : agent <code>tweet-scout</code> qui digère la semaine (git log + sessions Claude) et propose 5 candidats threads à raffiner avec <code>/tweet</code>.</div></li>
+  </ol>
+
+</div>
+</body>
+</html>

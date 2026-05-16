@@ -14,7 +14,8 @@
     "focusPaneOnFirstClick": true,
     "reorderOnNotification": false,
     "warnBeforeQuit": false,
-    "commandPaletteSearchesAllSurfaces": true
+    "commandPaletteSearchesAllSurfaces": true,
+    "openSupportedFilesInCmux": false
   },
 
   // === Terminal ===

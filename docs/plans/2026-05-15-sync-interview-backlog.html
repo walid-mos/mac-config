@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sync /interview ↔ /backlog — RFC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --primary: #0D9488;
+    --accent:  #F97316;
+    --bg-1:    #F8FAFC;
+    --bg-2:    #EEF2F6;
+    --text:    #141A30;
+    --muted:   #5C6577;
+    --line:    #D7DCE3;
+    --line-soft:#E5E9EE;
+    --accent-tint: rgba(249,115,22,.08);
+    --primary-tint: rgba(13,148,136,.08);
+    --warn: #B45309;
+    --warn-bg: #FEF3C7;
+    --danger: #B91C1C;
+    --ok: #15803D;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg-1: #141A30;
+      --bg-2: #1B2240;
+      --text: #F8FAFC;
+      --muted: #98A2B8;
+      --line: #2A3354;
+      --line-soft: #1F2742;
+      --accent-tint: rgba(249,115,22,.12);
+      --primary-tint: rgba(13,148,136,.14);
+      --warn-bg: #3A2A07;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg-1); color: var(--text); }
+  body { font-family: 'DM Sans', system-ui, sans-serif; font-size: 15px; line-height: 1.55; }
+  main { max-width: 1120px; margin: 0 auto; padding: 48px 32px 96px; }
+  h1, h2, h3 { font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; letter-spacing: -0.01em; margin: 0; }
+  h1 { font-size: 38px; line-height: 1.15; margin-bottom: 8px; }
+  h2 { font-size: 22px; margin-top: 56px; margin-bottom: 16px; }
+  h3 { font-size: 16px; font-weight: 700; margin-top: 24px; margin-bottom: 8px; }
+  p { margin: 0 0 12px; }
+  code, pre { font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+  pre { background: var(--bg-2); border: 1px solid var(--line-soft); border-radius: 8px; padding: 16px; overflow-x: auto; line-height: 1.5; }
+  code { background: var(--bg-2); padding: 1px 5px; border-radius: 4px; font-size: 12.5px; }
+  a { color: var(--primary); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* HEADER */
+  .eyebrow { text-transform: uppercase; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.12em; color: var(--primary); margin-bottom: 12px; }
+  .prompt-box { margin-top: 20px; padding: 12px 16px; border-left: 3px solid var(--accent); background: var(--accent-tint); border-radius: 0 8px 8px 0; font-size: 14px; color: var(--muted); }
+
+  /* TLDR */
+  .tldr { margin-top: 28px; padding: 16px 20px; background: var(--primary-tint); border-left: 3px solid var(--primary); border-radius: 0 8px 8px 0; }
+  .tldr strong { color: var(--text); }
+
+  /* SUMMARY STRIP */
+  .summary-strip { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 28px; }
+  .summary-cell { padding: 14px 16px; background: var(--bg-2); border-radius: 8px; border: 1px solid var(--line-soft); }
+  .summary-cell .k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 4px; }
+  .summary-cell .v { font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 16px; }
+  @media (max-width: 780px) { .summary-strip { grid-template-columns: repeat(2, 1fr); } }
+
+  /* DIAGRAM */
+  .diagram { background: var(--bg-2); border: 1px solid var(--line-soft); border-radius: 12px; padding: 24px; margin: 16px 0; }
+  .diagram-body { display: flex; flex-direction: column; align-items: center; }
+  .diag-caption { margin-top: 18px; padding-top: 12px; border-top: 1px dashed var(--line); font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); text-align: center; }
+
+  .diag-flow { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px; }
+  .diag-flow .node { padding: 10px 14px; background: var(--bg-1); border: 1px solid var(--line); border-radius: 8px; font-size: 13px; font-family: 'JetBrains Mono', monospace; }
+  .diag-flow .node.accent { border-color: var(--primary); background: var(--primary-tint); color: var(--primary); font-weight: 600; }
+  .diag-flow .node.outline { background: transparent; }
+  .diag-flow .node.muted { color: var(--muted); border-style: dashed; }
+  .diag-flow .node.warning { border-color: var(--warn); background: var(--warn-bg); color: var(--warn); }
+  .diag-flow .node.lg { padding: 14px 20px; font-size: 14px; }
+  .diag-flow .arrow { position: relative; width: 32px; height: 12px; }
+  .diag-flow .arrow::before { content: ''; position: absolute; left: 0; right: 8px; top: 50%; height: 1px; background: var(--muted); }
+  .diag-flow .arrow::after { content: ''; position: absolute; right: 0; top: 50%; transform: translateY(-50%); width: 0; height: 0; border-left: 6px solid var(--muted); border-top: 4px solid transparent; border-bottom: 4px solid transparent; }
+  .diag-flow .arrow.long { width: 48px; }
+  .diag-flow .arrow.dashed::before { background: repeating-linear-gradient(90deg, var(--muted) 0 4px, transparent 4px 8px); }
+  .node-stack { display: flex; flex-direction: column; gap: 8px; }
+
+  .diag-tree { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; line-height: 1.85; }
+  .diag-tree .indent { padding-left: 0; position: relative; }
+  .diag-tree .l1 { padding-left: 0; }
+  .diag-tree .l2 { padding-left: 24px; }
+  .diag-tree .l3 { padding-left: 48px; }
+  .diag-tree .l4 { padding-left: 72px; }
+  .diag-tree .k { color: var(--primary); }
+  .diag-tree .v { color: var(--muted); }
+  .diag-tree .new { background: var(--accent-tint); padding: 1px 4px; border-radius: 3px; }
+
+  .diag-compare { display: grid; grid-template-columns: 1fr 36px 1fr; gap: 16px; align-items: stretch; width: 100%; }
+  @media (max-width: 680px) { .diag-compare { grid-template-columns: 1fr; } .diag-compare .vs { display: none; } }
+  .diag-compare .pane { padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg-1); }
+  .diag-compare .pane .head { font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 10px; }
+  .diag-compare .pane.bad .head { color: var(--danger); }
+  .diag-compare .pane.good .head { color: var(--ok); }
+  .diag-compare .vs { display: flex; align-items: center; justify-content: center; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; color: var(--muted); font-size: 14px; }
+  .diag-compare ul { margin: 0; padding-left: 18px; font-size: 13px; }
+  .diag-compare li { margin-bottom: 4px; }
+
+  /* DECISIONS */
+  .decision { padding: 24px 0; border-bottom: 1px solid var(--line-soft); }
+  .decision:last-child { border-bottom: none; }
+  .dec-head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .dec-tag { font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 2px 8px; background: var(--primary-tint); color: var(--primary); border-radius: 4px; font-weight: 600; }
+  .dec-theme { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); text-transform: lowercase; }
+  .dec-title { font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 18px; margin: 6px 0 14px; }
+  .fact-preview { padding: 10px 14px; border-left: 3px solid var(--primary); background: var(--primary-tint); border-radius: 0 6px 6px 0; margin-bottom: 14px; font-size: 14.5px; }
+  .fields-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 12px; }
+  @media (max-width: 780px) { .fields-grid { grid-template-columns: 1fr; } }
+  .field { padding: 12px 14px; background: var(--bg-2); border-radius: 8px; border: 1px solid var(--line-soft); }
+  .field .lbl { font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 6px; }
+  .field .val { font-size: 13.5px; line-height: 1.55; }
+  .field .val code { font-size: 11.5px; }
+
+  /* TIMELINE */
+  .timeline { position: relative; padding-left: 28px; margin-top: 16px; }
+  .timeline::before { content: ''; position: absolute; left: 6px; top: 8px; bottom: 8px; width: 1px; background: var(--line); }
+  .tl-item { position: relative; padding-bottom: 22px; }
+  .tl-item::before { content: ''; position: absolute; left: -25px; top: 6px; width: 11px; height: 11px; border-radius: 50%; background: var(--bg-1); border: 2px solid var(--primary); }
+  .tl-item.done::before { background: var(--primary); }
+  .tl-num { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+  .tl-title { font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 15px; margin-bottom: 4px; }
+  .tl-body { font-size: 13.5px; color: var(--muted); }
+  .tl-tag { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; padding: 1px 7px; background: var(--bg-2); border: 1px solid var(--line-soft); border-radius: 4px; margin-right: 6px; margin-top: 6px; color: var(--text); }
+  .tl-tag.effort { background: var(--primary-tint); color: var(--primary); border-color: transparent; font-weight: 600; }
+  .tl-tag.skill { background: var(--accent-tint); color: var(--accent); border-color: transparent; font-weight: 600; }
+
+  /* RISK GRID */
+  .risk-grid { display: grid; grid-template-columns: 1.4fr 0.6fr 1.8fr; gap: 1px; background: var(--line-soft); border: 1px solid var(--line-soft); border-radius: 10px; overflow: hidden; }
+  @media (max-width: 780px) { .risk-grid { grid-template-columns: 1fr; } .risk-grid .rg-cell { border-bottom: 1px solid var(--line-soft); } }
+  .rg-cell { background: var(--bg-1); padding: 12px 14px; font-size: 13.5px; }
+  .rg-cell.head { background: var(--bg-2); font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+  .sev { display: inline-block; padding: 2px 8px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; font-weight: 600; text-transform: uppercase; }
+  .sev.low { background: var(--primary-tint); color: var(--primary); }
+  .sev.med { background: var(--warn-bg); color: var(--warn); }
+  .sev.high { background: rgba(185,28,28,.12); color: var(--danger); }
+
+  /* NEXT STEPS */
+  .next-steps { padding: 20px; background: var(--bg-2); border-radius: 12px; border: 1px solid var(--line-soft); }
+  .ns-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px dashed var(--line-soft); }
+  .ns-item:last-child { border-bottom: none; }
+  .ns-check { width: 16px; height: 16px; border: 1.5px solid var(--line); border-radius: 4px; margin-top: 3px; flex-shrink: 0; }
+  .ns-body .t { font-weight: 600; font-size: 14px; }
+  .ns-body .d { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .ns-body .tag { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; padding: 1px 6px; background: var(--primary-tint); color: var(--primary); border-radius: 3px; margin-left: 6px; }
+
+  /* MISC */
+  .lead { font-size: 16px; color: var(--muted); margin-bottom: 24px; max-width: 780px; }
+  .section-intro { color: var(--muted); margin-bottom: 16px; max-width: 780px; }
+
+  /* Dossier preview */
+  .dossier { background: var(--bg-2); border: 1px solid var(--line-soft); border-radius: 10px; padding: 18px; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; line-height: 1.7; }
+  .dossier .file { color: var(--primary); }
+  .dossier .label { color: var(--accent); font-weight: 600; }
+  .dossier .meta { color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+
+  <!-- HEADER -->
+  <section>
+    <div class="eyebrow">RFC · Implementation plan</div>
+    <h1>Sync <code>/interview</code> ↔ <code>/backlog</code></h1>
+    <p class="lead">Pivot JSON entre les deux skills + enrichissement codebase par phase, pour que <code>/backlog</code> génère des tâches atomiques <strong>complètes</strong> sans devinette ni perte de contexte.</p>
+    <div class="prompt-box">
+      « Trouve le meilleur moyen pour ne perdre aucun contexte entre <code>/interview</code> et <code>/backlog</code>, que le workflow soit ultra smooth. Backlog doit avoir assez d'intel pour générer des tâches atomiques mais aussi complètes — qu'un agent qui prend la task ne tombe pas dans des erreurs d'archi (ex. dupliquer une fonction qui existe déjà). »
+    </div>
+  </section>
+
+  <!-- TLDR -->
+  <section>
+    <div class="tldr">
+      <strong>TL;DR.</strong> <code>/interview</code> écrit un <strong>bundle JSON</strong> (Decisions + change_kind + target hints) à côté de <code>plan.html</code>. <code>/backlog</code> consomme ce bundle, génère des tâches atomiques liées par <code>decision_refs[]</code>, et enrichit chaque tâche via <strong>1 Explore agent par phase</strong> (Reuse / Follow / Avoid / Tests). Effort total : <strong>I4 / V8</strong>, étalé sur 3 skills.
+    </div>
+  </section>
+
+  <!-- SUMMARY STRIP -->
+  <section>
+    <div class="summary-strip">
+      <div class="summary-cell"><div class="k">Effort</div><div class="v">I4 / V8</div></div>
+      <div class="summary-cell"><div class="k">Skills touchés</div><div class="v">3</div></div>
+      <div class="summary-cell"><div class="k">Surface</div><div class="v">~5 modifs</div></div>
+      <div class="summary-cell"><div class="k">Blast radius</div><div class="v">Personal tooling</div></div>
+      <div class="summary-cell"><div class="k">Rétrocompat</div><div class="v">Préservée</div></div>
+    </div>
+  </section>
+
+  <!-- PROBLÈME -->
+  <section>
+    <h2>Le problème</h2>
+    <p class="section-intro">Aujourd'hui, le bouton "Copy as backlog prompt" de <code>plan-html</code> émet un <strong>markdown plat</strong> (Decisions verbatim + liste libre de Steps). Au copier-coller dans <code>/backlog</code>, on perd plusieurs canaux d'information.</p>
+
+    <div class="diagram">
+      <div class="diagram-body">
+        <div class="diag-compare">
+          <div class="pane bad">
+            <div class="head">❌ Handoff actuel — markdown plat</div>
+            <ul>
+              <li><code>change_kind</code> de l'interview <strong>perdu</strong></li>
+              <li>Projet Linear cible <strong>deviné</strong></li>
+              <li>Linkage Step → Decision <strong>perdu</strong></li>
+              <li>DoD par task <strong>perdu</strong> (la <em>Verification</em> est au niveau Decision, pas Step)</li>
+              <li>WHERE par task <strong>deviné</strong></li>
+              <li>« autres apps internes » → liste implicite</li>
+              <li>Aucune anti-duplication face au code existant</li>
+            </ul>
+          </div>
+          <div class="vs">vs</div>
+          <div class="pane good">
+            <div class="head">✅ Handoff cible — bundle JSON</div>
+            <ul>
+              <li>Bundle JSON pivot, généré par <code>plan-html</code></li>
+              <li>Decisions verbatim + <code>change_kind</code> + target hints</li>
+              <li><code>/backlog</code> mappe Decision → tâches atomiques</li>
+              <li>Chaque task porte <code>decision_refs[]</code> (traçabilité)</li>
+              <li>Check de couverture (∀ Decision, ≥1 task)</li>
+              <li>1 Explore agent par <strong>phase</strong> → dossier de réutilisation</li>
+              <li>Description enrichie : Reuse / Follow / Avoid / Tests</li>
+            </ul>
+          </div>
+        </div>
+        <div class="diag-caption">Avant ↔ après — ce qui transite entre les skills</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FLOW DIAGRAM -->
+  <section>
+    <h2>Flow cible</h2>
+    <p class="section-intro">Trois étapes, séquentielles, contrats clairs aux interfaces.</p>
+
+    <div class="diagram">
+      <div class="diagram-body">
+        <div class="diag-flow">
+          <div class="node-stack">
+            <div class="node accent">/interview</div>
+            <div class="node muted">§3.5 promote</div>
+            <div class="node outline">state.json<br>→ bundle.json</div>
+          </div>
+          <div class="arrow long"></div>
+          <div class="node-stack">
+            <div class="node accent">/plan-html</div>
+            <div class="node muted">next-steps</div>
+            <div class="node outline">bouton « Copy as<br>backlog » → JSON</div>
+          </div>
+          <div class="arrow long"></div>
+          <div class="node-stack">
+            <div class="node accent lg">/backlog</div>
+            <div class="node muted">Phase 1 → 4</div>
+            <div class="node outline">tasks.json +<br>phase-contexts/</div>
+          </div>
+        </div>
+        <div class="diag-caption">Pipeline interview → bundle → backlog enrichi</div>
+      </div>
+    </div>
+
+    <h3>Structure du bundle</h3>
+    <div class="diagram">
+      <div class="diagram-body" style="width:100%;align-items:flex-start;">
+        <div class="diag-tree" style="width:100%;">
+          <div class="l1"><span class="k">backlog-bundle.json</span></div>
+          <div class="l2">├── <span class="k">schema_version</span> <span class="v">: "1"</span></div>
+          <div class="l2">├── <span class="k">source</span></div>
+          <div class="l3">│   ├── <span class="k">kind</span> <span class="v">: "interview"</span></div>
+          <div class="l3">│   ├── <span class="k">slug</span> <span class="v">: "multi-services-isolation"</span></div>
+          <div class="l3">│   └── <span class="k">change_kind</span> <span class="v">: "breaking-brownfield"</span></div>
+          <div class="l2">├── <span class="k">target</span></div>
+          <div class="l3">│   ├── <span class="k">linear_project_hint</span> <span class="v">: "NextNode Infrastructure"</span></div>
+          <div class="l3">│   ├── <span class="k">linear_team_hint</span> <span class="v">: "INT"</span></div>
+          <div class="l3">│   └── <span class="k">repo_path_hint</span> <span class="v">: "packages/infrastructure"</span></div>
+          <div class="l2">├── <span class="k">decisions[]</span> <span class="v">— 6 champs verbatim closure</span></div>
+          <div class="l3">│   └── <span class="k">{ id, theme, fact, mechanism, edge, rejected, order, verification }</span></div>
+          <div class="l2">├── <span class="k">open_facts</span></div>
+          <div class="l3">│   └── <span class="k">apps_to_migrate</span> <span class="v">: ["monitoring"]</span></div>
+          <div class="l2">└── <span class="k">freeform</span> <span class="v">: "..."</span></div>
+        </div>
+        <div class="diag-caption" style="width:100%;">Schéma du pivot — pas de phases, pas de tasks (c'est /backlog qui les fabrique)</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DÉCISIONS -->
+  <section>
+    <h2>Décisions (5)</h2>
+
+    <article class="decision">
+      <div class="dec-head"><span class="dec-tag">D1</span><span class="dec-theme">schema</span></div>
+      <div class="dec-title">Bundle JSON comme pivot, pas markdown plat</div>
+      <div class="fact-preview">Le handoff <code>/interview → /backlog</code> passe par un fichier <code>backlog-bundle.json</code> structuré. Le markdown plat actuel reste accepté en fallback pour les paste manuels.</div>
+      <div class="fields-grid">
+        <div class="field"><div class="lbl">Mechanism</div><div class="val"><code>/interview §3.5</code> écrit <code>docs/interviews/&lt;slug&gt;/backlog-bundle.json</code>. <code>plan-html</code> ajoute un bouton « Copy as backlog » sur le bloc <code>next-steps</code> qui émet le même JSON dans le presse-papier.</div></div>
+        <div class="field"><div class="lbl">Edge</div><div class="val"><strong>Touche :</strong> § 3.5 de <code>/interview</code>, bouton du <code>next-steps</code> de <code>/plan-html</code>. <strong>Ne touche pas :</strong> le schéma 6 champs des Decisions, la closure UI, le rendu HTML.</div></div>
+        <div class="field"><div class="lbl">Rejected</div><div class="val">Markdown plat enrichi (devinette inévitable) · YAML (un format de plus, pas de gain) · Direct read de <code>state.json</code> par <code>/backlog</code> (couplage trop fort, casse le paste manuel).</div></div>
+        <div class="field"><div class="lbl">Order</div><div class="val">Première brique. Les 4 autres décisions dépendent de la forme du bundle.</div></div>
+        <div class="field" style="grid-column: 1 / -1;"><div class="lbl">Verification</div><div class="val">Après <code>/interview</code> sur un slug réel : <code>cat docs/interviews/&lt;slug&gt;/backlog-bundle.json | jq '.decisions | length'</code> retourne N. <code>jq '.source.change_kind'</code> retourne la valeur captée en discovery.</div></div>
+      </div>
+    </article>
+
+    <article class="decision">
+      <div class="dec-head"><span class="dec-tag">D2</span><span class="dec-theme">scope</span></div>
+      <div class="dec-title"><code>/interview</code> reste focus Decisions, <code>/backlog</code> fait le split phases+tasks</div>
+      <div class="fact-preview">L'interview ne produit jamais de phases ni de tasks. Le bundle porte uniquement les Decisions résolues. C'est <code>/backlog</code> qui décompose Decision → tasks atomiques et qui groupe en phases.</div>
+      <div class="fields-grid">
+        <div class="field"><div class="lbl">Mechanism</div><div class="val">Le bundle n'a pas de champ <code>phases</code> ni <code>tasks</code>. <code>/backlog</code> Phase 3 fait le mapping <code>Decision → 1..N tasks</code> en appliquant ses règles d'atomicité existantes (pas de "et" / "+" / "," dans les titres). Le phase grouping vient de <code>Decision.order</code>.</div></div>
+        <div class="field"><div class="lbl">Edge</div><div class="val"><strong>Touche :</strong> rien dans <code>/interview</code> (juste l'écriture du bundle). <strong>Ne touche pas :</strong> le UX closure, les 3 rounds (discovery / grilling / closure).</div></div>
+        <div class="field"><div class="lbl">Rejected</div><div class="val">UI inline dans la closure pour valider phases+tasks (alourdit <code>/interview</code> sans valeur ajoutée) · Pré-split côté <code>/interview</code> (mélange responsabilités).</div></div>
+        <div class="field"><div class="lbl">Order</div><div class="val">Concurrent avec D1.</div></div>
+        <div class="field" style="grid-column: 1 / -1;"><div class="lbl">Verification</div><div class="val"><code>jq 'has("phases")' bundle.json</code> → <code>false</code>. <code>jq 'has("tasks")' bundle.json</code> → <code>false</code>. Le bundle ne contient que decisions + métadonnées.</div></div>
+      </div>
+    </article>
+
+    <article class="decision">
+      <div class="dec-head"><span class="dec-tag">D3</span><span class="dec-theme">fidelity</span></div>
+      <div class="dec-title">Enforce <code>decision_refs[]</code> sur chaque task + check de couverture</div>
+      <div class="fact-preview">Chaque task générée par <code>/backlog</code> doit référencer ≥1 Decision du bundle (<code>decision_refs[]</code>). Avant Phase 4, vérifier que chaque Decision est couverte par ≥1 task. Sinon : générer la task manquante ou avorter.</div>
+      <div class="fields-grid">
+        <div class="field"><div class="lbl">Mechanism</div><div class="val">Nouvelle règle dans <code>/backlog</code> Phase 3, non négociable : <code>∀ task t : |t.decision_refs| ≥ 1</code> et <code>∀ Decision D : ∃ t : D ∈ t.decision_refs</code>. La preview Phase 4 affiche une colonne "Decisions couvertes" et flag rouge sur les Decisions orphelines.</div></div>
+        <div class="field"><div class="lbl">Edge</div><div class="val"><strong>Touche :</strong> <code>/backlog</code> Phase 3 (génération) et Phase 4 (preview). <strong>Ne touche pas :</strong> le format <code>tasks.json</code> côté worker, la création Linear elle-même.</div></div>
+        <div class="field"><div class="lbl">Rejected</div><div class="val">Couverture optionnelle / best-effort (perd la garantie) · Validation user-in-the-loop (déjà rejeté en D2).</div></div>
+        <div class="field"><div class="lbl">Order</div><div class="val">Après D1 (bundle existe). Avant D4 (l'enrichment se branche sur les tasks déjà décomposées).</div></div>
+        <div class="field" style="grid-column: 1 / -1;"><div class="lbl">Verification</div><div class="val">Sur un bundle test à 12 decisions : preview affiche couverture 12/12. Supprimer manuellement les <code>decision_refs</code> d'une task → preview affiche 11/12 + flag rouge sur la Decision orpheline.</div></div>
+      </div>
+    </article>
+
+    <article class="decision">
+      <div class="dec-head"><span class="dec-tag">D4</span><span class="dec-theme">enrichment</span></div>
+      <div class="dec-title">Codebase enrichment <strong>par phase</strong>, pas par theme ni par task</div>
+      <div class="fact-preview">Nouvelle sous-étape Phase 3.5 : pour chaque phase, lancer <strong>un seul</strong> Explore agent sur la surface union de toutes ses tasks. Le résultat (dossier de phase) est partagé entre toutes les tasks de la phase.</div>
+      <div class="fields-grid">
+        <div class="field"><div class="lbl">Mechanism</div><div class="val">Pour chaque phase : union des <code>where[]</code> de ses tasks → 1 Explore agent prompté avec <code>change_kind</code> + les Decisions couvertes (Mechanism + Edge) + la surface. Sortie : dossier <code>{reuse[], follow[], avoid[], tests[]}</code>. Chaque task pioche ses entrées pertinentes via match <code>where[]</code> / <code>decision_refs</code>.</div></div>
+        <div class="field"><div class="lbl">Edge</div><div class="val"><strong>Touche :</strong> <code>/backlog</code> nouvelle Phase 3.5. <strong>Ne touche pas :</strong> <code>/interview</code>, <code>/plan-html</code>, le worker <code>create_issues.py</code>.</div></div>
+        <div class="field"><div class="lbl">Rejected</div><div class="val">1 Explore par theme (cross-phase, signal éclaté) · 1 Explore par task (~25 agents, trop coûteux, redondant) · 0 enrichissement (problème non résolu, c'est le cœur du fix).</div></div>
+        <div class="field"><div class="lbl">Order</div><div class="val">Après D3 (couverture validée). Avant D5 (le dossier doit exister avant d'être persisté).</div></div>
+        <div class="field" style="grid-column: 1 / -1;"><div class="lbl">Verification</div><div class="val">Sur un bundle test à 5 phases : exactement 5 Explore agents lancés (vérifiable dans le log). Description finale d'une task contient ≥1 entrée Reuse pointant vers <code>file:line</code> existant.</div></div>
+      </div>
+    </article>
+
+    <article class="decision">
+      <div class="dec-head"><span class="dec-tag">D5</span><span class="dec-theme">persistence</span></div>
+      <div class="dec-title">Dossier de phase persisté à côté de <code>tasks.json</code></div>
+      <div class="fact-preview">Le dossier de phase est écrit sur disque dans <code>phase-contexts/phase-N-&lt;name&gt;.md</code>. Les agents qui prennent les tasks le lisent en plus de leur issue Linear pour un contexte partagé entre tâches sœurs.</div>
+      <div class="fields-grid">
+        <div class="field"><div class="lbl">Mechanism</div><div class="val">Layout : <code>/tmp/claude/backlog-&lt;slug&gt;-&lt;ts&gt;/phase-contexts/phase-1-&lt;name&gt;.md</code>, un fichier par phase. Markdown, lisible humain + agent. Référencé dans la description de chaque issue Linear : "Phase context: <code>&lt;path&gt;</code>".</div></div>
+        <div class="field"><div class="lbl">Edge</div><div class="val"><strong>Touche :</strong> <code>/backlog</code> Phase 3.5 (écriture du dossier) et Phase 4 (référence dans la description). <strong>Ne touche pas :</strong> le contenu de <code>tasks.json</code>.</div></div>
+        <div class="field"><div class="lbl">Rejected</div><div class="val">Dossier en mémoire seulement (perdu après run, pas de reprise) · Dossier intégré dans <code>tasks.json</code> (duplication N fois, alourdit l'issue Linear).</div></div>
+        <div class="field"><div class="lbl">Order</div><div class="val">Dernière. Toutes les autres doivent exister.</div></div>
+        <div class="field" style="grid-column: 1 / -1;"><div class="lbl">Verification</div><div class="val">Après run : <code>ls phase-contexts/</code> liste N fichiers (= nombre de phases). Chaque issue Linear contient une ligne "Phase context: <code>/tmp/claude/.../phase-N-*.md</code>".</div></div>
+      </div>
+    </article>
+  </section>
+
+  <!-- DOSSIER PREVIEW -->
+  <section>
+    <h2>Forme du dossier de phase</h2>
+    <p class="section-intro">Markdown, ~30-60 lignes par phase. Lu par les agents implémenteurs.</p>
+    <div class="dossier">
+<span class="meta"># Phase 1 — Schema &amp; types</span><br>
+<span class="meta"># Decisions couvertes: D1, D2, D3</span><br>
+<span class="meta"># Surface: packages/infrastructure/src/config/{types,parser,validation}.ts</span><br>
+<br>
+<span class="label">## Reuse</span><br>
+- <span class="file">parseManagedServices()</span> @ <span class="file">config/parser.ts:55</span> — mimer la structure pour <code>parseCustomServices()</code><br>
+- <span class="file">ManagedServiceConfig</span> @ <span class="file">config/types.ts:80</span> — extraire un type pivot avant d'ajouter <code>AppServiceConfig</code><br>
+- <span class="file">SERVICE_DEFINITIONS</span> @ <span class="file">services/registry.ts:12</span> — source de vérité reserved names, ne PAS hardcoder<br>
+<br>
+<span class="label">## Follow pattern</span><br>
+- Validators sidecars sous <span class="file">config/validation/services/*.ts</span> — un fichier par kind, signature <code>validateXxx(input): Result&lt;T, ValidationError&gt;</code><br>
+- <span class="file">toml-key.regex.ts:18</span> pour la regex de validation TOML key<br>
+<br>
+<span class="label">## Avoid</span><br>
+- Ne pas ajouter de logique deploy ici (D1.edge)<br>
+- Ne pas dupliquer la regex TOML — voir <span class="file">utils/toml.ts:18</span><br>
+- Ne pas casser <code>ServicesConfig</code> existant (breaking change réservé à D12)<br>
+<br>
+<span class="label">## Test scaffolding</span><br>
+- Fixtures TOML sous <span class="file">__fixtures__/configs/*.toml</span><br>
+- Helper <span class="file">parseFixture()</span> @ <span class="file">test/utils.ts:9</span><br>
+    </div>
+  </section>
+
+  <!-- TIMELINE -->
+  <section>
+    <h2>Timeline d'implémentation</h2>
+    <p class="section-intro">5 modifs séquentielles. Chaque étape est indépendamment testable.</p>
+
+    <div class="timeline">
+      <div class="tl-item">
+        <div class="tl-num">01</div>
+        <div class="tl-title">/interview § 3.5 écrit <code>backlog-bundle.json</code></div>
+        <div class="tl-body">Pure transformation de <code>state.json</code> → bundle. Pas de UI nouvelle. Écrit dans <code>docs/interviews/&lt;slug&gt;/</code> en même temps que la copie vers <code>docs/plans/</code>.</div>
+        <span class="tl-tag effort">I3</span><span class="tl-tag skill">/interview</span><span class="tl-tag">D1</span>
+      </div>
+      <div class="tl-item">
+        <div class="tl-num">02</div>
+        <div class="tl-title">/plan-html — bouton "Copy as backlog" émet le bundle JSON</div>
+        <div class="tl-body">Le bouton dans <code>next-steps</code> change de format : plus de markdown plat, JSON-stringify du bundle dans le presse-papier.</div>
+        <span class="tl-tag effort">I3</span><span class="tl-tag skill">/plan-html</span><span class="tl-tag">D1</span>
+      </div>
+      <div class="tl-item">
+        <div class="tl-num">03</div>
+        <div class="tl-title">/backlog Phase 1 — accepte <code>bundle.json</code> en entrée directe</div>
+        <div class="tl-body">Si l'argument pointe vers un <code>backlog-bundle.json</code> → parse-le. Sinon, retombe sur l'heuristique markdown actuelle. Resolve <code>linear_project_hint</code> via <code>workspace.md</code>.</div>
+        <span class="tl-tag effort">I3</span><span class="tl-tag skill">/backlog</span><span class="tl-tag">D1</span><span class="tl-tag">D2</span>
+      </div>
+      <div class="tl-item">
+        <div class="tl-num">04</div>
+        <div class="tl-title">/backlog Phase 3 — enforce <code>decision_refs[]</code> + check couverture</div>
+        <div class="tl-body">Génération de tasks atomiques avec <code>decision_refs[]</code> obligatoires. Avant la preview, vérifier la couverture inverse. Flag rouge si Decision orpheline.</div>
+        <span class="tl-tag effort">I3</span><span class="tl-tag skill">/backlog</span><span class="tl-tag">D3</span>
+      </div>
+      <div class="tl-item">
+        <div class="tl-num">05</div>
+        <div class="tl-title">/backlog Phase 3.5 — codebase enrichment + dossier par phase</div>
+        <div class="tl-body">Nouvelle sous-étape. 1 Explore agent par phase, dossier écrit dans <code>phase-contexts/</code>, sections <code>Reuse / Follow / Avoid / Tests</code> dans la description Linear de chaque task.</div>
+        <span class="tl-tag effort">I4</span><span class="tl-tag skill">/backlog</span><span class="tl-tag">D4</span><span class="tl-tag">D5</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- RISK GRID -->
+  <section>
+    <h2>Risques</h2>
+    <div class="risk-grid">
+      <div class="rg-cell head">Risque</div>
+      <div class="rg-cell head">Sév.</div>
+      <div class="rg-cell head">Mitigation</div>
+
+      <div class="rg-cell">Sur-enrichissement → bruit dans la description Linear</div>
+      <div class="rg-cell"><span class="sev med">Med</span></div>
+      <div class="rg-cell">Cap à ≤5 entrées par section (Reuse/Follow/Avoid/Tests). Drop section vide. Skip enrichment pour tasks triviales (bump version, doc-only).</div>
+
+      <div class="rg-cell">Drift des line numbers entre génération backlog et implémentation</div>
+      <div class="rg-cell"><span class="sev low">Low</span></div>
+      <div class="rg-cell">Doc explicite : les pointeurs <code>file:line</code> sont des <strong>indices</strong>, l'agent implémenteur valide en lisant le code. Pas une vérité gravée.</div>
+
+      <div class="rg-cell">Coût tokens Explore × N phases</div>
+      <div class="rg-cell"><span class="sev low">Low</span></div>
+      <div class="rg-cell">~4-6 agents par backlog moyen. Batching par phase (pas par task). Subagent type "Explore" (read-only, rapide).</div>
+
+      <div class="rg-cell">Couverture Decision → task incomplète (D oublié)</div>
+      <div class="rg-cell"><span class="sev med">Med</span></div>
+      <div class="rg-cell">Check de couverture inverse en Phase 3 (D3). Preview Phase 4 flag visuellement les Decisions orphelines. Avorter ou compléter avant push Linear.</div>
+
+      <div class="rg-cell">Bundle ↔ closure désync si <code>state.json</code> évolue</div>
+      <div class="rg-cell"><span class="sev low">Low</span></div>
+      <div class="rg-cell"><code>schema_version: "1"</code> dans le bundle. <code>/backlog</code> refuse les versions inconnues. Bump explicite à toute évolution du schéma.</div>
+
+      <div class="rg-cell">Markdown plat (fallback) reste utilisé par défaut → fix pas effectif</div>
+      <div class="rg-cell"><span class="sev high">High</span></div>
+      <div class="rg-cell"><code>/interview</code> écrit <strong>toujours</strong> le bundle. <code>/plan-html</code> émet <strong>toujours</strong> le JSON. Le markdown plat reste accepté en lecture pour rétrocompat mais n'est plus émis.</div>
+    </div>
+  </section>
+
+  <!-- NEXT STEPS -->
+  <section>
+    <h2>Next steps</h2>
+    <div class="next-steps">
+      <div class="ns-item">
+        <div class="ns-check"></div>
+        <div class="ns-body">
+          <div class="t">Étape 01 — Patcher <code>/interview</code> § 3.5<span class="tag">I3</span></div>
+          <div class="d">Ajouter l'écriture de <code>backlog-bundle.json</code> en même temps que la promotion vers <code>docs/plans/</code>.</div>
+        </div>
+      </div>
+      <div class="ns-item">
+        <div class="ns-check"></div>
+        <div class="ns-body">
+          <div class="t">Étape 02 — Patcher <code>/plan-html</code> bloc <code>next-steps</code><span class="tag">I3</span></div>
+          <div class="d">Le bouton "Copy as backlog" émet le bundle JSON au lieu du markdown plat.</div>
+        </div>
+      </div>
+      <div class="ns-item">
+        <div class="ns-check"></div>
+        <div class="ns-body">
+          <div class="t">Étape 03 — Patcher <code>/backlog</code> Phase 1<span class="tag">I3</span></div>
+          <div class="d">Accepter <code>bundle.json</code> en entrée directe, resolve le projet via <code>workspace.md</code>, fallback markdown préservé.</div>
+        </div>
+      </div>
+      <div class="ns-item">
+        <div class="ns-check"></div>
+        <div class="ns-body">
+          <div class="t">Étape 04 — Patcher <code>/backlog</code> Phase 3<span class="tag">I3</span></div>
+          <div class="d">Enforce <code>decision_refs[]</code> sur chaque task, check de couverture, preview avec flag orphelin.</div>
+        </div>
+      </div>
+      <div class="ns-item">
+        <div class="ns-check"></div>
+        <div class="ns-body">
+          <div class="t">Étape 05 — Ajouter <code>/backlog</code> Phase 3.5<span class="tag">I4</span></div>
+          <div class="d">Codebase enrichment par phase (1 Explore agent / phase), dossier <code>phase-contexts/</code>, sections Reuse / Follow / Avoid / Tests dans la description Linear.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

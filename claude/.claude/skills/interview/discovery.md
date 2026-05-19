@@ -31,9 +31,9 @@ The user can flip a branch back to IN via the toggle — pre-pruning only change
 
 ## 4. Render
 
-Generate `plan.html` with the `Interview · discovery` recipe (`header` + `context` + `branches-tree`). For the `branches-tree` UX contract (theme grouping, sticky filter bar, collapse-by-default, out-of-scope visual mute, etc.), see `../plan-html/blocks.md`. The `context` block must surface `change_kind` so the user sees the classification you applied. Include a `+ Ajouter une branche` affordance.
+Generate `plan.html` with the `Interview · discovery` recipe (`header` + `context` + `branches-tree`). For the `branches-tree` UX contract (theme grouping, sticky filter bar, collapse-by-default, out-of-scope visual mute, etc.), see `../html/blocks.md`. The `context` block must surface `change_kind` so the user sees the classification you applied. Include a `+ Ajouter une branche` affordance.
 
-Serve via `rp <slug>` and relay the URL in chat — protocol in `../plan-html/rich-mode.md`. Read `submission.json`:
+Serve via `rp <slug>` and relay the URL in chat — protocol in `../html/rich-mode.md`. Read `submission.json`:
 
 ```json
 {

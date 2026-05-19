@@ -22,18 +22,19 @@ The user's persona, distilled. **Tweets are output in ENGLISH**, written by a Fr
 
 - Standard sentence-case capitalization (`The build broke`, not `the build broke`)
 - Final period optional on short punchy tweets, mandatory in threads or anything over 2 sentences
-- Line breaks instead of commas for emphasis
+- Line breaks for the hook and the kicker, NOT for every clause. The body of a tweet usually flows as a 2-3 sentence paragraph with commas, conjunctions, comma splices. If every sentence sits on its own line, nothing reads as emphasis.
 - ALL CAPS sparingly for emphasis (`THIS`, `NEVER`, `WHY`)
 - Numbers as digits : `10 projects`, `3 apps`, `1 vps`, `4€` or `$5`
 - Currency : `€` if euros, `$` if dollars. Pick one per tweet, stick with it.
 
 ## Sentence shape
 
-- Short fragments, one idea per line
-- Line breaks replace conjunctions
+- **Block cap : 3-4 standalone line-broken blocks per single tweet, max.** If you hit 5+ blocks, you're using line breaks as default punctuation instead of emphasis. Merge body sentences into one flowing paragraph.
+- **Typical shape** : hook (1 line, standalone) → body (1-3 sentences flowing as ONE paragraph) → kicker (1 line, standalone, optional).
+- Body sentences chain with commas, conjunctions, comma splices. Line breaks reserved for hook and kicker.
 - Avoid subordinate clauses, avoid "in the context of which"
 - Oral connectors welcome : `so`, `like`, `basically`, `anyway`, `also`, `wait`
-- Comma splices acceptable for rhythm
+- Comma splices encouraged for rhythm inside the body paragraph
 
 ## Approved expressions (use sparingly, do not stack)
 
@@ -92,9 +93,7 @@ Single, tool swap :
 ```
 Oxlint vs ESLint on a Turborepo monorepo.
 
-Full lint : 1.2s vs 38s.
-
-Zero regression, 3 custom rules to port.
+Full lint went from 38s to 1.2s, zero regression, 3 custom rules to port.
 
 Idk how we lasted this long with ESLint.
 ```

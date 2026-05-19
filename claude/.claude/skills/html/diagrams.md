@@ -40,4 +40,4 @@ The difference between "schema" and "merde":
 - Mono font for technical identifiers (file paths, service names, hashes, versions). Sans for human labels.
 - Accent color = the highlighted element of the diagram (current target, "this is the change"). Muted grey = relationships / metadata. Red only for "blocked / no route".
 - Always centered horizontally inside the diagram body. Always a caption underneath naming what the reader is looking at.
-- Never use Mermaid, Graphviz, or any CDN — `plan-html` is hermetic by spec.
+- Never use Mermaid, Graphviz, or any CDN — `html` is hermetic by spec.

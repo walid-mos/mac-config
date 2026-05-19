@@ -2,7 +2,7 @@
 name: project-docs
 description: >-
   Owns the `docs/` layout for NextNode projects: where each kind of artifact
-  lives, slug/date naming rules, the contract other skills (`plan-html`,
+  lives, slug/date naming rules, the contract other skills (`html`,
   `interview`) follow. Load when bootstrapping `docs/`, choosing a folder for an
   artifact, or auditing a layout. User-invocable via `/project-docs`.
 user-invocable: true
@@ -10,7 +10,7 @@ user-invocable: true
 
 # project-docs
 
-`docs/` is the only home for Claude-generated artifacts in a NextNode project. This skill is the single source of truth for the layout — `plan-html` and `interview` reference it instead of redefining their own paths.
+`docs/` is the only home for Claude-generated artifacts in a NextNode project. This skill is the single source of truth for the layout — `html` and `interview` reference it instead of redefining their own paths.
 
 ## Scope
 
@@ -24,8 +24,8 @@ Three kinds. Folder name = plural. Add a new kind only when a real second exempl
 | Kind | Path | Lifecycle | Producer |
 |---|---|---|---|
 | Interview workflow | `docs/interviews/<slug>/` | Folder · stateful · multi-round | `/interview` (rich mode via `rp`) |
-| Implementation plan | `docs/plans/<YYYY-MM-DD>-<slug>.html` | Single file · static | `plan-html` (after interview closure, or stand-alone) |
-| Free-form note | `docs/notes/<YYYY-MM-DD>-<slug>.html` | Single file · static | `plan-html` (any other recipe — audit, review, retro, research, status, board) or hand-written |
+| Implementation plan | `docs/plans/<YYYY-MM-DD>-<slug>.html` | Single file · static | `html` (after interview closure, or stand-alone) |
+| Free-form note | `docs/notes/<YYYY-MM-DD>-<slug>.html` | Single file · static | `html` (any other recipe — audit, review, retro, research, status, board) or hand-written |
 
 Folder lifecycle (`interviews/` only) holds: `plan.html` (current round), `state.json` (cross-round memory), `submission.json` (latest user submission), `.rp-url` (transient, never commit). Single-file lifecycle: one self-contained HTML, no state, no companion files.
 

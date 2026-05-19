@@ -1,5 +1,5 @@
 ---
-name: plan-html
+name: html
 description: >-
   Generate a single self-contained HTML deliverable that captures the output of
   a Claude ↔ user working session (plan, design, audit, retro, research,
@@ -12,7 +12,7 @@ description: >-
 user-invocable: true
 ---
 
-# Plan HTML
+# HTML
 
 Form follows data. The same skill produces an implementation plan, a code review writeup, a retro, a research explainer, or a triage board — but each has its own shape. **Pick the shape from the intent. Never pour every output into the same 6-section markdown-in-HTML template.**
 
@@ -73,7 +73,7 @@ Default: NextNode brand from `nextnode-design`.
 
 ## Output paths (static mode)
 
-The canonical `docs/` layout is owned by the **`project-docs`** skill — load it for the contract. `plan-html` writes to one of three locations:
+The canonical `docs/` layout is owned by the **`project-docs`** skill — load it for the contract. `html` writes to one of three locations:
 
 - **Implementation plan** → `./docs/plans/<YYYY-MM-DD>-<slug>.html`
 - **Interview closure** (rich mode) → `./docs/interviews/<slug>/plan.html` (see `rich-mode.md`; never write a closure to `plans/`)

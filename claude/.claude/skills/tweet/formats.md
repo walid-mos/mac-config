@@ -10,14 +10,42 @@ Two output formats : **single tweet** and **thread**. Pick based on the source c
 
 ## Single tweet structure
 
-Three to four lines :
+Three blocks max, in this order :
 
 ```
-[hook line, sentence-case capitalization, period optional]
+[hook line, sentence-case capitalization, period optional, standalone block]
 
-[1-3 short lines of substance, line-broken not comma-broken]
+[body : 1-3 sentences flowing as ONE paragraph with commas, conjunctions, comma splices. NOT line-broken by default.]
 
-[optional kicker : question, punchline, parenthetical, or contrast]
+[optional kicker : question, punchline, parenthetical, or contrast, standalone block]
+```
+
+### Block cap
+
+**3-4 standalone blocks per single tweet, hard ceiling.** A block = a chunk separated by a blank line. If a draft has 5+ blocks, you're chopping the body into one-line paragraphs and losing the rhythm. Merge body sentences into one flowing paragraph.
+
+Bad (6 blocks, choppy) :
+```
+Built X.
+
+It does Y.
+
+Last week it broke.
+
+I fixed it.
+
+Now it works.
+
+Wild.
+```
+
+Good (3 blocks, flowing body) :
+```
+Built X to do Y.
+
+Last week it broke, I fixed it, now it works.
+
+Wild.
 ```
 
 Length budget : 200-280 chars. Below 200 it feels thin. Above 280 it gets cut (unless Premium long-form).

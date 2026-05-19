@@ -15,9 +15,9 @@ Closure is **not** "I think it's resolved." It is a mechanical completeness chec
 
 ## 2. Render the closure HTML
 
-Generate `plan.html` with the `Interview · closure` recipe (`header` + `decisions` + `risk-grid` + `open-questions`* + `next-steps`). For the `decisions` block UX contract (compact sidebar with scrollspy, decisions-as-sections, collapse-by-default with fact-preview, per-decision afterthought textarea), see `../plan-html/blocks.md`. For the per-decision diagram primitives, see `../plan-html/diagrams.md`. Every `decisions` card carries the six fields, each editable in place.
+Generate `plan.html` with the `Interview · closure` recipe (`header` + `decisions` + `risk-grid` + `open-questions`* + `next-steps`). For the `decisions` block UX contract (compact sidebar with scrollspy, decisions-as-sections, collapse-by-default with fact-preview, per-decision afterthought textarea), see `../html/blocks.md`. For the per-decision diagram primitives, see `../html/diagrams.md`. Every `decisions` card carries the six fields, each editable in place.
 
-Serve via `rp <slug>` and relay the URL in chat — protocol in `../plan-html/rich-mode.md`. Read `submission.json`:
+Serve via `rp <slug>` and relay the URL in chat — protocol in `../html/rich-mode.md`. Read `submission.json`:
 
 ```json
 {
@@ -45,7 +45,7 @@ When every cell on every row is concrete, the interview is complete.
 
 ## 4. Process afterthought comments
 
-The closure page exposes a per-decision afterthought textarea (see the `decisions` block in `../plan-html/blocks.md`). On submit, those land in `submission.json` as:
+The closure page exposes a per-decision afterthought textarea (see the `decisions` block in `../html/blocks.md`). On submit, those land in `submission.json` as:
 
 ```json
 "comments": [{ "target": "<decision-id>", "body": "<user's note>" }]

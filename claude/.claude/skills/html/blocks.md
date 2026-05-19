@@ -26,6 +26,11 @@ Each block has a fixed semantic role and a default visual. Adapt the visual to t
 
 - **questions** — grilling round of `/interview`. One card per pending question, organized by branch. Each card carries: question text, **recommended answer** (highlighted accent box), the one-sentence tradeoff, an optional **diagram** when the choice has a spatial / structural dimension, then the answer input. Always a `Skip · re-grill later` button as the third path. Submission feeds back as `answers: {<question-id>: {choice?, choices?, freetext?, skip?, note?}}`. Skipping a question signals "regenerate with refined wording in the next round" — never a final answer.
 
+  **Anti-patterns — never ship these:**
+
+  - **Never render options twice.** A grid of "option cards" stacked on top of the radio-list duplicates the same content in two forms — the reader sees `(a) (b) (c)` as cards, then `(a) (b) (c)` as radios. Pick *one* visual: either a structural diagram (the recommended path, see `./diagrams.md`) **or** the radio-list — never both. If the question has a spatial dimension, ship a `.diag-flow` / `.diag-compare` / `.diag-stack` that *shows the topology* (not the same text reformatted into cards), then the radio-list for the input. The radios already carry the option labels — text cards above them are pure noise.
+  - **Never reuse `--np-accent-bg` for a second "this is recommended" block.** The `.recommended` box (recommended-answer text, accent-bg fill) already owns that signal at the top of the card. A second element painted with the same `--np-accent-bg` (whether an "option card", a "primary row", or anything else) produces two visually identical teal-100 blocks side-by-side — same color, same role, redundant. The recommended option inside a diagram is signaled via *accent border* (3px-left or full 1px) + accent text on the row label + optionally one `.node.primary` tinted teal-500 inside the row — **not** by repainting the row fill with the teal-100 token.
+
   **Input type — pick the one that matches the question, never default to radio:**
 
   - `radio` (single `choice`) → the options are **mutually exclusive** alternatives. "Which lib", "which approach", "which deployment target". The recommended answer is one option pre-selected.
@@ -38,17 +43,56 @@ Each block has a fixed semantic role and a default visual. Adapt the visual to t
   - No fixed maximum. Radio: typically 2–5 distinct alternatives. Checkbox: up to 6–8 axes is fine (each is independent so cognitive load stays flat).
   - **Never invent a 4th option to round out a list of 3.** A weak 4th option that no one would ever pick is worse than 3 sharp ones — it dilutes the recommended answer and signals laziness. If only 2 real options exist, ship 2.
 
-  **Per-question diagram (optional but encouraged when relevant):**
+  **Per-question diagram — tabbed topologies (default pattern):**
 
-  Use a primitive from `./diagrams.md` inside the card, between the recommended-answer box and the inputs. Pick the primitive whose shape matches the question:
+  Whenever the choice has a spatial / structural / temporal dimension (where does X run? when does Y trigger? which path does Z follow?), ship a **tabbed diagram** between the recommended-answer box and the inputs — one tab per option, with the recommended one pre-active and badged.
 
-  - "X vs Y" UX or architecture comparisons → `.diag-compare` (two panes, mockup or layout per side).
-  - Side-by-side / inline / fullscreen layout choices → `mockup-tile` per option.
-  - Pipeline / flow / data-path choices → `.diag-flow`.
-  - Discriminated-union type choices (kind A vs kind B vs kind C, each with distinct fields) → `.diag-kinds`.
-  - Layered architecture choices (where does the logic live) → `.diag-stack`.
+  Data shape per question:
 
-  The bar is the same as for closure: *is text faster than a picture here?* For a UX choice ("side-by-side vs inline"), a diagram is almost always faster. Skip the diagram when the question is purely textual (naming, copy, ordering, yes/no on a non-spatial concept).
+  ```js
+  {
+    id: 'q1',
+    text: 'Where does X run?',
+    recommended: 'b',
+    // …
+    diagCaption: "Où s'exécute la commande migrate",
+    topologies: [
+      { id: 'a', label: '(a) compose one-shot',
+        body: '<span class="node">…</span>${A}<span class="node">…</span>',
+        pros: ['Pattern simple', 'No external deps'],
+        cons: ['Ships migrate image to VPS', 'SSH coupling'] },
+      { id: 'b', label: '(b) CI via Tailscale', recommended: true,
+        body: '<span class="node primary">…</span>${A}<span class="edge-label">Tailscale :5432</span>${A}<span class="node">…</span>',
+        pros: ['Reuses infrastructure/ on the runner', 'Zero migrate image on VPS'],
+        cons: ['Extra network surface (port 5432 on tailnet)'] },
+      { id: 'c', label: '(c) init container',
+        body: '<span class="node">…</span>${A}<span class="node">…</span>',
+        pros: ['Compose-native ordering'],
+        cons: ['User-image coupling', 'Migrate replayed on app restart'] },
+    ],
+  }
+  ```
+
+  Rendering contract:
+
+  - **One pane per option** — never a single "recommended-only" diagram (the reader can't see what they'd be choosing against). Never 3 panes stacked in the same view (the screen turns into noisy comparison text — what the tabs are for is *to hide the alternatives until the user asks*).
+  - **Default tab = the recommended option**, pre-active, with a small accent `rec-badge` ("recommandé") next to its label.
+  - **Tab strip styling** — minimal underline tabs (à la GitHub): mono uppercase labels (~12px), `--np-text-muted` default, `--np-accent-hover` on `.active`, 2px `--np-accent` underline via `::after` on the active tab. **Not** card-lift tabs with bg-soft strip + bg fill on active — that's heavy. The simple underline reads cleaner.
+  - **Pane body** — single horizontal `.diag-body` flex row: `.node` boxes + inline SVG `.arrow-svg` connectors + optional `.edge-label` mono strings. **The active topology's central node** carries `.node.primary` — `background: var(--np-accent-bg)` + `border: 1px solid var(--np-accent)` + `color: var(--np-accent-hover)`, **outline+tint, never saturated fill** (per `./themes.md` § Accent usage). Non-recommended topologies have no `.primary` — they're rendered in plain neutral.
+  - **Caption underneath**, mono uppercase, separated by a dashed top border (same as static diagrams).
+  - **State** — persist the active tab in `state.diagTab[questionId]` so re-renders (skip toggle, etc.) don't reset it. Attach a click handler that toggles `.active` on both `.diag-tab[data-diag-tab]` and `.diag-pane[data-diag-pane]`.
+  - **Pros / cons per pane** — each topology carries `pros: string[]` and `cons: string[]` arrays. The rendered pane shows the diagram body + a compact `▸ Pros & cons` toggle button (mono uppercase, outline). On click, expands a 2-column grid (`pros` left in accent-hover heading, `cons` right in muted heading) under the diagram. Persist the open/closed state **per question** (`state.diagDetails[questionId] = boolean`) — NOT per tab. When the user opens pros/cons on one tab then switches to another, the new tab inherits the open state and shows ITS pros/cons immediately. The toggle click propagates the new state across all panes' `.diag-details` and `.diag-details-toggle` in the question (one boolean drives every pane's open class + button label). Keep collapsed by default — always-expanded pros/cons clutter the pane and defeat the tabs. Skip pros/cons entirely on a topology only if there's nothing meaningful to say (rare — most decisions have at least 1-2 of each).
+
+  **Existing → proposed migrations** use the same primitive: ship two tabs labeled `EXISTANT` and `PROPOSED` (`recommended: true` on the proposed one), each carrying the topology of that state. The reader flips between current and target, sees the delta visually.
+
+  **Other primitives (`./diagrams.md`) — use when tabs don't fit:**
+
+  - "X vs Y" binary decision where both states are equally important to see simultaneously → `.diag-compare` (side-by-side panes, no tabbing).
+  - Discriminated-union type choices (kind A/B/C, each with distinct fields, not a topology) → `.diag-kinds`.
+  - Layered architecture (where does logic live, across layers) → `.diag-stack`.
+  - When the diagram is auto-laid-out flow with >4 nodes or branching → `mermaid` (per `./rich-blocks.md`).
+
+  The bar is the same as for closure: *is text faster than a picture here?* For a "where does X run / when does Y trigger" choice, tabs+topologies are almost always faster. Skip the diagram when the question is purely textual (naming, copy, ordering, yes/no on a non-spatial concept) — Q2/Q5 patterns (policy / lifecycle text-only choices) don't need one.
 
 - **resolved-summary** — read-only context shown at the top of grilling rounds 2..N. Compact list of `question → resolved answer` pairs, one per line. Each row has a `Re-open` link that flips the question back into the active `questions` block (rare; lets the user backtrack one cell without restarting the round). Omit in round 1.
 

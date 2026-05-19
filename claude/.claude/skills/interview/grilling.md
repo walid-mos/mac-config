@@ -6,7 +6,7 @@ For each in-scope branch, derive the questions needed to fill the six-field clos
 
 A round is a batch of all currently-pending questions across all branches. Pending = never asked, skipped in a prior round (re-grilled with refined wording), or re-opened from the resolved summary.
 
-Generate `plan.html` with the `Interview · grilling` recipe (`header` + `resolved-summary`* + `questions`). For the `questions` and `resolved-summary` block contracts (recommended-answer accent box, input-type rules, per-question diagram, skip-as-third-path, re-open link), see `../plan-html/blocks.md`. Per-question diagram primitives are documented in `../plan-html/diagrams.md` — load it whenever the round contains UX/architecture/comparison choices.
+Generate `plan.html` with the `Interview · grilling` recipe (`header` + `resolved-summary`* + `questions`). For the `questions` and `resolved-summary` block contracts (recommended-answer accent box, input-type rules, per-question diagram, skip-as-third-path, re-open link), see `../html/blocks.md`. Per-question diagram primitives are documented in `../html/diagrams.md` — load it whenever the round contains UX/architecture/comparison choices.
 
 Per-round budget: 4–10 questions feels right. Below 4, batch with the next branch; above 10, split into two rounds (process `state.json` after each, ordering follows depth-first traversal of the tree).
 
@@ -16,11 +16,11 @@ Per-round budget: 4–10 questions feels right. Below 4, batch with the next bra
 - **Orthogonal axes that combine → checkbox** with `choices: string[]`. Typical case: a UX question that mixes layout + features (e.g. side-by-side + syntax + gutter + chrome-minimal). Forcing this into a radio is a smell — the user has to pick a fake bundle instead of their real combination.
 - **Open-ended → textarea** with `freetext`. Use sparingly; most questions can be enumerated.
 - **Option count is content-driven**, not pinned at 4. Two sharp options beat four where two are filler. Never invent options to fill a slot.
-- **Include a diagram per question** when the choice has a spatial / structural dimension. UX layout choices, architecture comparisons, pipeline shapes — pick the primitive from `../plan-html/diagrams.md`. The reader should *see* the difference, not parse it from text.
+- **Include a diagram per question — but only when the choice has a real spatial / structural / temporal dimension.** UX layout, architecture topology, pipeline shape, "where does X run", "when does Y trigger", existing → proposed migration. Default pattern is a **tabbed diagram** — one tab per option, recommended pre-active + badge, click to switch (see `../html/blocks.md` § questions for the data shape and rendering contract). The reader should *see* the difference, not parse it from text. **Skip the diagram entirely when the question is purely textual** (naming, copy, ordering, yes/no on a non-spatial concept, policy / lifecycle choices) — a forced diagram for a text-only question is noise, not signal.
 
 ## 2. Run the round
 
-Serve via `rp <slug>` and relay the URL in chat — protocol in `../plan-html/rich-mode.md`. Read `submission.json`:
+Serve via `rp <slug>` and relay the URL in chat — protocol in `../html/rich-mode.md`. Read `submission.json`:
 
 ```json
 {

@@ -91,7 +91,8 @@
       "brew:*",
       "tailscale:*",
       "gh:*",
-      "cmux:*"
+      "cmux:*",
+      "open:*"
     ]
   },
   "skillListingBudgetFraction": 0.02,

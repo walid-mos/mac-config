@@ -66,15 +66,22 @@ Length budget : 200-280 chars. Below 200 it feels thin. Above 280 it gets cut (u
 ```
 Post 1 (hook) : the strongest line. End optionally with 🧵 or 👇. No "thread" prefix.
 
+---
+
 Post 2 : context or "here's what i tried first"
 
+---
+
 Post 3-N : one insight per post, each readable standalone
+
+---
 
 Last post : a clean closer (NOT a CTA)
 ```
 
 ### Thread rules
 
+- **Post separator is `---` on its own line, surrounded by blank lines. ALWAYS.** This is the ONLY thing that splits a thread into posts. Blank lines INSIDE a post are for hook/body/kicker blocks (per single tweet structure), not post boundaries. No `---` = single tweet. The UI parses this strictly; any other convention will render as one giant post.
 - Each post is a complete thought. A reader who lands on post 4 still gets value.
 - No `1/7` `2/7` numbering. X auto-threads, the reader sees the counter natively.
 - The 🧵 emoji is optional and goes at the END of post 1, not the start. Skip it if the hook is strong.

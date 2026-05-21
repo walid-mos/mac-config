@@ -37,7 +37,7 @@ Do **not** load for: marketing pages, product UIs, demos, anything where HTML is
 1. **Pick the shape** → read `./recipes.md` for the intent → recipe table.
 2. **Set up the visual scaffolding** → read `./themes.md` for the `--np-*` token vocabulary, the anti-FOUC `<head>` bootstrap, and the skip-zones list. Drop these into every HTML you generate; they are non-negotiable.
 3. **Compose from the block library** → read `./blocks.md`. For rich content (code, diffs, file trees, pills, Mermaid) → also read `./rich-blocks.md`. For custom-layout schemas (compare / stack / kinds / pool / timeline / inline SVG) → also read `./diagrams.md`.
-4. **If the artifact must round-trip through the user as typed data** (decisions, comments, tunable tokens) → read `./rich-mode.md` for the submission protocol, output path, three-button approval gate, and `rp` server loop. Otherwise stay in static mode.
+4. **If the artifact must round-trip through the user as typed data** (decisions, comments, tunable tokens) → read `./rich-mode.md` for the submission protocol, output path, two-button approval gate, and `rp` server loop. Otherwise stay in static mode.
 
 ## Layout
 

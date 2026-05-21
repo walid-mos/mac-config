@@ -81,7 +81,15 @@ Output format, verbatim, no preamble, no markdown wrapping :
 ```
 === FINALIST 1 (angle: <angle name>) ===
 
-<tweet or thread body, exactly as it would be posted on X>
+<post 1 content>
+
+---
+
+<post 2 content>
+
+---
+
+<post 3 content>
 
 rationale: <one line, why this works>
 
@@ -89,12 +97,16 @@ rationale: <one line, why this works>
 
 === FINALIST 2 (angle: <angle name>) ===
 
-<tweet or thread body>
+<single tweet body, no --- inside>
 
 rationale: <one line>
 ```
 
-For threads, separate posts with a blank line. Do not number posts inside the body. Do not prefix with anything.
+**Post separator inside a thread body : `---` on its own line, surrounded by blank lines.** This is the ONLY thing that splits a thread into posts. Blank lines INSIDE a post are reserved for the hook/body/kicker block structure (cf. `formats.md`) — they do NOT split posts. The downstream UI parses `---` strictly; any other convention will render the whole body as a single post.
+
+For a single tweet, do NOT emit any `---` inside the body. The presence of `---` = thread, the absence = single. This is the format toggle.
+
+Do not number posts inside the body. Do not prefix posts with anything.
 
 ## Hard bans (non-negotiable, override any other instruction)
 

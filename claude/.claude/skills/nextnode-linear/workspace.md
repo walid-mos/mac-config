@@ -26,6 +26,8 @@ Live state of the NextNode Solutions Linear workspace. **This file gets stale** 
 | YSumAI           | `NextNodeSolutions/ysumai`            | `ecead2c2-ca8b-41e7-8e0c-933162cd4698`   |
 | Kicked           | `NextNodeSolutions/kicked`            | `46dba6bc-867a-4ee5-bfca-b4dca19e001a`   |
 | Adiffi           | `NextNodeSolutions/adiffi`            | `d8d92f90-2af1-4b90-b36b-da4e08c3c405`   |
+| Agent Cockpit    | (internal, no public repo)            | `f84f7e83-f8bc-4f74-9927-b961f0c99750`   |
+| Scribe           | `tweet-ui` (local tool)               | `94c47c22-b7f7-49c1-974b-e47f478e7d00`   |
 
 ### Internal team (INT) - `core` monorepo packages
 

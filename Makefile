@@ -28,6 +28,8 @@ $(PACKAGES):
 claude-post:
 	@command -v claude >/dev/null || { echo "claude CLI not found, skipping MCP setup"; exit 0; }
 	@claude mcp add context7 -s user -- npx -y @upstash/context7-mcp@latest 2>/dev/null || echo "context7 already registered"
+	@claude plugin marketplace add pbakaus/impeccable 2>/dev/null || echo "impeccable marketplace already added"
+	@claude plugin list 2>/dev/null | grep -q impeccable || claude plugin install impeccable@impeccable
 
 rp-post:
 	@command -v node >/dev/null || { echo "node not found — install it (fnm install --lts) so 'rp' can serve plan.html"; exit 0; }

@@ -4,7 +4,9 @@ The visual primitives that distinguish a "plan rendu pro" from a "wall of markdo
 
 ## `code-block` — `<pre><code class="language-…">`
 
-Syntax-highlighted code via **highlight.js** (CDN, version-pinned, lazy-loaded only when the page contains at least one `<pre><code>`).
+Syntax-highlighted code via **highlight.js** (CDN, version-pinned, lazy-loaded only when the page contains at least one `<pre><code>`). The library colors **tokens**; the skill owns the **container** (padding, font, surface, border). Both halves are mandatory — shipping one without the other gives the dead-monospace look the recipe is meant to prevent.
+
+### Minimal form
 
 ```html
 <pre><code class="language-typescript">export function issue(userId: string): string {
@@ -13,13 +15,118 @@ Syntax-highlighted code via **highlight.js** (CDN, version-pinned, lazy-loaded o
 </code></pre>
 ```
 
-Supported languages = whatever highlight.js handles. Common: `language-typescript`, `language-python`, `language-bash`, `language-json`, `language-html`, `language-css`, `language-diff`.
-
-Loader pattern (put in the page footer, after the body content):
+### With file header + copy button (preferred for plans, audits, reviews)
 
 ```html
-<link id="hljs-light" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/styles/github.min.css">
-<link id="hljs-dark"  rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/styles/github-dark.min.css" disabled>
+<figure class="code-block">
+  <figcaption class="code-block__head">
+    <span class="code-block__file">src/auth/jwt.ts</span>
+    <span class="code-block__lang">TS</span>
+    <button class="code-block__copy" type="button" aria-label="Copy code">Copy</button>
+  </figcaption>
+  <pre><code class="language-typescript">export function issue(userId: string): string {
+  return jwt.sign({ sub: userId }, SECRET, { algorithm: 'HS256' })
+}
+</code></pre>
+</figure>
+```
+
+Wrap inside `<figure class="code-block">` whenever the snippet has identity (a file path, a language label worth surfacing, or it's referenced from elsewhere in the doc). Use the bare `<pre><code>` form only for tiny inline-ish snippets without identity.
+
+**Always declare the language** (`language-typescript`, `language-rust`, `language-toml`, etc.). A bare `<code>` falls back to hljs autodetect, which silently picks the wrong grammar half the time. Common values: `language-typescript`, `language-javascript`, `language-tsx`, `language-rust`, `language-python`, `language-bash`, `language-json`, `language-toml`, `language-yaml`, `language-html`, `language-css`, `language-sql`, `language-diff`.
+
+### Container CSS (required — drop into the main `<style>`)
+
+```css
+/* Bare pre/code — used when no <figure class="code-block"> wrapper */
+pre {
+  margin: 0;
+  padding: 14px 16px;
+  background: var(--np-bg-soft);
+  border: 1px solid var(--np-border);
+  border-radius: var(--np-radius);
+  overflow-x: auto;
+  font-family: var(--np-mono);
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--np-text);
+  tab-size: 2;
+}
+pre code,
+pre code.hljs {
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+}
+/* Inline code (inside <p>, <li>, table cells) */
+:not(pre) > code {
+  font-family: var(--np-mono);
+  font-size: .9em;
+  padding: 1px 6px;
+  background: var(--np-bg-soft);
+  border: 1px solid var(--np-border);
+  border-radius: 4px;
+  color: var(--np-text);
+}
+
+/* Figure wrapper with file header */
+.code-block {
+  margin: 0 0 16px;
+  border: 1px solid var(--np-border);
+  border-radius: var(--np-radius);
+  overflow: hidden;
+  background: var(--np-bg-soft);
+}
+.code-block__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--np-bg);
+  border-bottom: 1px solid var(--np-border);
+  font-family: var(--np-mono);
+  font-size: 12px;
+  color: var(--np-text-muted);
+}
+.code-block__file { flex: 1; font-weight: 600; color: var(--np-text); }
+.code-block__lang {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--np-accent-hover);
+  padding: 1px 6px;
+  background: var(--np-accent-bg);
+  border-radius: 3px;
+}
+.code-block__copy {
+  font: inherit;
+  font-size: 11px;
+  padding: 2px 8px;
+  background: transparent;
+  border: 1px solid var(--np-border);
+  border-radius: 4px;
+  color: var(--np-text-muted);
+  cursor: pointer;
+}
+.code-block__copy:hover { color: var(--np-accent-hover); border-color: var(--np-accent); }
+.code-block__copy.is-copied { color: var(--np-add-text); border-color: var(--np-add-border); }
+.code-block pre {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--np-bg-soft);
+}
+```
+
+### Loader pattern (page footer, lazy)
+
+```html
+<link id="hljs-light" rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/styles/atom-one-light.min.css">
+<link id="hljs-dark"  rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/styles/atom-one-dark.min.css" disabled>
 <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js"></script>
 <script>
 (function () {
@@ -31,11 +138,27 @@ Loader pattern (put in the page footer, after the body content):
   hljs.highlightAll()
   applyTheme(document.documentElement.dataset.theme || 'light')
   document.addEventListener('np:theme-change', (e) => applyTheme(e.detail.theme))
+
+  // Copy buttons — no-op if no .code-block__copy is on the page
+  document.querySelectorAll('.code-block__copy').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const code = btn.closest('.code-block')?.querySelector('pre code')?.innerText ?? ''
+      try {
+        await navigator.clipboard.writeText(code)
+        const prev = btn.textContent
+        btn.textContent = 'Copied'
+        btn.classList.add('is-copied')
+        setTimeout(() => { btn.textContent = prev; btn.classList.remove('is-copied') }, 1200)
+      } catch {}
+    })
+  })
 })()
 </script>
 ```
 
-Don't load the script if no `<pre><code>` is on the page (early return above).
+**Theme choice**: `atom-one-light` / `atom-one-dark` integrate better with the NextNode teal palette than `github` / `github-dark` (warmer greys, less harsh contrast). The container CSS above forces `pre code.hljs { background: transparent }`, so the doc's `--np-bg-soft` shows through and the snippet sits on the same surface as the rest of the page — no white-rectangle-on-grey artifact in light mode, no pitch-black-on-grey in dark mode.
+
+Don't load the script (or the `<link>` stylesheets) if no `<pre><code>` is on the page — the early return above handles the script, gate the `<link>`s the same way when generating.
 
 ## `diff` — `<div class="diff" data-file="…">`
 

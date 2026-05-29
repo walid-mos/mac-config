@@ -63,8 +63,8 @@ After writing `plan.html`:
    ```
    rp <slug>
    ```
-   `rp` resolves the slug to `docs/interviews/<slug>/`, starts the local server on port `7654` (default), opens the browser, and blocks until the user clicks Submit. The harness will notify when the process exits.
-2. **Immediately tell the user the URL in chat.** The browser auto-open may fail silently (focus, popup blocker, no GUI). Default URL: `http://localhost:7654/`; if a custom port was used, read `docs/interviews/<slug>/.rp-url`. One short chat line is enough — e.g. *"Round servi sur http://localhost:7654/ — clique Submit quand t'as fini."*
+   `rp` resolves the slug to `docs/interviews/<slug>/`, starts the local server (port `7654` by default, but it **auto-falls back to an OS-assigned free port** if 7654 is busy — so several `rp` can run in parallel without colliding), opens the browser, and blocks until the user clicks Submit. The harness will notify when the process exits.
+2. **Immediately tell the user the URL in chat.** The browser auto-open may fail silently (focus, popup blocker, no GUI). **Never assume the port** — read the actual URL from the server: it's the first stdout line of the background `rp` command, and is also written to `docs/interviews/<slug>/.rp-url`. (With a parallel run the port may not be 7654.) One short chat line is enough — e.g. *"Round servi sur <url> — clique Submit quand t'as fini."*
 3. Wait for the background process to complete. **Do not poll.**
 4. Read `docs/interviews/<slug>/submission.json` and act on it (apply decisions, address comments, tune tokens).
 

@@ -158,7 +158,29 @@ When the caller is a workspace package inside a Turborepo monorepo (e.g. `packag
 
 What stays Hetzner-specific (this file) is the **runtime contract**: the `app` service name, port `3000`, infra-owned compose keys, env injection, Caddy proxy. The Dockerfile must respect those, but its build strategy is generic monorepo concern.
 
-## Image naming
+## Image source - build vs upstream
+
+The `[deploy.image]` block in `nextnode.toml` selects whether the deploy pipeline **builds** the project's `Dockerfile` or **pulls a prebuilt upstream** image.
+
+```toml
+# Default - build from local Dockerfile (no [deploy.image] block needed)
+# Equivalent to: [deploy.image] source = "build"
+
+# Or: consume a prebuilt upstream image
+[deploy.image]
+source = "upstream"
+ref = "ghcr.io/some-org/some-image:v1.2.3"
+registry_auth_secret = "GHCR_READ_TOKEN"   # optional - omit for public images
+```
+
+| `source` | What happens | When to use |
+|----------|-------------|------------|
+| `"build"` (default) | The `build-image` job runs `docker buildx`, pushes to GHCR, deploy pulls it. Logs in to GHCR with the workflow's `GITHUB_TOKEN` - no extra config needed | Your project, your Dockerfile |
+| `"upstream"` | The `build-image` job is **skipped**. Deploy pulls `ref` directly. If `registry_auth_secret` is set, the deploy SSH session logs in to the registry first (token value from the named repo/org secret) | Vendor app, mirrored binary, fleet-rebrand of an upstream image |
+
+The `plan` command emits `image_source` and `upstream_image_ref` outputs so the workflow YAML can route past `build-image` without inline conditionals.
+
+## Image naming (build mode)
 
 Computed by `computeImageRef({ repository, sha })` in `domain/deploy/image-ref.ts`:
 
@@ -168,7 +190,7 @@ Computed by `computeImageRef({ repository, sha })` in `domain/deploy/image-ref.t
 
 Example: `NextNodeSolutions/Core` @ `abc1234567890…` -> `ghcr.io/nextnodesolutions/core:sha-abc1234`
 
-The `compute-image-ref` standalone CLI command is the single source of truth - any other ref string constructed by hand is a bug.
+The `compute-image-ref` standalone CLI command is the single source of truth - any other ref string constructed by hand is a bug. Upstream mode bypasses this entirely (the `ref` from config flows through unchanged).
 
 ## Local dev
 

@@ -19,21 +19,24 @@ user-invocable: true
 
 ## Layout
 
-Three kinds. Folder name = plural. Add a new kind only when a real second exemplar of it shows up — not before.
+Four kinds. Folder name = plural. Add a new kind only when a real second exemplar of it shows up — not before.
 
 | Kind | Path | Lifecycle | Producer |
 |---|---|---|---|
 | Interview workflow | `docs/interviews/<slug>/` | Folder · stateful · multi-round | `/interview` (rich mode via `rp`) |
 | Implementation plan | `docs/plans/<YYYY-MM-DD>-<slug>.html` | Single file · static | `html` (after interview closure, or stand-alone) |
+| Execution plan (machine) | `docs/plans/<slug>.plan.json` | Single file · static · sink-agnostic | `/backlog` (consumed by `/track` + `/next`) |
 | Free-form note | `docs/notes/<YYYY-MM-DD>-<slug>.html` | Single file · static | `html` (any other recipe — audit, review, retro, research, status, board) or hand-written |
+
+> `<slug>.plan.json` is the **machine-readable** backlog contract (`milestones[] → tracks[] → tasks[]`), distinct from the human-facing `<date>-<slug>.html` plan. It carries **no date prefix** (one live plan per slug) and is the durable input `/track` reads. The full schema lives in `track/SKILL.md`.
 
 Folder lifecycle (`interviews/` only) holds: `plan.html` (current round), `state.json` (cross-round memory), `submission.json` (latest user submission), `.rp-url` (transient, never commit). Single-file lifecycle: one self-contained HTML, no state, no companion files.
 
 ## Naming
 
 - **Slug** — kebab-case, ASCII, descriptive but short (`auth-middleware-migration`). No date in the slug.
-- **Date prefix** (`YYYY-MM-DD-`) — required on every single-file artifact.
-- **No date prefix** — on `interviews/<slug>/` folders (one interview per topic).
+- **Date prefix** (`YYYY-MM-DD-`) — required on every single-file **HTML** artifact (plans, notes).
+- **No date prefix** — on `interviews/<slug>/` folders (one interview per topic) and on `<slug>.plan.json` (one live execution plan per slug).
 - **Conflicts** — if the slug+date combo already exists, ask before overwriting.
 
 ## Bootstrap

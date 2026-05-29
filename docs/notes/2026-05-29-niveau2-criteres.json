@@ -1,0 +1,143 @@
+{
+  "artifact": "niveau2-challenge-criteria",
+  "version": "1",
+  "status": "validated",
+  "validated_on": "2026-05-29",
+  "thresholds_note": "value/unit éditables par critère",
+  "criteria": [
+    {
+      "id": "t1",
+      "category": "bob",
+      "name": "Nouvelle dépendance",
+      "active": true,
+      "action": "probe",
+      "condition": "Sur le point d'ajouter un package à package.json / d'importer une lib pas déjà présente dans le projet.",
+      "example": "Ajouter date-fns pour un seul format de date."
+    },
+    {
+      "id": "t2",
+      "category": "bob",
+      "name": "Intégration tierce / platform-native",
+      "active": true,
+      "action": "platform-native",
+      "condition": "Câbler un outil / Action GH / SDK / API externe — OU une feature existe nativement dans un outil déjà intégré.",
+      "example": "Écrire un upload R2 maison alors que l'Action tauri sait le faire (uploadUpdaterJson)."
+    },
+    {
+      "id": "t3",
+      "category": "bob",
+      "name": "Helper générique au-dessus du seuil",
+      "active": true,
+      "action": "probe",
+      "condition": "Écrire une utility générique qui dépasse le seuil et sent le déjà-résolu (merge, retry, chunk, parse…).",
+      "example": "Un deep-merge maison de 45 lignes.",
+      "threshold": { "value": 30, "unit": "LOC" }
+    },
+    {
+      "id": "t4",
+      "category": "bob",
+      "name": "Réimplémenter une primitive du framework",
+      "active": true,
+      "action": "platform-native",
+      "condition": "Hand-roll un truc que le framework fournit déjà nativement.",
+      "example": "<img> + lazy maison au lieu de next/image ; endpoint custom au lieu d'un endpoint Astro."
+    },
+    {
+      "id": "t5",
+      "category": "altitude",
+      "name": "Fonction qui gonfle",
+      "active": true,
+      "action": "simplify",
+      "condition": "Une fonction dépasse le seuil LOC, ou l'imbrication dépasse 3 niveaux.",
+      "example": "Une fonction de 70 lignes avec 4 niveaux de if imbriqués.",
+      "threshold": { "value": 50, "unit": "LOC" }
+    },
+    {
+      "id": "t6",
+      "category": "altitude",
+      "name": "Composant qui gonfle",
+      "active": true,
+      "action": "simplify",
+      "condition": "Un composant React dépasse le seuil LOC (candidat au split / extraction de hook).",
+      "example": "Un <Dashboard> de 320 lignes qui fait fetch + state + 3 sous-vues.",
+      "threshold": { "value": 150, "unit": "LOC" },
+      "note": "IL FAUT ABSOLUMENT RESPECTER SOLID -> CF REACT AGENT",
+      "doctrine": "Le LOC est un signal, pas la règle. Tout travail React franchissant le signal passe par react-implementer (ou en direct avec les skills react/coding chargés) qui ENFORCE SOLID : single-responsibility, composition over inheritance, extraction de hooks, état dérivé. Jamais un subagent générique (règle de routing CLAUDE.md)."
+    },
+    {
+      "id": "t7",
+      "category": "altitude",
+      "name": "Abstraction à un seul appelant",
+      "active": true,
+      "action": "simplify",
+      "condition": "Créer une interface / factory / classe de base / couche de config pour UN seul usage concret.",
+      "example": "Une interface Strategy avec une seule implémentation.",
+      "note": "Depend si prevu dajouter d'autres providers apres, globalement toujours YAGNI sauf pour certains point d'archi comme les strategy si on sait que plus tard on va ajouter d'autres autant respecter des le debut",
+      "doctrine": "Défaut = YAGNI, on inline. EXCEPTION = extension future CONNUE et engagée (pas spéculative) — ex: Strategy quand d'autres providers sont déjà au roadmap → on pose la couture dès le début. Discriminateur : sait-on vraiment qu'on ajoutera une autre implémentation, ou je devine ? Si incertain, c'est une question Niveau 1 (le roadmap inclut-il d'autres providers ?) → surface, ne devine pas."
+    },
+    {
+      "id": "t8",
+      "category": "altitude",
+      "name": "Troisième pattern pour le même problème",
+      "active": true,
+      "action": "surface-conflict",
+      "condition": "Deux patterns coexistent déjà pour ce problème, ou j'en introduis un nouveau au lieu de réutiliser.",
+      "example": "Un 3e style de fetch alors que le repo a déjà fetcher() et un hook useQuery."
+    },
+    {
+      "id": "t9",
+      "category": "altitude",
+      "name": "Config / DSL / state machine maison",
+      "active": true,
+      "action": "probe",
+      "condition": "Parser une config, écrire un mini-DSL, ou coder une state machine à la main.",
+      "example": "Un parseur de config maison au lieu de zod/valibot."
+    },
+    {
+      "id": "t10",
+      "category": "footgun",
+      "name": "Domaine footgun",
+      "active": true,
+      "action": "borrow-default",
+      "condition": "Le code touche un domaine à spec mouvante / piège élevé : dates-fuseaux, crypto-hash, parsing complexe (CSV/YAML/ICS/MIME), validation de schéma, i18n/formats nombre, markdown, auth/JWT.",
+      "example": "Calcul de différence de dates avec gestion de fuseau à la main."
+    },
+    {
+      "id": "t11",
+      "category": "llm",
+      "name": "Logique déterministe déléguée au LLM",
+      "active": true,
+      "action": "use-code",
+      "condition": "Sur le point d'utiliser le modèle pour du routing / des retries / la gestion de status-code / un transform déterministe.",
+      "example": "Demander au LLM de décider quel endpoint appeler selon un enum."
+    },
+    {
+      "id": "t12",
+      "category": "escalate",
+      "name": "Impact sur un contrat",
+      "active": true,
+      "action": "escalate",
+      "condition": "Le micro-choix change quelque chose validé au Niveau 1 : API publique, schéma persisté, URL, config déployée.",
+      "example": "Renommer un champ de réponse d'API pour simplifier le code."
+    },
+    {
+      "id": "t13",
+      "category": "escalate",
+      "name": "Dette long terme",
+      "active": true,
+      "action": "escalate",
+      "condition": "La dépendance envisagée a une license / un poids / une maintenance / une surface de sécurité non triviale.",
+      "example": "Tirer une lib de 2 Mo non maintenue depuis 2 ans pour gagner 15 lignes."
+    },
+    {
+      "id": "t14",
+      "category": "escalate",
+      "name": "Choix irréversible",
+      "active": true,
+      "action": "escalate",
+      "condition": "Le choix est difficile à annuler une fois en prod : migration de données, format persisté, identifiant public.",
+      "example": "Choisir le format de sérialisation d'un fichier d'état versionné."
+    }
+  ],
+  "freeform": ""
+}

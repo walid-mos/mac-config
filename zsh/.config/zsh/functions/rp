@@ -39,7 +39,10 @@ rp() {
 
 				OPTIONS:
 				    --port <port>  HTTP port (default: 7654, override with RP_PORT env).
-				                   Use 0 to let the OS pick a free port (URL printed on stdout).
+				                   If the port is busy (parallel rp), it auto-falls back
+				                   to an OS-assigned free port — no collision, no lock.
+				                   Use 0 to force an ephemeral port. URL printed on stdout
+				                   (first line) and written to <dir>/.rp-url.
 				    -h, --help     Show this help.
 
 				BEHAVIOR:

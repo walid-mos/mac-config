@@ -97,21 +97,37 @@ const server = createServer((req, res) => {
 	res.writeHead(404).end('not found')
 })
 
+// Parallel rp instances must not fight over a port. If the requested port is
+// taken (another rp already running), fall back to an OS-assigned free port —
+// the kernel hands out a guaranteed-unique one atomically, so no lock file or
+// port scan is needed. Solo runs keep the stable default; concurrent runs each
+// get their own port automatically.
+let retriedEphemeral = false
+
 server.on('error', (err) => {
+	if (err.code === 'EADDRINUSE' && port !== 0 && !retriedEphemeral) {
+		retriedEphemeral = true
+		console.error(`rp: port ${port} in use — falling back to an OS-assigned free port`)
+		server.listen(0, '127.0.0.1')
+		return
+	}
 	if (err.code === 'EADDRINUSE') {
 		console.error(`rp: port ${port} is already in use`)
-		console.error(`rp: another rp may be running — kill it, or pass --port <N> / RP_PORT=<N>`)
+		console.error(`rp: pass --port <N> / RP_PORT=<N>, or use 0 for an ephemeral port`)
 		process.exit(3)
 	}
 	console.error(`rp: server error: ${err.message}`)
 	process.exit(1)
 })
 
-server.listen(port, '127.0.0.1', () => {
+// 'listening' (not the listen callback) so this fires for whichever bind wins —
+// the requested port or the ephemeral fallback.
+server.on('listening', () => {
 	const actualPort = server.address().port
 	const url = `http://127.0.0.1:${actualPort}/`
-	// Both stdout (parseable) and stderr (visible in logs), plus a sidecar file
-	// for callers that prefer reading the URL from disk.
+	// Both stdout (parseable, first line) and stderr (visible in logs), plus a
+	// sidecar file for callers that prefer reading the URL from disk. The port
+	// may differ from the requested one (ephemeral fallback) — always trust this.
 	console.log(url)
 	console.error(`rp: serving ${planPath}`)
 	console.error(`rp: open ${url}`)
@@ -128,6 +144,8 @@ server.listen(port, '127.0.0.1', () => {
 		spawn(opener, [url], { stdio: 'ignore', detached: true }).unref()
 	}
 })
+
+server.listen(port, '127.0.0.1')
 
 process.on('SIGINT', () => {
 	console.error('rp: interrupted')

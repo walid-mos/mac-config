@@ -39,14 +39,20 @@ The identifier regex for this skill: `\[M(\d+)\.([A-Z]+)-(\d+)\]` (e.g.
 
 1. `git rev-parse --is-inside-work-tree` — if NOT a git repo, REFUSE and tell the user.
 2. Slug = `git remote get-url origin` last path segment, strip `.git` (fallback: repo
-   root dir name). The tracker store is `docs/plans/<slug>/` at the git root
-   (`git rev-parse --show-toplevel`).
-3. Read `docs/plans/<slug>/progress.md` and `docs/plans/<slug>/track.json`. Missing
-   `progress.md` → there is no active track; tell the user to run `/track` first and
-   STOP. (The slug is derived from the repo you're in, so there is no wrong-tree
-   ambiguity to guard against — you're always operating on this repo's own track.)
-4. If `progress.md` has neither a `[ ]` nor a `[~]` line → the track is fully
-   shipped; remind the user (`/track` for the next one) and STOP.
+   root dir name). The tracker store is `docs/plans/<slug>/.tracks/` at the git root
+   (`git rev-parse --show-toplevel`). Trackers are **per-track and parallel**:
+   `.tracks/M{M}.{track}/{progress.md,track.json}`.
+3. **Select the track explicitly — `/next` does NOT look at the git branch.**
+   - `$ARGUMENTS` names a coordinate (`M2.A`, `m2.a`) → use `.tracks/M2.A/`.
+   - No argument, and **exactly one** `.tracks/*/` has an unfinished checklist (a `[ ]`
+     or `[~]` line) → use that one (the unambiguous case — no need to make the user
+     type the coordinate).
+   - No argument, and **several** trackers are unfinished → do NOT guess. List them
+     (`M{M}.{track} — <X open tasks>`) and ask the user to re-run as `/next M{M}.{track}`.
+     STOP. (This is plain disambiguation, never a clobber.)
+   - **No `.tracks/` at all** → no track staged; tell the user to run `/track` and STOP.
+4. If the selected `progress.md` has neither a `[ ]` nor a `[~]` line → that track is
+   fully shipped; remind the user (`/pr` to open it, `/track` for the next) and STOP.
 
 ### Phase 2 — Validate the previous task (commit + push + close any `[~]`)
 
@@ -201,12 +207,15 @@ half-work in the tree.
    STOP — let the user trigger the next one.
 2. **No auto-chaining.** Do not call `/next` from within a `/next` run. The user
    types `/next` again when ready; that contract protects token cost.
-3. **The tracker files are the source of truth.** In `docs/plans/<slug>/`:
-   `track.json` is the cached task data, `progress.md` the working checklist. Do not
-   re-read `plan.json` on `/next` unless `track.json` is missing or corrupt.
-4. **Tracker state lives in the repo, never `/tmp`.** `progress.md` + `track.json`
-   sit in `docs/plans/<slug>/` (gitignored, durable across reboots). The slug is
-   derived from the current repo, so there is no wrong-tree ambiguity.
+3. **The tracker files are the source of truth.** In
+   `docs/plans/<slug>/.tracks/M{M}.{track}/`: `track.json` is the cached task data,
+   `progress.md` the working checklist. Do not re-read `plan.json` on `/next` unless
+   `track.json` is missing or corrupt.
+4. **Tracker state lives in the repo, never `/tmp`.** Per-track files sit under
+   `docs/plans/<slug>/.tracks/M{M}.{track}/` (gitignored, durable across reboots). The
+   active track is chosen **explicitly** (`/next M{M}.{track}`, or auto when exactly one
+   tracker is unfinished) — `/next` never reads the git branch. Trackers for sibling
+   tracks coexist untouched.
 5. **At most one `[~]` task at a time.** Multiple `[~]` lines = bug; STOP and
    surface. If any Linear adapter call fails, stop and surface — never leave
    Linear out of sync.

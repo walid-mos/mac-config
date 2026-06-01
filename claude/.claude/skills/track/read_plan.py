@@ -20,8 +20,8 @@ Output (summary):
     {
       "effort": "V8",
       "milestones": [
-        { "id": "M1", "number": 1, "demo": "...", "skeleton": true,
-          "tracks": [ { "id": "A", "task_count": 2,
+        { "id": "M1", "number": 1, "demo": "...", "skeleton": true, "needs": [],
+          "tracks": [ { "id": "A", "branch": "feat/...", "task_count": 2,
                         "first_titles": ["...", "..."] } ] }
       ]
     }
@@ -43,6 +43,9 @@ from typing import Any
 
 MILESTONE_ID_RE = re.compile(r"^[Mm](\d+)$")
 MILESTONE_ARG_RE = re.compile(r"^[Mm]?(\d+)$")
+BRANCH_RE = re.compile(
+    r"^(feat|fix|chore|refactor|docs|test|perf|build|ci|style|revert)/[a-z0-9][a-z0-9-]*$"
+)
 
 
 def die(msg: str) -> "None":
@@ -80,6 +83,43 @@ def load_plan(path: str) -> dict[str, Any]:
     return data
 
 
+def validate_milestone_graph(plan: dict[str, Any]) -> None:
+    """`needs[]` must be explicit, backward-only, and reference existing milestones."""
+    numbers_by_id: dict[str, int] = {}
+    for milestone in plan["milestones"]:
+        numbers_by_id[milestone["id"]] = milestone_number(milestone)
+    for milestone in plan["milestones"]:
+        mid = milestone["id"]
+        needs = milestone.get("needs")
+        if needs is None:
+            die(f"milestone {mid} is missing required 'needs' (use [] for the skeleton)")
+        if not isinstance(needs, list) or not all(isinstance(n, str) for n in needs):
+            die(f"milestone {mid} 'needs' must be a list of milestone-id strings, got {needs!r}")
+        if bool(milestone.get("skeleton", False)) and needs:
+            die(f"skeleton milestone {mid} must have 'needs': [] (it depends on nothing)")
+        for ref in needs:
+            if ref not in numbers_by_id:
+                die(f"milestone {mid} needs {ref!r}, which is not a milestone in this plan")
+            if numbers_by_id[ref] >= numbers_by_id[mid]:
+                die(f"milestone {mid} needs {ref!r}, not a strictly-earlier milestone (forward/cyclic dep)")
+
+
+def validate_branches(plan: dict[str, Any]) -> None:
+    """Every track carries a unique `branch` = `<conventional-type>/<kebab-slug>`."""
+    seen: dict[str, str] = {}
+    for milestone in plan["milestones"]:
+        for track in milestone.get("tracks", []):
+            coord = f"{milestone.get('id')}.{track.get('id')}"
+            branch = track.get("branch")
+            if not isinstance(branch, str) or not branch:
+                die(f"track {coord} is missing a string 'branch'")
+            if not BRANCH_RE.match(branch):
+                die(f"track {coord} branch {branch!r} must be '<type>/<kebab-slug>' (no coordinate)")
+            if branch in seen:
+                die(f"branch {branch!r} is shared by tracks {seen[branch]} and {coord} — must be unique")
+            seen[branch] = coord
+
+
 def derive_identifier(milestone_id: str, track_id: str, step: Any) -> str:
     if not isinstance(step, str) or not step.isdigit():
         die(f"task 'step' must be a numeric string, got {step!r}")
@@ -95,6 +135,7 @@ def summary(plan: dict[str, Any]) -> dict[str, Any]:
             tracks_out.append(
                 {
                     "id": track.get("id"),
+                    "branch": track.get("branch"),
                     "task_count": len(tasks),
                     "first_titles": [t.get("title", "") for t in tasks[:2]],
                 }
@@ -105,6 +146,7 @@ def summary(plan: dict[str, Any]) -> dict[str, Any]:
                 "number": milestone_number(milestone),
                 "demo": milestone.get("demo"),
                 "skeleton": bool(milestone.get("skeleton", False)),
+                "needs": milestone.get("needs", []),
                 "tracks": tracks_out,
             }
         )
@@ -129,8 +171,9 @@ def slice_track(plan: dict[str, Any], want_milestone: int, want_track: str) -> d
                     "number": want_milestone,
                     "demo": milestone.get("demo"),
                     "skeleton": bool(milestone.get("skeleton", False)),
+                    "needs": milestone.get("needs", []),
                 },
-                "track": {"id": track["id"], "tasks": tasks_out},
+                "track": {"id": track["id"], "branch": track.get("branch"), "tasks": tasks_out},
             }
         die(f"milestone M{want_milestone} has no track {want_track!r}")
     die(f"no milestone M{want_milestone} in plan")
@@ -163,6 +206,8 @@ def main(argv: list[str]) -> int:
         die(f"usage: {argv[0]} <plan.json> [--milestone M --track T]")
     path, milestone, track = parse_args(argv)
     plan = load_plan(path)
+    validate_milestone_graph(plan)
+    validate_branches(plan)
     if milestone is None:
         out = summary(plan)
     else:

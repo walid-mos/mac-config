@@ -58,8 +58,9 @@ Schema (immutable structure — progress is NOT stored here):
       "id": "M1",
       "demo": "Run agent → Claude Code spawn → output streamé",
       "skeleton": true,
+      "needs": [],
       "tracks": [
-        { "id": "A", "tasks": [
+        { "id": "A", "branch": "feat/agent-spawn-stream", "tasks": [
           { "step": "01", "title": "Spawn process Claude Code", "size": "I4",
             "slice_of": ["D2"], "done_when": "un PID tourne, logs capturés",
             "description": "WHAT…\n\nWHY…\n\nWHERE…\n\nDONE WHEN…",
@@ -97,9 +98,17 @@ plan), and STOP. Do NOT invent a plan.
 python3 ~/.stow_repository/claude/.claude/skills/track/read_plan.py <plan.json>
 ```
 
-Emits the milestone/track summary (counts, demo string, first task titles).
-Print a 1-line summary per track. Walking-skeleton milestone (`skeleton: true`)
-first. If the plan has no tracks → surface it as a `/backlog` bug and STOP.
+Emits the milestone/track summary (counts, demo string, first task titles, and each
+milestone's `needs[]`). Print a 1-line summary per track. Walking-skeleton milestone
+(`skeleton: true`) first. If the plan has no tracks → surface it as a `/backlog` bug
+and STOP.
+
+**Surface the parallelism, don't fake it.** `needs[]` is each milestone's
+milestone-level dependency. Milestones sharing the same `needs` are **parallelizable**
+— one git worktree per track, as today. `/track` does NOT auto-detect which milestones
+are already shipped (there is no plan-wide completion ledger — that is agent-cockpit's
+job). So show the `needs` edges and let the operator pick a parallel branch; never
+claim a milestone is "unblocked" on your own.
 
 ### Phase 4 — Pick a track
 
@@ -120,23 +129,37 @@ python3 ~/.stow_repository/claude/.claude/skills/track/read_plan.py <plan.json> 
 
 ### Phase 5 — Persist the progress checklist (durable, in-repo)
 
-The tracker store is `docs/plans/<slug>/` at the git root — the same folder that
-holds `plan.json`. `/track` writes the active track's `progress.md` + `track.json`
-**there** (NOT in `/tmp` — nothing ephemeral). Both are gitignored (the `.gitignore`
-`/backlog` wrote), so they survive reboots but never pollute git history. This is
-the in-house tracker store; agent-cockpit will read the same folder later.
+**One tracker per track — they coexist.** Tracks are **parallel** (see the model
+above), so their state must be too. The store is **per-track**, keyed by the track
+coordinate:
 
-**One active track per checkout.** `progress.md` / `track.json` represent the track
-currently in flight. To ship two tracks of the same milestone in parallel, use a
-separate git worktree per track (each checkout keeps its own gitignored progress
-files) — that is the parallel-PR story.
+```
+docs/plans/<slug>/.tracks/M{M}.{track}/progress.md
+docs/plans/<slug>/.tracks/M{M}.{track}/track.json
+```
 
-**Resume support**: if `docs/plans/<slug>/progress.md` already exists with unchecked
-`[ ]`/`[~]` boxes, ask the user: resume that track, or replace it with the newly
-picked one? (Replace overwrites `progress.md` + `track.json`.) Never silently
-clobber an in-flight track.
+`/track M2.A` writes `.tracks/M2.A/` **regardless of whether `.tracks/M1.A/` already
+exists** — staging one track NEVER touches, replaces, or asks about another. There is
+**no single "active track"** and **no replace-or-abort question across tracks**: that
+was the old single-file design, and it contradicted parallelism. The whole point of a
+track is that it runs alongside its siblings. The `.tracks/` dir is gitignored,
+durable across reboots, never in git history — **self-heal** plans authored before per-track
+trackers existed: ensure `docs/plans/<slug>/.gitignore` contains a `.tracks/` line
+(append if missing), remove the obsolete top-level `progress.md` / `track.json` lines
+from it, and `rm` those stale top-level files if present (they were gitignored
+ephemeral state from the old single-file layout — never committed, safe to delete).
 
-Write **two** files into `docs/plans/<slug>/`:
+**Which track `/next` ships is chosen explicitly** — `/next M{M}.{track}` (or `/next`
+alone when exactly one tracker is unfinished). `/next` does **not** look at the git
+branch. The `branch` field is just the name to check out / `wt` for that track's PR; it
+is not a selector. Sibling trackers coexist, each drained by its own `/next M…`.
+
+**Resume — scoped to the SAME coordinate only.** If `.tracks/M{M}.{track}/progress.md`
+already exists for **the track you just picked** with unchecked `[ ]`/`[~]` boxes, ask:
+resume it, or overwrite it? Never silently clobber in-flight work. A *different* track's
+tracker existing is **never** a reason to ask anything — leave it alone.
+
+Write **two** files into `docs/plans/<slug>/.tracks/M{M}.{track}/`:
 
 #### `progress.md` — user-facing checklist
 
@@ -147,6 +170,7 @@ Started: {ISO timestamp}
 Plan: {abs path to plan.json}
 Slug: {slug}
 Milestone: M{M} — {demo string}
+Branch: {track.branch}   ← checkout / worktree this for the PR
 
 ## Helpers
 
@@ -173,7 +197,7 @@ Milestone: M{M} — {demo string}
   "slug": "<slug>",
   "plan_path": "<abs path to plan.json>",
   "milestone": { "id": "M1", "number": 1, "demo": "...", "skeleton": true },
-  "track": { "id": "A", "tasks": [
+  "track": { "id": "A", "branch": "feat/agent-spawn-stream", "tasks": [
     { "step": "01", "identifier": "[M1.A-01]", "title": "...", "size": "I4",
       "slice_of": ["D2"], "done_when": "...", "description": "...", "sink_id": null }
   ]}
@@ -187,9 +211,11 @@ augmented with `slug` and `plan_path`.
 
 Print, in 4 short lines:
 
-- `Plan: <abs path to progress.md>`
+- `Plan: <abs path to .tracks/M{M}.{track}/progress.md>`
 - `Track: M{M}.{track} — {X} tasks`
-- `Next: /next` (when ready to ship the first task)
+- `Branch: {track.branch}` (the name to `wt {branch}` / `git checkout -b {branch}` for
+  this track's PR — not a `/next` selector)
+- `Next: /next M{M}.{track}` (ships this track's first task)
 - `À toi de jouer.`
 
 Then STOP.
@@ -203,9 +229,11 @@ Then STOP.
    `sink_id`. `/track` is pure plan.json → scratch.
 2. **The plan file is authored by `/backlog`.** If `plan.json` is missing, STOP
    and point the user at `/backlog`. Never fabricate a plan.
-3. **The progress files live in the repo, not `/tmp`.** `progress.md` + `track.json`
-   sit in `docs/plans/<slug>/` (durable, gitignored). One active track per checkout;
-   parallel tracks use parallel git worktrees. Never write tracker state to `/tmp`.
+3. **The progress files live in the repo, not `/tmp`.** Each track owns
+   `docs/plans/<slug>/.tracks/M{M}.{track}/progress.md` + `track.json` (durable,
+   gitignored). Trackers are **per-track and coexist** — staging M2.A never touches
+   M1.A. `/next M{M}.{track}` selects a track explicitly (never by git branch). Never
+   write tracker state to `/tmp`, and never collapse the trackers into one "active" file.
 4. **Schema mismatch = fail loud.** If `read_plan.py` exits non-zero (bad JSON,
    missing `milestones`, malformed `step`), surface the error — do not paper over
    a half-parsed plan.

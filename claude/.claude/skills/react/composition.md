@@ -72,6 +72,30 @@ function UserDashboard() {
 }
 ```
 
+**Imperative components are NOT exempt.** A canvas / WebGL / terminal / chart component that subscribes to an event source AND paints AND coordinates with a backend is doing THREE jobs — "it's imperative" is not a license to fuse them. Split along the same SRP line:
+
+- **Pure render/measure logic** (no React) → a plain module (`fooRenderer.ts`).
+- **The external-system glue** (subscriptions, observers, refs, the effects) → a custom hook (`useFoo`).
+- **The component** → presentational shell: call the hook, return JSX.
+
+```tsx
+// FORBIDDEN - one component fuses Tauri subscription + canvas drawing + resize/backend coordination
+function TerminalPane({ sessionId }) {
+  const canvasRef = useRef(null)
+  useEffect(() => { /* listen(...) + draw 6 lines */ }, [sessionId])
+  useEffect(() => { /* ResizeObserver + 20 lines of sizing/redraw/propagate */ }, [sessionId])
+  return <div><canvas ref={canvasRef} /></div>
+}
+
+// MANDATORY - renderer module (pure) + use* hook (glue) + presentational shell
+const TerminalPane = ({ sessionId }) => {
+  const { containerRef, canvasRef } = useTerminalCanvas(sessionId) // hook owns refs + effects
+  return <div ref={containerRef}><canvas ref={canvasRef} /></div>
+}
+```
+
+**Effects follow from this.** An effect body is **wiring + cleanup only**: subscribe/observe → delegate to a named handler → return teardown. A 20-line anonymous function inside `useEffect` is the smell. Extract the pure part to a module function (parameterized, so it stays stable per RULE 4.4) and leave only the thin reactive binding (which closes over props/refs) inside the effect.
+
 ### O - Open/Closed: Extend via composition
 
 ```tsx

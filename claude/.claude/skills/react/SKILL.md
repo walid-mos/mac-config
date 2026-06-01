@@ -14,6 +14,8 @@ description: >-
 
 These rules apply to ALL React code you write or modify.
 
+> **ROUTING - qui a le droit d'écrire du React.** Toute écriture, modification ou refacto d'un fichier React (`*.tsx` / `*.jsx`, ou tout fichier qui importe React / utilise du JSX) passe **OBLIGATOIREMENT par le subagent `react-implementer`** - lui seul. Éditer un fichier React **depuis le main thread est INTERDIT**, même pour une modif triviale (prop, import, `className`). Déléguer à un subagent générique (`general-purpose`, `Plan`, `Explore`) est tout aussi INTERDIT : ces contextes ne chargent pas cette doctrine et produisent du code non conforme. Le main thread peut **lire** du React (comprendre, planifier, router) mais **jamais l'éditer**. Règle : **`react-implementer` ou rien.**
+
 ---
 
 ## RULE 0 - COMPOSITION IS EVERYTHING (HIGHEST PRIORITY)
@@ -93,6 +95,104 @@ Full rules and dependency removal checklist in [`## Hooks`](#hooks) below.
 - Context is almost never needed - only for sub-tree scoping (e.g. theme section). Jotai is preferred for everything else.
 
 Full patterns in [patterns.md](patterns.md).
+
+---
+
+## RULE 6 - RENDER COMPONENTS, DON'T CALL THEM
+
+If a function takes props-like inputs **or** returns whole component / view / page subtrees, it **is** a component. Give it a `PascalCase` name, put it in its own scope, and mount it as `<Name ... />`. **Never invoke it as a plain function** (`renderName(...)`).
+
+Calling a component as a function inlines its output into the **caller's** fiber: no own identity, no own hooks, no reconciliation or memo boundary, invisible as a node in DevTools, and any state/effects it "owns" silently become the caller's. When that function also *selects which view to show* (a route/page dispatcher) and is called from a layout shell, it drags the routing concern into the shell — an SRP violation (RULE 0 / S). The shell must not know the route table.
+
+**Where the line is** (so this is never rationalized away):
+
+- **Inline fragment-helper — ALLOWED.** A small pure function returning *child fragments* consumed in ONE spot inside its owner's render (e.g. a `renderState` switch producing the `<p>`/`<li>` children of the owner's own element). It takes no props, dispatches no page-level components, and pulls no new concern into the host.
+- **Disguised component — FORBIDDEN.** A function that takes props, and/or returns page/view-level components chosen by a condition. Extract it into a real named component and mount it as JSX.
+
+```tsx
+// FORBIDDEN - component called as a function; the routing concern leaks into the shell
+const renderMainContent = (
+  pathname: string,
+  projectPath: string | null,
+): JSX.Element => {
+  if (matchTasksRoute(pathname)) return <TasksView repoPath={projectPath} />
+  return <PlanView />
+}
+function App() {
+  const pathname = usePathname()
+  return <section>{renderMainContent(pathname, projectPath)}</section>
+}
+
+// MANDATORY - real component owns its own routing concern, mounted as JSX
+function MainContent({ projectPath }: { projectPath: string | null }) {
+  const pathname = usePathname()
+  if (matchTasksRoute(pathname)) return <TasksView repoPath={projectPath} />
+  return <PlanView />
+}
+function App() {
+  return <section><MainContent projectPath={projectPath} /></section>
+}
+```
+
+---
+
+## RULE 7 - REACT 19 REFS ARE PLAIN PROPS (NO forwardRef)
+
+In React 19, `ref` is a **regular prop**. `forwardRef` is deprecated legacy boilerplate - do NOT wrap components in it, even when forwarding a ref to a DOM node (e.g. a styled `<input>` / `<button>` primitive).
+
+Type the props with `ComponentPropsWithRef<'element'>` and spread `{...props}` straight onto the native element - `ref` flows through unchanged.
+
+```tsx
+// FORBIDDEN - forwardRef shim in a React 19 codebase
+const Input = forwardRef<HTMLInputElement, Props>(
+  ({ className, ...props }, ref) => (
+    <input ref={ref} className={cn(base, className)} {...props} />
+  ),
+)
+
+// MANDATORY - ref is just a prop, spread it
+type Props = ComponentPropsWithRef<'input'> & { invalid?: boolean }
+
+export const Input = ({ invalid = false, className, ...props }: Props): JSX.Element => (
+  <input
+    aria-invalid={invalid}
+    className={cn(base, invalid && 'border-red-600/50', className)}
+    {...props}
+  />
+)
+```
+
+**Why this is the RHF-compatible form:** `react-hook-form`'s `register('email', …)` returns `{ name, onChange, onBlur, ref }`. Spreading it onto `<Input {...register('email')} />` passes the `ref` through as a plain prop - identical effect to a `forwardRef` wrapper, without the legacy shim. This is also consistent with the greenfield rule: no back-compat scaffolding the runtime no longer needs.
+
+---
+
+## RULE 8 - ONE COMPONENT PER FILE
+
+Each component lives in **its own file**, named after the component (`UserCard.tsx` exports `UserCard`). One file = one public component. This keeps imports obvious, diffs surgical, and each component independently testable and movable.
+
+**The only exception:** a **truly tiny, private** sub-component used by **exactly one** component, **co-located in that same file**, never exported, never reused elsewhere. A 3-line presentational helper (a `<StatusDot />`, a single list-row) sitting next to its sole consumer is fine. The moment it grows state/effects, gains a second caller, or wants its own test → extract it to its own file.
+
+- **FORBIDDEN:** two exported components in one file; a grab-bag file (`components.tsx` exporting five unrelated components); a sub-component large enough to own state / effects / a real props surface kept inline "for convenience".
+- **MANDATORY:** one exported component per file. A private mini-helper stays inline only when it is tiny **and** single-use **and** unexported.
+
+```tsx
+// FORBIDDEN - two real components sharing a file
+export function UserCard({ user }: { user: User }) { /* ... */ }
+export function UserList({ users }: { users: User[] }) { /* ... */ } // → UserList.tsx
+
+// ALLOWED - tiny, private, single-use helper co-located with its only consumer
+function StatusDot({ online }: { online: boolean }): JSX.Element {
+  return <span className={online ? 'bg-green-500' : 'bg-gray-400'} />
+}
+
+export function UserCard({ user }: { user: User }): JSX.Element {
+  return (
+    <article>
+      <StatusDot online={user.online} /> {user.name}
+    </article>
+  )
+}
+```
 
 ---
 
@@ -269,7 +369,12 @@ These mimic class lifecycle methods, bypass dependency linting, and prevent prop
 | Suppressing `exhaustive-deps` | FORBIDDEN | Fix the code |
 | Mutating props or state directly | FORBIDDEN | New references |
 | Class inheritance for components | FORBIDDEN | Composition |
+| `forwardRef` wrapper in a React 19 codebase | FORBIDDEN | `ref` is a plain prop - type with `ComponentPropsWithRef` and spread `{...props}` (RULE 7) |
 | God-components with config props | FORBIDDEN | `children` / slots |
+| Component-shaped function called as `renderThing(props)` instead of `<Thing/>` | FORBIDDEN | Extract & mount as JSX; route dispatch → own component (RULE 6) |
+| Multiple exported components in one file / grab-bag `components.tsx` | FORBIDDEN | One component per file; only a tiny private single-use helper may co-locate (RULE 8) |
+| Imperative component fusing subscription + render + backend coordination | FORBIDDEN | Renderer module + `use*` hook + presentational shell (composition.md S) |
+| Effect body with inline logic beyond wiring + cleanup | FORBIDDEN | Extract pure logic to a module fn (RULE 4.4); keep the effect thin |
 | Index as key on dynamic lists | FORBIDDEN | Stable unique IDs |
 | Context for shared state | AVOID | Jotai atoms |
 | Context for local state | AVOID | Props, children, lift state |

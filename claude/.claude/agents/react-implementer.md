@@ -4,8 +4,10 @@ description: >-
   MUST BE USED proactively for any task that writes, modifies, or refactors
   React code (*.tsx, *.jsx, or any file that imports React / uses JSX) — this
   includes new components, bugfixes, refactors, component splits, state
-  rewiring, hook extraction, and effect cleanup. Use INSTEAD of any generic
-  subagent (general-purpose, Plan, Explore) for React work. Loads the
+  rewiring, hook extraction, and effect cleanup. This agent is the ONLY allowed
+  writer of React code: the main thread MUST NOT edit React files directly (not
+  even a trivial prop/import/className change), and generic subagents
+  (general-purpose, Plan, Explore) are equally forbidden for React work. Loads the
   mandatory rule skills (coding, javascript, typescript, react) BEFORE
   writing a single line, then applies them strictly: composition over
   inheritance, no needless useEffect, derived state instead of mirrored
@@ -75,6 +77,9 @@ Before writing, run this checklist in your head :
 4. **Composition first** (RULE 0). Before adding a config prop, ask : would a `children` slot or a sub-component be cleaner ? Before reaching for Context / Jotai, can composition reduce drilling ?
 5. **Component purity** (RULE 2). No mutation of props, state, or external variables during render. New references on every update.
 6. **Hooks discipline** (RULE 4). Top-level only. No `useMount` / `useEffectOnce` wrappers. Never suppress `exhaustive-deps`.
+7. **Altitude / SRP smell-test** (RULE 0 / composition.md S). Count the component's distinct jobs. Does it fuse data-subscription + rendering + backend/coordination? "It's an imperative canvas/chart/terminal component" is NOT an SRP exemption — extract the pure renderer to a module and the subscriptions/effects to a `use*` hook, leaving a presentational shell. Effect bodies must be wiring + cleanup; a multi-line anonymous function inside `useEffect` means the logic belongs in a named module fn (RULE 4.4) or the hook. Do NOT mark SRP=PASS just because the micro-checks (no `any`, refs not read in render) pass — that is the exact rubber-stamp this agent has shipped before.
+8. **Component or helper ?** (RULE 6). A function that takes props **or** returns page/view-level subtrees IS a component → it MUST be a named component mounted as `<Name />`, never called as `renderName(props)`. Only a propless inline fragment-helper, used in ONE spot inside its owner's render, may stay a function. A function that *also* selects which view to show is a router outlet — extract it; never leave route dispatch inside a layout shell (SRP, RULE 0 / S). Do NOT rationalize a disguised component as "the repo's render\* helper pattern" — re-read RULE 6's "where the line is".
+9. **One component per file ?** (RULE 8). Each component gets its own file named after it. The ONLY thing allowed to share a file is a tiny, private, single-use, unexported sub-component. Two exported components in one file, a grab-bag `components.tsx`, or an inline sub-component large enough to own state/effects/a real props surface → split into separate files.
 
 ### Step 4 — write the code
 
@@ -113,6 +118,7 @@ In your reply to the caller :
 - **`any` or `as` in TypeScript** → FORBIDDEN. Type-safe always.
 - **Class inheritance for components** → FORBIDDEN. Compose.
 - **God-component with config props** → FORBIDDEN. Use `children` / slots.
+- **Component-shaped function called as `renderThing(props)`** instead of mounted as `<Thing />` → FORBIDDEN. Extract a named component, mount as JSX; route/view dispatch in a layout shell is the canonical instance — pull it into its own component (RULE 6).
 - **Index as key on dynamic lists** → FORBIDDEN. Use stable IDs.
 - **Mutating props or state directly** → FORBIDDEN. New references.
 - **Adding a dependency to `package.json` without the Build-or-Borrow probe** → FORBIDDEN. Cf. global `CLAUDE.md`.

@@ -1,4 +1,5 @@
 {
+  "skillListingBudgetFraction": 0.02,
   "env": {
     "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1",
     "CLAUDE_CODE_DISABLE_OFFICIAL_MARKETPLACE_AUTOINSTALL": "1",
@@ -51,9 +52,78 @@
     ],
     "defaultMode": "auto"
   },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -x '/Users/walid-mos/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/walid-mos/.orca/agent-hooks/claude-hook.sh'; fi"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -x '/Users/walid-mos/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/walid-mos/.orca/agent-hooks/claude-hook.sh'; fi"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -x '/Users/walid-mos/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/walid-mos/.orca/agent-hooks/claude-hook.sh'; fi"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -x '/Users/walid-mos/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/walid-mos/.orca/agent-hooks/claude-hook.sh'; fi"
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -x '/Users/walid-mos/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/walid-mos/.orca/agent-hooks/claude-hook.sh'; fi"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -x '/Users/walid-mos/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/walid-mos/.orca/agent-hooks/claude-hook.sh'; fi"
+          }
+        ]
+      }
+    ]
+  },
   "statusLine": {
     "type": "command",
     "command": "bash ~/.claude/statusline-command.sh"
+  },
+  "enabledPlugins": {
+    "impeccable@impeccable": true
   },
   "sandbox": {
     "enabled": true,
@@ -95,9 +165,9 @@
       "open:*"
     ]
   },
-  "skillListingBudgetFraction": 0.02,
   "effortLevel": "xhigh",
   "autoUpdatesChannel": "latest",
   "theme": "auto",
-  "skipAutoPermissionPrompt": true
+  "skipAutoPermissionPrompt": true,
+  "skipWorkflowUsageWarning": true
 }

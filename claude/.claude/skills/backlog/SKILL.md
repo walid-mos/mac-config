@@ -234,13 +234,13 @@ Run every check; any failure blocks the write (fail loud).
    separate repo (`mac-config`) and is never a deliverable.
 7. **Write** `docs/plans/<slug>/plan.json` at the git root (`mkdir -p
    docs/plans/<slug>`). `sink_id: null` on every task (lazy sink). Compute `effort`
-   = the engine-size roll-up of the whole plan (I3 … V12). Also write
-   `docs/plans/<slug>/.gitignore` containing `.tracks/` so the spec (`plan.json`) is
-   versioned but the **per-track** progress (`.tracks/M{M}.{track}/{progress.md,
-   track.json}`) stays durable-on-disk and out of git history. The folder is the
-   in-house tracker store — `/track` and `/next` work entirely from it (agent-cockpit
-   will read the same folder later). Trackers are per-track and parallel; there is no
-   single "active track" file.
+   = the engine-size roll-up of the whole plan (I3 … V12). The committed `plan.json`
+   is the **only** file `/backlog` produces — there is no `.tracks/` folder, no
+   `progress.md`, no `track.json`. Execution state lives in the **per-project
+   database** `~/mizraj/<slug>/progress.db` (outside the repo): `/track` ingests a
+   chosen track into it, `/next` drains it, and the agent-cockpit app is a co-client
+   of the same file. `plan.json` is the durable, versioned **spec**; the db is the
+   durable, out-of-repo **state**. Nothing to gitignore.
 8. **Validate the contract — reuse `/track`'s own validator, don't reimplement:**
    ```bash
    python3 ~/.stow_repository/claude/.claude/skills/track/read_plan.py docs/plans/<slug>/plan.json

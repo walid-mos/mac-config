@@ -9,7 +9,6 @@ Chaque dossier de premier niveau est un **package Stow** dont l'arborescence int
 ```
 .stow_repository/
 ├── Makefile              # orchestrateur stow + hooks post-install
-├── claude/.claude/       # config Claude Code (settings, skills, commands)
 ├── cmux/.config/cmux/    # config cmux
 ├── colima/.config/colima # config colima (template _templates/)
 ├── docker/.docker/       # config Docker CLI
@@ -30,24 +29,22 @@ cd ~/.stow_repository
 make install
 ```
 
-`make install` symlinke tous les packages dans `$HOME` puis exécute les post-hooks (notamment `claude-post` qui enregistre le MCP Context7).
+`make install` symlinke tous les packages dans `$HOME` puis exécute les post-hooks.
 
 ## Cibles Makefile
 
 | Cible             | Effet                                                                 |
 |-------------------|-----------------------------------------------------------------------|
 | `make`, `make install` | Stow tous les packages + lance tous les post-hooks                |
-| `make <package>`  | Stow un seul package (`make claude`, `make nvim`, …)                  |
+| `make <package>`  | Stow un seul package (`make nvim`, `make zsh`, …)                     |
 | `make restow`     | Rebuild les symlinks (utile après ajout/suppression de fichiers)      |
 | `make unstow`     | Supprime tous les symlinks                                            |
-| `make claude-post`| (Ré)enregistre le MCP Context7 — idempotent                           |
 | `make help`       | Affiche l'aide                                                        |
 
 ## Conventions
 
-- **Pas de runtime data committée.** Tout ce qui est généré au runtime (sessions, history, plugins téléchargés, caches, projets) est explicitement ignoré dans `.gitignore`. Ne commit jamais `~/.claude.json` ni `claude/.claude/projects/`, etc.
+- **Pas de runtime data committée.** Tout ce qui est généré au runtime (caches, données de session, fichiers temporaires) est explicitement ignoré dans `.gitignore`.
 - **Secrets.** `zsh/.config/zsh/secrets` est gitignored. Toute API key vit dans ce fichier ou dans le trousseau macOS.
-- **Configuration MCP.** Les serveurs MCP sont stockés par Claude Code dans `~/.claude.json` (user scope, non versionnable). Pour rendre l'install reproductible, ajouter la commande `claude mcp add ...` dans le hook `claude-post` du Makefile.
 - **Stow ne supporte pas de hooks natifs.** Tout post-install passe par le Makefile (`<package>-post`).
 
 ## Ajouter un nouveau package

@@ -1,2 +1,0 @@
-# "Compound commands with cd and git require approval"
-cd\s.*(?:&&|;|\|\|)\s*git

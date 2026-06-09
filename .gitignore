@@ -1,30 +1,5 @@
 .DS_Store
 
-# Claude user config (stays in ~/, not in Stow)
-.claude.json
-.claude
-
-# Unignore claude/.claude/ stow package (overrides global .claude/ ignore)
-!claude/.claude/
-
-# Claude: ignore runtime data inside the stow package
-claude/.claude/projects/
-claude/.claude/debug/
-claude/.claude/file-history/
-claude/.claude/history.jsonl
-claude/.claude/session-env/
-claude/.claude/shell-snapshots/
-claude/.claude/statsig/
-claude/.claude/todos/
-claude/.claude/downloads/
-claude/.claude/plugins/
-claude/.claude/cache/
-claude/.claude/paste-cache/
-claude/.claude/image-cache/
-claude/.claude/security_warnings_state_*.json
-claude/.claude/stats-cache.json
-claude/.claude/plans/
-
 # ZSH secrets (API keys)
 zsh/.config/zsh/secrets
 

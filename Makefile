@@ -1,8 +1,8 @@
 SHELL := /usr/bin/env bash
 STOW := stow -t $(HOME)
-PACKAGES := cmux colima docker ghostty languages nvim opencode rectangle rp starship zsh
+PACKAGES := cmux colima docker ghostty languages nvim opencode rectangle rp rtk starship zsh
 
-.PHONY: help install all unstow restow $(PACKAGES) rp-post
+.PHONY: help install all unstow restow $(PACKAGES) rp-post rtk-post
 
 help:
 	@echo "Targets:"
@@ -14,7 +14,7 @@ help:
 	@echo ""
 	@echo "Packages: $(PACKAGES)"
 
-install all: $(PACKAGES) rp-post
+install all: $(PACKAGES) rp-post rtk-post
 
 unstow:
 	@for pkg in $(PACKAGES); do $(STOW) -D $$pkg; done
@@ -28,3 +28,12 @@ $(PACKAGES):
 rp-post:
 	@command -v node >/dev/null || { echo "node not found — install it (fnm install --lts) so 'rp' can serve plan.html"; exit 0; }
 	@echo "rp ready: \`rp <slug>\` will serve plan.html and wait for /submit"
+
+rtk-post:
+	@if ! command -v rtk >/dev/null; then \
+		if command -v brew >/dev/null; then brew install rtk; \
+		else echo "rtk introuvable et brew indisponible — installe rtk à la main (https://github.com/rtk-ai/rtk)"; fi; \
+	fi
+	@command -v rtk >/dev/null && rtk init -g --auto-patch >/dev/null \
+		&& echo "rtk prêt: hook posé dans ~/.claude — redémarre Claude Code pour l'activer" \
+		|| echo "rtk non installé — étape ignorée"

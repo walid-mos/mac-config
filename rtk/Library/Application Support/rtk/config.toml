@@ -1,0 +1,15 @@
+# RTK — Rust Token Killer
+# Compresse la sortie des commandes CLI avant qu'elle n'entre dans le contexte LLM
+# (60-90 % de tokens en moins). Doc : https://github.com/rtk-ai/rtk
+#
+# Le binaire et le hook Claude Code sont posés par `make rtk` (cible rtk-post du
+# Makefile : `brew install rtk` puis `rtk init -g`). Ce fichier ne versionne que
+# la config ; les logs runtime vivent dans ~/.local/share/rtk/ (hors repo).
+
+[hooks]
+# Commandes dont RTK NE réécrit PAS la sortie (passées telles quelles).
+exclude_commands = ["curl"]
+
+[tee]
+enabled = true        # conserve la sortie brute en cas d'échec
+mode = "failures"     # "failures" | "always" | "never"

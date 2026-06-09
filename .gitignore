@@ -30,3 +30,7 @@ docker/.docker/.token_seed
 docker/.docker/.token_seed.lock
 docker/.docker/buildx/
 docker/.docker/contexts/
+
+# RTK: only version config.toml; ignore any runtime/cache data in the package
+rtk/Library/Application Support/rtk/*
+!rtk/Library/Application Support/rtk/config.toml

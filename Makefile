@@ -1,6 +1,6 @@
 SHELL := /usr/bin/env bash
 STOW := stow -t $(HOME)
-PACKAGES := cmux colima docker ghostty languages nvim opencode rectangle rp rtk starship zsh
+PACKAGES := claude cmux colima docker ghostty languages nvim opencode rectangle rp rtk starship zsh
 
 .PHONY: help install all unstow restow $(PACKAGES) rp-post rtk-post
 

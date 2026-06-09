@@ -7,8 +7,7 @@ description: >-
   per-project progress.db, then hand off to /next. Use when the user runs
   `/track` (choose a milestone+track) or `/track M1.A` (stage one track
   directly). Companion to `/backlog` (producer of plan.json) and `/next` (ships
-  the track's tasks one at a time). A track is a sequential chain of tasks that
-  becomes ONE PR.
+  tasks one at a time).
 ---
 
 # track
@@ -17,6 +16,20 @@ description: >-
 the sink-agnostic `plan.json` produced by `/backlog`, lets the user pick one
 **track** of one **milestone**, and **ingests** it into the project's
 `progress.db` so `/next` can drain it one task per invocation.
+
+## MUST / MUST NOT
+
+| | |
+|---|---|
+| MUST | Read `docs/plans/<slug>/plan.json` and write only to `~/mizraj/<slug>/progress.db` |
+| MUST | Verify `cockpit_db.sh` exists before calling it (Phase 5 guard) |
+| MUST | Fail loud on any non-zero exit from `read_plan.py` or `cockpit_db.sh` |
+| MUST | Surface `needs[]` parallelism — never declare a milestone "unblocked" on your own |
+| MUST | Stop at the end of Phase 6; never begin implementing tasks |
+| MUST NOT | Write to Linear — that is `/next`'s concern |
+| MUST NOT | Fabricate a plan if `plan.json` is missing — point the user at `/backlog` |
+| MUST NOT | Reset task status on re-ingest — idempotency is state-preserving |
+| MUST NOT | Create or write any file other than the db (no `.tracks/`, no `progress.md`) |
 
 ## The single source of truth — `~/mizraj/<slug>/progress.db`
 
@@ -33,27 +46,8 @@ per-track file store is gone. All track state lives in the db. The db client is
 `cockpit-db/cockpit_db.sh` (sqlite3 + canonical SQL — no Python in the DB
 layer); `/track` uses it to ingest, `/next` to read and write task state.
 
-**Model** (see `docs/notes/2026-05-29-workflow-phases-redesign.html`):
-- **Milestone** — a demonstrable increment, ordered by visible value. `M1` is
-  the walking skeleton.
-- **Track** — a sequential chain of tasks inside a milestone that ships as ONE
-  PR. Tracks of the same milestone are independent → parallelizable.
-- **Task** — one commit, calibrated I3/I4. The grain `/next` executes.
-
-The derived identifier `[M{milestone}.{track}-{step}]` (e.g. `[M1.A-01]`) encodes
-both axes; regex `\[M(\d+)\.([A-Z]+)-(\d+)\]`.
-
-### Task state vocabulary (the `status` column)
-
-| status        | meaning                                                                                          |
-|---------------|--------------------------------------------------------------------------------------------------|
-| `backlog`     | Not started.                                                                                     |
-| `in_progress` | Implemented on the working tree, NOT committed — awaiting validation. Linear In Progress if `sink_id`. |
-| `done`        | Validated on the previous `/next`; committed + pushed (`commit_sha` set). Linear Done + archived if `sink_id`. |
-| `blocked`     | Skipped by `/next` until unblocked; `blocked_reason` says why.                                    |
-
-`/next` owns the transitions; `/track` only ingests tasks (as `backlog` on first
-insert — re-ingest never resets an already-progressed task).
+See `model.md` for the full domain vocabulary (Milestone/Track/Task definitions,
+identifier regex, and task state table).
 
 ---
 
@@ -109,6 +103,12 @@ edges so the operator can pick a parallel branch; never claim a milestone is
 
 ### Phase 5 — Ingest the chosen track into progress.db
 
+Guard before the first db call:
+```bash
+COCKPIT=~/.stow_repository/claude/.claude/skills/cockpit-db/cockpit_db.sh
+test -f "$COCKPIT" || { echo "FATAL: cockpit_db.sh not found at $COCKPIT"; exit 1; }
+```
+
 ```bash
 bash ~/.stow_repository/claude/.claude/skills/cockpit-db/cockpit_db.sh \
   ingest-track <git-root> <plan.json> M{M} {track}
@@ -116,9 +116,11 @@ bash ~/.stow_repository/claude/.claude/skills/cockpit-db/cockpit_db.sh \
 This upserts the full milestone/track skeleton + the `needs` DAG, then the chosen
 track's tasks (status `backlog` on first insert). It is **idempotent and
 state-preserving**: re-ingesting a track whose tasks are already `in_progress` /
-`done` / `blocked` refreshes their structural fields (title, description, size,
-`slice_of`, …) but **never** resets `status`, `commit_sha`, or `blocked_reason`.
-So re-running `/track M1.A` after `/backlog` re-emits the plan is safe.
+`done` / `blocked` refreshes their structural fields (description, size,
+`slice_of`, …) but **never** resets `status`, `commit_sha`, `blocked_reason`, or
+`title` — `title` is seeded from the plan on first insert, then owned by the app
+(the UI lets a user rename a task), so a rename survives re-ingest. So re-running
+`/track M1.A` after `/backlog` re-emits the plan is safe.
 
 A track is "staged" exactly when it has tasks in the db, so ingesting `M2.A`
 **never touches** `M1.A` — tracks are parallel and independent, each its own rows
@@ -144,9 +146,8 @@ Then STOP.
 
 ## Rules
 
-1. **`/track` reads plan.json and writes the db. It never writes Linear.** The
-   only Linear coupling is the optional adapter `next/set_state.py`, called by
-   `/next` for tasks that carry a `sink_id`.
+1. **`/track` reads plan.json and writes the db. It never writes Linear.** Any
+   Linear sync is `/next`'s concern (tasks that carry a `sink_id`).
 2. **The plan file is authored by `/backlog`.** If `plan.json` is missing, STOP
    and point the user at `/backlog`. Never fabricate a plan.
 3. **State lives in `~/mizraj/<slug>/progress.db`, never in files.** No

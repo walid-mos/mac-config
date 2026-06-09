@@ -2,12 +2,10 @@
 name: interview
 description: >-
   Interview the user relentlessly about a plan, design, or proposal until
-  reaching shared understanding, resolving each branch of the decision tree,
-  then capture the resolved decisions as an autonomous HTML deliverable.
-  Asks one question at a time with a recommended answer. Use when the user
-  runs `/interview`, says "grill me", "stress-test this plan", "challenge my
-  design", "interview me", or wants to surface unresolved assumptions before
-  implementation.
+  reaching shared understanding, resolving each branch of the decision tree.
+  Use when the user runs `/interview`, says "grill me", "stress-test this
+  plan", "challenge my design", "interview me", or wants to surface unresolved
+  assumptions before implementation.
 user-invocable: true
 ---
 
@@ -44,6 +42,10 @@ On invocation, pick a kebab-case slug from the topic (e.g. `auth-middleware-migr
   - **Binary "go / wait" prompts** ("Go for closure?", "Should I proceed?", "Continue?") are banned. Generate the next round; the user pacing is driven by their HTML submission, not by chat confirmations.
   - The only allowed chat outputs between rounds are: the one-paragraph plan restatement (discovery), the `rp` URL, a short summary after merging a submission, and tool output. Anything else belongs in the HTML.
 
-## Fallback
+## No-rp path
 
-If `rp` is unavailable (no Node, no browser), fall back to the static `html` output at `./docs/interviews/<slug>/plan.html` (same folder as rich mode — just no live server) and run the phases in chat (Discovery → Grilling → Closure). The HTML loop is the preferred path; the chat fallback is for environments that can't serve.
+If `rp` is unavailable (no Node, no browser), produce the static `html` output at `./docs/interviews/<slug>/plan.html` (same folder as rich mode — just no live server) and run the phases in chat (Discovery → Grilling → Closure). The HTML loop is the preferred path; this path is for environments that can't serve.
+
+## state.json recovery
+
+If `state.json` is absent mid-interview (file deleted, worktree switched), reconstruct it from the latest `plan.html` round: re-parse the resolved-summary block and the answers embedded in the last grilling round. Warn in chat once ("Reconstructed state from plan.html — verify if rounds are missing") and continue from the reconstructed state. **Never silently restart the decision tree.**

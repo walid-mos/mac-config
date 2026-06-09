@@ -4,11 +4,9 @@ user-invocable: true
 description: >-
   Ship the next task of a staged track, one task per invocation, reading and
   writing state in the per-project progress.db. Use when the user runs `/next`:
-  it commits + pushes the previous task (now validated by the user), then starts
-  the next one and stops. Companion to `/track` (which stages the track into the
-  db) and `/backlog`. **Never commits or pushes the current task**: commit +
-  push happen only at the START of the next `/next`, after the user has reviewed
-  the working-tree diff. A track ships as ONE PR.
+  commits + pushes the previously validated task, then implements the next one
+  and stops. Never commits or pushes the current task — that happens at the
+  START of the following `/next`. Companion to `/track` and `/backlog`.
 ---
 
 # next
@@ -91,13 +89,14 @@ The identifier regex: `\[M(\d+)\.([A-Z]+)-(\d+)\]` (e.g. `[M1.A-01]`).
    If the working tree has changes:
 
    ```bash
-   git add -A
+   git add --update   # stages only tracked files — never use git add -A (risks .env / binaries)
    git commit -m "<type>(<scope>): <imperative summary>"   # add -m "" -m "Closes <sink_id>" ONLY if the task has a sink_id
    ```
 
    Conventional commit, matching the repo's existing style (`git log --oneline -10`
-   if unsure). Add the `Closes <sink_id>` trailer **only when the task carries a
-   `sink_id`**. No `sink_id` → no trailer (expected in the decoupled model).
+   if unsure — or see `/pr` for the convention-detection algorithm). Add the
+   `Closes <sink_id>` trailer **only when the task carries a `sink_id`**. No
+   `sink_id` → no trailer (expected in the decoupled model).
 
    Then push:
 
@@ -152,15 +151,28 @@ the only state.)
 
 ### Phase 5 — Implement the task
 
-Read the task's `description` (WHAT / WHY / WHERE / DONE WHEN) and `done_when`,
-then execute. Stay strictly within scope — no "while I'm here". If the task mixes
-multiple concepts, that's a `/backlog` bug: STOP and surface it.
+**Guard first**: if the task's `description` OR `done_when` is empty/NULL in the
+db, do NOT guess the task — set it `blocked` (reason: `missing spec`) and surface
+to the user; an unspecified task is a `/backlog` bug, never something to invent.
+
+Otherwise read the task's `description` (WHAT / WHY / WHERE / DONE WHEN) and
+`done_when`, then execute. Stay strictly within scope — no "while I'm here". If
+the task mixes multiple concepts, that's a `/backlog` bug: STOP and surface it.
+
+**FORBIDDEN in this phase**: touching files outside the task's WHERE paths;
+adding dependencies not listed in the task; refactoring adjacent code; upgrading
+tooling; fixing "while I'm here" issues.
 
 ### Phase 6 — Verify
 
 Run typecheck / tests / lint / build appropriate to the repo. If
 `/nextnode-standards` applies, run those exact commands. Do NOT skip verification
 on a "trivial" change. **Keep output small** — pipe noisy runs through `tail -40`.
+
+**No test suite in the repo?** Skip the test run, but still run an explicit
+minimal gate — typecheck + lint + build (whatever exists). Never fake it (no
+"grep for syntax errors") and never silently skip verification entirely; state
+which gate you ran.
 
 ### Phase 7 — Leave the working tree dirty (no commit)
 
@@ -207,14 +219,7 @@ Do not leave half-work in the tree.
 
 ## Bundled helper
 
-- `set_state.py <issue_id> <state_type> [--archive]` — the **optional** Linear
-  adapter. state_type ∈ `{backlog, unstarted, started, completed, canceled}`;
-  `--archive` also calls `issueArchive`. Called by Phase 4 (`started`) and Phase 2
-  (`completed --archive`) **only when the task carries a `sink_id`**. Reads
-  `LINEAR_API_KEY` (no `Bearer ` prefix), `urllib` only.
-
-The db client `cockpit-db/cockpit_db.sh` (sqlite3, no Python) is shared with
-`/track`.
+`set_state.py` — Linear adapter; called only in Phase 2 (`completed --archive`) and Phase 4 (`started`) when the task carries a `sink_id`.
 
 ---
 
@@ -225,8 +230,7 @@ The db client `cockpit-db/cockpit_db.sh` (sqlite3, no Python) is shared with
    After Phase 9, STOP — let the user trigger the next one.
 2. **No auto-chaining.** Do not call `/next` from within a `/next` run.
 3. **The db is the source of truth.** `~/mizraj/<slug>/progress.db`, read/written
-   via `cockpit_db.sh`. There is no `.tracks/`, no cached `track.json` — do not
-   look for one. The active track is chosen **explicitly** (`/next M{M}.{track}`,
+   via `cockpit_db.sh`. The active track is chosen **explicitly** (`/next M{M}.{track}`,
    or auto when exactly one staged track is unfinished); `/next` never reads the
    git branch.
 4. **At most one `in_progress` task at a time.** Multiple = bug; STOP and surface.

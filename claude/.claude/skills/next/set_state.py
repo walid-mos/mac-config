@@ -4,7 +4,7 @@ next skill helper — set a Linear issue's workflow state by type.
 
 This is the OPTIONAL Linear adapter. /next calls it only when a task carries
 a `sink_id` (the Linear issue UUID) in the plan. When a task has no sink_id,
-state lives purely in the /tmp scratch checklist + git, and this helper is
+state lives purely in the per-project progress.db + git, and this helper is
 never invoked.
 
 Picks the FIRST workflow state of the issue's team matching the requested

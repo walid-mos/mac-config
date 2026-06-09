@@ -1,15 +1,14 @@
 ---
 name: backlog
 user-invocable: true
-argument-hint: "[path to interview bundle or plan file]"
+argument-hint: "[interview bundle | plan file | --straighten]"
 description: >-
-  Produce a versioned, sink-agnostic plan.json from a planning conversation, an
-  /interview backlog-bundle, or a plan file. Decomposes the work into
-  value-ordered milestones (M1 = walking skeleton), each cut into vertical I3/I4
-  task slices grouped into parallel tracks (1 track = 1 PR), and writes
-  docs/plans/<repo-slug>/plan.json for /track + /next to ship. No Linear push,
-  no sink coupling. Load when turning a plan, design, audit, or resolved
-  interview into an actionable backlog.
+  Produce a versioned, sink-agnostic plan.json from a planning conversation,
+  /interview backlog-bundle, or plan file. Decomposes work into value-ordered
+  milestones (M1 = walking skeleton), vertical I3/I4 task slices, and parallel
+  tracks (1 track = 1 PR). Writes docs/plans/<repo-slug>/plan.json for /track
+  + /next. Load when turning a resolved plan or interview into an actionable
+  backlog.
 ---
 
 # backlog
@@ -20,8 +19,21 @@ into a `plan.json` conforming to the contract `/track` reads. It **never pushes 
 a sink**; sink entries (Linear issues, etc.) are created lazily by `/track`/`/next`
 for the tasks that need them.
 
-Doctrine + full rationale: `docs/notes/2026-05-29-workflow-phases-redesign.html`.
 Consumers: `/track` (stages one track), `/next` (ships it task by task).
+
+---
+
+| FORBIDDEN | MANDATORY |
+|-----------|-----------|
+| Push to any sink (Linear, etc.) | Write exactly one file: `docs/plans/<slug>/plan.json` |
+| Time estimates — difficulty (engine scale) only | Run the completeness-critic subagent before declaring done |
+| Re-litigate the approach from `/interview` | Validate with `read_plan.py` before declaring done |
+| Slice by file or module | Slice vertically — one observable behavior per task |
+| Coexistence / compat / fallback code in tasks | Greenfield only — one atomic contract task per breaking change |
+| Create a task touching `~/.claude/skills/...` | Every surface from Enumerate maps to ≥1 task |
+| Time estimate in any field | `done_when` is observable; never admits a red/broken state |
+
+---
 
 ## The model — three axes, never conflated
 
@@ -60,9 +72,11 @@ encode a guess into a task.
 The approach ("is this even the best way?") and the demo spine are `/interview`'s
 job. `/backlog` **consumes** a resolved plan — it does not re-litigate the
 approach. If the input still has open architectural ambiguity, STOP and send the
-user back to `/interview`.
+user back to `/interview`. Likewise a decision **too thin to enumerate any surface**
+(empty `edge` *and* `verification`, no real `mechanism`) is unresolved at the grain
+`/backlog` needs — send it back too (the Enumerate source-quality gate below).
 
-## Pipeline — Spine · Slice · Lane · Check
+## Pipeline — Spine · Enumerate · Slice · Lane · Check
 
 ### 1. Spine — value-ordered milestones (the demo axis)
 
@@ -73,7 +87,9 @@ user back to `/interview`.
 2. **Name the walking skeleton.** M1 = the single thinnest end-to-end behavior that
    exercises every layer the plan introduces, with everything not-yet-built stubbed
    or hardcoded.
-   - Bundle has `demo_spine` → M1 = its first entry; M2…Mn = the rest, in order.
+   - Bundle has `demo_spine` → M1 = its first entry; verify it describes a thin
+     end-to-end behavior, not a rich feature. If the first entry is a fully-featured
+     demo, re-derive a thinner skeleton and treat the rest as later milestones.
    - No `demo_spine` → derive it: scan the decisions' `verification` fields for the
      end-to-end chain; M1 reproduces the shortest chain that touches every layer,
      stubbing the rest.
@@ -88,36 +104,56 @@ user back to `/interview`.
    declares `needs: ["M1"]` (NOT the immediately-preceding milestone) — that is what
    tells `/track` (and later agent-cockpit) it can ship in **parallel** with its
    siblings. `needs` is **required and explicit** — no implicit "depends on the
-   previous one" default (greenfield: no hidden fallback). Refs point **backward
-   only** (strictly lower milestone number); a forward or cyclic ref is a bug.
+   previous one" default. Refs point **backward only** (strictly lower milestone
+   number); a forward or cyclic ref is a bug.
    - **Derive each edge from a concretely consumed artifact.** `M_k` needs `M_j` iff
      `M_k`'s *implementation* reads / extends / calls / overrides a behavior, schema,
      route, or module that `M_j` is the one to build. **Value-order is NOT
      dependency** — a milestone that merely ships *after* another does not `need` it.
-   - **Anti-pattern — the lazy linear chain.** If `needs` comes out as a perfect spine
-     (`M2→M1, M3→M2, M4→M3, …`), you almost certainly defaulted to value-order instead
-     of deriving real edges → **STOP and re-derive**, asking per milestone: "which
-     earlier demo's *code* does this one actually consume?". A public landing page does
-     not `need` the auth system. Most real plans are a **branching** DAG, not a chain —
-     a landing page hangs off the skeleton in parallel with the whole auth→billing spine.
-   - **A dependency edge is not all-or-nothing — watch the thin integration edge.** A
-     feature is usually *mostly* independent of the thing it eventually plugs into.
-     BYOK is always per-account, yet the **bulk** of it (key encryption, provider
-     abstraction, routing override) needs **no** accounts at all; only the thin
-     "persist the key *for this user*" slice touches auth. Do **not** let that one
-     wire-up make the **whole** milestone `need` another and serialize the 90 % that
-     is independent. Re-slice: keep the account-independent bulk edge-free (ship it in
-     parallel, or fold its layer into an earlier milestone that already owns it), and
-     isolate the genuinely-dependent slice as a **tail task** (or push it into the
-     milestone that owns the dependency). `needs` carries only the edges that
-     survive *after* that re-slice — what the milestone truly cannot build without,
-     never what its final integration point grazes.
+
+   Common traps when drawing milestone edges → see [anti-patterns.md](anti-patterns.md).
+
 5. **Hard reject — horizontal layers.** A milestone whose demo is "the persistence
    layer", "all the backend", "the types", "the IPC bindings" is a horizontal layer,
    not a demo. If you cannot phrase `demo` as an *observable behavior*, it is not a
    milestone — re-spine.
 
-### 2. Slice — vertical I3/I4 tasks
+### 2. Enumerate — the surfaces each decision implies (the completeness axis)
+
+A decision is **not** an atom — it is a bag of **surfaces**. Before slicing, expand
+every decision into an explicit, **named** list of the surfaces it implies, drawn
+from its six fields (`fact` / `mechanism` / `edge` / `rejected` / `order` /
+`verification`). A surface is one concrete addressable thing: an entity, a
+route/endpoint, a state, a role, an error/edge path, a config key, an integration
+point, an observable behavior from `verification`. The `edge` and `verification`
+fields are gold — they are *literally* the surfaces a lazy slice skips.
+
+1. **List, don't count.** For each decision `Dk`, emit `surfaces(Dk)` = a list of
+   short **named** handles (`créer-clé`, `révoquer-clé`, `edge:quota-dépassé`,
+   `verify:routing-OK`), never a number. **Every concrete plural or count in the
+   source is a split marker** — `mechanism` says "endpoints" → one surface per
+   endpoint; `edge` lists three cases → three surfaces. (This is the Slice plural
+   rule pulled *upstream*: plurals seed surfaces, they are not discovered after the
+   fact.)
+2. **Source-quality gate — fail loud.** A decision whose six fields yield **no**
+   enumerable surface (vacuous `edge` *and* `verification`, a one-liner with no real
+   `mechanism`) is **too thin to slice deep** — backlog depth is capped by decision
+   richness (garbage in / garbage out). STOP and send that decision back to
+   `/interview` to thicken it; never invent surfaces to paper over a thin decision.
+3. `surfaces[]` is **working state** — the input to the coverage check and the
+   completeness-critic in the Check phase. It is NOT emitted into `plan.json`, which
+   still stores only `slice_of` decision ids.
+
+### 3. Slice — vertical I3/I4 tasks
+
+**The unit of coverage is the *surface*, not the decision.** Slice each decision
+until **every** surface in its `surfaces[]` (from the Enumerate phase) is realized
+by a task. **Anti-pattern — one task per decision.** A decision carrying N
+enumerated surfaces but a single `slice_of:["Dk"]` task is **under-sliced**: it
+ticks the decision on paper and skips the rest. This is the twin, on the *depth*
+axis, of §1.4's "lazy linear chain" — one task per decision is the smell, never the
+target. Fold sibling surfaces into one task only when they genuinely ship in the
+same atomic commit; otherwise split.
 
 1. Within each milestone, cut **vertical** tasks: each does a thin slice through the
    layers it needs, never a whole horizontal layer. **Never slice by file or
@@ -151,39 +187,39 @@ user back to `/interview`.
      slice: "add the port allocator" *includes* installing its dependency).
 3. **`slice_of`** — list the decision ids the task realizes (`["D2"]`). Every task
    slices ≥1 decision, OR is plumbing folded into a slice (see 4). No orphans.
+   Track, as working state (not emitted into `plan.json`), **which surfaces** each
+   task covers — that surface→task map is exactly what the coverage check and the
+   completeness-critic diff against `surfaces[]`.
 4. **Plumbing folds in.** Logging, error/empty/loading states, config, validation
    ship *with* the slice that needs them — not as standalone ceremony tasks. A
    standalone plumbing task is allowed only when it is genuinely I3+ AND
    independently valuable (rare).
 5. **`description`** (mandatory, self-contained): WHAT (one sentence) · WHY (links to
    the decision) · WHERE (file paths if known) · DONE WHEN (≤3 checkable bullets).
-   **`done_when`** = the one-line acceptance summary.
+   **`done_when`** = the one-line acceptance summary; never admits a red/broken state.
+   Infrastructure/plumbing tasks with no directly observable user behavior: typecheck
+   + tests green qualifies only when the task itself adds tests exercising its
+   contract.
 6. **Titles** — short imperative, ONE artifact, no `and`/`et`/`+`/`puis`, **no
    prefix**. Concrete plurals (`tables`, `endpoints`, `methods`) or counts in a
    title are split markers — split per item.
 
-### 3. Lane — parallel tracks
+### 4. Lane — parallel tracks
 
 1. Within a milestone, draw the dependency edges between its tasks.
 2. A **track** = a maximal **sequential chain** (A→B→C) shipping as **one PR**. Tasks
    joined by a dependency edge go in the same track, ordered by `step`.
 3. Tasks with **no dependency edge AND no shared merge surface** (disjoint file sets)
-   go in **separate tracks** → parallel PRs. The executor is **parallel agents in
-   worktrees**, not one human working serially — an independent split ships
-   concurrently, so it **pays for itself by default**. Never coalesce on the
-   assumption that "nobody will parallelize it" or "the dev is solo / on a deadline":
-   that assumption is false — agents do the work, and over-coalescing destroys the
-   parallelism information the orchestrator needs. The planner's job is to **expose
-   maximal safe parallelism**, not to pre-serialize it for a human.
+   go in **separate tracks** → parallel PRs. Expose maximal safe parallelism — never
+   pre-serialize it.
+
+   Rationale and coalescing traps → see [anti-patterns.md](anti-patterns.md).
+
 4. **Coalesce only the coupled.** Merge two tracks into one **only** when they are
    genuinely coupled: they share a **merge surface** (edit the same files → would
    conflict as separate PRs) **or** a dependency edge chains them. Coupling — not
-   size, not deadline, not "is it worth a human's time" — is the sole criterion. A
-   lone independent I3 is its **own** track (an agent ships it in parallel), never
-   folded "to save a PR". The only thing that forces tasks into one track is that
-   shipping them separately would **conflict or violate an ordering**. Unsure whether
-   two tasks are independent? Compare their file sets: disjoint ⇒ split, overlapping
-   ⇒ coalesce.
+   size, not deadline — is the sole criterion. Unsure whether two tasks are
+   independent? Compare their file sets: disjoint ⇒ split, overlapping ⇒ coalesce.
 5. Track ids: `A`, `B`, `C`… per milestone. `step`: 2-digit zero-padded numeric
    **string** (`"01"`), ordered within the track.
 6. **`branch` — one per track.** Author a branch name `<type>/<slug>`:
@@ -199,14 +235,33 @@ user back to `/interview`.
 7. If a track balloons past what's reviewable as one PR, the milestone is too big —
    split the milestone, not the PR.
 
-### 4. Check — coverage, band, contract
+### 5. Check — coverage, band, contract
 
 Run every check; any failure blocks the write (fail loud).
 
-1. **Forward coverage** — every decision is `slice_of` ≥1 task. `uncovered =
-   decisions − ⋃ slice_of`. Non-empty → STOP and list them (a decision with no task
-   is dead rationale). *This is the only coverage check — no reverse machinery, no
-   `atoms × 1.3`, no histogram.*
+1. **Element coverage — every *surface* maps to a task, not just every decision.**
+   The unit is the surface from the Enumerate phase. `uncovered = ⋃ surfaces(Dk) −
+   ⋃ surfaces-covered-by-tasks`. Non-empty → STOP, re-slice the **named** surfaces,
+   recompute. Decision-level forward coverage is the weak floor this subsumes: a
+   decision with zero tasks is still dead rationale, but a decision with one task
+   and four orphaned surfaces now **fails** where forward coverage passed (that is
+   the lazy task this check exists to kill).
+   - **Compute it with an independent critic, never self-audit.** The pass that
+     wrote the tasks carries an "I'm done" bias and will rubber-stamp its own
+     output. Spawn a **subagent** (`Explore`, read-only) that re-derives `surfaces[]`
+     from the *source decisions* from scratch — blind to the produced tasks — then
+     diffs its surface list against the tasks' covered surfaces and returns
+     `uncovered[]` plus any **redundant** task (two tasks on the same surface with no
+     distinct reason). This is **extraction-then-match**, NOT the old `atoms × 1.3`
+     multiplier: that was a number-vs-number ratio — gameable (pad the count with
+     filler) and blind (never said *which* surface was missing). A set diff over
+     **named** surfaces is diagnostic and non-gameable — the completeness-detector
+     pattern. Loop re-slice → re-critic until `uncovered[]` is empty, or every
+     remaining gap is an explicit, justified fold.
+   - **Minimum decisions guard.** If the resolved input contains fewer than 2
+     enumerable decisions, the plan is under-specified — surface coverage will
+     trivially pass with almost any task. STOP and send the user back to `/interview`
+     to flesh out the spec before continuing.
 2. **Size band** — every task ∈ {I3, I4}. Any I6+ or standalone sub-I3 → fix first.
 3. **INVEST-S+V + green-per-commit** — each task is independently shippable (Small)
    and valuable (Valuable), AND **leaves the suite green on its own commit**
@@ -229,9 +284,9 @@ Run every check; any failure blocks the write (fail loud).
    an adjacent milestone's demo (or it carries only ~1–2 trivial tasks total), fold
    it into that neighbor and re-spine. The walking-skeleton M1 is **exempt** — it is
    allowed to be thin.
-6. **Skill-ban** — drop any task whose WHERE points at `~/.claude/skills/...` or
-   `~/.stow_repository/claude/.claude/skills/...`. Personal tooling lives in a
-   separate repo (`mac-config`) and is never a deliverable.
+6. **Skill-ban** — drop any task whose WHERE points at `~/.claude/skills/...` or any
+   skills directory path. Personal tooling lives in a separate repo (`mac-config`)
+   and is never a deliverable.
 7. **Write** `docs/plans/<slug>/plan.json` at the git root (`mkdir -p
    docs/plans/<slug>`). `sink_id: null` on every task (lazy sink). Compute `effort`
    = the engine-size roll-up of the whole plan (I3 … V12). The committed `plan.json`
@@ -241,12 +296,18 @@ Run every check; any failure blocks the write (fail loud).
    chosen track into it, `/next` drains it, and the agent-cockpit app is a co-client
    of the same file. `plan.json` is the durable, versioned **spec**; the db is the
    durable, out-of-repo **state**. Nothing to gitignore.
-8. **Validate the contract — reuse `/track`'s own validator, don't reimplement:**
+8. **Validate the contract before showing the preview — reuse `/track`'s own
+   validator, don't reimplement.** Locate it relative to this skills directory:
    ```bash
-   python3 ~/.stow_repository/claude/.claude/skills/track/read_plan.py docs/plans/<slug>/plan.json
+   SKILLS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+   python3 "$SKILLS_DIR/track/read_plan.py" docs/plans/<slug>/plan.json
    ```
-   Exit non-zero → the structure is wrong (bad JSON, missing `milestones`, malformed
-   `step`); fix and rewrite until it exits 0.
+   If `$BASH_SOURCE` is unavailable (e.g. running as a model tool call), locate via
+   the git root: `$(git rev-parse --show-toplevel)` then find
+   `.claude/skills/track/read_plan.py` from there, or adjust to your stow path.
+   Run this **before** showing the preview. Exit non-zero → the structure is wrong
+   (bad JSON, missing `milestones`, malformed `step`); fix and rewrite until it exits
+   0. Do not show the preview until the validator exits 0.
 
 ## Output schema
 
@@ -281,6 +342,8 @@ Run every check; any failure blocks the write (fail loud).
 
 ## Preview + hand off
 
+**Run the validator (Check §8) first. Only show the preview after it exits 0.**
+
 Show a compact preview, then STOP — `/track` takes over:
 
 - Per milestone: `M{n} [skeleton] — <demo> — tracks: A(x tasks · sizes) B(y) …`.
@@ -293,28 +356,43 @@ Show a compact preview, then STOP — `/track` takes over:
 
 **No push, no detached worker, no Linear.** The plan file is the deliverable.
 
-## Rules
+## Straighten mode — fold ad-hoc tasks into the plan
 
-1. **Output is a `plan.json` conforming to the `/track` contract — nothing else.**
-   No push, no sink write, no Linear. Sink entries are created lazily downstream.
-2. **Titles carry NO prefix.** The identifier `[M{m}.{track}-{step}]` is derived by
-   `/track`/`/next`; storing it is a bug.
-3. **Milestones are ordered by demoable VALUE, never by dependencies — but the
-   dependencies are recorded.** M1 = walking skeleton. Every milestone carries an
-   explicit `needs: [Mx, …]` (skeleton = `[]`, backward refs only); siblings sharing
-   the same `needs` are parallelizable. A milestone whose demo is a horizontal layer
-   is a bug.
-4. **Every task is I3 or I4.** I6+ splits into a track; sub-I3 folds into its slice.
-   Difficulty (engine scale), never time.
-5. **One coverage check only: forward** (every decision → ≥1 task). No reverse
-   coverage, no `atoms × 1.3`, no histogram, no plumbing-checklist ceremony.
-6. **1 task = 1 commit · 1 track = 1 PR · 1 branch · 1 milestone = 1 demo.** Each
-   track carries a `branch` = `<conventional-type>/<short-slug>`, no coordinate,
-   unique across the plan.
-7. **Never create a task that touches a Claude skill** (`~/.claude/skills/...`). Drop
-   it.
-8. **Validate with `read_plan.py` before declaring done** — fail loud on any schema
-   mismatch.
-9. **Approach + demo spine come from `/interview`.** `/backlog` consumes a resolved
-   plan; it does not choose the approach. Open architectural ambiguity → back to
-   `/interview`.
+When an agent (or you) has piled up **extra ad-hoc tasks** outside the pipeline —
+mid-execution additions, a brain-dump list, loose "we should also…" items — do NOT
+rubber-stamp them into the db. Ad-hoc tasks are the **worst** offenders for
+laziness: each is usually one coarse line ("add a settings page") hiding a fistful
+of surfaces. Straightening = running them through the **same** Enumerate → Slice →
+element-coverage-critic discipline as a fresh plan, then merging the result into
+`plan.json` so `/track` registers it in `progress.db` the normal way.
+
+**Trigger:** `$ARGUMENTS` is `--straighten` (the raw tasks follow, live in the
+conversation, or in a file you point at), or the user says "straighten / redresse
+ces tâches / enregistre-les proprement".
+
+1. **Read before write.** Load the existing `docs/plans/<slug>/plan.json` (the spec)
+   and explore the repo. Every ad-hoc task lands in an existing milestone+track or
+   justifies a **new** track — it never floats free.
+2. **Each ad-hoc task is a mini-spec, not a finished task.** Reverse-engineer the
+   decision(s) it realizes, then **Enumerate its surfaces** (same gate: a one-liner
+   with no enumerable surface is too thin — ask the user to clarify, never invent).
+   "Add a settings page" expands into its real surfaces (render, each field,
+   persistence, validation, empty/error states, the verification).
+3. **Slice** each into I3/I4 vertical tasks and **assign** to the right track (by
+   merge-surface / dependency — the same Lane rules). Genuinely independent work →
+   its own track + `branch`.
+4. **Run the element-coverage critic** over the merged set, exactly as for a fresh
+   plan. Straightened tasks meet the identical bar — no lazy pass because "they were
+   just quick adds".
+5. **Merge into `plan.json`**, then validate with `read_plan.py` and hand off to
+   `/track M{m}.{track}` (idempotent + state-preserving: already-shipped tasks keep
+   their status).
+
+**Boundaries (fail loud, greenfield):**
+- The skill writes the **plan** (the spec) and lets `/track` register it in the db.
+  It does **not** write flat `origin='user'` rows — those are the agent-cockpit
+  app's domain. New scope belongs in `plan.json`, never in a parallel ad-hoc store.
+- **Never renumber or delete an existing track/task** to make ad-hoc work fit:
+  append with new `step` numbers (preserve every existing `[M{m}.{track}-{step}]`
+  identifier) or open a new track. Renumbering an already-ingested track orphans its
+  db rows.

@@ -1,5 +1,10 @@
 -- Upsert the full milestone/track skeleton + the needs DAG from a plan summary
 -- (the output of `read_plan.py <plan.json>`, written to @DOC@). STRUCTURAL only:
+--
+-- RUNTIME CONSTRAINT: readfile() is a sqlite3 CLI shell extension. This file
+-- MUST be executed via the sqlite3 CLI shell (as cockpit_db.sh does). It is
+-- incompatible with library-mode sqlite3 clients (Python sqlite3, SQLAlchemy,
+-- etc.) that do not load the shell extension.
 -- task rows are ingested per chosen track by ingest_tasks.sql, so a track is
 -- "staged" for /next exactly when it has tasks. Idempotent — re-running changes
 -- nothing but refreshed structural fields.

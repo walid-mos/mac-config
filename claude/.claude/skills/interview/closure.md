@@ -67,7 +67,7 @@ Once the closure is final (no blank cells, no unresolved afterthoughts), do **tw
 
 ```
 mkdir -p docs/plans
-cp docs/interviews/<slug>/plan.html docs/plans/<YYYY-MM-DD>-<slug>.html
+cp "docs/interviews/<slug>/plan.html" "docs/plans/<YYYY-MM-DD>-<slug>.html"
 ```
 
 The interview folder stays in place as historical state (rounds, submissions, `state.json`). The copy in `docs/plans/` is the authoritative implementation plan — that's what code reviews and future readers look at.
@@ -82,48 +82,7 @@ Write to:
 docs/interviews/<slug>/backlog-bundle.json
 ```
 
-Schema (JSON, one decision per object — `schema_version: "1"` is required, `/backlog` refuses unknown versions):
-
-```json
-{
-  "schema_version": "1",
-  "source": {
-    "kind": "interview",
-    "slug": "<slug>",
-    "change_kind": "<from state.json>"
-  },
-  "target": {
-    "linear_project_hint": "<best match from Decisions — empty string if unsure>",
-    "linear_team_hint": "<INT | SAS | CLI | empty string>",
-    "repo_path_hint": "<packages/X | apps/Y | empty string>"
-  },
-  "decisions": [
-    {
-      "id": "D1",
-      "theme": "<from state.json>",
-      "fact": "...",
-      "mechanism": "...",
-      "edge": "...",
-      "rejected": "...",
-      "order": "...",
-      "verification": "..."
-    }
-  ],
-  "open_facts": {
-    "<lower_snake_key>": "<value>"
-  },
-  "freeform": "<state.json freeform if any>"
-}
-```
-
-**Filling `target`** — scan the resolved Decisions for concrete repo/package mentions:
-
-- Mentions `packages/<x>` or `core/packages/<x>` → `repo_path_hint = "packages/<x>"`, `linear_project_hint = "NextNode <X>"`, `linear_team_hint = "INT"`.
-- Mentions a product (YSumAI, Kicked, Adiffi, NextNode Landing) → matching SAS project, `linear_team_hint = "SAS"`.
-- Mentions infra / deploy / CI / Hetzner / Cloudflare → `linear_project_hint = "NextNode Infrastructure"`, `linear_team_hint = "INT"`.
-- If genuinely ambiguous, leave the fields as empty strings — `/backlog` falls back to asking.
-
-**Filling `open_facts`** — capture facts surfaced during the interview that don't belong inside a Decision card. Typical entries: `apps_to_migrate: ["monitoring", "kicked"]`, `registry: "ghcr.io/nextnodesolutions"`, `reserved_names_source: "SERVICE_DEFINITIONS"`. Free-form key/value, lower-snake-case keys. Omit the key entirely if nothing matches.
+Full JSON schema (including `demo_spine`, `target` filling rules, and `open_facts` guidance): see `./bundle-schema.md`.
 
 After writing, confirm in chat with a one-line summary including both artifacts:
 

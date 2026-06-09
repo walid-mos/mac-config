@@ -29,7 +29,8 @@ Output (summary):
 Output (--milestone/--track): the matching track, every task carrying the
 derived "identifier" plus all its plan.json fields (title, size, slice_of,
 done_when, description, sink_id, ...). No notion of completion state lives
-here — progress is tracked in the /tmp scratch checklist, not in plan.json.
+here — progress is tracked in ~/mizraj/<slug>/progress.db (cockpit_db.sh),
+not in plan.json.
 
 Logs FATAL ... to stderr and exits 2 on any structural problem (fail loud).
 """

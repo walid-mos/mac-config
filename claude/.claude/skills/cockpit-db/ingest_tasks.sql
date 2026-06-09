@@ -1,9 +1,15 @@
 -- Upsert the chosen track's tasks + their slice_of from a track slice (the
 -- output of `read_plan.py <plan.json> --milestone M --track T`, written to @DOC@).
+--
+-- RUNTIME CONSTRAINT: readfile() is a sqlite3 CLI shell extension. This file
+-- MUST be executed via the sqlite3 CLI shell (as cockpit_db.sh does). It is
+-- incompatible with library-mode sqlite3 clients (Python sqlite3, SQLAlchemy,
+-- etc.) that do not load the shell extension.
 -- The surrogate id is the coordinate without brackets ("[M1.A-01]" -> "M1.A-01");
--- identifier keeps the brackets and is the upsert key. ON CONFLICT updates
--- STRUCTURAL columns only — status / blocked_reason / commit_sha / created_at are
--- execution state owned by the app and /next, never clobbered by re-ingest.
+-- identifier keeps the brackets and is the upsert key. ON CONFLICT refreshes
+-- STRUCTURAL columns only — title / status / blocked_reason / commit_sha /
+-- created_at are app-owned, never clobbered by re-ingest. `title` is seeded
+-- here on first insert, then owned by the app so a user rename survives.
 BEGIN;
 
 INSERT INTO tasks
@@ -31,7 +37,6 @@ ON CONFLICT(identifier) DO UPDATE SET
     milestone_id = excluded.milestone_id,
     track_id     = excluded.track_id,
     step         = excluded.step,
-    title        = excluded.title,
     description  = excluded.description,
     done_when    = excluded.done_when,
     size         = excluded.size,

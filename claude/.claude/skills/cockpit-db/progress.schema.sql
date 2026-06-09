@@ -5,6 +5,9 @@
 -- checksummed migration: this file IS the contract, versioned via schema_meta.
 -- A version mismatch is a loud refusal, never a silent migration.
 
+-- Enable WAL mode on first open (idempotent; setting persists in the DB file).
+PRAGMA journal_mode=WAL;
+
 -- Live agent sessions: one row per spawned PTY, written on create and removed
 -- on close. Per-project now that the whole database is per-project.
 CREATE TABLE IF NOT EXISTS agent_sessions (
@@ -51,25 +54,29 @@ CREATE TABLE IF NOT EXISTS tracks (
 -- fully editable) and track-derived rows (origin 'track'). `id` is the surrogate
 -- the app addresses: a ULID for a user task, the coordinate "M5.A-01" for a
 -- track task. `identifier` is the derived coordinate (NULL for user tasks),
--- UNIQUE so the skills upsert track tasks on it. Re-ingesting the plan updates
--- only the STRUCTURAL columns; the STATE columns (status, blocked_reason,
--- commit_sha, created_at) are never clobbered. The CHECK constraints make the
--- status/origin vocabulary the enforced contract.
+-- UNIQUE so the skills upsert track tasks on it. Re-ingesting the plan refreshes
+-- only the STRUCTURAL columns; the APP-OWNED columns (title, status,
+-- blocked_reason, commit_sha, created_at) are never clobbered. `title` is the
+-- subtle one: the plan seeds it on first insert, but the app owns it thereafter
+-- (the UI lets a user rename a task), so re-ingest leaves it alone. The CHECK
+-- constraints make the status/origin vocabulary the enforced contract.
 CREATE TABLE IF NOT EXISTS tasks (
     id             TEXT PRIMARY KEY NOT NULL,
     identifier     TEXT UNIQUE,
     origin         TEXT NOT NULL CHECK (origin IN ('user', 'track')),
-    -- structural (NULL for a flat user task) ───────────────────────
+    -- structural, refreshed from the plan on every re-ingest (NULL for a flat user task)
     milestone_id   TEXT,
     track_id       TEXT,
     step           TEXT,
-    title          TEXT NOT NULL,
     description    TEXT,
     done_when      TEXT,
     size           TEXT,
     sink_id        TEXT,
     position       INTEGER NOT NULL DEFAULT 0,
-    -- execution state ──────────────────────────────────────────────
+    -- app-owned, never clobbered by re-ingest ──────────────────────
+    -- `title` is seeded from the plan on first insert, then owned by the
+    -- app (like `created_at`) so a user rename survives re-ingest.
+    title          TEXT NOT NULL,
     status         TEXT NOT NULL DEFAULT 'backlog'
                      CHECK (status IN ('backlog', 'in_progress', 'done', 'blocked')),
     blocked_reason TEXT,

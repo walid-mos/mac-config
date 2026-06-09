@@ -1,6 +1,6 @@
 # Discovery (round 0)
 
-Restate the user's plan in one paragraph in chat — short, confirms you parsed it. Then explore the codebase (parallel `Explore` subagents if the surface is non-trivial).
+Restate the user's plan in one paragraph in chat — short, confirms you parsed it. Then explore the codebase (parallel Read/Bash tool calls; use TaskCreate for heavy parallel exploration if the surface is non-trivial).
 
 ## 1. Classify the change (mandatory, before enumerating branches)
 

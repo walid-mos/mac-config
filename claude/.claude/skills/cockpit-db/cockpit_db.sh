@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # cockpit_db.sh — the planning skills' sqlite3 client for the per-project progress
-# database (~/mizraj/<slug>/progress.db). No Python in the DB layer: the
-# deterministic engine is sqlite3 + the canonical SQL beside this file.
+# database (~/mizraj/<slug>/progress.db). No Python in the DB read/write layer:
+# the deterministic engine is sqlite3 + the canonical SQL beside this file.
+# Plan parsing (ingest-track) still calls read_plan.py to validate and slice the
+# plan.json; the DB itself is touched only via sqlite3 CLI + SQL files.
 # progress.schema.sql here is byte-identical to agent-cockpit's copy, and
 # schema_meta.version (SCHEMA_VERSION) turns any drift into a loud refusal at open
 # instead of a silent migration. The app and these skills are independent
@@ -28,17 +30,20 @@ log() { printf '%s\n' "$*" >&2; }
 # Quote a value as a single-quoted SQL string literal (double embedded quotes).
 sql_str() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/''/g")"; }
 
-# slug = last path segment of the origin remote URL with .git stripped, lowercased;
-# fallback to the git work-tree directory name. Mirrors the app's repo_slug.
+# slug = the last segment of the origin remote URL with a trailing .git stripped,
+# lowercased; fallback to the git work-tree directory name. Mirrors the app's
+# repo_slug (src-tauri/src/db/mod.rs:54, slug_from_remote_url) byte-for-byte —
+# both are repo-only and must STAY repo-only, or the app and the skills resolve
+# different ~/mizraj/<slug>/progress.db files and silently read past each other.
 repo_slug() {
-    local dir="$1" url slug root
+    local dir="$1" url s repo root
     url="$(git -C "$dir" remote get-url origin 2>/dev/null || true)"
     if [ -n "$url" ]; then
-        slug="${url%/}"
-        slug="${slug##*[:/]}"
-        slug="${slug%.git}"
-        if [ -n "$slug" ]; then
-            printf '%s' "$slug" | tr '[:upper:]' '[:lower:]'
+        s="${url%/}"            # drop a trailing slash
+        repo="${s##*[:/]}"      # last segment after the final : or /
+        repo="${repo%.git}"     # drop a trailing .git
+        if [ -n "$repo" ]; then
+            printf '%s' "$repo" | tr '[:upper:]' '[:lower:]'
             return
         fi
     fi
@@ -53,7 +58,6 @@ db_path() { printf '%s/mizraj/%s/progress.db' "$HOME" "$(repo_slug "$1")"; }
 open_db() {
     local db="$1" version
     mkdir -p "$(dirname "$db")"
-    sqlite3 "$db" "PRAGMA journal_mode=WAL;" >/dev/null
     sqlite3 -cmd ".timeout 5000" "$db" < "$SCHEMA_SQL"
     version="$(sqlite3 "$db" 'SELECT version FROM schema_meta')"
     [ "$version" = "$SCHEMA_VERSION" ] \

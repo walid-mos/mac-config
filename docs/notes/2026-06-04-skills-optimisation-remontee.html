@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="fr" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Remontée skills · décisions à trancher</title>
+<script>
+(function () {
+  try {
+    var stored = localStorage.getItem('np-theme');
+    var theme = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', theme);
+  } catch (e) {
+    document.documentElement.setAttribute('data-theme', 'light');
+  }
+})();
+</script>
+<style>
+:root {
+  --np-bg:          oklch(98.4% 0.003 247.86);
+  --np-bg-soft:     oklch(96.8% 0.007 247.84);
+  --np-text:        oklch(20.8% 0.042 265.76);
+  --np-text-muted:  oklch(55.4% 0.046 257.42);
+  --np-border:      oklch(92.9% 0.013 255.51);
+  --np-border-soft: oklch(96.8% 0.007 247.84);
+  --np-accent:      oklch(70.4% 0.14 182.503);
+  --np-accent-bg:   oklch(95.3% 0.051 180.801);
+  --np-accent-hover:oklch(60% 0.118 184.704);
+  --np-on-accent:   #06201d;
+  --np-highlight:   #F97316;
+  --np-success:     #16A34A;
+  --np-warn:        #D97706;
+  --np-danger:      #DC2626;
+  --np-add-bg:      #DCFCE7;
+  --np-add-text:    #166534;
+  --np-del-bg:      #FEE2E2;
+  --np-del-text:    #991B1B;
+  --np-shadow-soft: 0 2px 6px rgba(0,0,0,.06);
+  --np-shadow-pop:  0 4px 16px rgba(0,0,0,.12);
+  --np-radius:      8px;
+  --np-mono:        "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --np-sans:        "DM Sans", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --np-display:     "Plus Jakarta Sans", "DM Sans", sans-serif;
+}
+[data-theme="dark"] {
+  --np-bg:          oklch(20.8% 0.042 265.76);
+  --np-bg-soft:     oklch(27.9% 0.041 260.03);
+  --np-text:        oklch(98.4% 0.003 247.86);
+  --np-text-muted:  oklch(70.4% 0.04 256.79);
+  --np-border:      oklch(37.2% 0.044 257.29);
+  --np-border-soft: oklch(27.9% 0.041 260.03);
+  --np-accent:      oklch(77.7% 0.152 181.912);
+  --np-accent-bg:   oklch(38.6% 0.063 188.416);
+  --np-accent-hover:oklch(85.5% 0.138 181.071);
+  --np-on-accent:   #04231f;
+  --np-highlight:   #FB923C;
+  --np-success:     #4ADE80;
+  --np-warn:        #FBBF24;
+  --np-danger:      #F87171;
+  --np-add-bg:      rgba(74,222,128,.18);
+  --np-add-text:    #86EFAC;
+  --np-del-bg:      rgba(248,113,113,.18);
+  --np-del-text:    #FCA5A5;
+  --np-shadow-soft: 0 2px 6px rgba(0,0,0,.40);
+  --np-shadow-pop:  0 4px 16px rgba(0,0,0,.55);
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--np-bg); color: var(--np-text);
+  font-family: var(--np-sans); line-height: 1.6; -webkit-font-smoothing: antialiased;
+}
+.layout { display: grid; grid-template-columns: 220px 1fr; max-width: 1180px; margin: 0 auto; }
+.rail { position: sticky; top: 0; height: 100vh; overflow: auto; padding: 28px 16px 28px 24px; border-right: 1px solid var(--np-border); }
+.rail .brand { font-family: var(--np-display); font-weight: 700; font-size: 15px; letter-spacing: -.01em; }
+.rail .brand .dot { color: var(--np-accent); }
+.rail .meta { font-size: 11px; color: var(--np-text-muted); margin: 6px 0 18px; font-family: var(--np-mono); }
+.rail nav a { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; font-size: 12.5px; color: var(--np-text-muted); text-decoration: none; line-height: 1.35; }
+.rail nav a:hover { background: var(--np-bg-soft); color: var(--np-text); }
+.rail nav a.active { color: var(--np-accent-hover); background: var(--np-bg-soft); }
+.rail nav a .n { font-family: var(--np-mono); font-size: 10px; color: var(--np-text-muted); min-width: 14px; }
+.rail nav a.active .n { color: var(--np-accent); }
+.rail .group { font-family: var(--np-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--np-text-muted); margin: 18px 0 6px 8px; }
+.rail .progress { margin: 16px 8px 0; }
+.rail .progress .bar { height: 5px; border-radius: 99px; background: var(--np-border); overflow: hidden; }
+.rail .progress .bar i { display: block; height: 100%; width: 0; background: var(--np-accent); transition: width .3s; }
+.rail .progress .lbl { font-family: var(--np-mono); font-size: 10px; color: var(--np-text-muted); margin-top: 6px; }
+main { padding: 40px 48px 140px; min-width: 0; }
+.eyebrow { font-family: var(--np-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--np-accent-hover); }
+h1 { font-family: var(--np-display); font-size: 30px; line-height: 1.15; letter-spacing: -.02em; margin: 8px 0 14px; }
+h2 { font-family: var(--np-display); font-size: 20px; letter-spacing: -.01em; margin: 0 0 16px; padding-top: 8px; }
+.prompt-box { background: var(--np-bg-soft); border: 1px solid var(--np-border); border-left: 3px solid var(--np-accent); border-radius: var(--np-radius); padding: 12px 16px; font-size: 14px; color: var(--np-text-muted); margin-bottom: 8px; }
+section { scroll-margin-top: 20px; padding: 30px 0; border-top: 1px solid var(--np-border-soft); }
+section:first-of-type { border-top: none; }
+.strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 18px 0 4px; }
+.cell { background: var(--np-bg-soft); border: 1px solid var(--np-border); border-radius: var(--np-radius); padding: 12px 14px; }
+.cell .k { font-family: var(--np-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--np-text-muted); }
+.cell .v { font-family: var(--np-display); font-size: 21px; font-weight: 700; margin-top: 3px; letter-spacing: -.01em; }
+.cell .v small { font-size: 12px; font-weight: 500; color: var(--np-text-muted); }
+.cell .v .add { color: var(--np-success); } .cell .v .del { color: var(--np-danger); }
+.tl { position: relative; margin: 6px 0 0; padding-left: 22px; }
+.tl::before { content:""; position:absolute; left:5px; top:6px; bottom:6px; width:2px; background: var(--np-border); }
+.wave { position: relative; padding: 0 0 18px; }
+.wave::before { content:""; position:absolute; left:-22px; top:4px; width:11px; height:11px; border-radius:99px; background: var(--np-accent); box-shadow: 0 0 0 3px var(--np-bg); }
+.wave .wt { font-weight: 600; font-size: 14.5px; }
+.wave .wt .tag { font-family: var(--np-mono); font-size: 10px; color: var(--np-accent-hover); border:1px solid var(--np-accent); border-radius: 4px; padding: 1px 5px; margin-right: 8px; }
+.wave .wd { font-size: 13.5px; color: var(--np-text-muted); margin-top: 3px; }
+.eff { font-family: var(--np-mono); font-size: 10px; font-weight: 700; color: var(--np-text-muted); border:1px solid var(--np-border); border-radius:4px; padding:1px 5px; margin-left:6px; }
+.dec { background: var(--np-bg-soft); border: 1px solid var(--np-border); border-radius: 10px; padding: 20px 22px; margin-bottom: 18px; }
+.dec-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.dec-id { font-family: var(--np-mono); font-size: 11px; font-weight: 700; color: var(--np-accent-hover); letter-spacing: .05em; }
+.dec-head h3 { font-family: var(--np-display); font-size: 17px; margin: 0; flex: 1; min-width: 200px; letter-spacing: -.01em; }
+.dec-ctx { font-size: 14px; color: var(--np-text); margin: 4px 0 14px; padding-left: 12px; border-left: 3px solid var(--np-border); }
+.dec-ctx code, .dec code { font-family: var(--np-mono); font-size: 12px; background: var(--np-bg); border:1px solid var(--np-border); border-radius: 4px; padding: 1px 5px; }
+.point { margin: 0 0 14px; }
+.point-q { font-size: 13.5px; font-weight: 600; margin-bottom: 7px; }
+.opts { display: flex; flex-direction: column; gap: 6px; }
+.opt { position: relative; display: flex; gap: 9px; align-items: flex-start; font-size: 13px; padding: 8px 12px; border: 1px solid var(--np-border); border-radius: 7px; background: var(--np-bg); cursor: pointer; transition: border-color .12s, background .12s, box-shadow .12s; }
+.opt input { position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none; }
+.opt:hover { border-color: var(--np-accent); }
+.opt .mark { font-family: var(--np-mono); font-size: 11px; color: var(--np-text-muted); min-width: 16px; font-weight: 700; }
+.opt .body { flex: 1; }
+.opt.rec .mark { color: var(--np-accent-hover); }
+.opt.selected { border-color: var(--np-accent); background: var(--np-bg-soft); box-shadow: inset 0 0 0 1px var(--np-accent); }
+.opt .check { color: var(--np-accent); font-weight: 700; opacity: 0; transition: opacity .12s; }
+.opt.selected .check { opacity: 1; }
+.rec-tag { display:inline-block; font-family: var(--np-mono); font-size: 9px; text-transform: uppercase; letter-spacing:.05em; color: var(--np-accent-hover); border:1px solid var(--np-accent); border-radius: 4px; padding: 0 5px; margin-left: 6px; vertical-align: middle; }
+.dec-note { width: 100%; margin-top: 12px; font-family: var(--np-sans); font-size: 13px; line-height: 1.5; border: 1px dashed var(--np-border); border-radius: 7px; padding: 9px 12px; background: transparent; color: var(--np-text); resize: vertical; min-height: 40px; }
+.dec-note::placeholder { color: var(--np-text-muted); }
+.dec-note:focus { outline: none; border-style: solid; border-color: var(--np-accent); background: var(--np-bg); }
+.dec-note.has-value { border-style: solid; border-color: var(--np-accent); background: var(--np-bg); }
+.callout { border:1px solid var(--np-border); border-left: 4px solid var(--np-warn); border-radius: 8px; padding: 16px 18px; background: var(--np-bg-soft); }
+.callout h3 { margin: 0 0 6px; font-size: 15px; font-family: var(--np-display); }
+.fp { font-size: 13.5px; margin: 10px 0 0; padding-left: 14px; border-left: 2px solid var(--np-border); }
+.fp b { color: var(--np-text); } .fp .ok { color: var(--np-success); font-weight: 600; }
+.next li { margin-bottom: 7px; font-size: 14px; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 18px; }
+.btn { font-family: var(--np-sans); font-size: 13px; font-weight: 600; border-radius: 7px; padding: 9px 16px; cursor: pointer; border: 1px solid var(--np-accent); background: transparent; color: var(--np-accent-hover); }
+.btn:hover { background: var(--np-accent-bg); }
+.btn.primary { background: var(--np-accent); color: var(--np-on-accent); }
+.btn.primary:hover { background: var(--np-accent-hover); color: var(--np-bg); }
+.actions .hint { font-size: 12px; color: var(--np-text-muted); }
+/* sticky action bar */
+.dock { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 15; display: flex; gap: 10px; align-items: center; background: var(--np-bg-soft); border: 1px solid var(--np-border); box-shadow: var(--np-shadow-pop); border-radius: 99px; padding: 8px 10px 8px 16px; }
+.dock .status { font-size: 12px; color: var(--np-text-muted); font-family: var(--np-mono); }
+.dock .status b { color: var(--np-accent-hover); }
+.np-theme-toggle { position: fixed; top: 16px; right: 16px; z-index: 20; width: 38px; height: 38px; border-radius: 99px; cursor: pointer; border: 1px solid var(--np-border); background: var(--np-bg-soft); color: var(--np-text); font-size: 16px; box-shadow: var(--np-shadow-soft); }
+.toast { position: fixed; bottom: 74px; left: 50%; transform: translateX(-50%) translateY(20px); opacity: 0; transition: .25s; background: var(--np-text); color: var(--np-bg); font-size: 13px; padding: 9px 16px; border-radius: 8px; pointer-events: none; z-index: 30; }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+@media (max-width: 1024px) { .rail { display: none; } .layout { grid-template-columns: 1fr; } main { padding: 32px 22px 120px; } .strip { grid-template-columns: repeat(2,1fr);} }
+@media (max-width: 560px) { .strip { grid-template-columns: 1fr; } .dock { left: 12px; right: 12px; transform: none; justify-content: space-between; } }
+</style>
+</head>
+<body>
+<button class="np-theme-toggle" aria-label="Basculer le thème">◐</button>
+
+<div class="layout">
+  <aside class="rail">
+    <div class="brand">NextNode<span class="dot">.</span></div>
+    <div class="meta">audit · 2026-06-04</div>
+    <nav id="nav">
+      <a href="#recap"><span class="n">00</span> Récap de la session</a>
+      <div class="group">Décisions à trancher</div>
+      <a href="#dec-a"><span class="n">A</span> Repro du hook (settings.json)</a>
+      <a href="#dec-b"><span class="n">B</span> nextnode-linear : politiques</a>
+      <a href="#dec-c"><span class="n">C</span> nextnode-design : conventions</a>
+      <a href="#dec-d"><span class="n">D</span> /next : recovery d'état</a>
+      <a href="#dec-e"><span class="n">E</span> /allow : portée &amp; robustesse</a>
+      <div class="group">Contexte</div>
+      <a href="#faux"><span class="n">!</span> Faux positifs rattrapés</a>
+      <a href="#suite"><span class="n">→</span> La suite</a>
+    </nav>
+    <div class="progress">
+      <div class="bar"><i id="pbar"></i></div>
+      <div class="lbl"><span id="pct">0</span>% parcouru</div>
+    </div>
+  </aside>
+
+  <main>
+    <section id="recap">
+      <div class="eyebrow">Audit · skills Claude · remontée</div>
+      <h1>Optimisation des skills — ce qui est fait, ce qu'il reste à trancher</h1>
+      <div class="prompt-box">« Remontée complète des skills + optimise tout (token pur, token effectif, fiabilité, exhaustivité), supprime l'agent React et enforce le skill, inspire-toi des skills de Matt Pocock. »</div>
+
+      <div class="strip">
+        <div class="cell"><div class="k">Fichiers touchés</div><div class="v">82 <small>+ 2 créés</small></div></div>
+        <div class="cell"><div class="k">Diff</div><div class="v"><span class="add">+1785</span> <span class="del">−1282</span></div></div>
+        <div class="cell"><div class="k">ref react-implementer</div><div class="v">0</div></div>
+        <div class="cell"><div class="k">Skills audités</div><div class="v">31 <small>+ cross-check</small></div></div>
+        <div class="cell"><div class="k">Fixes appliqués</div><div class="v">233</div></div>
+        <div class="cell"><div class="k">Skips raisonnés</div><div class="v">74</div></div>
+      </div>
+
+      <div class="tl" style="margin-top:26px">
+        <div class="wave"><div class="wt"><span class="tag">V0</span>Suppression agent React + enforcement<span class="eff">I4</span></div>
+          <div class="wd">Agent <code>react-implementer</code> supprimé ; routing <code>CLAUDE.md</code> réécrit (greenfield) → « charge la doctrine + le hook enforce » ; hook <code>react-ts-gate</code> câblé (repo + live, Pre+Post). Testé : <b>bloque <code>any</code>/<code>as</code></b>, passe le code propre, alerte <code>useEffect</code>.</div></div>
+        <div class="wave"><div class="wt"><span class="tag">V1</span>Cluster coding (doctrine)<span class="eff">I6</span></div>
+          <div class="wd"><code>coding</code> : <b>RULE 12 = DRY</b>, <b>RULE 13 = SOLID/SRP + split fichiers</b>, méta-règles IA sorties dans <code>ops-discipline.md</code>. <code>architecture.md</code> : <b>ARCH 0 — deep modules</b> (deletion test, seams, dépendances). <code>react</code> : RULE 9 (DRY/complexité/test/mémo) + fix Context/Jotai.</div></div>
+        <div class="wave"><div class="wt"><span class="tag">V2</span>Fan-out 29 skills restants<span class="eff">I6</span></div>
+          <div class="wd">233 fixes : hex de marque faux purgés, chemins <code>/Users/walid</code>→<code>walid-mos</code>, docstrings <code>/tmp</code>→<code>progress.db</code>, descriptions resserrées, <code>satisfies</code>/<code>??=</code>/tables F&nbsp;/&nbsp;M ajoutés, dédup par ownership.</div></div>
+        <div class="wave"><div class="wt"><span class="tag">V3</span>Nouveau skill + méta<span class="eff">I4</span></div>
+          <div class="wd">🆕 <code>/architecture</code> invocable (Explore → rapport <code>/html</code> → grilling <code>/interview</code>, doctrine deep-modules). <code>learn</code> : modèle SKILL.md canonique + discipline Pocock.</div></div>
+      </div>
+    </section>
+
+    <section id="dec-a">
+      <h2>Décisions à trancher <span style="font-family:var(--np-mono);font-size:12px;color:var(--np-text-muted);font-weight:400">— clique tes choix (reco pré-cochée), puis « Copier mes réponses »</span></h2>
+
+      <article class="dec" data-dec="A" data-title="A — Reproductibilité du hook">
+        <div class="dec-head"><span class="dec-id">DÉCISION A</span><h3>Reproductibilité du hook d'enforcement</h3><span class="eff">I3</span></div>
+        <p class="dec-ctx"><code>~/.claude/settings.json</code> n'est <b>pas</b> un symlink stow (Claude le réécrit au runtime → présence d'un <code>.bak</code>). J'ai écrit le hook dans le <b>repo</b> (source versionnée) <b>et</b> dans le <b>live</b> (actif maintenant). Mais sur une machine neuve, <code>make claude</code> ne peut pas symlinker <code>settings.json</code> (conflit avec le fichier réel) → le hook du repo ne s'applique pas tout seul.</p>
+        <div class="point" data-q="Reproductibilité du hook">
+          <div class="point-q">Comment rendre le hook reproductible sur une machine neuve ?</div>
+          <div class="opts">
+            <label class="opt"><input type="radio" name="A1" value="a — cible Makefile claude-post (jq idempotent)" checked><span class="mark">a</span><span class="body">Cible Makefile <code>claude-post</code> qui <b>merge</b> le hook dans le live via <code>jq</code> (idempotent).<span class="rec-tag">recommandé</span></span><span class="check">✓</span></label>
+            <label class="opt"><input type="radio" name="A1" value="b — script de sync séparé"><span class="mark">b</span><span class="body">Script de sync <code>settings.json</code> séparé, hors <code>make</code>.</span><span class="check">✓</span></label>
+            <label class="opt"><input type="radio" name="A1" value="c — statu quo, application manuelle"><span class="mark">c</span><span class="body">Statu quo : le repo sert de doc, application manuelle.</span><span class="check">✓</span></label>
+          </div>
+        </div>
+        <textarea class="dec-note" data-note="A" placeholder="💬 Note / nuance / question pour Claude…"></textarea>
+      </article>
+    </section>
+
+    <section id="dec-b">
+      <article class="dec" data-dec="B" data-title="B — nextnode-linear">
+        <div class="dec-head"><span class="dec-id">DÉCISION B</span><h3>nextnode-linear : politiques runtime</h3><span class="eff">I3</span></div>
+        <p class="dec-ctx">Trois trous qui dépendent de TON workspace Linear (impossible à deviner sans le live) — l'agent a flaggé au lieu d'inventer.</p>
+        <div class="point" data-q="stateId par défaut">
+          <div class="point-q">1. <code>stateId</code> par défaut à la création d'une issue ?</div>
+          <div class="opts">
+            <label class="opt"><input type="radio" name="B1" value="a — Backlog (à confirmer)" checked><span class="mark">a</span><span class="body">« Backlog » (à confirmer une fois pour les 3 teams).<span class="rec-tag">recommandé</span></span><span class="check">✓</span></label>
+            <label class="opt"><input type="radio" name="B1" value="b — query live à chaque fois"><span class="mark">b</span><span class="body">Query live à chaque création pour résoudre l'état d'entrée.</span><span class="check">✓</span></label>
+          </div>
+        </div>
+        <div class="point" data-q="LINEAR_API_KEY absent">
+          <div class="point-q">2. Comportement si <code>LINEAR_API_KEY</code> est absent ?</div>
+          <div class="opts">
+            <label class="opt"><input type="radio" name="B2" value="a — abort clair" checked><span class="mark">a</span><span class="body">Abort avec message clair.<span class="rec-tag">recommandé</span></span><span class="check">✓</span></label>
+            <label class="opt"><input type="radio" name="B2" value="b — prompter pour la clé"><span class="mark">b</span><span class="body">Prompter l'utilisateur pour la clé.</span><span class="check">✓</span></label>
+          </div>
+        </div>
+        <div class="point" data-q="Règles de labels">
+          <div class="point-q">3. Règles d'usage des labels ?</div>
+          <div class="opts">
+            <label class="opt"><input type="radio" name="B3" value="a — documenter mes labels"><span class="mark">a</span><span class="body">Documenter les labels que tu utilises réellement.</span><span class="check">✓</span></label>
+            <label class="opt"><input type="radio" name="B3" value="b — pas de règle pour l'instant" checked><span class="mark">b</span><span class="body">Pas de règle tant que tu n'en utilises pas systématiquement.<span class="rec-tag">recommandé</span></span><span class="check">✓</span></label>
+          </div>
+        </div>
+        <textarea class="dec-note" data-note="B" placeholder="💬 ex : le nom exact de l'état d'entrée Linear…"></textarea>
+      </article>
+    </section>
+
+    <section id="dec-c">
+      <article class="dec" data-dec="C" data-title="C — nextnode-design">
+        <div class="dec-head"><span class="dec-id">DÉCISION C</span><h3>nextnode-design : conventions manquantes</h3><span class="eff">I4</span></div>
+        <p class="dec-ctx">Gaps P2 sans source de vérité dans le skill : pas d'échelle spacing/radius/shadow, et pas de fallback si <code>nextnode-landing/src/styles/global.css</code> est inaccessible.</p>
+        <div class="point" data-q="Échelle spacing/radius/shadow">
+          <div class="point-q">1. Figer une échelle spacing / radius / shadow ?</div>
+          <div class="opts">
+            <label class="opt"><input type="radio" name="C1" value="a — extraire de nextnode-landing et figer" checked><span class="mark">a</span><span class="body">Extraire l'échelle réelle depuis <code>nextnode-landing</code> une fois et la figer.<span class="rec-tag">recommandé</span></span><span class="check">✓</span></label>
+            <label class="opt"><input type="radio" name="C1" value="b — laisser à impeccable"><span class="mark">b</span><span class="body">Laisser ça au moteur <code>impeccable</code>, ne rien figer.</span><span class="check">✓</span></label>
+          </div>
+        </div>
+        <div class="point" data-q="Fallback global.css inaccessible">
+          <div class="point-q">2. Fallback si <code>global.css</code> inaccessible ?</div>
+          <div class="opts">
+            <label class="opt"><input type="radio" name="C2" value="a — fallback colors.md + warning" checked><span class="mark">a</span><span class="body">Fallback documenté sur les tokens last-known de <code>colors.md</code> + warning.<span class="rec-tag">recommandé</span></span><span class="check">✓</span></label>
+            <label class="opt"><input type="radio" name="C2" value="b — échouer fort"><span class="mark">b</span><span class="body">Échouer fort (refuser de deviner les couleurs).</span><span class="check">✓</span></label>
+          </div>
+        </div>
+        <textarea class="dec-note" data-note="C" placeholder="💬 ex : confirmer que nextnode-landing est la source de vérité…"></textarea>
+      </article>
+    </section>
+
+    <section id="dec-d">
+      <article class="dec" data-dec="D" data-title="D — /next recovery">
+        <div class="dec-head"><span class="dec-id">DÉCISION D</span><h3>/next : recovery d'état</h3><span class="eff">I3</span></div>
+        <p class="dec-ctx">Deux trous de robustesse dans le shipping loop.</p>
+        <div class="point" data-q="description/done_when NULL">
+          <div class="point-q">1. Si <code>description</code> / <code>done_when</code> d'une tâche est NULL/vide ?</div>
+          <div class="opts">
+            <label class="opt"><input type="radio" name="D1" value="a — surface + set blocked" checked><span class="mark">a</span><span class="body">Surface à l'utilisateur + set <code>blocked</code> (jamais deviner).<span class="rec-tag">recommandé</span></span><span class="check">✓</span></label>
+            <label class="opt"><input type="radio" name="D1" value="b — dériver du titre"><span class="mark">b</span><span class="body">Dériver depuis le titre de la tâche.</span><span class="check">✓</span></label>
+          </div>
+        </div>
+        <div class="point" data-q="Pas de suite de tests">
+          <div class="point-q">2. Fallback si le repo n'a pas de suite de tests (Phase 6) ?</div>
+          <div class="opts">
+            <label class="opt"><input type="radio" name="D2" value="a — skip tests + vérif minimale (build/lint)" checked><span class="mark">a</span><span class="body">Skip la validation tests mais exiger une vérif minimale explicite (build/lint).<span class="rec-tag">recommandé</span></span><span class="check">✓</span></label>
+            <label class="opt"><input type="radio" name="D2" value="b — grep erreurs de syntaxe (rejeté)"><span class="mark">b</span><span class="body">Le « grep des erreurs de syntaxe » de l'audit (rejeté : pas fiable cross-stack).</span><span class="check">✓</span></label>
+          </div>
+        </div>
+        <textarea class="dec-note" data-note="D" placeholder="💬 Note pour Claude…"></textarea>
+      </article>
+    </section>
+
+    <section id="dec-e">
+      <article class="dec" data-dec="E" data-title="E — /allow">
+        <div class="dec-head"><span class="dec-id">DÉCISION E</span><h3>/allow : portée &amp; robustesse</h3><span class="eff">I3–I4</span></div>
+        <p class="dec-ctx">Le skill écrit toujours dans le <code>settings.json</code> user (<code>~/.claude</code>) et suppose un JSON bien formé.</p>
+        <div class="point" data-q="Scope projet vs user">
+          <div class="point-q">1. Supporter un <code>.claude/settings.json</code> de projet dans un repo ?</div>
+          <div class="opts">
+            <label class="opt"><input type="radio" name="E1" value="a — détecter le scope projet" checked><span class="mark">a</span><span class="body">Ajouter une détection/flag projet (permissions par repo).<span class="rec-tag">recommandé</span></span><span class="check">✓</span></label>
+            <label class="opt"><input type="radio" name="E1" value="b — rester user-scope (statu quo)"><span class="mark">b</span><span class="body">Rester user-scope uniquement (statu quo).</span><span class="check">✓</span></label>
+          </div>
+        </div>
+        <div class="point" data-q="JSON malformé">
+          <div class="point-q">2. Comportement sur <code>settings.json</code> malformé ?</div>
+          <div class="opts">
+            <label class="opt"><input type="radio" name="E2" value="a — abort + message clair" checked><span class="mark">a</span><span class="body">Abort + message clair pointant la ligne fautive.<span class="rec-tag">recommandé</span></span><span class="check">✓</span></label>
+            <label class="opt"><input type="radio" name="E2" value="b — backup + recréer"><span class="mark">b</span><span class="body">Backup + recréer le fichier.</span><span class="check">✓</span></label>
+          </div>
+        </div>
+        <textarea class="dec-note" data-note="E" placeholder="💬 Note pour Claude…"></textarea>
+      </article>
+
+      <div class="actions">
+        <button class="btn primary" id="copybtn">Copier mes réponses (markdown)</button>
+        <button class="btn" id="resetbtn">Tout remettre sur les recos</button>
+        <span class="hint">→ colle-moi le résultat, ou dis simplement « toutes les recos ».</span>
+      </div>
+    </section>
+
+    <section id="faux">
+      <h2>Garde-fou qui a fonctionné</h2>
+      <div class="callout">
+        <h3>⚠︎ 2 findings d'audit FAUX, rattrapés par les agents (fail-loud)</h3>
+        <p style="font-size:13.5px;color:var(--np-text-muted);margin:2px 0 0">Les agents avaient consigne de vérifier et de refuser plutôt que d'appliquer un fix douteux. Deux recommandations de l'audit étaient incorrectes :</p>
+        <p class="fp"><b><code>vitest</code> · <code>experimental_AstroContainer</code></b> — l'audit disait « renommer en <code>AstroContainer</code>, stable depuis Astro 5 ». <span class="ok">Faux</span> : vérifié via context7, l'API Container est <b>toujours expérimentale en Astro 6</b>, l'export reste <code>experimental_AstroContainer</code>. L'agent a <b>refusé le rename</b> (aurait cassé l'import) et corrigé seulement le cadrage stale « 4.9.0 ».</p>
+        <p class="fp"><b><code>nextnode-infra</code> · lien <code>supabase-service.md</code></b> — l'audit disait « référence cassée ». <span class="ok">Faux positif</span> : le fichier existe. Référence préservée telle quelle.</p>
+      </div>
+    </section>
+
+    <section id="suite">
+      <h2>La suite</h2>
+      <ul class="next">
+        <li>Tu cliques tes choix ci-dessus (les recos sont pré-cochées) → <b>Copier mes réponses</b> → tu me colles ça.</li>
+        <li>J'applique les décisions retenues (≈ I3–I4 chacune) dans les skills concernés.</li>
+        <li>Rien n'est commité — tu peux relire le diff (<code>git diff</code>) avant que je commit / ouvre une PR sur <code>v4</code>.</li>
+      </ul>
+    </section>
+  </main>
+</div>
+
+<div class="dock">
+  <span class="status"><b id="dockcount">5</b>/5 décisions · <span id="dockdelta">0 modifiée(s)</span></span>
+  <button class="btn primary" id="copybtn2">Copier mes réponses</button>
+</div>
+
+<div class="toast" id="toast">Copié ✓</div>
+
+<script>
+document.querySelector('.np-theme-toggle').addEventListener('click', function () {
+  var cur = document.documentElement.getAttribute('data-theme');
+  var next = cur === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  try { localStorage.setItem('np-theme', next); } catch (e) {}
+  document.dispatchEvent(new CustomEvent('np:theme-change', { detail: next }));
+});
+
+// --- interactivity: option selection ---
+function refresh() {
+  document.querySelectorAll('.opt').forEach(function (o) {
+    o.classList.toggle('selected', o.querySelector('input').checked);
+  });
+  // count how many chosen options differ from the recommended default
+  var delta = 0;
+  document.querySelectorAll('.point').forEach(function (p) {
+    var checked = p.querySelector('input:checked');
+    var rec = p.querySelector('.opt input'); // first = recommended? not reliable
+    var recLabel = p.querySelector('.opt .rec-tag');
+    var recOpt = recLabel ? recLabel.closest('.opt').querySelector('input') : null;
+    if (recOpt && checked && recOpt !== checked) delta++;
+  });
+  document.querySelectorAll('.dec-note').forEach(function (n) { n.classList.toggle('has-value', n.value.trim().length > 0); });
+  document.getElementById('dockdelta').textContent = delta + ' modifiée(s)';
+}
+document.querySelectorAll('.opt input').forEach(function (i) { i.addEventListener('change', refresh); });
+document.querySelectorAll('.dec-note').forEach(function (n) { n.addEventListener('input', refresh); });
+
+function reset() {
+  document.querySelectorAll('.point').forEach(function (p) {
+    var recLabel = p.querySelector('.opt .rec-tag');
+    if (recLabel) recLabel.closest('.opt').querySelector('input').checked = true;
+  });
+  refresh();
+}
+
+function buildMarkdown() {
+  var out = ['# Décisions skills — mes réponses', ''];
+  document.querySelectorAll('.dec').forEach(function (dec) {
+    out.push('## ' + dec.getAttribute('data-title'));
+    dec.querySelectorAll('.point').forEach(function (p) {
+      var q = p.getAttribute('data-q');
+      var checked = p.querySelector('input:checked');
+      out.push('- ' + q + ' → ' + (checked ? checked.value : '(non choisi)'));
+    });
+    var note = dec.querySelector('.dec-note');
+    if (note && note.value.trim()) out.push('  note: ' + note.value.trim());
+    out.push('');
+  });
+  return out.join('\n');
+}
+
+function copyAnswers() {
+  navigator.clipboard.writeText(buildMarkdown()).then(function () {
+    var t = document.getElementById('toast'); t.classList.add('show');
+    setTimeout(function () { t.classList.remove('show'); }, 1700);
+  });
+}
+document.getElementById('copybtn').addEventListener('click', copyAnswers);
+document.getElementById('copybtn2').addEventListener('click', copyAnswers);
+document.getElementById('resetbtn').addEventListener('click', reset);
+refresh();
+
+// --- scrollspy + progress ---
+var links = Array.from(document.querySelectorAll('#nav a'));
+var sections = links.map(function (a) { return document.querySelector(a.getAttribute('href')); });
+var spy = new IntersectionObserver(function (entries) {
+  entries.forEach(function (e) {
+    if (!e.isIntersecting) return;
+    links.forEach(function (l) { l.classList.toggle('active', l.getAttribute('href') === '#' + e.target.id); });
+  });
+}, { rootMargin: '-15% 0px -70% 0px' });
+sections.forEach(function (s) { if (s) spy.observe(s); });
+
+window.addEventListener('scroll', function () {
+  var h = document.documentElement;
+  var p = Math.round((h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100) || 0;
+  document.getElementById('pbar').style.width = p + '%';
+  document.getElementById('pct').textContent = p;
+});
+</script>
+</body>
+</html>

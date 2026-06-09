@@ -1,6 +1,6 @@
 # Testing Astro with Vitest - Container API
 
-The Astro Container API (available since Astro 4.9.0) lets you render `.astro` components in isolation inside Vitest. It runs server-side only - no browser, no dev server.
+The Astro Container API lets you render `.astro` components in isolation inside Vitest. It runs server-side only - no browser, no dev server. As of Astro 6 the API is still flagged experimental and the export is `experimental_AstroContainer` (alias it on import).
 
 ## Setup
 
@@ -139,8 +139,5 @@ container.addClientRenderer({
 
 ## Astro-specific gotchas
 
-- Always use `getViteConfig()` from `astro/config`, never `defineConfig` from `vitest/config` (`.astro` imports will fail).
 - One fresh `AstroContainer` per test (no shared container - state leaks).
-- `AstroContainer.create()` returns a Promise - `await` it.
-- Use `renderToResponse` for endpoints (`routeType: "endpoint"`), `renderToString` for components.
 - Assert on rendered content with `toContain()`; never snapshot full HTML.

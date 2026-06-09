@@ -55,7 +55,7 @@ Pass data to the page via `props`:
 
 ```astro
 ---
-export function getStaticPaths() {
+export async function getStaticPaths() {
   const posts = await getCollection('blog')
   return posts.map((post) => ({
     params: { slug: post.id },

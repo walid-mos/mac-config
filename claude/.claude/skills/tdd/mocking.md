@@ -24,4 +24,4 @@ The SDK approach means:
 
 ## Also See
 
-- [interface-design.md](interface-design.md) - dependency injection, pure return values, small surface area
+- [interface-design.md](interface-design.md) - dependency injection, pure return values, small surface area, deep vs shallow modules

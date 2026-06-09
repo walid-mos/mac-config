@@ -10,7 +10,7 @@ Two output formats : **single tweet** and **thread**. Pick based on the source c
 
 ## Single tweet structure
 
-Three blocks max, in this order :
+Three blocks max (hook, body, kicker), in this order :
 
 ```
 [hook line, sentence-case capitalization, period optional, standalone block]
@@ -22,7 +22,7 @@ Three blocks max, in this order :
 
 ### Block cap
 
-**3-4 standalone blocks per single tweet, hard ceiling.** A block = a chunk separated by a blank line. If a draft has 5+ blocks, you're chopping the body into one-line paragraphs and losing the rhythm. Merge body sentences into one flowing paragraph.
+**3 standalone blocks per single tweet, hard ceiling (hook, body, kicker).** A block = a chunk separated by a blank line. If a draft has 4+ blocks, you're chopping the body into one-line paragraphs and losing the rhythm. Merge body sentences into one flowing paragraph.
 
 Bad (6 blocks, choppy) :
 ```

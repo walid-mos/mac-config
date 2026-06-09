@@ -31,4 +31,4 @@
 | `mcp <name>` | Discover via MCP discovery - see [mcp-discovery.md](mcp-discovery.md) |
 | Anything starting with `mcp__` | Strip last segment after `__` -> `<prefix>__*` |
 
-Path resolution: Replace `~` with `/Users/walid`. If the path doesn't end with `**`, append `/**`.
+Path resolution: Expand `~` to the user's home directory. If the path doesn't end with `**`, append `/**`.

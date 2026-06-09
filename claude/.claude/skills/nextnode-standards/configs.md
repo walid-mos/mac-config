@@ -2,6 +2,26 @@
 
 This file consolidates the smaller per-tool config notes for `@nextnode-solutions/standards`. For larger configs see the dedicated files: `typescript.md`, `tsdown.md`, `vitest.md`, `oxlint.md`.
 
+## semantic-release
+
+**Export path**: `@nextnode-solutions/standards/semantic-release`
+
+Shared config for semantic-release in monorepo packages. The standards package ships `@semantic-release/git`, `@semantic-release/github`, and `semantic-release-monorepo` as transitive `dependencies` - consumers only need `semantic-release` itself.
+
+```json
+// .releaserc.json
+{
+  "extends": ["semantic-release-monorepo", "@nextnode-solutions/standards/semantic-release"],
+  "tagFormat": "@nextnode-solutions/<name>-v${version}"
+}
+```
+
+**Important**: `semantic-release-monorepo` MUST be in the `extends` array (not via CLI `-e` flag). The `-e` flag silently overrides the plugin list from the shared config, dropping `@semantic-release/git`. Order matters: monorepo first, standards second (later entries override earlier ones for `plugins`).
+
+Plugins: commit-analyzer, release-notes-generator, npm, git (commits `package.json` version), github.
+
+---
+
 ## commitlint
 
 **Export path**: `@nextnode-solutions/standards/commitlint`
@@ -61,7 +81,7 @@ export default config
 | `*.{js,mjs,cjs,jsx,ts,mts,cts,tsx,vue,svelte,astro}` | `oxlint` then `oxfmt --write` |
 | `*.json` | `oxfmt --write` |
 
-Requires `husky` for git hook integration:
+Requires `husky` (v9+) for git hook integration:
 
 ```bash
 pnpm add -D husky lint-staged better-sort-package-json

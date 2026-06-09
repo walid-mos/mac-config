@@ -1,6 +1,6 @@
 # Hetzner pricing tables
 
-All prices in **EUR, VAT excluded**. European locations (`fsn1` / `nbg1` / `hel1`). Verified **2026-04-10**.
+All prices in **EUR, VAT excluded**. European locations (`fsn1` / `nbg1` / `hel1`). Verified **2026-04-15**.
 
 For non-EU prices, deprecated SKU checks, or live verification, query the Hetzner Cloud API - see [api.md](api.md).
 
@@ -51,7 +51,7 @@ Arm-based. Best price/performance ratio for ARM-compatible workloads.
 ### Notes
 
 - All shared-vCPU servers include 20 TB of traffic per month
-- Traffic overages and exact rates are NOT in this skill - check the Hetzner website
+- Traffic overages and exact rates are NOT in this skill - use `GET /v1/pricing` (see [api.md](api.md))
 - Storage is bundled with the plan; you cannot add extra local SSD (use Volumes separately)
 - Dual-stack (IPv4 + IPv6) is included; IPv4-only and IPv6-only options exist with different pricing (not documented here)
 

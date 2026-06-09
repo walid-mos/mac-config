@@ -29,7 +29,7 @@ The user's persona, distilled. **Tweets are output in ENGLISH**, written by a Fr
 
 ## Sentence shape
 
-- **Block cap : 3-4 standalone line-broken blocks per single tweet, max.** If you hit 5+ blocks, you're using line breaks as default punctuation instead of emphasis. Merge body sentences into one flowing paragraph.
+- **Block cap** : 3 blocks max (hook, body, kicker). See `formats.md` § "Block cap" for examples.
 - **Typical shape** : hook (1 line, standalone) → body (1-3 sentences flowing as ONE paragraph) → kicker (1 line, standalone, optional).
 - Body sentences chain with commas, conjunctions, comma splices. Line breaks reserved for hook and kicker.
 - Avoid subordinate clauses, avoid "in the context of which"

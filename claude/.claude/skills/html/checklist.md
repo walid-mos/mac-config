@@ -1,0 +1,11 @@
+# Pre-ship checklist — silent failure modes
+
+Re-scan the page once before serving. These are the six ways a plan looks fine but misbehaves once the user starts interacting.
+
+- **Section ids collide.** Two `<section>` whose `<h2>` slugifies to the same id — the runtime auto-appends `-2`, `-3` and any deep-link anchors break. Write `id="…"` explicitly on the `<section>` whenever you reference it from a sidebar / scrollspy / `<a href="#…">`.
+- **Editable vs static prose.** A `<p>` that holds a generated artefact or a quoted code excerpt — runtime makes it editable, which is almost never the intent. Move it into a skip-zone container (`<pre>`, `.diff`, `.mermaid`, etc.) or mark it `<p class="static">`. Conversely, an inert paragraph the user must be able to refine: it must live inside a `<section>` and not inside a skip-zone.
+- **Form name collisions.** Two `<form class="rich-question">` whose radios share the same `name` — the auto-derived question id collides and one answer overwrites the other. Use distinct `name`s, or set `data-question-id` explicitly. **Always pre-check exactly one radio per question** — without `checked`, no default lands in the submission.
+- **`<` and `>` inside `.diff` blocks.** Literal angle brackets in diff content get parsed as HTML and the diff breaks visually. Escape them (`&lt;` / `&gt;`) — *only* inside the diff content itself, not the surrounding markup.
+- **Invalid defaults in `rich-custom`.** A `<form class="rich-custom">` input with `required` / `pattern` / `min` / `max` whose default fails the constraint — user can never submit. Walk every form's initial state once and confirm it validates. Inputs without `name` drop silently from the submission; two custom forms sharing `data-custom-id` overwrite each other.
+- **Token discipline broken.** `grep -E '#[0-9A-Fa-f]{3,8}' plan.html` inside any `<style>` block other than `:root` / `[data-theme=…]` — every hit is a future dark-mode bug.
+- **Code block surface broken.** Open the page and look at one snippet: it must have padding (≥12px), a token-driven background (`--np-bg-soft`), a border, and visible syntax colors. If the snippet looks like unstyled black-on-white monospace, you forgot the container CSS, the `language-…` class on `<code>`, or the hljs loader — re-check the `code-block` recipe in `./rich-blocks.md`.

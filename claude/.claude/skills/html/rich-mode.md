@@ -35,7 +35,7 @@ async function rpSubmit(payload) {
     body: JSON.stringify(payload),
   })
   if (!res.ok) throw new Error('submit failed')
-  document.body.innerHTML = '<main style="padding:4rem;font-family:DM Sans,sans-serif"><h1>✓ Submitted</h1><p>Return to Claude — you can close this tab.</p></main>'
+  document.body.innerHTML = '<main style="padding:4rem;font-family:var(--np-sans)"><h1>✓ Submitted</h1><p>Return to Claude — you can close this tab.</p></main>'
 }
 ```
 

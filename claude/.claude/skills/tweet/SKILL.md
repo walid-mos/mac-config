@@ -1,13 +1,10 @@
 ---
 name: tweet
 description: >-
-  Draft a tweet or a thread in the user's voice from a session of dev work,
-  screenshots, or a free description. Spawns the `tweet-drafter` subagent
-  which drafts 5 candidates, self-critiques against voice/format/algo rules,
-  and returns 2 finalists ready to copy-paste. Use when the user runs
-  `/tweet`, says "fais-moi un tweet", "genere un thread", or shares a
-  screenshot of something they shipped and wants it published. Goal: build
-  the user's dev audience without sounding like a guru.
+  Draft or polish a tweet/thread in the user's voice. Use when the user runs
+  `/tweet`, says "fais-moi un tweet", "tweet ça", "genere un thread",
+  "balance ça sur X", "corrige <tweet>" / "fix <tweet>", or shares a
+  screenshot of something shipped and wants it published.
 user-invocable: true
 argument-hint: "corrige <text> | [--thread|--single] [topic or free description]"
 ---
@@ -16,17 +13,9 @@ argument-hint: "corrige <text> | [--thread|--single] [topic or free description]
 
 This file is the entry point and the workflow. The doctrine lives in three companion files. Edit them, not the agent.
 
-## When to load
-
-- User runs `/tweet`
-- User says "fais-moi un tweet", "tweet ça", "genere un thread", "balance ça sur X"
-- User pastes a screenshot or describes what they just shipped and wants a tweet out of it
-
-Do NOT load for: rewriting a post the user already drafted (they iterate manually), LinkedIn content (different beast, different audience).
-
 ## Companion files
 
-Always load all three before spawning the drafter:
+Do NOT load for: rewriting a post the user already drafted (they iterate manually), LinkedIn content (different beast, different audience).
 
 1. `./voice.md` : persona, FR/EN code-switch, banned and approved expressions
 2. `./formats.md` : single tweet structure, thread structure, hook library, char budgets
@@ -78,14 +67,16 @@ Apply these transformations IN ORDER. Each one is conservative : fix only what's
 7. **Banned expressions** : if a slop opener, hype emoji as content, or LLM-formal trope from `voice.md` is present, remove or rewrite it
 8. **Char budget** : if the post is over 280 chars, trim. Never silently truncate; if a cut changes meaning, flag it
 
-**DO NOT** :
+**Polish-mode HARD BANS**
 
-- Reorganize the tweet
-- Add or remove content (translation is not addition)
-- Change the angle, the message, or the punchline
-- Formalize the tone beyond fixing actual errors
-- Add new emojis, hashtags, or CTAs the user did not include
-- "Improve" voice tics that are intentional (line breaks, dev-twitter idioms `tbh` `ngl` `imo`, comma splices, contractions)
+| FORBIDDEN | MANDATORY |
+|-----------|-----------|
+| Reorganize structure or reorder blocks | Keep original structure exactly |
+| Add content, examples, or context | Only fix what is actually wrong |
+| Change the angle, message, or punchline | Preserve intent and voice tics |
+| Formalize tone beyond fixing real errors | Match voice.md persona |
+| Add emojis, hashtags, or CTAs not present | Remove those explicitly banned in voice.md |
+| "Improve" intentional style tics (line breaks, `tbh`, comma splices) | Treat voice tics as correct |
 
 ### Step 4 : return
 
@@ -126,16 +117,7 @@ Once the topic is resolved, also collect:
 
 ### Phase 2 : spawn the drafter
 
-Spawn the `tweet-drafter` agent via the Agent tool with the bundle. The agent:
-
-1. Loads `voice.md`, `formats.md`, `algo.md`
-2. Drafts 5 candidates (varying angles)
-3. Self-critiques each against the rules
-4. Returns 2 finalists with a one-line rationale per
-
-### Phase 3 : present
-
-Show the 2 finalists verbatim, copy-paste ready, rationale collapsed below. No preamble.
+Spawn the `tweet-drafter` agent via the Agent tool with the resolved topic, format hint, and any repo context. Show the 2 finalists verbatim, copy-paste ready, rationale collapsed below. No preamble.
 
 If the user wants another pass, rerun `/tweet` with their feedback in `$ARGUMENTS`. Do not loop autonomously.
 

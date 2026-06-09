@@ -1,6 +1,6 @@
 # Algo : X algorithm signals
 
-Distilled from the X algorithm publication on `github.com/xai-org/x-algorithm` (May 2026) and observed by @Picaro_11. The drafter MUST keep these signals in mind when scoring candidates.
+Distilled from the X algorithm publication on `github.com/twitter/the-algorithm` (March 2023) and observed by @Picaro_11. The drafter MUST keep these signals in mind when scoring candidates.
 
 ## What the algo PUNISHES (avoid)
 

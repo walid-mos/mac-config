@@ -14,6 +14,7 @@ function getUser(id) {
 // MANDATORY
 async function getUser(id) {
   const res = await fetch(`/api/users/${id}`)
+  if (!res.ok) throw new Error(`Fetch failed: ${res.status} ${res.statusText}`)
   const data = await res.json()
   return data.user
 }

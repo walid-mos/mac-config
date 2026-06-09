@@ -35,9 +35,11 @@ plan ---+--- quality (matrix with prod-gate if prod)
         |
         +--- provision (needs quality) --- dns (conditional, needs provision)
         |
-        +--- build-image (needs quality)
+        +--- build-image (needs quality + image_source == "build")
         |
-        \--- deploy (needs provision + build-image)
+        +--- migrate (needs provision + build-image + has_postgres == "true")
+        |
+        \--- deploy (needs provision + build-image + migrate)
 ```
 
 Inputs:
@@ -52,12 +54,13 @@ Jobs:
 
 | Job | Depends on | What it does |
 |-----|-----------|-------------|
-| `plan` | -- | Parse config, output quality matrix + project_name + has_prod_gate + has_domain |
+| `plan` | -- | Parse config, output quality matrix + project_name + has_prod_gate + has_domain + has_postgres + image_source + upstream_image_refs |
 | `quality` | plan | Run lint/test/prod-gate matrix |
 | `provision` | plan + quality | `node src/index.ts provision` - ensure Hetzner VPS, Tailscale join, firewall, convergence (Caddy/Vector) |
 | `dns` | plan + quality + provision | `node src/index.ts dns` - reconcile Cloudflare DNS A records. **Only runs if `has_domain == 'true'`** |
-| `build-image` | plan + quality | `compute-image-ref` CLI + `docker/bake-action@v6` (targets `app`, push to GHCR, GHA cache) |
-| `deploy` | plan + provision + build-image | `node src/index.ts deploy` - SSH to VPS, write .env, docker compose pull + up, reload Caddy |
+| `build-image` | plan + quality | `compute-image-ref` CLI renders `docker-bake.json` from `nextnode.toml` at the workspace root and emits `image_refs` (JSON Record) + `bake_file` (its basename). A single `docker/bake-action` (`source: .`, `files: <bake_file>`) runs all `build` targets in one shot, pushes to GHCR, uses GHA layer cache scoped per target. **Skipped when `image_source == "upstream"`** — plan's `upstream_image_refs` carries the refs instead. |
+| `migrate` | plan + provision + build-image | `node src/index.ts migrate-remote` — stage rollout + take pre-migrate R2 snapshot + run `migrate_command` in an ephemeral container on the project network. **Only runs if `has_postgres == 'true'`.** Receives `IMAGE_REFS` (JSON Record) — built path from `build-image`, upstream path from plan. |
+| `deploy` | plan + provision + build-image + migrate | `node src/index.ts deploy` - SSH to VPS, render per-service compose + `.env.<name>` files, docker compose pull, bring postgres up (phase 1), rotate user services (phase 2), reload Caddy. |
 
 Permissions (declared at workflow level): `contents: read`, `actions: read`, `packages: write` (GHCR push).
 
@@ -72,13 +75,13 @@ Secrets (all live at the **GitHub org level** on `NextNodeSolutions` - callers o
 
 **Tailscale**: Both `provision` and `deploy` jobs connect the CI runner to the tailnet via `tailscale/github-action@v4` with OAuth credentials. SSH to the VPS goes through the tailnet IP - never the public IP.
 
-**Image ref flow**: `build-image` job runs `node src/index.ts compute-image-ref` to write `image_ref` to `GITHUB_OUTPUT`. Value is then injected into `docker/bake-action` via `set: app.tags=<ref>` and forwarded to the `deploy` job as `IMAGE_REF` env var. This is the single source of truth - projects never reference `ghcr.io/…` in their own code.
+**Image ref flow**: build path — `build-image` runs `node src/index.ts compute-image-ref`, which renders a `docker-bake.json` from `nextnode.toml` (`renderBakeFile` in `domain/deploy/bake-file.ts`), writes it at the workspace root (`writeBakeFile` in `adapters/build-output/bake-file.ts`), and writes `image_refs` (JSON Record `{<service>: {registry, repository, tag}}`) + `bake_file` (the basename) to `GITHUB_OUTPUT`. `docker/bake-action` consumes it with `source: .` + `files: <bake_file>` — the rendered file holds every `build` target's `context` / `dockerfile` / optional stage `target` / `tags` / per-target GHA cache, so one bake call covers every `build` service. `nextnode.toml` is the single source of truth for build shape — the caller ships no docker-compose.yml. `image_refs` is forwarded to the `migrate` and `deploy` jobs as `IMAGE_REFS`. Upstream path — `build-image` is skipped; `plan`'s `upstream_image_refs` (parsed from `[deploy.services.<name>].ref`, validated through `parseImageRef`) is the JSON fed as `IMAGE_REFS`. Both paths produce the SAME JSON shape, consumed by `parseImageRefsEnv` on the deploy side. Projects never reference `ghcr.io/…` in their own code.
 
-**DNS reconciliation**: The `dns` job runs after provision and creates/updates Cloudflare A records. Internal projects get an A record pointing to the Tailscale CGNAT IP (unproxied). Public projects get an A record pointing to the VPS public IP (proxied in production, unproxied in development).
+**DNS reconciliation**: The `dns` job runs after provision and creates/updates Cloudflare A records — **one A record per routed service** (each `[deploy.services.<name>]` that declares a `url`). Internal projects point to the Tailscale CGNAT IP (unproxied). Public projects point to the VPS public IP (proxied in production, unproxied in development).
 
-**Multi-service is NOT supported** - compose generation hardcodes a single service named `app`. The `build-image` job also targets only `app`. Caller projects are mono-service today; multi-service is a future extension.
+**Multi-service**: N services per project are accepted, with strict cross-service rules — single `source` (all `build` or all `upstream`), unique `url` within `project.domain`, exactly one `needs = ["postgres"]` owner when postgres is declared, homogeneous `registry_auth_secret` across upstream services. Per-service primitives wired today: image refs (`Record<service, ImageRef>`), `.env.<name>` files with symmetric cross-service URL injection, host-port allocation per routed service, DNS record + Caddy upstream per routed service, `depends_on` gating that adapts to Y's source (`service_healthy` for build, `service_started` for upstream). Still single-service-only: `[deploy.volumes]` mounts (primary service only), postgres database, supabase stack, healthcheck command. See [multi-service.md](multi-service.md).
 
-See [hetzner-caller.md](hetzner-caller.md) for the caller-side project convention (docker-compose.yml shape, Dockerfile, forbidden keys).
+See [hetzner-caller.md](hetzner-caller.md) for the caller-side project convention (Dockerfile, `nextnode.toml` build shape, infra-owned runtime concerns).
 
 ### `deploy-static.yml` (type=static - Cloudflare Pages)
 

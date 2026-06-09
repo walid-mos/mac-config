@@ -78,7 +78,7 @@ export default defineConfig({
   },
   "devDependencies": {
     "@nextnode-solutions/standards": "workspace:*",
-    "tsdown": "^0.21.9"
+    "tsdown": "<latest-stable>"
   }
 }
 ```

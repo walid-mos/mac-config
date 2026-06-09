@@ -1,11 +1,10 @@
 ---
 name: turborepo
 description: >-
-  Turborepo monorepo conventions - task pipeline (`turbo.json`), workspace
-  filtering, and the canonical Docker deploy pattern via `turbo prune
-  --docker`. Provider-agnostic: works for any Docker target (Hetzner, Render,
-  AWS ECS, Scaleway, Fly, GHCR, etc.). Load when working in a `turbo.json`
-  repo or when writing a Dockerfile for a monorepo workspace package.
+  Turborepo monorepo conventions - task pipeline (`turbo.json`, `turbo run`),
+  workspace filtering, and the canonical Docker deploy pattern via `turbo prune
+  --docker`. Load when working in a `turbo.json` repo or writing a Dockerfile
+  for a monorepo workspace package.
 user-invocable: true
 synced-at: 9be7dae
 ---
@@ -20,6 +19,7 @@ This skill covers two domains: the task pipeline (`turbo.json` + `turbo run`) an
 
 - **`turbo.json` basics** - task definitions, `dependsOn: ["^build"]`, outputs, caching. See below.
 - **Docker deploy pattern** - `turbo prune --docker` + multi-stage Dockerfile. See [docker.md](docker.md).
+- **`docker/bake-action` + generated bake file** - the `source: .` gotcha for runtime-rendered bake/compose files. See [docker.md](docker.md#dockerbake-action-with-a-runtime-generated-bake-file).
 - **Anti-patterns** - what NOT to do (legacy `pnpm deploy`, `inject-workspace-packages`, bypassing turbo with raw pnpm filters in CI). See [docker.md](docker.md#anti-patterns).
 
 ## `turbo.json` essentials
@@ -46,7 +46,7 @@ Minimal config:
 
 Key concepts:
 
-- **`dependsOn: ["^build"]`** - the `^` prefix means "the same task in upstream workspace deps". So `build` first runs `build` in every workspace dep before running it for the target. This is what makes `pnpm exec turbo build --filter=@org/app` topologically correct.
+- **`dependsOn: ["^build"]`** - the `^` prefix means "the same task in every package this package depends on". So `build` first runs `build` in all dependencies of the target package before running it for the target. This is what makes `pnpm exec turbo build --filter=@org/app` topologically correct.
 - **`outputs`** - paths to cache. Turborepo hashes inputs (source files, deps, config) and caches `outputs` by hash. A second run with the same hash skips work.
 - **No `outputs` ⇒ no caching** for that task. `format`/`format:check` and other inherently-side-effectful tasks should set `"cache": false` instead of relying on missing outputs.
 
@@ -70,13 +70,65 @@ In CI: combine with `[HEAD^1]` to run tasks only on changed packages.
 
 The only case for raw `pnpm --filter` is one-off scripts that aren't part of the task pipeline (e.g., a custom dev orchestrator).
 
+## `env` passthrough — the #1 cache-correctness bug
+
+Turborepo does NOT see environment variables unless you declare them. A task that reads `NODE_ENV` or `DATABASE_URL` will produce **the same cached output regardless of env changes** unless those vars are listed in `turbo.json`.
+
+```json
+{
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"],
+      "env": ["NODE_ENV", "DATABASE_URL", "NEXT_PUBLIC_*"]
+    }
+  },
+  "globalEnv": ["CI", "NODE_ENV"]
+}
+```
+
+- **`env`** (per-task): env vars that affect that task's output. Changes to these vars bust the task's cache.
+- **`globalEnv`**: env vars that bust ALL tasks if changed.
+- **Wildcard patterns** (`NEXT_PUBLIC_*`) are supported.
+- Missing an env var here = silent stale cache in CI. Always audit before adding CI pipelines.
+
+## Remote caching
+
+Turborepo supports shared remote caches so CI hits the same cache as dev (and different CI runs share hits).
+
+```bash
+# Vercel Remote Cache (free for personal/hobby, paid for teams)
+turbo login            # authenticate once
+turbo link             # link repo to Vercel project
+
+# CI: set TURBO_TOKEN + TURBO_TEAM env vars — turbo picks them up automatically
+TURBO_TOKEN=<token> TURBO_TEAM=<org-slug> turbo build
+```
+
+Self-hosted alternative: [`turborepo-remote-cache`](https://github.com/ducktors/turborepo-remote-cache) (open-source, S3-compatible). Set `TURBO_API` + `TURBO_TOKEN` to point at it.
+
+Remote caching is opt-in and transparent — `turbo run` behaves identically with or without it; the only difference is where cache artifacts are stored and shared from.
+
 ## Rules
 
 1. **Task pipelines live in `turbo.json`.** Cross-package task ordering goes through `dependsOn: ["^task"]`, not via shell scripts that chain pnpm filters.
 2. **Always go through `turbo run`** for tasks defined in `turbo.json`. Raw `pnpm --filter` skips the cache.
 3. **Use `turbo prune --docker` for monorepo Dockerfiles.** It is the canonical Turborepo Docker pattern. See [docker.md](docker.md). Do NOT use `pnpm deploy` + `inject-workspace-packages` in a Turborepo - that combo predates turbo prune and forces hard-linked workspace deps, which breaks live editing of shared packages.
 4. **Declare `outputs` for any cacheable task.** Without `outputs`, turbo can't restore from cache. Tasks that don't produce artifacts but are still expensive (e.g., `lint`) should rely on `inputs` hashing alone - outputs `[]` is valid.
-5. **Add `node_modules`, `.turbo`, `dist`, `.git` to `.dockerignore`** before running `turbo prune --docker`. Otherwise the Docker build context drags symlinks pointing outside the container.
+5. **`.dockerignore` is mandatory before `turbo prune --docker`.** See [docker.md](docker.md#dockerignore-mandatory) for the required entries. Missing it ships host symlinks into the image.
+6. **`docker/bake-action@v6` needs `source: .` for a runtime-generated bake file.** Its default `source` is the Git context, which ignores files a prior CI step writes into the workspace — so a rendered `docker-bake.json` is read as "not there". Set `source: .` to run Bake from the runner workspace. See [docker.md](docker.md#dockerbake-action-with-a-runtime-generated-bake-file).
+
+## Quick reference
+
+| NEVER | ALWAYS |
+|---|---|
+| `pnpm --filter @org/app build` in CI (bypasses cache) | `turbo run build --filter=@org/app` |
+| `pnpm deploy` + `inject-workspace-packages` in a Turborepo | `turbo prune --docker` |
+| Ship dev deps in the runtime stage | Install `--prod` or prune deps in a separate runtime stage |
+| Omit `outputs` on a cacheable task | Declare `outputs: ["dist/**"]` or `outputs: []` + `cache: false` |
+| Omit `env[]` for tasks that read env vars | List every env var that affects the output in `env` or `globalEnv` |
+| Copy `.` without a `.dockerignore` | Always add `.dockerignore` with `node_modules`, `.turbo`, `.git`, `dist` |
+| Set `format`/`lint:check` `outputs` (they have none) | Use `"cache": false` for purely side-effectful tasks |
 
 ## Cross-references
 

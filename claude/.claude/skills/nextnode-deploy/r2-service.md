@@ -9,11 +9,15 @@ R2 is the first registered backing service, but the layer is generic. Every serv
 ## Config
 
 ```toml
-[services.r2]
-buckets = ["uploads", "thumbnails"]
+[[services.r2.buckets]]
+name = "uploads"
+cdn  = true          # public custom domain uploads.cdn.<domain> + R2_BUCKET_UPLOADS_URL
+
+[[services.r2.buckets]]
+name = "thumbnails"  # cdn omitted -> private bucket, no public URL
 ```
 
-Bucket aliases are kebab-case; each alias becomes one Cloudflare R2 bucket per environment.
+`buckets` is a **table-array** of `{ name, cdn }` (`R2BucketConfig`). Bucket aliases (`name`) are kebab-case; each becomes one Cloudflare R2 bucket per environment. `cdn` defaults to `false` (private). `cdn = true` opts the bucket into a public Cloudflare custom domain (see "Public CDN domains" below) — requires `project.domain`.
 
 ## Naming and addressing (pure logic)
 
@@ -54,6 +58,7 @@ interface R2ServiceState {
 interface R2BucketBinding {
   readonly alias: string
   readonly name: string
+  readonly publicUrl?: string  // present only for `cdn = true` buckets (and only when project has a domain)
 }
 ```
 
@@ -66,6 +71,17 @@ interface R2BucketBinding {
 
 Deploy never needs CF admin privileges - it just consumes what provision wrote.
 
+## Public CDN domains (`cdn = true`)
+
+A bucket with `cdn = true` is served publicly at `<alias>.cdn.<resolveDeployDomain(project.domain)>` (e.g. `uploads.cdn.dev.example.com` in development). The `cdn.` parent keeps public buckets isolated from the apex and the app's own routes. This is the only prod-allowed path — the `*.r2.dev` managed domain is rate-limited / non-prod.
+
+- **Pure logic** (`domain/cloudflare/r2/custom-domain.ts`): `computeR2CustomDomainHostname(alias, resolvedDomain)` → `<alias>.cdn.<resolvedDomain>`, `computeR2PublicUrl(hostname)` → `https://<hostname>`. `resolvedDomain` is the **already env-resolved** deploy domain — the caller resolves it ONCE; re-resolving here would double the `dev.` prefix.
+- **Adapter** (`adapters/cloudflare/r2/domains.ts`): `ensureR2CustomDomain` (idempotent GET-before-POST via `listR2CustomDomains`; passing `zoneId` lets Cloudflare auto-create the proxied CNAME — no separate DNS write), `getR2CustomDomainStatus`, `deleteR2CustomDomain`.
+- **Provision** (`cli/services/r2/ensure.ts` → `attachCustomDomains`): resolves the zone id ONCE (`lookupZoneId(extractRootDomain(deployDomain))`), attaches a custom domain to every `cdn` bucket, then `awaitR2DomainActive` polls `getR2CustomDomainStatus` until `ssl === "active"` (20 × 5s, fails loud) before the binding's `publicUrl` is persisted — so the stored URL actually serves. `ensure`'s `deployDomain: string | null` comes pre-resolved from `ctx.deployDomain`; `null` (no `project.domain`) ⇒ no bucket gets a domain.
+- **Teardown**: `project`-scope teardown detaches every `cdn` bucket's custom domain (`deleteR2CustomDomain`) — Cloudflare removes the auto-created CNAME with it. `vps` scope leaves R2 in place.
+
+The implicit supabase `backups` bucket is always `cdn: false` — internal, never public.
+
 ## Runtime contract (deploy command)
 
 `buildR2ServiceEnv(state)` projects the state to env:
@@ -74,7 +90,9 @@ Deploy never needs CF admin privileges - it just consumes what provision wrote.
 function buildR2ServiceEnv(state: R2ServiceState): ServiceEnv {
   const publicEnv = { R2_ENDPOINT: state.endpoint }
   for (const binding of state.buckets) {
-    publicEnv[`R2_BUCKET_${binding.alias.toUpperCase().replaceAll('-', '_')}`] = binding.name
+    const key = `R2_BUCKET_${binding.alias.toUpperCase().replaceAll('-', '_')}`
+    publicEnv[key] = binding.name
+    if (binding.publicUrl !== undefined) publicEnv[`${key}_URL`] = binding.publicUrl  // cdn buckets only
   }
   return {
     public: publicEnv,
@@ -94,13 +112,16 @@ Use `@aws-sdk/client-s3` with `region: 'auto'`, `endpoint: process.env.R2_ENDPOI
 
 Bucket aliases are stable (the env var name doesn't change between environments). Bucket names DO change per environment - code never references the materialized name directly.
 
+For a `cdn = true` bucket, build public links from `process.env.R2_BUCKET_<ALIAS>_URL` (the `https://<alias>.cdn.<domain>` base) — never hand-construct the CDN hostname. The var is absent for private buckets, so reading it tells you whether public serving is enabled.
+
 ## Teardown
 
 `teardown` for an R2-using project deletes:
 
-1. Each provisioned bucket (via Cloudflare API)
-2. The R2 API token (deleted via CF API)
-3. The state object in `nextnode-state` under the project's key
+1. Each `cdn = true` bucket's public custom domain (`deleteR2CustomDomain`, `project` scope only — the auto-created CNAME goes with it)
+2. Each provisioned bucket (via Cloudflare API)
+3. The R2 API token (deleted via CF API)
+4. The state object in `nextnode-state` under the project's key
 
 `teardown-guard` validates this is safe before destruction (e.g. checks for presence of `[deploy].vps` or other indicators that the project is in active use).
 
@@ -111,3 +132,4 @@ Bucket aliases are stable (the env var name doesn't change between environments)
 3. **Credentials are derived, not stored upstream** - the CF API token returned by `createR2Token` is hashed via SHA256 to produce the S3 secret key. The CF token itself is **NOT** persisted in state - only the derived S3 key pair.
 4. **State lives in infra R2, not per-project** - every project's R2 service state is a JSON object in the `nextnode-state` bucket. The deploy job reads it back via S3 SDK; the app never reads it directly.
 5. **Public vs secret channels are non-negotiable** - bucket names + endpoint flow through `GITHUB_ENV` (public). Access keys flow through `DeployInput.secrets` (secret). Never put a secret on the public channel - `mergeServiceEnvs` enforces the partition but the rule is "credentials live in the secret half".
+6. **CDN is opt-in per bucket and the deploy domain is resolved ONCE** - only `cdn = true` buckets get a public custom domain + `R2_BUCKET_<ALIAS>_URL`; everything else is private. The hostname is built from the ALREADY env-resolved deploy domain threaded down as `ctx.deployDomain` (the same single resolution shared with SITE_URL and Pages custom domains) — `computeR2CustomDomainHostname` never calls `resolveDeployDomain` itself, or development would double the `dev.` prefix. Provision waits for `ssl === "active"` before persisting the URL; teardown detaches it on `project` scope. The supabase `backups` bucket is forced `cdn: false`.

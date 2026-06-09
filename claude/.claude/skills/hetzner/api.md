@@ -58,11 +58,11 @@ curl -s -H "Authorization: Bearer $HETZNER_API_KEY_READ" \
 ```jsonc
 // /v1/server_types → .server_types[]
 {
-  "name": "cpx21",
+  "name": "cpx22",
   "architecture": "x86",          // "x86" | "arm"
   "cpu_type": "shared",           // "shared" | "dedicated"
   "category": "regular_purpose",
-  "cores": 3, "memory": 4, "disk": 80,
+  "cores": 2, "memory": 4, "disk": 80,
   "deprecated": false,
   "deprecation": null,            // or {announced, unavailable_after}
   "locations": [                  // per-location availability

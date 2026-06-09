@@ -1,11 +1,8 @@
 ---
 name: astro
 description: >-
-  Astro 6 framework rules, patterns, and best practices (latest major; 6.1.8
-  as of 2026-04-22). Load whenever working on an Astro project
-  (astro.config.ts, .astro files, src/pages/, src/content/). Covers
-  components, routing, content collections, rendering modes, islands
-  architecture, styling, API routes, env vars, and deployment. Must be used
+  Astro 6 framework rules and best practices. Load for any Astro project
+  (astro.config.ts, .astro files, src/pages/, src/content/). Must be used
   alongside /typescript and /coding.
 user-invocable: true
 synced-at: 3fbec5f3da69a242a9c400e13193e6dd593b8296
@@ -14,6 +11,20 @@ synced-at: 3fbec5f3da69a242a9c400e13193e6dd593b8296
 # Astro 6 - Mandatory Rules
 
 These rules apply to ALL Astro code you write or modify. This skill targets **Astro 6** (latest major - tracks the latest release, not legacy lines). Most rules also apply unchanged to Astro 5, but assume 6 unless a rule says otherwise. When starting a new Astro project, install the latest major - never default to 5 just because tutorials still show it.
+
+## Quick Bans
+
+| FORBIDDEN | MANDATORY instead |
+|---|---|
+| `output: 'hybrid'` | `output: 'static'` or `'server'` + per-route `prerender` |
+| `import { z } from 'zod'` | `import { z } from 'astro/zod'` |
+| `process.env[name]` or `import.meta.env[varName]` (bracket) | `astro:env/server` — named import or `getSecret()` |
+| `client:load` as the default hydration | `client:visible` or `client:idle` unless immediate hydration is required |
+| Unscoped framework integration `react()` | `react({ include: ['**/emails/**'] })` — scope with `include` |
+| `Astro.props.x` in the template | Destructure in frontmatter: `const { x } = Astro.props` |
+| Multi-line union types in `.astro` frontmatter | Single-line: `export type Foo = 'a' \| 'b' \| 'c'` |
+| `any` props or untyped `Props` | Explicit `interface Props { … }` |
+| Bare `<img>` for local or remote images | `<Image />` or `<Picture />` from `astro:assets` |
 
 ---
 
@@ -245,6 +256,45 @@ export type ButtonVariant = 'default' | 'accent' | 'muted'
 Applies to all unions in the `---` fence (including `interface Props`). Override Prettier multi-line union formatting for `.astro` files. `.ts`/`.tsx` outside `.astro` is unaffected.
 
 ---
+
+## RULE 15 - PAGES STAY THIN
+
+Keep `.astro` page frontmatter to data-fetching + layout glue only. Business logic belongs in `src/lib/` or `src/services/` utilities, not in page frontmatter. Shared data-fetching logic (e.g. repeated `getCollection()` calls) should be extracted into a utility function rather than duplicated across pages.
+
+Boundary heuristic: if frontmatter grows beyond ~10 LOC of logic, extract it.
+
+---
+
+## RULE 16 - USE `astro:assets` FOR IMAGES
+
+Always use `<Image />` and `<Picture />` from `astro:assets` for local and remote images. Bare `<img>` tags bypass Astro's image pipeline (no optimization, no lazy loading, no size inference).
+
+```astro
+---
+import { Image, Picture } from 'astro:assets'
+import hero from '../assets/hero.jpg'
+---
+
+<!-- MANDATORY - local image (alt required) -->
+<Image src={hero} alt="Hero banner" />
+
+<!-- MANDATORY - remote image (width + height required) -->
+<Image src="https://example.com/photo.jpg" alt="Photo" width={800} height={600} />
+
+<!-- MANDATORY - art-direction with multiple formats -->
+<Picture src={hero} formats={['avif', 'webp']} alt="Hero" />
+
+<!-- FORBIDDEN - bypasses optimization pipeline -->
+<img src="/images/hero.jpg" alt="Hero" />
+```
+
+`<Image />` infers width/height for local images automatically. For remote images, declare `width`/`height` to avoid layout shift. See [Astro docs → Images](https://docs.astro.build/en/guides/images/).
+
+---
+
+## Testing
+
+Unit-test Astro components with `vitest` + `@testing-library/astro`; use Playwright for e2e. Load `/test` and `/vitest` whenever writing tests. Keep business logic in `src/lib/` so it can be unit-tested without rendering a full component.
 
 ## Quick Reference
 

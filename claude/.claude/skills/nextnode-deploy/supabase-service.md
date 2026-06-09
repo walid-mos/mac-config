@@ -63,7 +63,7 @@ Studio basic auth reads `DASHBOARD_PASSWORD` from the systemd EnvironmentFile re
 
 ## R2 `backups` alias (auto-injection)
 
-`computeR2ServiceAliases` (called when `[services.supabase]` is declared) appends the literal alias `backups` to the project's `[services.r2] buckets` list — operators do not need to add it manually. Bucket physical name is `<project>-<env>-backups`, provisioned via the standard `ensureR2Bucket` flow at `provision`.
+`computeR2ServiceBuckets` (called when `[services.supabase]` is declared) appends the bucket `{ name: "backups", cdn: false }` to the project's `[services.r2].buckets` list — operators do not need to add it manually. It is always private (`cdn: false` — an internal backup store must never be served publicly). Bucket physical name is `<project>-<env>-backups`, provisioned via the standard `ensureR2Bucket` flow at `provision`.
 
 `buildSupabaseBackupEnv(r2State)` projects the loaded R2 service state down to the four env vars the backup sidecar reads:
 
@@ -213,7 +213,7 @@ Same shape as other compose-stack services:
 4. **Provision is idempotent and never rotates secrets** — `JWT_SECRET`, `POSTGRES_PASSWORD`, `PG_EXPORTER_PASSWORD` are skip-on-present. Rotations are dedicated standalone CLI commands.
 5. **`DASHBOARD_PASSWORD` is operator-set, never auto-generated** — GitHub env-secrets are write-only; auto-generating would lock the operator out of Studio. `requireDashboardPasswordSecret` enforces this with a loud failure.
 6. **`ANON_KEY` / `SERVICE_ROLE_KEY` are derived, never stored** — signed in-process from `JWT_SECRET` at deploy time with `SUPABASE_DERIVED_KEY_IAT = 0` so they stay stable across redeploys. Don't add them to the GitHub secrets list.
-7. **Backup `backups` R2 alias is auto-injected** — `computeR2ServiceAliases` appends it whenever supabase is declared. Operators must not also declare it manually in `[services.r2]` (idempotency-checked, but the convention is "don't").
+7. **Backup `backups` R2 bucket is auto-injected and always private** — `computeR2ServiceBuckets` appends `{ name: "backups", cdn: false }` whenever supabase is declared. Operators must not also declare it manually in `[services.r2]` (idempotency-checked, but the convention is "don't"), and must never give it `cdn = true` — it is an internal backup store.
 8. **Studio is fronted by Caddy basic auth on `studio.<domain>`** — never expose the studio container's `:3000` to the public internet directly. The `http_basic` route is the only sanctioned entrypoint.
 9. **kong is the only external API entrypoint** — apps must hit `https://api.<domain>` (kong), never the auth/storage/realtime services directly. The compose network is internal-only.
 10. **Versions are fleet-wide pins** — bump the image constants in `domain/services/supabase.ts` to roll a new version across every Supabase project. Never override per project.

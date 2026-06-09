@@ -34,7 +34,7 @@ Three services land in the rendered compose file (`buildPostgresSidecar`, `build
 
 | Service | Image | Network | Host port | Purpose |
 |---------|-------|---------|-----------|---------|
-| `app` | (project Dockerfile or upstream ref) | project network + reverse-proxy | allocated via `allocateHostPort` | the user app, `depends_on: postgres (healthy)` |
+| `<declared-service-name>` | (project Dockerfile or upstream ref) | project network + reverse-proxy | allocated via `allocateHostPort` | the user app, `depends_on: postgres (healthy)` |
 | `postgres` | `postgres:<NEXTNODE_POSTGRES_VERSION>` | project network only | **none** (never bound to a host port) | the database; data volume is the named `postgres-data` mounted at `/var/lib/postgresql/data` |
 | `postgres-backup` | `ghcr.io/solectrus/postgres-s3-backup:<NEXTNODE_POSTGRES_VERSION>` | project network only | none | runs `@daily`, pushes a dump to the project's R2 backup bucket |
 
@@ -162,7 +162,7 @@ The runner (`adapters/postgres/restore-runner.ts`) feeds the password to libpq v
 
 `teardown` on a postgres-using project:
 
-1. Stops + removes the `app`, `postgres`, `postgres-backup` services
+1. Stops + removes every declared user service (`<name>`), `postgres`, `postgres-backup`
 2. **Preserves the `postgres-data` named volume by default** (state survives) - pass `wipeBackups` to drop it along with the R2 backup objects via `wipePostgresBackups`
 3. Removes the per-project R2 backup bucket only when `wipeBackups` is set
 

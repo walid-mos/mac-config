@@ -4,10 +4,8 @@ user-invocable: true
 description: >-
   Add or remove tool permissions in Claude Code settings.json (allow/deny
   lists). Use when the user runs `/allow`, says "allow npm", "allow this
-  command", "deny rm -rf", or after pasting a Claude permission prompt to
-  approve/deny it. Supports manual patterns (tool names, MCP servers,
-  WebFetch domains), paste mode (copy a permission prompt directly), and
-  bypass mode (manage security heuristic auto-approvals).
+  command", "deny rm -rf", or pastes a Claude permission prompt to
+  approve/deny it.
 ---
 
 # Allow - Permission Management
@@ -35,7 +33,7 @@ Bypass mode (manage security heuristic auto-approvals):
   /allow deny bypass <name>         -> remove a bypass pattern
 
   Known names: command_substitution, brace_obfuscation, dot_source,
-               heredoc, quoted_flags, cd_git_compound
+               heredoc, quoted_flags, cd_git_compound, consecutive_quotes
 
 Paste mode: Copy a Claude permission prompt and paste it as the argument.
   Supports standard tool prompts AND "Network request outside of sandbox" prompts.
@@ -44,11 +42,13 @@ Paste mode: Copy a Claude permission prompt and paste it as the argument.
 
 ## Step 2: Detect mode
 
-Look at the raw `$ARGUMENTS` text:
+Evaluate in strict priority order — stop at the first match:
 
-- **Bypass Mode**: The first word (after optional deny/blacklist) is `bypass`. See [bypass-mode.md](bypass-mode.md).
-- **Paste Mode**: The input contains newlines AND at least one line starting with 3+ spaces (indented content from a Claude permission prompt). See [paste-mode.md](paste-mode.md).
-- **Manual Mode**: Single-line or no indented lines. See [manual-mode.md](manual-mode.md). If manual mode dispatches to MCP discovery, see [mcp-discovery.md](mcp-discovery.md).
+1. **Bypass Mode** (highest priority): The first word (after optional deny/blacklist) is `bypass`. See [bypass-mode.md](bypass-mode.md).
+2. **Paste Mode**: The input contains newlines AND at least one line starting with 3+ spaces (indented content from a Claude permission prompt). See [paste-mode.md](paste-mode.md).
+3. **Manual Mode** (default): Single-line or no indented lines. See [manual-mode.md](manual-mode.md). If manual mode dispatches to MCP discovery, see [mcp-discovery.md](mcp-discovery.md).
+
+**MANDATORY**: Never re-evaluate mode once matched. Bypass always wins over paste; paste always wins over manual.
 
 ## Domain extraction
 
@@ -70,7 +70,7 @@ Apply this extraction to `WebFetch(domain:...)` patterns. For `sandbox.network.a
 
 After resolving a pattern from paste or manual mode, apply it:
 
-1. Read `~/.claude/settings.json`
+1. Read `~/.claude/settings.json`. **If it is malformed JSON** (parse fails), do NOT overwrite or recreate it — STOP and surface a clear error naming the file and the parse problem (the offending line if you can locate it) so the user fixes it by hand. Never back-up-and-recreate: that silently drops their config.
 2. If the `permissions` key doesn't exist, create it: `{"allow": [], "deny": []}`
 3. If the target list key doesn't exist, create it as `[]`
 4. **Duplicate check**: If the resolved pattern already exists in the target list, inform the user and STOP:

@@ -2,18 +2,14 @@
 name: test
 user-invocable: false
 description: >-
-  This skill MUST be loaded ANY TIME tests are being written, whether
-  explicitly requested by the user ("write tests", "add tests", "test this",
-  "cover this with tests") OR when the assistant decides on its own to write
-  or modify tests. If you are about to create or edit a file matching
-  *.test.* or *.spec.* patterns, you MUST load this skill first.
-  It enforces strict testing quality rules to prevent common LLM
-  testing anti-patterns.
+  Enforces LLM-proof test-quality rules. Use whenever writing or modifying
+  tests: user request ("write/add/cover tests") OR assistant is about to
+  create/edit any *.test.* or *.spec.* file.
 ---
 
 # Testing Best Practices - Mandatory Rules
 
-You are writing tests. Follow every rule below without exception. These rules exist because LLMs have well-documented failure modes when generating tests. You MUST actively resist these patterns.
+This skill owns test QUALITY. Also load: the project's language testing skill (e.g. `/vitest` when vitest is in `package.json`); `/tdd` if you are writing tests BEFORE the implementation (red-green-refactor). Global rules (em-dash ban, greenfield, verify-in-code-before-asking) live in the user's CLAUDE.md.
 
 ## Golden Rule
 
@@ -25,6 +21,13 @@ You are writing tests. Follow every rule below without exception. These rules ex
 - **Name tests as behavior specifications.** Use descriptive names that explain the expected behavior: `should reject expired tokens`, `returns empty array when no results found`. Never use `test1`, `testFunction`, or vague names.
 - **AAA pattern.** Structure every test as Arrange / Act / Assert. Separate the three sections visually.
 - **Group with `describe` blocks.** Group tests by unit/feature, not by method name. Use nesting for sub-behaviors.
+
+## Test File Structure
+
+- **One test file per module under test (SRP).** Mirror the source layout; no mega test file covering an entire feature across many modules. When a test file grows past ~150 lines, split it along the module boundaries it covers (clean splitting = `/coding` RULE 13).
+- **Shared setup goes in typed helpers.** Extract repeated mock factories / fixture loaders into a dedicated `test-helpers/` (or `__mocks__/`) file, typed, reused across tests. Inline one-off setup; factor out anything used by 2+ tests (DRY = `/coding` RULE 12).
+- **Test body max ~20 lines.** If a test body exceeds that, extract the Arrange step into a helper. No nested `if`/loops inside a test body.
+- **Never import from another test file.** Shared code lives in a non-`.test`/`.spec` helper module, never in another test file (avoids circular test-helper coupling).
 
 ## Assertions
 
@@ -49,6 +52,11 @@ If you cannot identify edge cases, state that explicitly rather than skipping th
 - **Never mock first-party code** unless it has side effects (DB writes, network calls). Use real implementations.
 - **Prefer fakes over mocks.** In-memory implementations > mock objects. They catch more real bugs.
 - **Every mock must be justified.** If you add a mock, add a comment explaining WHY it's mocked (what side effect it prevents).
+
+## Layer Discipline
+
+- **A unit test must not cross an architectural layer boundary.** No real DB calls, no HTTP, no filesystem, no clock - fake/mock those at the boundary (see Mocking Rules).
+- **Integration tests that span layers are explicit.** Label them as integration and place them in a separate directory (e.g. `tests/integration/`). Never disguise a multi-layer integration test as a unit test.
 
 ## LLM Anti-Patterns - EXPLICITLY FORBIDDEN
 
@@ -81,78 +89,7 @@ test("processes data", () => {
 ### 3. Snapshot Worship
 FORBIDDEN: Generating snapshot tests for complex objects you don't fully understand. Snapshots are only acceptable for stable, well-understood UI output.
 
-### 4. Tests That Mirror Implementation
-FORBIDDEN: Asserting that internal methods were called in a specific order. If renaming a private method breaks your test, the test is wrong.
-
-### 5. Copy-Paste Test Farms
-FORBIDDEN: Dozens of near-identical tests with trivially different inputs. Use parameterized tests (`test.each` / `it.each`) instead when testing the same behavior with different data.
-
-### 6. Fabricated Expected Values
-FORBIDDEN: Guessing what the expected output should be. If you don't know the correct expected value, say so. NEVER invent an expected value just to make the test pass.
-
-### 7. Testing the Framework
-FORBIDDEN: Writing tests that verify language features or framework behavior rather than application logic.
-
-### 8. Manual `throw` or `return` Inside a Test Body
-FORBIDDEN: Using `throw new Error(...)`, early `return`, or `return Promise.reject(...)` to signal failure. The test runner fails a test when an `expect` assertion fails - no manual control flow is needed. Every failure path MUST be expressed through an assertion.
-```
-// FORBIDDEN - manual throw
-it("validates input", () => {
-  if (!result.valid) {
-    throw new Error("should be valid"); // use an assertion instead
-  }
-});
-
-// FORBIDDEN - early return silently skips assertions (test passes vacuously)
-it("fetches user", async () => {
-  const user = await getUser(1);
-  if (!user) return;
-  expect(user.name).toBe("Alice");
-});
-
-// CORRECT
-it("validates input", () => {
-  expect(result.valid).toBe(true);
-});
-
-it("fetches user", async () => {
-  const user = await getUser(1);
-  expect(user).not.toBeNull();
-  expect(user.name).toBe("Alice");
-});
-```
-When you need to assert a branch should/should not be reached, use the framework's assertion helpers (e.g. `expect(() => fn()).toThrow()`, `await expect(fn()).rejects.toThrow()`, or `expect.unreachable()` in Vitest). Never hand-roll failure with `throw`.
-
-**Discriminated-union subjects - no `if (...) return` narrowing tricks.** When the subject is a tagged union (e.g. `{ ok: true; value } | { ok: false; errors }`), do NOT use `if (result.ok) return` as a TypeScript narrowing workaround. The runtime behavior is indistinguishable from the forbidden early-return pattern: if any `expect` above it is ever removed or reordered, the test silently passes while skipping the real assertions.
-
-```
-// FORBIDDEN - narrowing via early return
-const result = parseConfig(input);
-expect(result.ok).toBe(false);
-if (result.ok) return; // vacuous-pass trap
-expect(result.errors).toEqual(["bad key"]);
-
-// PREFERRED - single whole-shape assertion, no narrowing needed
-expect(parseConfig(input)).toEqual({
-  ok: false,
-  errors: ["bad key"],
-});
-```
-
-If the test legitimately needs different matchers per field (e.g. `toContain` on one, `toMatchObject` on another), use the framework's type-narrowing assertion helper (`expect.unreachable()` in Vitest) in the wrong branch - never a manual `return` or `throw`.
-
-### 9. Inline File Generation Instead of Fixtures
-FORBIDDEN: Using `writeFileSync` to create test input files inline. Put input data (TOML, JSON, YAML) in `fixtures/` files with descriptive names and load via a helper:
-```
-const fixture = (name: string): string => join(FIXTURES, name)
-vi.stubEnv('PIPELINE_CONFIG_FILE', fixture('static-with-domain.toml'))
-```
-
-### 10. Generic Variable Names for Mock Data
-FORBIDDEN: `call`, `args`, `result`, or indexed access (`call[0]`) on mock calls. Destructure into domain-specific names:
-```
-const [url, init] = mock.mock.lastCall ?? []
-```
+Patterns 4-10 are equally forbidden but less frequently violated. Before writing tests, read the full forbidden-pattern catalogue in `anti-patterns.md`: 4 mirror-implementation, 5 copy-paste farms, 6 fabricated expected values, 7 testing the framework, 8 manual `throw`/early-`return` (+ discriminated-union narrowing trap), 9 inline file generation vs fixtures, 10 generic mock-data names.
 
 ## Test Isolation
 
@@ -165,9 +102,27 @@ const [url, init] = mock.mock.lastCall ?? []
 
 - **Always `await` async operations.** Missing `await` causes tests to pass vacuously.
 - **Test rejection cases.** For every async happy path, test the rejection/error path.
-- **Handle timeouts explicitly.** Set appropriate timeouts for async tests; don't rely on defaults.
+- **Handle timeouts explicitly.** Set per-test timeouts for slow async tests rather than relying on defaults: Vitest/Jest take a timeout as the third arg to `it`/`test` (e.g. `it("name", async () => {...}, 10_000)`); Jest also has `jest.setTimeout(ms)` at file scope.
 
-## Before Finishing
+## Before Finishing (mandatory)
 
-- **Run the tests.** Never consider tests done until they execute and pass.
-- **Verify tests can fail.** Mentally (or actually) confirm that breaking the production code would cause the test to fail. If a test passes no matter what, it's worthless.
+1. **Run the tests.** Tests are not done until they execute and pass.
+2. **Verify each test can fail.** Confirm (by actually breaking the production code, or by inspecting that every assertion is load-bearing) that a regression would make the test red. A test that passes no matter what is worthless - delete or fix it.
+3. **Every exported public function has at least one test.** Coverage breadth across the module, not just depth per test.
+
+## Quick Reference
+
+| FORBIDDEN | MANDATORY |
+| --- | --- |
+| Asserting internal calls, private state, execution order | Assert public API outputs / side effects / observable state |
+| `toBeTruthy()` / `toBeDefined()` / empty `toMatchObject({})` as catch-alls | Specific values: `toBe`, `toEqual`, `toThrow(SpecificError)` |
+| Test with no meaningful assertion | At least one load-bearing assertion per test |
+| Manual `throw` / early `return` / `if (...) return` narrowing to signal failure | Express every failure path through an assertion |
+| Mocking the code under test or first-party pure code | Mock only system boundaries (network, DB, FS, time); prefer fakes |
+| Unit test that hits real DB/HTTP/FS/clock | Fake the boundary; label cross-layer tests as integration, separate dir |
+| Reimplementing prod logic / fabricating expected values | Known, hardcoded expected values |
+| Snapshot tests of objects you don't fully understand | Snapshots only for stable, well-understood UI output |
+| Copy-paste near-identical tests | `test.each` / `it.each` |
+| Mega test file across many modules; importing from another test file | One test file per module; shared setup in a typed helper module |
+| Tests depending on order / shared mutable state | Fresh state per test (`beforeEach`), clean up in `afterEach` |
+| Shipping tests without running them or proving they can fail | Run + verify-can-fail + every public function covered |

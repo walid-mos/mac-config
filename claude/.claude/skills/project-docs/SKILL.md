@@ -1,10 +1,10 @@
 ---
 name: project-docs
 description: >-
-  Owns the `docs/` layout for NextNode projects: where each kind of artifact
-  lives, slug/date naming rules, the contract other skills (`html`,
-  `interview`) follow. Load when bootstrapping `docs/`, choosing a folder for an
-  artifact, or auditing a layout. User-invocable via `/project-docs`.
+  Owns the `docs/` layout for NextNode projects: folder structure, kind-based
+  routing (interviews, plans, notes), slug/date naming rules. Load when
+  bootstrapping `docs/`, placing an artifact, or auditing layout.
+  User-invocable via `/project-docs`.
 user-invocable: true
 ---
 
@@ -25,18 +25,18 @@ Four kinds. Folder name = plural. Add a new kind only when a real second exempla
 |---|---|---|---|
 | Interview workflow | `docs/interviews/<slug>/` | Folder · stateful · multi-round | `/interview` (rich mode via `rp`) |
 | Implementation plan | `docs/plans/<YYYY-MM-DD>-<slug>.html` | Single file · static | `html` (after interview closure, or stand-alone) |
-| Execution plan (machine) | `docs/plans/<slug>.plan.json` | Single file · static · sink-agnostic | `/backlog` (consumed by `/track` + `/next`) |
+| Execution plan (machine) | `docs/plans/<slug>/plan.json` | Folder · static · sink-agnostic | `/backlog` (consumed by `/track` + `/next`) |
 | Free-form note | `docs/notes/<YYYY-MM-DD>-<slug>.html` | Single file · static | `html` (any other recipe — audit, review, retro, research, status, board) or hand-written |
 
-> `<slug>.plan.json` is the **machine-readable** backlog contract (`milestones[] → tracks[] → tasks[]`), distinct from the human-facing `<date>-<slug>.html` plan. It carries **no date prefix** (one live plan per slug) and is the durable input `/track` reads. The full schema lives in `track/SKILL.md`.
+> `docs/plans/<slug>/plan.json` is the **machine-readable** backlog contract (`milestones[] → tracks[] → tasks[]`), distinct from the human-facing `<date>-<slug>.html` plan. The folder is keyed on slug (one live plan per slug) and is the durable input `/track` reads. See `/backlog` for the schema.
 
-Folder lifecycle (`interviews/` only) holds: `plan.html` (current round), `state.json` (cross-round memory), `submission.json` (latest user submission), `.rp-url` (transient, never commit). Single-file lifecycle: one self-contained HTML, no state, no companion files.
+Folder lifecycle (`interviews/` only): stateful, multi-file — owned entirely by `/interview`, do not create or modify manually. Single-file lifecycle: one self-contained HTML, no state, no companion files.
 
 ## Naming
 
 - **Slug** — kebab-case, ASCII, descriptive but short (`auth-middleware-migration`). No date in the slug.
 - **Date prefix** (`YYYY-MM-DD-`) — required on every single-file **HTML** artifact (plans, notes).
-- **No date prefix** — on `interviews/<slug>/` folders (one interview per topic) and on `<slug>.plan.json` (one live execution plan per slug).
+- **No date prefix** — on `interviews/<slug>/` folders (one interview per topic) and on `plans/<slug>/plan.json` (one live execution plan per slug).
 - **Conflicts** — if the slug+date combo already exists, ask before overwriting.
 
 ## Bootstrap
@@ -45,14 +45,26 @@ Folder lifecycle (`interviews/` only) holds: `plan.html` (current round), `state
 
 ## Interview → plan promotion
 
-When `/interview` closes, copy the final `plan.html` to `docs/plans/<YYYY-MM-DD>-<slug>.html` so the plan is discoverable from the canonical location. The interview folder stays as historical state.
+When `/interview` closes, **`/interview` is responsible** for copying the final `plan.html` to `docs/plans/<YYYY-MM-DD>-<slug>.html` so the plan is discoverable from the canonical location. `/html` does not perform this copy. The interview folder stays as historical state.
 
-## Anti-patterns
+## Placement decision tree
 
-- Mixing pluriel/singulier (`docs/plan/` vs `docs/plans/`) — pluriel only.
-- Date in a slug (`auth-migration-2026-05-15`) — date is the prefix, slug is timeless.
-- A `state.json` outside `docs/interviews/<slug>/` — stateful workflow → folder.
-- A file at `docs/<slug>.html` (no kind folder) — assign a kind.
+1. Is it a stateful multi-round workflow? → `docs/interviews/<slug>/` (owned by `/interview`, do not create manually)
+2. Is it a machine-readable backlog? → `docs/plans/<slug>/plan.json` (produced by `/backlog`)
+3. Is it a human-readable HTML artifact? → interview promotion → `docs/plans/`, everything else → `docs/notes/`
+4. None of the above? → not a `docs/` artifact; store outside the repo
+
+## FORBIDDEN / CORRECT
+
+| FORBIDDEN | CORRECT |
+|---|---|
+| `docs/plan/` (singular) | `docs/plans/` |
+| `docs/plans/<slug>.plan.json` (flat file) | `docs/plans/<slug>/plan.json` (subfolder) |
+| `docs/<slug>.html` (no kind folder) | `docs/plans/` or `docs/notes/` |
+| Date in slug: `auth-migration-2026-05-15` | Slug timeless: `auth-migration`, date is the prefix |
+| `state.json` outside `docs/interviews/<slug>/` | Stateful workflow → interview folder only |
+| Inventing a new kind folder ad-hoc | Add a kind only when a real second exemplar exists |
+| Creating `docs/interviews/<slug>/` manually | Owned by `/interview` — never create manually |
 
 ## Adding a new kind
 

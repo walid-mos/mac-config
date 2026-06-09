@@ -36,7 +36,7 @@ const httpTransport = new HttpTransport({
 Features:
 - Batches logs and flushes periodically or when batch is full
 - Exponential backoff on retry
-- SSRF protection (validates endpoint URL)
+- SSRF protection (validates endpoint URL — blocks private/loopback IPs such as `10.x`, `172.16-31.x`, `192.168.x`, `127.x`; if you are deploying to an internal logging service on a private network, you may see silent log loss)
 - Call `transport.dispose()` on shutdown to flush remaining logs
 
 ## Using multiple transports

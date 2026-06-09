@@ -35,7 +35,7 @@ Parse it:
 | `Read` | Use the indented path -> `Read(<path>)` |
 | `Edit` | Extract parent directory of the indented path -> `Edit(<parentDir>/**)` |
 | `Write` | Extract parent directory -> `Write(<parentDir>/**)` |
-| `WebFetch` | `WebFetch(*)` |
+| `WebFetch` | If the indented line contains a hostname or URL, extract the root domain (see [SKILL.md](SKILL.md)) -> `WebFetch(domain:<rootDomain>)`. Otherwise `WebFetch(*)`. |
 | `WebSearch` | `WebSearch(*)` |
 | `mcp__*` (any MCP tool) | Strip the last segment (after final `__`) -> `<prefix>__*` (e.g. `mcp__plugin_context7_context7__query-docs` -> `mcp__plugin_context7_context7__*`) |
 | Other | Use the tool name as-is |

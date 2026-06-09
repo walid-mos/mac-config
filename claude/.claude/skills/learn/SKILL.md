@@ -1,9 +1,9 @@
 ---
 name: learn
 description: >-
-  Create or update Claude Code skills. Use when the user says "/learn",
-  wants to teach a new rule, create a skill for a package, or sync an
-  existing skill with codebase changes.
+  Create or update Claude Code skills. Use when the user runs /learn, wants to
+  teach a new rule or coding convention, create a skill for a package, or sync
+  an existing skill with codebase changes.
 user-invocable: true
 argument-hint: "[rule or topic]"
 ---
@@ -14,7 +14,12 @@ Create new skills, update existing ones, or add rules to skills. Three modes: **
 
 ## Skills directory
 
-All skills live in: `~/.stow_repository/claude/.claude/skills/<skill-name>/SKILL.md`
+Locate the skills directory dynamically:
+```bash
+find ~ -name "SKILL.md" -path "*/.claude/skills/*" | head -1
+# Extract the parent-parent directory: that is the skills root
+```
+The path is machine-specific (e.g. `~/.stow_repository/claude/.claude/skills/` on this machine). Never hardcode it across machines.
 
 ## Mode Detection
 
@@ -28,7 +33,7 @@ Otherwise, continue to Step 2.
 ### Step 2 - Detect project context
 
 1. Read `package.json` (or equivalent manifest) to get the package name
-2. List existing skills: `ls ~/.stow_repository/claude/.claude/skills/`
+2. List existing skills by running `ls` on the skills directory (resolved above)
 3. Match the current package against skill names and descriptions (read frontmatter of candidates)
 4. Decision:
    - **Matching skill found** --> **Update mode**
@@ -42,7 +47,7 @@ Add a rule to an existing skill.
 
 ### Workflow
 
-1. **Identify the target skill** from the rule's domain. Match keywords in $ARGUMENTS against existing skill names (js/javascript --> `javascript`, ts/typescript --> `typescript`, react/component/jsx --> `react`, test/testing --> `test`, general/coding --> `coding`, etc.). If ambiguous, ask the user which skill to target.
+1. **Identify the target skill** from the rule's domain. Match keywords in $ARGUMENTS against existing skill names (js/javascript --> `javascript`, ts/typescript --> `typescript`, react/component/jsx --> `react`, test/testing --> `test`, general/coding --> `coding`, etc.). Auto-decide on a clear match. If still ambiguous after keyword matching, ask the user which skill to target before proceeding.
 
 2. **Read the target skill** - load the full SKILL.md to understand its structure, existing rules, numbering, and formatting.
 
@@ -56,7 +61,9 @@ Add a rule to an existing skill.
 
 5. **Apply the edit** - use the Edit tool to add the rule. If the skill has both a rules section AND a quick reference table, update both.
 
-6. **Summarize** what was added and where.
+6. **Verify placement** - re-read the edited section to confirm correct placement and formatting. Do not report success without checking.
+
+7. **Summarize** what was added and where.
 
 ---
 
@@ -74,16 +81,20 @@ Create a skill for a package or project that doesn't have one yet.
    - Tests - usage patterns, expected behaviors
    - Config files - options, defaults, environment variables
 
-2. **Offer to interview** - ask the user:
+2. **Check for partial matches** - before creating, re-scan the skills directory for any skill whose name or description partially matches the package. If found, switch to Update mode instead.
+
+3. **Offer to interview** - ask the user:
    > "I've read the codebase. Want me to grill you with questions to deepen the skill, or should I generate it from what I've found?"
 
-   If yes, invoke `/interview` focused on:
+   If yes, call the **Skill tool** with `skill="interview"` and focus the interview on:
    - What patterns should the skill enforce?
    - What are common mistakes to avoid?
    - What non-obvious conventions exist?
    - What integration patterns matter most?
 
-3. **Generate the files** - create `~/.stow_repository/claude/.claude/skills/<name>/`. SKILL.md is the entry point (frontmatter + overview + rules); reference files hold deep content. See `## Skill Conventions` below for structure and quality bar.
+   Do not just write `/interview` in text - invoke the Skill tool.
+
+4. **Generate the files** - create `<skills-root>/<name>/`. SKILL.md is the entry point (frontmatter + overview + rules); reference files hold deep content. See `## Skill Conventions` below for structure and quality bar.
 
    **SKILL.md frontmatter**:
    ```yaml
@@ -97,7 +108,7 @@ Create a skill for a package or project that doesn't have one yet.
    ---
    ```
 
-4. **Record the sync point** - `synced-at` in frontmatter stores the HEAD commit of the project at generation time.
+5. **Record the sync point** - `synced-at` in frontmatter stores the HEAD commit of the project at generation time. If the project has no git history, set `synced-at` to the current date in `YYYY-MM-DD` format and note it is date-based.
 
 ---
 
@@ -135,8 +146,52 @@ Sync an existing skill with codebase changes since it was last written.
 
 ## Skill Conventions
 
-1. **Multi-file by default** - SKILL.md is the overview (~200 lines max), reference files hold the depth. One file per major concept. Only trivial skills (pure workflow like `interview`) can be single-file.
-2. **SKILL.md is the map** - summarize each topic in 3-5 lines, then link to the detail file with `See [topic.md](topic.md)`. Reference files are self-contained.
-3. **Frontmatter uses `>-`** for multiline descriptions.
-4. **Rules section at the end of SKILL.md** - numbered, actionable, specific.
-5. **`synced-at` in frontmatter** for package-documentation skills - always include it.
+### Structure template
+
+```
+---
+name: <skill-name>
+description: >-
+  <What it does, 1 sentence. Use when <triggers>, 1 sentence.>
+user-invocable: true          # omit if internal only
+argument-hint: "[hint]"       # omit if no args
+synced-at: <git-sha or YYYY-MM-DD>  # package skills only
+---
+
+# <Title>
+
+<2-3 line overview>
+
+## <Section>
+...
+
+## Rules
+1. ...
+```
+
+### Description = the always-on cost
+
+The frontmatter `description` is the ONLY thing loaded into every session (it sits in the always-on skill list) and is the sole trigger signal. Treat it as permanent tax:
+- 3rd person. First sentence = what the skill does; second = `Use when <concrete triggers>` (slash command, keywords, file globs, package names).
+- Keep it tight - drop feature enumerations and implementation internals (those belong in the body). If two skills could fire for the same intent, make each description say which one owns it.
+
+### Progressive disclosure = the per-call cost
+
+The SKILL.md **body** loads in full on every invocation; **sub-files** load only when the body points to them.
+- Keep INLINE: the rules/imperatives plus a FORBIDDEN/MANDATORY quick-reference table - that is what makes the skill get followed.
+- Move OUT to a `<topic>.md` sub-file: long code examples, edge-case catalogues, rarely-needed detail. Reference sub-files one level deep (a sub-file never links to another sub-file).
+- Single ownership: never restate another skill's rule - cross-reference its owner (brand tokens -> nextnode-design, DRY/SOLID -> coding, status table -> track). No time-sensitive claims ("ends 2025-…"): state the current reality.
+
+### FORBIDDEN / MANDATORY
+
+| NEVER | ALWAYS |
+|---|---|
+| Single-file SKILL.md over 200 lines without sub-files | Split large content into `<topic>.md` reference files |
+| Omit `synced-at` for package-documentation skills | Include it; use date if no git history |
+| Put rules anywhere but the last section of SKILL.md | Rules section is last, numbered, actionable |
+| Omit `>-` for multiline frontmatter descriptions | Use `>-` block style |
+| Report rule added without re-reading the edited section | Verify placement by re-reading after every Edit |
+| Create a new skill without checking for a partial match first | Scan the skills directory; switch to Update mode if match found |
+| Description that enumerates features / implementation internals | One sentence "what" + one sentence "Use when <triggers>" |
+| Restate a rule another skill owns | Cross-reference the owner in one line |
+| Long code examples / edge-case catalogues in the body | Keep rules + quick-ref table inline; move examples to a `<topic>.md` |

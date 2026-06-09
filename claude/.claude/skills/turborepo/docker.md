@@ -48,12 +48,17 @@ COPY --from=prepare /repo/out/full/ ./
 RUN pnpm exec turbo build --filter=@org/app
 
 # Stage 4 - Runtime: only the built artefact + prod deps.
+# Install production deps from scratch (do NOT copy node_modules from build
+# stage — that includes all dev deps and silently bloats the image).
 FROM node:24-alpine AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
+RUN corepack enable pnpm
+COPY --from=prepare /repo/out/json/ ./
+COPY --from=prepare /repo/out/pnpm-lock.yaml ./pnpm-lock.yaml
+RUN pnpm install --frozen-lockfile --prod
 COPY --from=build /repo/packages/app/dist ./dist
 COPY --from=build /repo/packages/app/package.json ./
-COPY --from=build /repo/node_modules ./node_modules
 EXPOSE 3000
 CMD ["node", "dist/server/entry.mjs"]
 ```
@@ -66,7 +71,7 @@ CMD ["node", "dist/server/entry.mjs"]
 | `prepare` | Where `turbo prune --docker` runs. Needs the full repo + a global `turbo`. Discarded after - turbo is not shipped at runtime. |
 | `deps` | Cacheable install. Copies *only* manifests + lockfile - layer is invalidated only when a `package.json` actually changes. |
 | `build` | Adds source on top of `deps`, runs the actual build via `turbo`. Source edits invalidate this layer but not `deps`. |
-| `runtime` | Fresh `node:24-alpine` base, only the build artefact + `node_modules`. No turbo, no pnpm, no source. Smallest possible image. |
+| `runtime` | Fresh `node:24-alpine` base. Runs `pnpm install --prod` on the pruned manifests, then copies only the built artefact. Prod deps only — no turbo, no dev deps, no source. |
 
 ## `.dockerignore` (mandatory)
 
@@ -114,6 +119,23 @@ Three problems:
 - `COPY packages ./packages` includes all source, so any source edit invalidates install.
 - Filter `@org/app...` ships `package.json`s of unrelated workspaces *if they share a parent path*, since pnpm filter graph doesn't prune the lockfile.
 - Bypasses turbo cache.
+
+## `docker/bake-action` with a runtime-generated bake file
+
+When CI builds images via [`docker/bake-action`](https://github.com/docker/bake-action) and the bake file (or compose file) is **generated at build time** — rendered from a config source of truth by a prior step rather than committed — you MUST set `source: .` on the bake-action step:
+
+```yaml
+- name: Build and push
+  uses: docker/bake-action@v6
+  with:
+    source: .                                       # run Bake from the runner workspace
+    files: ${{ steps.render.outputs.bake_file }}    # a file a previous step wrote at runtime
+    push: true
+```
+
+**Why.** `docker/bake-action@v6` defaults `source:` to the **Git context** (the commit being built), not the runner's working directory. A `docker-bake.json` a previous step writes into `$GITHUB_WORKSPACE` is therefore invisible to Bake — it reads the tree as committed, where the file does not exist. Symptom: `failed to read` / `no such file` for a file that is demonstrably sitting in the workspace. Setting `source: .` runs Bake from the workspace, so `files:` resolves by relative path/basename and each target's `context: "."` resolves to the repo root.
+
+This is orthogonal to the `turbo prune` Dockerfile pattern above — it applies whenever the bake definition is produced at runtime (rendered tags, config-driven targets, a bake file emitted from a single source of truth) instead of being checked in.
 
 ## Smoke test
 

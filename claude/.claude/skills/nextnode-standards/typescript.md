@@ -1,9 +1,12 @@
 # Config: TypeScript
 
-**Export paths**:
-- `@nextnode-solutions/standards/typescript/library` - for npm packages
-- `@nextnode-solutions/standards/typescript/nextjs` - for Next.js apps
-- `@nextnode-solutions/standards/typescript/astro` - for Astro apps
+**Export paths** - pick by project type:
+
+| Config | Use when |
+|--------|----------|
+| `@nextnode-solutions/standards/typescript/library` | Publishable npm package (logger, infrastructure, email-manager, any `package.json` with `exports`) |
+| `@nextnode-solutions/standards/typescript/nextjs` | Next.js app (`next` in dependencies) |
+| `@nextnode-solutions/standards/typescript/astro` | Astro app (`astro` in dependencies) |
 
 ## Project setup
 

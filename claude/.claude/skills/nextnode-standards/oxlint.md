@@ -19,7 +19,7 @@ export default defineConfig({
 ## What it enforces
 
 **Plugins**: typescript, react, unicorn, import
-**Custom plugins**: `no-type-assertion` (bans `as` type assertions, allows `as const`)
+**Custom plugins**: `no-type-assertion` - bundled inside `@nextnode-solutions/standards` (bans `as` type assertions, allows `as const`; no separate install required)
 
 **Categories**:
 - `correctness` -> error

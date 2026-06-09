@@ -15,14 +15,28 @@ const siteUrl = import.meta.env.SITE
 const analyticsId = import.meta.env.PUBLIC_ANALYTICS_ID
 ```
 
-### Runtime (`locals.runtime.env`)
+### Runtime secrets and Cloudflare bindings
 
-Non-PUBLIC vars (secrets, service bindings) live on the Workers runtime binding — never inlined.
+Two categories, two paths — pick the right one:
+
+| What | Path | Why |
+|---|---|---|
+| Plain string secrets (`RESEND_API_KEY`, `API_TOKEN`, …) | `astro:env/server` — `import { X } from 'astro:env/server'` or `getSecret('X')` | Cross-adapter, type-safe, validated at startup. **MANDATORY for plain vars.** |
+| Cloudflare-specific bindings (KV, D1, R2, AI, Queues, Durable Objects) | `locals.runtime.env.MY_KV` | These are object handles, not strings — `astro:env` cannot represent them. **MANDATORY for CF bindings.** |
 
 ```ts
-// MANDATORY
-export async function POST({ locals }: APIContext): Promise<Response> {
-  const { RESEND_API_KEY } = locals.runtime.env
+// MANDATORY — plain secret: use astro:env
+import { RESEND_API_KEY } from 'astro:env/server'
+
+export async function POST({ request }: APIContext): Promise<Response> {
+  // use RESEND_API_KEY directly
+}
+
+// MANDATORY — Cloudflare binding (KV / D1 / R2 / etc.): use locals.runtime.env
+export async function GET({ locals }: APIContext): Promise<Response> {
+  const { MY_KV } = locals.runtime.env
+  const value = await MY_KV.get('key')
+  // ...
 }
 
 // FORBIDDEN - undefined at runtime
@@ -33,7 +47,7 @@ const apiKey = process.env.RESEND_API_KEY
 ```
 
 Set them in:
-- **Local dev**: `.env` for build-time vars; `wrangler.toml` `[vars]` + `platformProxy: { enabled: true }` for runtime bindings.
+- **Local dev**: `.env` for build-time vars and `astro:env` secrets; `wrangler.toml` `[vars]` + `platformProxy: { enabled: true }` for runtime bindings.
 - **Cloudflare Pages**: Dashboard → Settings → Environment variables.
 
 ## Global scope restrictions (Workers runtime)

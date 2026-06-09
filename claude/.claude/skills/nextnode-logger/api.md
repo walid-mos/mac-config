@@ -21,8 +21,9 @@ const logger = createLogger({
 
 All config fields are optional. Sensible defaults are applied:
 - `environment`: auto-detected from `NODE_ENV` and runtime
-- `includeLocation`: true in development, false in production
+- `includeLocation`: true in development, false in production — **NEVER set `includeLocation: true` explicitly in production**: it leaks stack-trace paths and has a measurable performance cost
 - `transports`: `[new ConsoleTransport()]` with auto-detected environment
+- `silent`: use `silent: true` to suppress all output (e.g., test environment setup, conditional silencing based on `NODE_ENV`) — prefer `createNoopLogger()` in tests
 
 ---
 
@@ -70,7 +71,7 @@ logger.info('User created', {
 | `requestId` | `string` | Per-call request ID override |
 | `details` | `unknown` | Arbitrary structured data |
 | `status` | `number` | HTTP status code |
-| `[key: string]` | `unknown` | Additional arbitrary fields |
+| `[key: string]` | `unknown` | Additional arbitrary fields (index signature — named fields above always take precedence) |
 
 ---
 

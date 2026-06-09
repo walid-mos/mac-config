@@ -2,12 +2,12 @@
 
 How to match a workload to a Hetzner Cloud server line and size.
 
-All prices EUR, VAT excluded. Verified 2026-04-10.
+All prices EUR, VAT excluded. Verified 2026-04-15.
 
 ## Decision tree
 
 1. **Does the workload need dedicated CPU?**
-   - Production DB, sustained high CPU, SLA-bound, p99 sensitive → **CCX line** (see [dedicated-vcpu.md](dedicated-vcpu.md))
+   - Production DB, sustained high CPU, SLA-bound, p99 sensitive → **CCX line** (see CCX table in [pricing-tables.md](pricing-tables.md))
    - Most web apps, dev, staging, CI runners → continue to step 2
 
 2. **Are the binaries x86-only?**

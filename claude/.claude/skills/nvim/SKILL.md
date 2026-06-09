@@ -1,18 +1,23 @@
 ---
 name: nvim
 description: >-
-  Neovim plugin configuration pitfalls and best practices. Covers subtle bugs
-  when overriding plugin defaults in Lua - especially the case-sensitive key
-  merge trap that silently breaks keymap overrides in `mappings`/`keymap`
-  tables. Load when writing or editing Lua files under
-  `~/.config/nvim/lua/plugins/` or `nvim/lua/plugins/`, or whenever overriding
-  a Neovim plugin's mapping table.
+  Neovim plugin config in Lua (lazy.nvim, plugin opts). Load when editing files
+  under nvim/lua/plugins/ or when overriding a Neovim plugin's keymap/mapping
+  table.
 user-invocable: true
 ---
 
 # Neovim plugin configuration
 
 Niche pitfalls when configuring third-party Neovim plugins in Lua. Each rule here was paid for by a real debugging session - respect them.
+
+## MANDATORY checklist — before overriding any plugin mapping
+
+1. **Find the plugin's default config** - `ls ~/.local/share/nvim/lazy/<plugin>/lua/<plugin>/` then open the config file.
+2. **grep for exact key case** - `grep -n '["<' <file>` and note whether the key is `<cr>` or `<CR>`, `<tab>` or `<Tab>`, etc.
+3. **Match byte-for-byte** - copy the exact case from the default into your override. Do not guess.
+
+Skipping this checklist is the most common source of silent keymap failures.
 
 ## Core concepts
 
@@ -60,16 +65,22 @@ A 10-second check that saves an hour of "why doesn't my keymap work."
 
 ### Bind order of `user_mappings` vs `config.mappings`
 
-Some plugins (Neogit is a known example, `neogit/lib/buffer.lua:764-791`) bind `user_mappings` (functions) **before** `config.mappings` (command strings). If the same key appears in both - even via case difference - the default binds after yours and wins silently.
+Some plugins bind `user_mappings` (functions) **before** `config.mappings` (command strings). If the same key appears in both - even via case difference - the default binds after yours and wins silently. Neogit is a known example; locate the current bind site with:
+
+```bash
+grep -n "user_mappings\|config.mappings" ~/.local/share/nvim/lazy/neogit/lua/neogit/lib/buffer.lua
+```
 
 **Fix**: put your override under the exact key the plugin uses in its defaults so the merge collapses to a single entry (yours). This removes the default from the map entirely and there's nothing to re-bind.
+
+See [plugin-conventions.md](plugin-conventions.md) for the Neogit-specific details.
 
 ### Reloading plugin config
 
 Editing `opts = { ... }` in a `lazy.nvim` plugin spec does NOT hot-reload. The plugin's `setup()` runs once at init. After changing config:
 
-- Full nvim restart (cleanest), or
-- `:Lazy reload <plugin>` to re-run setup.
+- **Full nvim restart** (cleanest, safest), or
+- **`:Lazy reload <plugin>`** to re-run `setup()` — but note this does NOT re-fire autocmds or re-register sources (e.g. nvim-cmp sources, LSP on-attach handlers) that ran at startup. If your change touches those, only a full restart works.
 
 Don't debug a "my change doesn't work" issue without reloading.
 
@@ -88,6 +99,33 @@ Don't debug a "my change doesn't work" issue without reloading.
 6. **Read the bind order** of user vs default mappings in any plugin where you pass functions alongside overridden defaults. If user is bound first, default-bound-after will clobber yours unless you replace the default entry directly.
 
 7. **Don't guess keycode equivalence** at config-table level. `<Tab>` / `<tab>`, `<CR>` / `<cr>`, `<Esc>` / `<esc>`, `<C-Space>` / `<C-space>` - any of these can be the difference between "works" and "silently ignored."
+
+## FORBIDDEN / MANDATORY
+
+| | Rule |
+|---|---|
+| FORBIDDEN | Guessing keycode case in a table-keyed mapping. Always grep the plugin source first. |
+| FORBIDDEN | Writing `["<CR>"]` to override a plugin default without confirming the default uses `<CR>` not `<cr>`. |
+| FORBIDDEN | Assuming `:Lazy reload` fully resets plugin state. Full restart is required for autocmds/sources. |
+| MANDATORY | Follow the 3-step checklist above before every mapping override. |
+| MANDATORY | Match plugin default key case byte-for-byte in all table-keyed overrides. |
+| MANDATORY | Verify the bind order (user vs default) in any plugin where you pass functions alongside string defaults. |
+
+## lazy.nvim spec patterns
+
+When writing or modifying a plugin spec, use the right field:
+
+| Need | Use | Notes |
+|---|---|---|
+| Pass config to `setup()` | `opts = { ... }` | Merged with any parent spec `opts`; lazy.nvim calls `setup(opts)` automatically. |
+| Custom setup logic | `config = function(_, opts) ... end` | Receives the merged `opts`; use when you need to call multiple setup fns or do pre/post work. |
+| Declare plugin deps | `dependencies = { ... }` | Loaded before this plugin. Order within the array is respected. |
+| Load on filetype | `ft = { "lua", "python" }` | Defers load until that filetype is opened. |
+| Load on command | `cmd = { "Neogit" }` | Defers load until command is invoked. |
+| Load on event | `event = "BufReadPost"` | Common events: `VeryLazy`, `BufReadPost`, `InsertEnter`. |
+| Pin a version | `tag = "v1.2.3"` or `commit = "<sha>"` | Prefer `tag` when the plugin uses semver releases. |
+
+**`opts` vs `config` decision rule**: if `setup(opts)` is the only call needed, use `opts`. Reach for `config` only when you need imperative logic around setup.
 
 ## Quick reference
 

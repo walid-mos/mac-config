@@ -6,6 +6,16 @@ Import from the dedicated testing entry point:
 import { createSpyLogger, createMockLogger, createNoopLogger } from '@nextnode-solutions/logger/testing'
 ```
 
+## Which logger to use
+
+| Scenario | Logger | Why |
+|----------|--------|-----|
+| Assert that a specific message was logged (content, level, call count) | `createSpyLogger()` | `SpyLogger` provides `.wasCalledWith()`, `.getCallsByLevel()`, `.calls` — high-level query API |
+| Assert on the exact arguments passed to each log call (shape, order) | `createMockLogger()` | `MockLogger` exposes `.mock.calls` — same interface as vitest/jest mock functions |
+| Logger is a required dep but the test does not care about logging at all | `createNoopLogger()` | Discards everything silently — zero noise, zero overhead |
+
+FORBIDDEN: manual logger mock (e.g. `{ info: vi.fn(), debug: vi.fn(), ... }`). Use the factory functions above.
+
 ## Spy logger
 
 Returns a `SpyLogger` directly - records all log calls with query methods:

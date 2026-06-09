@@ -2,12 +2,10 @@
 name: pr
 user-invocable: true
 description: >-
-  Open a clean GitHub pull request via `gh` from the current branch to a
-  target branch (default: repo's default branch). Use when the user runs
-  `/pr`, asks to "open a PR", "create a pull request", or wants to push the
-  current branch as a reviewable PR. Runs pre-flight hygiene, generates a
-  conventional-commit-aligned title and structured body (Summary / Changes /
-  Test plan). Flags: `--draft`, `--base <branch>`, `--title`, `--body`.
+  Open a GitHub pull request via `gh` from the current branch. Use when the
+  user runs `/pr`, says "open a PR", "create a pull request", or wants to push
+  the current branch as a reviewable PR. Flags: `--draft`, `--base <branch>`,
+  `--title`, `--body`.
 ---
 
 # Clean Pull Request
@@ -33,6 +31,16 @@ Examples:
 
 Execute phases in order. Stop and report on any REFUSE condition; do not push or open a PR until every pre-flight check passes.
 
+**FORBIDDEN — never do any of these:**
+
+| Never | Reason |
+|---|---|
+| Force-push (`--force`, `--force-with-lease`) | Data loss, PR history corruption |
+| Auto-commit uncommitted work | User must own every commit |
+| Auto-rebase | Rewriting history is the user's call |
+| Skip git hooks (`--no-verify`) | Hooks are the last safety net — see CLAUDE.md |
+| Create a PR on main/master/develop/trunk | Refuse: "cannot PR base branch into itself" |
+
 ### Phase 1 - Resolve context (single Bash call, read-only)
 
 ```bash
@@ -42,6 +50,7 @@ gh auth status > /dev/null 2>&1 || { echo "REFUSE: gh not authenticated"; exit 1
 
 branch=$(git rev-parse --abbrev-ref HEAD)
 default_branch=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null)
+[ -z "$default_branch" ] && { echo "REFUSE: cannot resolve default branch — is this repo pushed to GitHub?"; exit 1; }
 base="${ARG_BASE:-$default_branch}"
 
 echo "branch=$branch"
@@ -56,8 +65,6 @@ git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || echo "(no 
 echo "---"
 gh pr view --json number,state,url 2>/dev/null || echo "(no existing PR)"
 ```
-
-Use the output to drive Phase 2 checks.
 
 ### Phase 2 - Pre-flight hygiene
 
@@ -158,7 +165,7 @@ Body rules:
 
 ### Phase 6 - Create the PR
 
-Pass the body via heredoc to preserve formatting:
+Pass the body via heredoc to preserve formatting (use the body generated in Phase 5 verbatim):
 
 ```bash
 gh pr create \
@@ -166,13 +173,7 @@ gh pr create \
   --title "<generated title>" \
   ${DRAFT:+--draft} \
   --body "$(cat <<'EOF'
-## Summary
-
-- ...
-
-## Test plan
-
-- [ ] ...
+<Phase 5 body here>
 EOF
 )"
 ```
@@ -188,10 +189,3 @@ Output to the user:
 3. **Soft warnings** raised in Phase 2 (behind-base, large-diff, no-tests) so they can act on them.
 4. **Next steps** if applicable: rebase suggestion, attach screenshots for UI PRs, request reviewers.
 
-## Rules
-
-1. **Resolve the default branch from GitHub**, not by guessing `main`. Some repos use `master`, `develop`, or `trunk`.
-2. **Detect commit-message convention from history.** Don't impose Conventional Commits on a repo that doesn't use them.
-3. **Title hard-cap is 72 chars.** Never truncate a user-supplied `--title`; warn instead.
-4. **Test plan is non-negotiable.** Every PR body has at least one test-plan item, even if it's "Manually verified locally - no automated coverage exists."
-5. **No data exfiltration.** The body comes from local git context only - never include env vars, file contents outside the diff, or secrets.

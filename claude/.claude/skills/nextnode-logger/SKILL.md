@@ -1,11 +1,10 @@
 ---
 name: nextnode-logger
 description: >-
-  How to use @nextnode-solutions/logger in NextNode projects. Covers the
-  Logger API, child loggers, transports (console, HTTP), formatters, testing
-  utilities, and integration patterns. Load when @nextnode-solutions/logger
-  appears in package.json, when the user imports `createLogger`/`Logger` from
-  it, or when configuring logging in a NextNode project.
+  How to use @nextnode-solutions/logger in NextNode projects. Load when
+  @nextnode-solutions/logger appears in package.json, when the user imports
+  `createLogger` or `Logger` from it, or when configuring logging in a
+  NextNode project.
 user-invocable: true
 synced-at: a755da5
 ---
@@ -33,82 +32,33 @@ Use the relevant sub-file for details:
 
 ---
 
-## Basic usage
-
-```typescript
-import { logger } from '@nextnode-solutions/logger'
-
-// Use the default instance
-logger.info('Server started', { scope: 'http', details: { port: 3000 } })
-logger.warn('Slow query detected', { details: { duration: 1500 } })
-logger.error('Failed to connect', { details: { error } })
-logger.debug('Request payload', { details: { body } })
-```
-
-### Log levels (priority order)
+## Log levels (priority order)
 
 | Level | Priority | When to use |
 |-------|----------|-------------|
 | `debug` | 0 | Detailed diagnostic info, development only |
 | `info` | 1 | Normal operational events |
-| `warn` | 2 | Something unexpected but recoverable |
-| `error` | 3 | Something failed, needs attention |
+| `warn` | 2 | Something unexpected but recoverable — the process continues |
+| `error` | 3 | Unrecoverable failure or data loss — needs immediate attention |
 
 Logs below `minLevel` are silently dropped. Default: `debug` (all logs).
 
-## Setup
+See [api.md](api.md) for the full API including child loggers and request correlation patterns.
 
-```bash
-pnpm add @nextnode-solutions/logger
-```
+## Quick Reference — MANDATORY / FORBIDDEN
 
-No peer dependencies. Zero runtime dependencies.
+| # | Rule | Verdict |
+|---|------|---------|
+| 1 | Use `@nextnode-solutions/logger` — never `console.log` (oxlint flags it) | **FORBIDDEN: console.log** |
+| 2 | Import the `Logger` interface as a constructor/param dep in business logic | **FORBIDDEN: import global logger in business-logic classes** |
+| 3 | Pass structured data in `details: {}` — never build the message via string interpolation | **FORBIDDEN: string interpolation in log messages** |
+| 4 | Set `includeLocation: true` only in development | **FORBIDDEN: includeLocation:true in production** |
+| 5 | Call `logger.dispose()` on SIGTERM when `HttpTransport` is in use | **MANDATORY: dispose() on SIGTERM** |
+| 6 | Create a child logger per request (with `requestId`) — never pass it manually to each call | **MANDATORY: child logger per request** |
+| 7 | Scope by domain noun, not file name — lowercase, kebab-case for compounds | **MANDATORY: scope format** |
+| 8 | Use `createSpyLogger()` / `createMockLogger()` / `createNoopLogger()` in tests | **FORBIDDEN: manual logger mock** |
 
-The package has three entry points:
+### Scope naming
 
-| Import path | What it provides |
-|------------|-----------------|
-| `@nextnode-solutions/logger` | Core logger class, factory, default instance, formatters, types, utilities |
-| `@nextnode-solutions/logger/testing` | Spy logger, mock logger, noop logger for tests |
-| `@nextnode-solutions/logger/transports/http` | HTTP transport for log aggregation |
-
-## Patterns
-
-### Module-scoped logger
-
-```typescript
-import { createLogger } from '@nextnode-solutions/logger'
-
-const logger = createLogger({ scope: 'database' })
-
-export function query(sql: string): Result {
-  logger.debug('Executing query', { details: { sql } })
-  // ...
-}
-```
-
-### Per-request child logger (Express/Fastify)
-
-Create a child logger per request with the request ID, so all logs within the request inherit it without manual threading:
-
-```typescript
-import { createLogger, generateRequestId } from '@nextnode-solutions/logger'
-
-const appLogger = createLogger({ scope: 'api', environment: 'production' })
-
-app.use((req, res, next) => {
-  const requestId = req.headers['x-request-id'] as string ?? generateRequestId()
-  req.logger = appLogger.child({ requestId })
-  req.logger.info('Request received', { details: { method: req.method, url: req.url } })
-  next()
-})
-```
-
-## Rules
-
-1. **Use the logger, not console** - oxlint warns on `console.log`. Use `@nextnode-solutions/logger` instead.
-2. **Inject loggers via constructor/parameter** - Don't import a global logger in business logic. Accept a `Logger` interface for testability.
-3. **Use child loggers for request context** - Create a child logger per request with the request ID. Don't pass request IDs manually to each log call.
-4. **Scope by domain, not by file** - Use scopes like `'auth'`, `'database'`, `'api'` - not file names.
-5. **Dispose on shutdown** - If using HttpTransport, always call `dispose()` to flush buffered logs.
-6. **Use testing utilities in tests** - Never mock the logger manually. Use `createSpyLogger()` or `createMockLogger()` from `@nextnode-solutions/logger/testing`.
+Canonical forms: `'auth'`, `'db'`, `'http'`, `'email-queue'`, `'payments'`.  
+FORBIDDEN: file-path-style scopes (`'src/services/userService'`) or mixed-case (`'UserService'`).

@@ -8,7 +8,7 @@ The `project.internal` config field (boolean, default `false`) controls whether 
 
 | Layer | Public (`internal: false`) | Internal (`internal: true`) |
 |-------|---------------------------|----------------------------|
-| **DNS** | A record → VPS public IP, proxied (prod) / unproxied (dev) | A record → Tailscale CGNAT IP, never proxied |
+| **DNS** | One A record **per routed service** → VPS public IP, proxied (prod) / unproxied (dev) | One A record per routed service → Tailscale CGNAT IP, never proxied |
 | **Firewall** | HTTP/S open globally, SSH restricted to tailscale0 | All traffic restricted to tailscale0 interface |
 | **UFW** | `ufw allow 80/tcp`, `ufw allow 443/tcp` | `ufw allow in on tailscale0 to any port 80`, etc. |
 | **Caddy** | ACME TLS (via R2 cert storage) | Internal TLS (self-signed or internal CA) |
@@ -23,7 +23,7 @@ The old monolithic `HetznerVpsTarget` was split into focused modules in `adapter
 | `ensure-infra.ts` | High-level provision orchestrator: handles fresh provision vs. resume from saved state |
 | `provision-vps.ts` | VPS creation via hcloud API + Tailscale join + firewall setup |
 | `converge-vps.ts` | Post-boot convergence: waits for cloud-init, syncs Caddy/Vector config via SSH |
-| `deploy-container.ts` | Docker container deployment: write `.env`, `docker-compose.yml`, pull + up via SSH |
+| `deploy-container.ts` | Two-phase container rollout. `stageRollout`: write one `.env.<name>` per declared service (with symmetric cross-service URL injection) + compose.yaml, login to every registry the forwarded token covers, pull every service image. `bringUpDb`: phase 1 brings postgres + postgres-backup to healthy via `docker compose up -d --wait`. `bringUpApp`: phase 2 bare `docker compose up -d --remove-orphans` rotates every user service on the same compose file (cross-phase compose identity invariant — see SKILL.md rule 15). |
 | `hcloud-client.ts` | Typed HTTP client for Hetzner Cloud API |
 | `hcloud-state.ts` | R2-backed state persistence with ETag-based optimistic locking |
 | `hcloud-firewall.ts` | Firewall CRUD helpers |
@@ -66,11 +66,13 @@ All Hetzner-specific business decisions live in `domain/hetzner/`:
 
 ### DNS records (`dns-records.ts`)
 
-`computeVpsDnsRecords(input)` - returns desired Cloudflare A records:
+`computeVpsDnsRecords(input)` - returns one Cloudflare A record per **routed** service (each service declaring a `url`):
 
-- **Internal**: Single A record → `tailnetIp` (CGNAT range, never proxied)
-- **Public production**: A record → `publicIp` (proxied via Cloudflare CDN, TTL=1)
-- **Public development**: A record → `publicIp` (unproxied, TTL=300)
+- **Internal**: A record per service → `tailnetIp` (CGNAT range, never proxied)
+- **Public production**: A record per service → `publicIp` (proxied via Cloudflare CDN, TTL=1)
+- **Public development**: A record per service → `publicIp` (unproxied, TTL=300)
+
+Each record's hostname is `resolveDeployDomain(service.url, environment)`. Services without `url` get no DNS record — they're internal-only on the compose network. See [multi-service.md](multi-service.md) for the full routing model.
 
 ### Firewall rules (`firewall-rules.ts`)
 
@@ -81,12 +83,13 @@ All Hetzner-specific business decisions live in `domain/hetzner/`:
 
 UFW on the VPS further restricts SSH to the tailscale0 interface in both modes.
 
-### Caddy config (`caddy-for-project.ts`)
+### Caddy config (`caddy-for-project.ts` + `service-upstreams.ts`)
 
 `buildCaddyForProject(input)` - high-level orchestrator:
 
 - Routes to `buildCaddyConfig()` (public, ACME via R2 cert storage) or `buildInternalCaddyConfig()` (internal TLS)
-- Configures reverse proxy to `localhost:{hostPort}`
+- Builds **one upstream per routed service** via `buildServiceUpstreams` (`{hostname: resolveDeployDomain(url, env), dial: "localhost:<hostPort>"}`) — each becomes a reverse-proxy block with its own ACME cert subject
+- Services without `url` are omitted from Caddy entirely (compose-network reach only)
 
 ### Vector config (`vector-config.ts`)
 

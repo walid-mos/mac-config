@@ -2,27 +2,28 @@
 name: hetzner
 description: >-
   Hetzner Cloud server pricing reference. Verified prices for all cloud server
-  lines (CX, CPX, CAX, CCX). Load BEFORE proposing ANY Hetzner infrastructure
-  cost, sizing, or server recommendation. Never guess prices - always consult
-  this skill first.
+  lines (CX, CPX, CAX, CCX). Load before any Hetzner infrastructure cost,
+  sizing, or server recommendation.
 user-invocable: true
 synced-at: 2026-04-15-hetzner-api-verified
 ---
 
 # Hetzner Cloud Pricing
 
-Verified pricing reference for Hetzner Cloud servers. **Always load this skill before proposing any Hetzner pricing or server recommendation.** Prior attempts to recall Hetzner prices from memory have been wrong every time - use only the values documented here.
+Verified pricing reference for Hetzner Cloud servers. All prices in **EUR, VAT excluded**, **European locations only** (fsn1 / nbg1 / hel1). Last cross-checked against the live Hetzner Cloud API (`GET /v1/server_types`, `GET /v1/pricing`) on **2026-04-15**. US (`ash`, `hil`) and APAC (`sin`) datacenters exist with different prices - use the API for non-EU. See [api.md](api.md).
 
-## Last verified
+## FORBIDDEN / MANDATORY
 
-**2026-04-15** - cross-checked against the live Hetzner Cloud API (`GET /v1/server_types`, `GET /v1/pricing`). All prices in **EUR, VAT excluded**, **European locations only** (fsn1 / nbg1 / hel1). US (`ash`, `hil`) and APAC (`sin`) datacenters exist with different prices - use the API, not the tables, when the user provisions outside EU. See [api.md](api.md).
-
-## Arguments
-
-- No argument: full pricing overview and selection guidance
-- `shared`: shared vCPU lines only (CX, CPX, CAX)
-- `dedicated`: dedicated vCPU line only (CCX)
-- `recommend`: pick a server for a given workload
+| FORBIDDEN | MANDATORY |
+|---|---|
+| Quote a Hetzner price from memory | Consult the tables below or [pricing-tables.md](pricing-tables.md) |
+| Recommend CPX v1 SKUs (cpx11–cpx51) | Use CPX v2 (CPX22–CPX62) or CX v3 |
+| Quote prices without VAT status | Always state "VAT excluded" |
+| Use EU table prices for ash / hil / sin | Fetch per-location prices via the API |
+| Invent a missing SKU | Tell the user it's not documented; point to [api.md](api.md) |
+| Quote pricing for volumes / LBs / IPs from memory | Use `GET /v1/pricing` - only server prices are in tables |
+| Recommend shared vCPU for production databases | Use CCX instead |
+| Recommend CCX for a low-traffic web app | Use CX or CAX |
 
 ## Instructions
 
@@ -41,15 +42,6 @@ Verified pricing reference for Hetzner Cloud servers. **Always load this skill b
 - When recommending, use [selection-guide.md](selection-guide.md) to match workload → server
 - Always quote: name, vCPU, RAM, SSD, traffic, hourly + monthly price
 - Always mention **"VAT excluded"** when quoting prices
-
-## Server Lines Overview
-
-| Line | Type | Arch | CPU | Best for |
-|---|---|---|---|---|
-| **CX** | Shared vCPU | x86 | Intel / AMD | Most cost-efficient - small/medium web apps, dev/staging |
-| **CPX** | Shared vCPU | x86 | AMD EPYC | Higher base clock - CPU-bound workloads, build servers |
-| **CAX** | Shared vCPU | Arm64 | Ampere Altra | Best price/perf for ARM-compatible workloads |
-| **CCX** | Dedicated vCPU | x86 | AMD EPYC | Production DBs, high-traffic apps, sustained high CPU |
 
 ## Quick Reference - Cheapest entry per line
 
@@ -70,4 +62,4 @@ See [pricing-tables.md](pricing-tables.md) for full tables (shared + dedicated) 
 4. **Only cloud server prices are in tables** - for volumes, snapshots, backups, LBs, floating IPs, traffic overage, primary IPs, query `GET /v1/pricing` (see [api.md](api.md)). Don't invent missing SKUs - check `GET /v1/server_types` first.
 5. **Flag potentially stale pricing** - `synced-at` tracks the last verification date. If asked >3 months after that, warn and re-verify via API.
 6. **Tables are EU-only** - prices apply to `fsn1`, `nbg1`, `hel1`. For `ash`, `hil`, or `sin`, fetch per-location prices via the API. `sin` has 2 TB included traffic, not 20 TB.
-7. **CPX v1 (cpx11–cpx51) is being phased out** - all EU + `sin` availability ends 2025-12-31; `cpx41/cpx51` are already gone everywhere. Never recommend CPX v1 for new projects - direct users to CPX v2 (`cpx12/22/32/42/52/62`) or CX v3.
+7. **CPX v1 (cpx11–cpx51) was discontinued on 2025-12-31** - all SKUs are gone from EU + `sin`; `cpx41/cpx51` were removed first. Never recommend any CPX v1 SKU - direct users to CPX v2 (`cpx22/32/42/52/62`) or CX v3.

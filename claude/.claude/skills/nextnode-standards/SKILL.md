@@ -1,13 +1,10 @@
 ---
 name: nextnode-standards
 description: >-
-  How to use @nextnode-solutions/standards in NextNode projects. Covers all
-  exported configs: oxlint, oxfmt, TypeScript, tsdown, Vitest (backend +
-  frontend + astro), commitlint, lint-staged, semantic-release, editorconfig,
-  npmrc, and Tailwind theme. Load when @nextnode-solutions/standards appears
-  in package.json, when extending one of its configs (e.g. tsconfig
-  `extends`, vitest `import from`), or when configuring tooling in a
-  NextNode project.
+  How to use @nextnode-solutions/standards in NextNode projects: all tooling
+  configs (oxlint, oxfmt, TypeScript, tsdown, Vitest, commitlint,
+  semantic-release, Tailwind). Load when @nextnode-solutions/standards is in
+  package.json or when configuring tooling in a NextNode project.
 user-invocable: true
 synced-at: a755da5
 ---
@@ -41,38 +38,8 @@ Use the relevant sub-file for details:
 - [oxlint.md](oxlint.md) - linting rules and overrides
 - [typescript.md](typescript.md) - TypeScript configs (library, Next.js, Astro)
 - [tsdown.md](tsdown.md) - bundler config base for publishable packages
-- [vitest.md](vitest.md) - test configs (backend, frontend, **astro**)
-- [configs.md](configs.md) - smaller configs: commitlint, lint-staged, oxfmt, Tailwind theme, editorconfig, .npmrc
-
-### Vitest export paths
-
-Three vitest base configs ship - pick by project type:
-
-| Export | When to use |
-|--------|-------------|
-| `@nextnode-solutions/standards/vitest/backend` | Node libraries (logger, infrastructure, email-manager) |
-| `@nextnode-solutions/standards/vitest/frontend` | Browser/React projects |
-| `@nextnode-solutions/standards/vitest/astro` | Astro projects (uses `getViteConfig` under the hood) |
-
-There is also a types-only `@nextnode-solutions/standards/vitest/vite-plugin` for projects that need Vitest's type augmentation without bringing in the Vite runtime config.
-
-### semantic-release
-
-**Export path**: `@nextnode-solutions/standards/semantic-release`
-
-Shared config for semantic-release in monorepo packages. The standards package ships `@semantic-release/git`, `@semantic-release/github`, and `semantic-release-monorepo` as transitive `dependencies` - consumers only need `semantic-release` itself.
-
-```json
-// .releaserc.json
-{
-  "extends": ["semantic-release-monorepo", "@nextnode-solutions/standards/semantic-release"],
-  "tagFormat": "@nextnode-solutions/<name>-v${version}"
-}
-```
-
-**Important**: `semantic-release-monorepo` MUST be in the `extends` array (not via CLI `-e` flag). The `-e` flag silently overrides the plugin list from the shared config, dropping `@semantic-release/git`. Order matters: monorepo first, standards second (later entries override earlier ones for `plugins`).
-
-Plugins: commit-analyzer, release-notes-generator, npm, git (commits `package.json` version), github.
+- [vitest.md](vitest.md) - test configs and all export paths (backend, frontend, astro, vite-plugin)
+- [configs.md](configs.md) - commitlint, lint-staged, oxfmt, Tailwind theme, editorconfig, .npmrc, semantic-release
 
 ---
 
@@ -111,7 +78,7 @@ And these package.json fields:
 
 ```json
 {
-  "packageManager": "pnpm@10.11.0",
+  "packageManager": "pnpm@<current-pnpm-version>",
   "scripts": {
     "lint": "oxlint",
     "format": "oxfmt --write .",
@@ -122,15 +89,18 @@ And these package.json fields:
 }
 ```
 
-**`packageManager` is required** - The NextNode CI pipeline (`pnpm/action-setup`) reads the pnpm version from this field. Without it, the pipeline will fail. Always pin to an exact version (e.g. `pnpm@10.11.0`), never a range or major-only.
+**`packageManager` is required** - The NextNode CI pipeline (`pnpm/action-setup`) reads the pnpm version from this field. Without it, the pipeline will fail. Always pin to the exact version in use in the monorepo (check the root `package.json`) - never a range or major-only.
 
 ## Rules
 
-1. **Never override core rules** - Only add project-specific overrides. Never weaken `no-explicit-any`, `eqeqeq`, `strict`, etc.
-2. **Tabs, not spaces** - oxfmt enforces tabs. Configure your editor accordingly.
-3. **No semicolons** - The codebase uses no-semicolon style.
-4. **Single quotes** - Except in JSX where double quotes are used.
-5. **Import sorting is automatic** - Don't manually sort imports. oxfmt handles it.
-6. **Type imports must be separate** - Use `import type { Foo }` not `import { type Foo }`.
-7. **Astro projects: run `astro check` as part of Definition of Done** - oxlint does not catch TypeScript type errors in `.astro` files. For any Astro project, the sanitization pipeline MUST include both `pnpm run lint` (oxlint) AND `pnpm astro check`. A task is not done until both pass.
-8. **Exclude `vitest.config.ts` from tsconfig** - `vitest.config.ts` uses `getViteConfig` (Astro) or Vite's `defineConfig`, which only types the `test` property via Vitest's type augmentation (`/// <reference types="vitest/config" />`). `astro check` and `tsc` don't resolve this augmentation, causing a `ts(2353)` error. Since TypeScript does NOT inherit `exclude` from extended tsconfigs (only `compilerOptions` are merged), every project must add `"exclude": ["vitest.config.ts"]` in its own `tsconfig.json`.
+| FORBIDDEN | MANDATORY |
+|-----------|-----------|
+| Weakening core oxlint rules (`no-explicit-any`, `eqeqeq`, `strict`, etc.) | Add project-specific overrides only on top of the base config |
+| Spaces for indentation | Tabs everywhere (oxfmt enforces this) |
+| Semicolons | No-semicolon style throughout |
+| Double quotes in non-JSX code | Single quotes in TS/JS; double quotes in JSX attributes |
+| Manually sorting imports | Let oxfmt handle import ordering automatically |
+| Inline type imports: `import { type Foo }` | Separate type imports: `import type { Foo }` |
+| Skipping `astro check` on Astro projects | Run both `pnpm run lint` (oxlint) AND `pnpm astro check` - see `/astro` RULE 8 |
+| Relying on extended tsconfig to inherit `exclude` | Add `"exclude": ["vitest.config.ts"]` in every project's own `tsconfig.json` |
+| Ranging or omitting `packageManager` field | Pin exact pnpm version matching the monorepo root `package.json` |

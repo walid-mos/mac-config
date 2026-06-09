@@ -58,7 +58,7 @@ Critical fields for publishing:
   "engines": {
     "node": ">=24.0.0"
   },
-  "packageManager": "pnpm@10.11.0"
+  "packageManager": "pnpm@<current>"
 }
 ```
 

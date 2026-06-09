@@ -28,4 +28,26 @@ class ValidationError extends Error {
 }
 ```
 
+## Never swallow a caught error
+
+A `catch` that does nothing (or only logs) hides the failure from the caller. Either recover meaningfully, or re-throw — preserve the cause with `{ cause }`.
+
+```js
+// FORBIDDEN - error vanishes, caller thinks it succeeded
+try {
+  await save(record)
+} catch (err) {
+  console.log(err) // swallowed: caller never learns it failed
+}
+
+// MANDATORY - re-throw (optionally wrapped) so the caller can react
+try {
+  await save(record)
+} catch (err) {
+  throw new PersistenceError(`Failed to save ${record.id}`, { cause: err })
+}
+```
+
+Only swallow when the catch genuinely makes the operation succeed (e.g. a documented optional cleanup), and say so in a comment.
+
 For language-agnostic error handling principles (fail-fast, error-first ordering, no ambiguous return values), see the `coding` skill (RULE 1, RULE 11).

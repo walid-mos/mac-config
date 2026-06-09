@@ -185,6 +185,7 @@
   },
   "effortLevel": "xhigh",
   "autoUpdatesChannel": "latest",
+  "disableDeepLinkRegistration": "disable",
   "theme": "auto",
   "skipAutoPermissionPrompt": true,
   "skipWorkflowUsageWarning": true

@@ -8,6 +8,32 @@ When working on a task that touches structure, scan for these patterns first. If
 
 ---
 
+## ARCH 0 - Deep Modules Over Shallow (HIGHEST PRIORITY)
+
+The best modules are **deep**: a lot of behaviour behind a small interface. The *interface* is everything a caller must know to use the module correctly - not just the type signature, but invariants, ordering, error modes, and required config. **Depth = leverage:** how much capability a caller gets per unit of interface they have to learn.
+
+- **Shallow module = smell.** When the interface is nearly as complex as the implementation (a one-line pass-through, a wrapper that just forwards args, a "manager" that re-exposes every internal), it adds cost without hiding complexity. Inline it or deepen it.
+- **The deletion test.** Imagine deleting the module. If complexity vanishes, it was a pass-through - delete it. If the same complexity reappears duplicated across N callers, the module was earning its keep - keep it.
+- **The interface is the test surface.** Callers and tests cross the same seam. If a test must reach *past* the interface (poke private state, stub internals) to verify behaviour, the module is the wrong shape - redesign it, don't add a back door.
+- **Dependency direction.** Depend on abstractions, not details. High-level policy (business rules) must not import low-level mechanism (DB, HTTP, FS) directly - invert via an interface/parameter and inject the concrete adapter at the edge. Stable things must not depend on volatile things.
+- **Seams: one adapter is hypothetical, two are real.** A *seam* is a place you can change behaviour without editing in place. Don't introduce one (an interface, a strategy, a plugin point) until something *actually* varies across it - a speculative seam is a shallow module in disguise.
+
+Vocabulary, used consistently: **module** (interface + implementation), **interface** (all a caller must know), **depth** (behaviour per unit of interface), **seam** (where behaviour can be swapped), **adapter** (a concrete thing at a seam), **leverage** (what callers gain), **locality** (change, bugs, and knowledge concentrated in one place).
+
+```
+// SHALLOW - the interface is as wide as the implementation; deleting it changes nothing
+function fetchThenParse(url) {
+  return fetch(url).then(r => r.json())   // every caller could just do this
+}
+
+// DEEP - small interface, real behaviour hidden behind it (retry, status check, typed result, abort)
+async function getJson(url, { signal }) {
+  // checks res.ok, retries on 5xx, validates the shape, throws a typed error
+}
+```
+
+---
+
 ## ARCH 1 - No God Objects
 
 A struct/class that holds state for unrelated concerns is a god object in formation.
@@ -136,6 +162,10 @@ When detected, STOP feature work and propose a refactor BEFORE the next addition
 
 | Pattern | Verdict | Instead |
 |---|---|---|
+| Shallow module (interface ≈ implementation; pass-through) | FORBIDDEN | Inline it or deepen it (ARCH 0) |
+| High-level policy importing low-level detail (DB/HTTP/FS) | FORBIDDEN | Depend on an abstraction, inject the adapter (ARCH 0) |
+| Speculative seam with a single adapter | AVOID | Add the seam only when a 2nd variant appears (ARCH 0) |
+| Test reaching past the interface (private state/internals) | FORBIDDEN | Test through the interface; reshape the module (ARCH 0) |
 | Single struct with >15 heterogeneous fields | FORBIDDEN | Split by ownership |
 | `[]string` or `map[string]any` as domain model | FORBIDDEN | Named typed structs |
 | Switch/if-chain with >10 cases | FORBIDDEN | Dispatch table / registry |

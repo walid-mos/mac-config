@@ -14,7 +14,8 @@ These rules apply to ALL code you write or modify, in every language. No excepti
 
 ## See also
 
-- [architecture.md](architecture.md) - Project-level architectural rules: no god objects, typed structures over positional data, dispatch tables over switch chains, explicit invariants and ownership, centralized cross-cutting namespaces, velocity-vs-progress signals. Load when designing or modifying structures across files, not just functions.
+- [architecture.md](architecture.md) - Project-level architectural rules: deep vs shallow modules (depth = leverage), the deletion test, seams & dependency direction, no god objects, typed structures over positional data, dispatch tables over switch chains, explicit invariants and ownership, centralized cross-cutting namespaces, velocity-vs-progress signals. Load when designing or modifying structures across files, not just functions.
+- [ops-discipline.md](ops-discipline.md) - AI operational rules (context / grep-before-read, model routing on subagent calls, routing-is-not-an-excuse). Load when operating as an agent/orchestrator; NOT needed for plain code authoring.
 
 ---
 
@@ -271,55 +272,53 @@ Errors should be caught AS CLOSE to their source as possible and should produce 
 
 ---
 
-## RULE 12 - Context Discipline (Grep Before Read)
+## RULE 12 - DRY: One Source of Truth per Piece of Knowledge
 
-Most of an AI coding bill is paying for context that never gets used. Reading 2000-line files to fix 30 lines is the single biggest leak. Don't do it.
+Every piece of knowledge - a constant, a validation rule, a business calculation, a type shape - has exactly ONE authoritative home. Duplicated knowledge means every change becomes a hunt for copies, and the copy you miss is the bug.
 
-**Mandatory habits:**
-- **Locate before opening.** Use `Grep` / `Glob` first to find the exact symbol, function, or filename. Only `Read` once you know which file and roughly which lines matter.
-- **Read targeted slices.** When a file is large (>500 lines) and you know the area, pass `offset` and `limit` to `Read`. Do NOT default to loading whole files.
-- **One file at a time, on demand.** Never pre-load 5 files "in case they're related". Open the next file only when the current one tells you to.
-- **Delegate breadth to Explore.** For "where is X defined / which files reference Y" across the repo, spawn the `Explore` subagent rather than running grep+Read in the main loop. Explore returns a digest; the main loop stays small.
-- **Don't re-read after editing.** `Edit` and `Write` are tracked. Reading a file you just changed to "verify" is pure waste - the tool would have errored if the change failed.
+- **Rule of three.** The same literal/logic in two places is a watch-flag; the **third** occurrence MUST be extracted to a named constant, function, or module. Don't extract on first sight - you don't yet know the shape.
+- **DRY is about knowledge, not character-similarity.** Two snippets that look alike but change for **different reasons** are NOT duplication - leave them apart. Coupling them creates a wrong abstraction, which is worse than the duplication (AHA - Avoid Hasty Abstractions).
+- **Single source of truth across boundaries.** A value needed in two files or languages (a color, an enum, a route) lives in one place; the other side imports/reads it. Never re-hardcode it "for convenience".
+- **Find it before you write it.** Before adding a helper, `grep` for an existing one (cf. global `CLAUDE.md` "Read before you write"). Reuse beats rewrite.
 
 ```
-// FORBIDDEN - blind whole-file read for a small fix
-Read("/path/to/big-module.ts")            // 1800 lines, you need 20
+// FORBIDDEN - same business rule copy-pasted; one copy will drift
+function priceCart(x)    { return x * 1.2 }  // 20% VAT
+function priceInvoice(x) { return x * 1.2 }  // 20% VAT (again)
 
-// MANDATORY - locate, then slice
-Grep("functionName", path="/path/to")     // returns file:line
-Read("/path/to/big-module.ts", offset=420, limit=60)
+// MANDATORY - one source of truth
+const VAT_RATE = 0.2
+const withVat = (amount) => amount * (1 + VAT_RATE)
 ```
 
-If you cannot articulate WHY you need to read a file right now, do not read it.
+When you fix a bug, search for the same mistake elsewhere - duplicated knowledge usually means duplicated bugs.
 
 ---
 
-## RULE 13 - Model Routing on Subagent Calls
+## RULE 13 - SOLID & Single Responsibility at the Module/File Level
 
-The `Agent` tool accepts an optional `model` parameter (`"haiku" | "sonnet" | "opus"`). Use it. Running Opus on lint, lookup, or rename is paying premium for what Haiku nails.
+RULE 3 is SRP for *functions*; this is SRP for *files and modules*, plus the rest of SOLID. A module has ONE reason to change.
 
-**Pass `model: "haiku"` explicitly when invoking Agent for:**
-- Read-only search / lookup (`Explore` agent, "where is X", "find references")
-- Mechanical edits (rename a symbol, fix a lint, tweak a log message, adjust formatting)
-- Status / introspection (`statusline-setup`, "what's the current git state")
-- Q&A about tooling (`claude-code-guide`, "how does hook X work")
-
-**Do NOT override (let it inherit) for:**
-- `general-purpose` multi-step work (research + edits + reasoning)
-- `Plan` (architect / design)
-- Code review, security review
-- Anything requiring cross-file reasoning, design tradeoffs, or correctness judgment
-
-**Rule of thumb:** if the task is "find / list / format / rename", it's a Haiku job. If it's "decide / design / reason / refactor across files", let the parent model handle it.
+- **S - Single Responsibility / clean file splitting.** One primary export per file, named after it (`createInvoice.ts` exports `createInvoice`; `UserCard.tsx` exports `UserCard`). Split a file when it mixes unrelated concerns, when you need "and" to describe it, or when it grows past ~200-250 lines. No `utils.js` grab-bags of unrelated helpers - group by domain concern.
+- **O - Open/Closed.** Extend by adding code (a new entry in a dispatch table, a new module satisfying an interface), not by editing central code on every new case. See `architecture.md` ARCH 3.
+- **L - Liskov.** Any implementation must honor the contract of what it replaces - no surprise `throw` / `null` / narrowed behavior a caller can't see. If a subtype can't fulfill the interface, it needs a different interface.
+- **I - Interface Segregation.** Depend on the narrow surface you actually use, not a fat one. Pass `{ name }`, not the whole `User`, when name is all you need.
+- **D - Dependency Inversion.** High-level policy must not import low-level detail directly. Depend on an abstraction (an interface, an injected function) and pass the concrete adapter in. This is what makes code testable - see `architecture.md` (deep modules, seams) and the `tdd` skill.
 
 ```
-// MANDATORY - cheap lookup
-Agent({ subagent_type: "Explore", model: "haiku", prompt: "find every call site of fooBar across packages/" })
+// FORBIDDEN - high-level logic hard-wired to a concrete IO detail
+function reportSales() {
+  const rows = postgres.query("SELECT ...")   // policy depends on Postgres
+  return summarize(rows)
+}
 
-// MANDATORY - no override, real work
-Agent({ subagent_type: "general-purpose", prompt: "refactor the auth flow to use the new session API" })
+// MANDATORY - depend on an abstraction, inject the detail
+function reportSales(loadRows) {
+  return summarize(loadRows())                 // testable, swappable
+}
 ```
+
+**Drive new behavior test-first.** When adding a feature or fixing a bug, reach for the `tdd` skill (red -> green -> refactor) - it bakes SRP and testable seams into the design instead of bolting tests on after.
 
 ---
 
@@ -339,9 +338,11 @@ Agent({ subagent_type: "general-purpose", prompt: "refactor the auth flow to use
 | Negated boolean names | FORBIDDEN | Positive form |
 | Side effects in pure helpers | FORBIDDEN | Push IO to the edges |
 | Em dash character `-` (U+2014) | FORBIDDEN | Use `-` with spaces or rephrase |
-| `Read` whole file before locating area | FORBIDDEN | `Grep`/`Glob` first, then `Read` with `offset`/`limit` |
-| Pre-loading files "just in case" | FORBIDDEN | Open files on demand, one at a time |
-| Re-reading a file you just edited | FORBIDDEN | Trust the edit; tool would error on failure |
-| Default model for `Explore`/lookup `Agent` calls | FORBIDDEN | Pass `model: "haiku"` explicitly |
-| Overriding `model` on `general-purpose`/`Plan` | FORBIDDEN | Let it inherit the parent model |
+| Same knowledge in 3+ places (constant, rule, type) | FORBIDDEN | One source of truth, others import it (RULE 12) |
+| Hasty abstraction coupling look-alikes that change separately | FORBIDDEN | Keep apart until the shape is proven (RULE 12) |
+| Multiple unrelated exports / >250-line grab-bag file | FORBIDDEN | One concern per file, split by responsibility (RULE 13) |
+| High-level policy importing a concrete IO detail | FORBIDDEN | Depend on an abstraction, inject the adapter (RULE 13) |
+| Adding behavior without a failing test first | AVOID | Drive it test-first - load `tdd` |
+
+> AI operational rules (grep-before-read, model routing, routing-is-not-an-excuse) moved to [ops-discipline.md](ops-discipline.md) - load when orchestrating.
 

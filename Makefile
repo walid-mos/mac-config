@@ -30,6 +30,12 @@ claude-post:
 	@claude mcp add context7 -s user -- npx -y @upstash/context7-mcp@latest 2>/dev/null || echo "context7 already registered"
 	@claude plugin marketplace add pbakaus/impeccable 2>/dev/null || echo "impeccable marketplace already added"
 	@claude plugin list 2>/dev/null | grep -q impeccable || claude plugin install impeccable@impeccable
+	@command -v jq >/dev/null || { echo "jq not found - skipping react-ts-gate hook merge"; exit 0; }
+	@S="$$HOME/.claude/settings.json"; [ -f "$$S" ] || cp claude/.claude/settings.json "$$S"; \
+		tmp="$$(mktemp)"; \
+		jq --arg pre "sh ~/.claude/hooks/react-ts-gate.sh pre" --arg post "sh ~/.claude/hooks/react-ts-gate.sh post" \
+		'def ensure($$evt; $$cmd): .hooks[$$evt] = ((.hooks[$$evt] // []) as $$arr | if any($$arr[]?; (.matcher=="Edit|Write") and any((.hooks//[])[]?; (.command//"")|test("react-ts-gate"))) then $$arr else $$arr + [{matcher:"Edit|Write", hooks:[{type:"command", command:$$cmd}]}] end); ensure("PreToolUse"; $$pre) | ensure("PostToolUse"; $$post)' \
+		"$$S" > "$$tmp" && mv "$$tmp" "$$S" && echo "react-ts-gate hook ensured in $$S" || { echo "hook merge failed - is $$S valid JSON?"; rm -f "$$tmp"; }
 
 rp-post:
 	@command -v node >/dev/null || { echo "node not found — install it (fnm install --lts) so 'rp' can serve plan.html"; exit 0; }

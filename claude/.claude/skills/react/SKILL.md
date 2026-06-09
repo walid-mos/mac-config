@@ -14,7 +14,7 @@ description: >-
 
 These rules apply to ALL React code you write or modify.
 
-> **ROUTING - qui a le droit d'écrire du React.** Toute écriture, modification ou refacto d'un fichier React (`*.tsx` / `*.jsx`, ou tout fichier qui importe React / utilise du JSX) passe **OBLIGATOIREMENT par le subagent `react-implementer`** - lui seul. Éditer un fichier React **depuis le main thread est INTERDIT**, même pour une modif triviale (prop, import, `className`). Déléguer à un subagent générique (`general-purpose`, `Plan`, `Explore`) est tout aussi INTERDIT : ces contextes ne chargent pas cette doctrine et produisent du code non conforme. Le main thread peut **lire** du React (comprendre, planifier, router) mais **jamais l'éditer**. Règle : **`react-implementer` ou rien.**
+> **Ce skill EST la doctrine.** Charge-le directement (avec `coding` + `javascript`/`typescript`) **avant** d'écrire du React — pas via un agent dédié. L'enforcement est garanti par le hook `react-ts-gate` qui s'exécute à chaque Write/Edit d'un `.ts(x)/.js(x)` : il bloque `any`/`as` et alerte sur `useEffect` + taille de fichier. Si tu délègues du React à un subagent, son prompt doit lui faire charger ces skills en premier.
 
 ---
 
@@ -196,49 +196,24 @@ export function UserCard({ user }: { user: User }): JSX.Element {
 
 ---
 
+## RULE 9 - DON'T REPEAT UI, KEEP COMPONENTS SHALLOW & TESTED
+
+- **DRY for React.** Repeated markup or logic = extract. Duplicated JSX -> a component; duplicated stateful logic -> a custom hook (shares logic, not state - RULE 4). Rule of three: the third copy MUST be extracted; don't abstract on the first (you don't know the shape yet).
+- **Shallow JSX.** Keep render trees flat: JSX nested >3 levels, or a component past ~150 lines, means extract a child component. Prefer fragments over wrapper `<div>`s.
+- **Test behaviour, not internals.** Test components as a user does (React Testing Library: query by role/text, fire events, assert visible output). Never assert internal state, hook call order, or snapshot a tree you don't understand. Load the `test` skill (+ `vitest`) for component tests; `tdd` to drive them first.
+- **Memoize only when measured.** `useMemo` / `useCallback` / `React.memo` are for proven hot paths or to stabilize a dependency/ref - not a default. Compute during render first (RULE 1/3); reach for memo when a profile says so.
+
+---
+
 ## State management
 
 ### Minimal state - if derivable, not state
 
-For each piece of data, if ANY is true it's NOT state:
-1. Unchanged over time --> Constant
-2. Passed from parent --> Prop
-3. Computable from state/props --> Derived value
-
-```tsx
-// FORBIDDEN - redundant state
-const [items, setItems] = useState<Item[]>([])
-const [itemCount, setItemCount] = useState(0)
-const [hasItems, setHasItems] = useState(false)
-const [selectedItem, setSelectedItem] = useState<Item | null>(null)
-
-// MANDATORY - single source of truth
-const [items, setItems] = useState<Item[]>([])
-const [selectedId, setSelectedId] = useState<string | null>(null)
-
-const itemCount = items.length
-const hasItems = items.length > 0
-const selectedItem = items.find(i => i.id === selectedId) ?? null
-```
+If a value is a constant, a prop, or computable from state/props, it is **not state** - compute it during render (RULE 3). Never mirror a derived value (`itemCount`, `hasItems`, `selectedItem`) into its own `useState`; derive it: `const selectedItem = items.find(i => i.id === selectedId) ?? null`.
 
 ### Immutable updates - always
 
-```tsx
-// FORBIDDEN - mutates state
-items.push(item)
-setItems(items) // same reference, React skips re-render
-
-// MANDATORY
-setItems([...items, item])
-
-// FORBIDDEN - mutates nested state
-const user = users.find(u => u.id === id)
-user.name = newName
-setUsers([...users])
-
-// MANDATORY
-setUsers(users.map(u => u.id === id ? { ...u, name: newName } : u))
-```
+Never mutate state; create new references: `setItems([...items, item])`, `setUsers(users.map(u => u.id === id ? { ...u, name: newName } : u))`. In-place `push`/`splice`/field assignment keeps the same reference and React skips the re-render. Full rule: `coding` RULE 7.
 
 ### Group related state
 
@@ -281,8 +256,8 @@ This is the single authoritative decision table for state management:
 |---|---|
 | Local UI state (toggle, form input) | `useState` |
 | Complex local state (multi-field, many handlers) | `useReducer` |
-| Cross-cutting concerns (theme, auth, locale) | Context |
-| Shared state across distant components | **Jotai atoms** - see [jotai.md](jotai.md) |
+| Sub-tree scoping only (a themed section, a scoped form) | Context |
+| Cross-cutting + shared state across distant components (auth, locale, flags) | **Jotai atoms** - see [jotai.md](jotai.md) |
 | Server state (fetch, cache, sync, invalidation) | A server-state library (React Query / SWR / RSC) - never `useState` + `useEffect` |
 
 State lives in the **closest common parent** when using `useState`/`useReducer`. Jotai atoms are the escape hatch when lifting would require drilling through too many layers.
@@ -298,20 +273,7 @@ State lives in the **closest common parent** when using `useState`/`useReducer`.
 
 ### Never suppress exhaustive-deps
 
-```tsx
-// FORBIDDEN
-useEffect(() => {
-  fetchData(userId)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [])
-
-// MANDATORY - fix the code, not the linter
-useEffect(() => {
-  fetchData(userId)
-}, [userId])
-```
-
-If the linter complains, the code has a design problem. Fix the design.
+Never add `// eslint-disable react-hooks/exhaustive-deps`. A linter complaint means a design problem - fix it via the dependency-removal checklist below, not by silencing the rule.
 
 ### Dependency removal checklist
 
@@ -376,6 +338,10 @@ These mimic class lifecycle methods, bypass dependency linting, and prevent prop
 | Imperative component fusing subscription + render + backend coordination | FORBIDDEN | Renderer module + `use*` hook + presentational shell (composition.md S) |
 | Effect body with inline logic beyond wiring + cleanup | FORBIDDEN | Extract pure logic to a module fn (RULE 4.4); keep the effect thin |
 | Index as key on dynamic lists | FORBIDDEN | Stable unique IDs |
+| Duplicated JSX / stateful logic (3rd copy) | FORBIDDEN | Extract a component / custom hook (RULE 9) |
+| JSX nested >3 levels or component >150 lines | FORBIDDEN | Extract child components (RULE 9) |
+| Asserting internal state / hook order / blind snapshots | FORBIDDEN | Test visible behaviour via RTL (RULE 9) |
+| `useMemo`/`useCallback`/`memo` by default | AVOID | Memoize only proven hot paths / dep stability (RULE 9) |
 | Context for shared state | AVOID | Jotai atoms |
 | Context for local state | AVOID | Props, children, lift state |
 | Prop drilling through 3+ layers | AVOID | Compose with children, then Jotai |

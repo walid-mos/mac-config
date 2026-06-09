@@ -44,18 +44,18 @@
 
 L'utilisateur dit **précisément et explicitement** qu'il veut un fallback, une migration ou un backup. Tant que ce n'est pas dit noir sur blanc, la réponse par défaut est **greenfield, rien d'autre**. Dans le doute → demander, ne jamais présumer qu'un fallback/une migration est souhaité. Vaut **surtout sur les features**.
 
-## Subagent routing
+## React — charger la doctrine avant d'écrire (skill + hook, pas d'agent dédié)
 
-### HARD RULE — tout fichier React passe OBLIGATOIREMENT par `react-implementer`
+### HARD RULE — pas de React sans les skills `coding` + `javascript` + `typescript` + `react` chargés
 
-Dès que tu écris, modifies ou refactors du code **React** (`.tsx` / `.jsx`, ou tout fichier qui importe React / utilise du JSX), tu **dois déléguer au subagent `react-implementer`**. **Aucune exception, aucun critère ne surpasse cette règle.**
+Dès que tu écris, modifies ou refactors du **React** (`.tsx` / `.jsx`, ou tout fichier qui importe React / utilise du JSX), tu **dois d'abord charger et appliquer** les skills `coding`, `javascript`, `typescript` puis `react`. **Aucune exception, aucun critère ne surpasse cette règle.** La connaissance React générique ne suffit pas : ces skills codifient des règles non-évidentes (composition > config > héritage, `useEffect` quasi-interdit, état dérivé, hooks, un composant par fichier, `any`/`as` bannis) qui priment sur les habitudes par défaut.
 
-- **INTERDIT sur le main thread** : ne JAMAIS éditer un fichier React directement depuis le thread principal — pas même une modif triviale (une prop, un import, un `className`, un typo dans du JSX). Le main thread ne charge pas la doctrine (`coding`, `javascript`, `typescript`, `react` skills) et produit du code qui viole les règles du repo (SOLID/composition, useEffect, état dérivé, etc.).
-- **INTERDIT via un subagent générique** : déléguer du travail React à `general-purpose`, `Plan`, `Explore` ou tout autre subagent qui n'est pas `react-implementer` est tout aussi proscrit, pour la même raison (doctrine non chargée).
-- **Seule voie autorisée pour écrire du React** : `react-implementer`, et lui seul.
-- Le main thread garde le droit de **lire / explorer** du React (comprendre, planifier, router), d'éditer des fichiers **non-React** (docs `.md`, config, scripts) et d'orchestrer la délégation. Lire est autorisé ; **écrire/éditer un fichier React ne l'est pas**.
+- **Charge la doctrine AVANT la première ligne.** Pas de React écrit « de mémoire » : sans `coding` + `javascript` + `typescript` + `react` chargés, tu produis du code non conforme.
+- **L'enforcement est déterministe (hook `react-ts-gate`).** À chaque Write/Edit d'un fichier `.ts(x)/.js(x)`, le hook **bloque** `any` et les assertions `as` (sauf `as const`), et **alerte** sur `useEffect` et les fichiers trop longs. Un blocage = corrige le design, ne le contourne jamais.
+- **Déléguer reste permis ; charger la doctrine reste obligatoire.** Si tu confies du React à un subagent (Workflow, `general-purpose`…), son prompt doit lui faire charger ces skills en premier. Un agent qui n'a pas chargé la doctrine n'écrit pas de React.
+- **Lire / explorer** du React est toujours libre.
 
-Règle mnémotechnique : pour écrire du React, c'est **`react-implementer` ou rien**. Jamais le main thread, jamais un autre agent.
+Règle mnémotechnique : **pas de React sans la doctrine `react` chargée.** Le skill, pas un agent dédié.
 
 ## Build-or-Borrow — gate avant écriture de code
 

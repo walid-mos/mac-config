@@ -43,8 +43,7 @@ if [ "$phase" = "pre" ]; then
 - any & as: INTERDITS (seul as const toléré).
 - useEffect: quasi-interdit. Préfère état dérivé, event handlers, calcul au render. Un effet = synchro avec un système EXTERNE réel.
 - Composition > config > héritage. SRP. Petits composants. Pas de god-component ni de prop explosion.
-- Budget: < ${LINE_BUDGET} lignes/fichier, sinon découpe en composants/hooks.
-- Tâche React non-triviale → déléguer au subagent react-implementer."
+- Budget: < ${LINE_BUDGET} lignes/fichier, sinon découpe en composants/hooks (SRP, composition)."
 	else
 		reminder="RAPPEL doctrine — TS ($file). Applique coding + typescript.
 - any & as: INTERDITS (seul as const toléré). Utilise type-guards, génériques, types de retour explicites.

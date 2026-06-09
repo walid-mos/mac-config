@@ -82,6 +82,15 @@
             "command": "if [ -x '/Users/walid-mos/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/walid-mos/.orca/agent-hooks/claude-hook.sh'; fi"
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh ~/.claude/hooks/react-ts-gate.sh pre"
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -91,6 +100,15 @@
           {
             "type": "command",
             "command": "if [ -x '/Users/walid-mos/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/walid-mos/.orca/agent-hooks/claude-hook.sh'; fi"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh ~/.claude/hooks/react-ts-gate.sh post"
           }
         ]
       }

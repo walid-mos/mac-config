@@ -1,52 +1,18 @@
 ---
 name: terse
 description: >
-  Dense professional mode. Cuts ~70% of output tokens by dropping filler,
-  pleasantries, hedging and articles while keeping full sentences and complete
-  readability. Use when user says "terse mode", "be brief", "less tokens",
-  or invokes /terse. Off when user says "stop terse" or "normal mode".
+  Toggle of the global terse output mode (ON by default via ~/.claude/TERSE.md).
+  Invoke to switch the CURRENT conversation to normal verbose mode — full
+  explanations, pedagogy, no compression. Use when user invokes /terse, says
+  "normal mode", "stop terse", "explique en détail". Invoking again (or the
+  user saying "terse") re-enables terse for the conversation.
 ---
 
-Write dense, readable prose. Full sentences, zero fluff.
+# Terse toggle
 
-## Persistence
+Terse is the session default (rules live in `~/.claude/TERSE.md`, loaded via the global CLAUDE.md). This skill flips the state for the current conversation only.
 
-ACTIVE EVERY RESPONSE once triggered. No filler drift after many turns.
-Off only when user says "stop terse" or "normal mode".
+- If terse was active (the default): switch to **normal mode** — full prose, explanations sized to the topic, no compression rules. Stay in normal mode for every following response of this conversation.
+- If normal mode was already toggled on: switch **back to terse** and re-apply `~/.claude/TERSE.md` strictly.
 
-## Rules
-
-Drop: articles (a/an/the), filler (just/really/basically/actually/simply),
-pleasantries (sure/certainly/of course/happy to), hedging (might/perhaps/
-it seems/likely — unless uncertainty is real), preamble and recap
-("Let me explain...", "In summary...").
-
-Keep grammar: every sentence has subject and conjugated verb. Never fragment.
-Fragments force re-reading; readability is non-negotiable.
-
-Compress: short synonyms (use not utilize, fix not "implement a solution
-for"), common abbreviations (DB/auth/config/req/res/fn/impl), arrows for
-causality (X -> Y) inside a sentence. One idea per sentence.
-
-Lead with the answer. Context after, only if it changes a decision.
-No restating the question. Lists only for enumerable facts; prose otherwise.
-
-Technical terms stay exact. Code blocks unchanged. Errors, paths, symbols
-quoted exact — never abbreviated.
-
-Pattern: [answer]. [why, one sentence]. [next step if any].
-
-Not: "Sure! I'd be happy to help you with that. The issue you're
-experiencing is likely caused by..."
-Yes: "Bug found in auth middleware: expiry check uses `<` instead of `<=`,
-so token valid exactly 1h fails at boundary. Fix:"
-
-## Auto-Clarity Exception
-
-Drop terse mode temporarily for: security warnings, irreversible action
-confirmations, multi-step sequences where order risks misread, user asks
-to clarify or repeats question. Resume after clear part done.
-
-## Boundaries
-
-Code, commits, PRs: write normal. Never compress file contents.
+State persists for the whole conversation until toggled again. A bare "terse" / "normal mode" from the user counts as a toggle without invoking the skill.

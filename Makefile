@@ -2,7 +2,7 @@ SHELL := /usr/bin/env bash
 STOW := stow -t $(HOME)
 PACKAGES := claude cmux colima docker ghostty languages nvim opencode rectangle rp rtk starship zsh
 
-.PHONY: help install all unstow restow $(PACKAGES) rp-post rtk-post
+.PHONY: help install all unstow restow $(PACKAGES) claude-post rp-post rtk-post
 
 help:
 	@echo "Targets:"
@@ -14,7 +14,7 @@ help:
 	@echo ""
 	@echo "Packages: $(PACKAGES)"
 
-install all: $(PACKAGES) rp-post rtk-post
+install all: $(PACKAGES) claude-post rp-post rtk-post
 
 unstow:
 	@for pkg in $(PACKAGES); do $(STOW) -D $$pkg; done
@@ -24,6 +24,14 @@ restow:
 
 $(PACKAGES):
 	$(STOW) $@
+
+claude-post:
+	@if ! command -v d2 >/dev/null; then \
+		if command -v brew >/dev/null; then brew install d2; \
+		else echo "d2 introuvable et brew indisponible — installe-le à la main (https://d2lang.com)"; fi; \
+	fi
+	@command -v d2 >/dev/null && echo "d2 prêt: le skill /html rend les blocs data-np=\"d2\" au build" \
+		|| echo "d2 non installé — les blocs d2 feront échouer build.sh"
 
 rp-post:
 	@command -v node >/dev/null || { echo "node not found — install it (fnm install --lts) so 'rp' can serve plan.html"; exit 0; }

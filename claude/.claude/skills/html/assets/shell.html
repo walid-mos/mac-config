@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="{{LANG}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>{{TITLE}}</title>
+<script>
+(function () {
+  try {
+    var stored = localStorage.getItem('np-theme');
+    var theme = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', theme);
+  } catch (e) {
+    document.documentElement.setAttribute('data-theme', 'light');
+  }
+})();
+</script>
+<style>
+{{CSS}}
+</style>
+</head>
+<body{{BODY_ATTRS}}>
+<div class="layout">
+<aside class="sidebar"></aside>
+<main class="main">
+{{BODY}}
+</main>
+</div>
+<script>
+{{JS}}
+</script>
+</body>
+</html>

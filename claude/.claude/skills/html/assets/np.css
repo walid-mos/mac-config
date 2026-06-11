@@ -421,6 +421,18 @@ pre code, pre code.hljs { background: transparent; padding: 0; font: inherit; co
 .copy-btn:hover { background: var(--np-accent-bg); }
 .copy-btn.is-copied { color: var(--np-add-text); border-color: var(--np-add-border); }
 
+/* ---------- tabs (runtime builds the tab-list from [data-tab] children) ---------- */
+.tabs { margin: 14px 0; }
+.tabs .tab-list { display: flex; gap: 2px; flex-wrap: wrap; border-bottom: 1px solid var(--np-border); }
+.tabs .tab-btn { font: inherit; font-size: 13px; font-weight: 600; padding: 7px 14px; margin-bottom: -1px; background: transparent; border: 0; border-bottom: 2px solid transparent; color: var(--np-text-muted); cursor: pointer; }
+.tabs .tab-btn:hover { color: var(--np-text); }
+.tabs .tab-btn.active { color: var(--np-accent-hover); border-bottom-color: var(--np-accent); }
+.tabs > [data-tab] { padding-top: 14px; }
+.tabs.tabs-ready > [data-tab] { display: none; }
+.tabs.tabs-ready > [data-tab].active { display: block; }
+/* no-JS fallback: panels stack, each labelled by its data-tab */
+.tabs:not(.tabs-ready) > [data-tab]::before { content: attr(data-tab); display: block; font-family: var(--np-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--np-text-muted); margin: 14px 0 6px; }
+
 /* ---------- collapse (native details) ---------- */
 details.fold { border: 1px solid var(--np-border); border-radius: var(--np-radius); background: var(--np-bg-soft); margin: 10px 0; }
 details.fold > summary { cursor: pointer; padding: 10px 14px; font-weight: 600; font-size: 13.5px; list-style: none; display: flex; align-items: center; gap: 8px; }
@@ -459,7 +471,9 @@ form.rich-question textarea { width: 100%; min-height: 64px; font: inherit; font
 
 /* ---------- print ---------- */
 @media print {
-  .np-theme-toggle, .rp-gate, .sidebar, .copy-btn, .code-block__copy { display: none !important; }
+  .np-theme-toggle, .rp-gate, .sidebar, .copy-btn, .code-block__copy, .tabs .tab-list { display: none !important; }
   .layout.has-sidebar { grid-template-columns: 1fr; }
+  .tabs.tabs-ready > [data-tab] { display: block !important; }
+  .tabs.tabs-ready > [data-tab]::before { content: attr(data-tab); display: block; font-family: var(--np-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--np-text-muted); margin: 14px 0 6px; }
   body { font-size: 12px; }
 }

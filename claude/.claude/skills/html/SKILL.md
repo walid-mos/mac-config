@@ -2,11 +2,9 @@
 name: html
 description: >-
   Generate a single self-contained HTML deliverable (plan, audit, review,
-  retro, research, decision record, triage board). Token-optimized: you write
-  only the semantic body content; a build script wraps it with the shared
-  NextNode stylesheet + runtime (theme, sidebar, copy buttons, diff parser,
-  lazy mermaid/hljs). Load on "génère un html", "fais-moi un récap html", or
-  any session whose output is a standalone HTML artifact (not a product UI).
+  retro, research, decision record, triage board) styled with the shared
+  NextNode shell. Load on "génère un html", "fais-moi un récap html", or any
+  session whose output is a standalone HTML artifact (not a product UI).
 user-invocable: true
 ---
 
@@ -18,7 +16,7 @@ Form follows data. The same skill produces an implementation plan, a review writ
 
 ## Pipeline
 
-1. **Pick the shape** from the intent (table below). Compose freely from the block vocabulary — the table is a starter, not an enclosure.
+1. **Pick the shape** from the intent (table below). Compose freely from the block vocabulary.
 2. **Read `./reference.md`** for the markup vocabulary (block classes, data-islands, rich-mode forms).
 3. **Write the body fragment** to a temp file (e.g. `/tmp/<slug>.body.html`): semantic markup only — sections, blocks, inline SVG. No `<html>`, no `<head>`, no stylesheet, no runtime script.
 4. **Build**:
@@ -34,12 +32,12 @@ Form follows data. The same skill produces an implementation plan, a review writ
 | Intent | Composition |
 |---|---|
 | Implementation plan | header + strip + file-tree + timeline + flow diagram + risk-grid + next-steps |
-| Code review writeup | header + tldr + diff + file-by-file + pills by severity |
+| Code review writeup | header + tldr + diff + file-by-file (tabs si >3 fichiers) + pills by severity |
 | Architecture audit | header + svg module map + findings + risk-grid + next-steps |
 | Retro / post-mortem | header + timeline (minute-by-minute) + twocol good/bad + next-steps |
 | Research / explainer | header + tldr + prose sections (`-w prose`) + diagrams + sources |
 | Triage / backlog board | header + board data-island (`-m rich` if decisions come back) |
-| Decision record | header + diag-compare or ctable + callout (decision) + risk-grid |
+| Decision record | header + diag-compare/ctable (2 options) or tabs (3+) + callout (decision) + risk-grid |
 | Status report | header + strip + timeline + twocol shipped/slipped |
 
 ## Rules
@@ -47,7 +45,8 @@ Form follows data. The same skill produces an implementation plan, a review writ
 - **Content only, never invented**: if the data for a block isn't there, omit the block.
 - **Per-doc custom styling is allowed** — one `<style>` at the top of the body fragment — but only `var(--np-*)` tokens, **no color literal**. New color = new token in `np.css`, not a hex in the doc.
 - **At least one spatial block** (diagram, SVG, timeline, board) unless the doc is pure prose. Walls of `<h2>` + `<p>` are a smell.
-- **Real architecture schemas → D2.** A `<div data-np="d2">` block is rendered at build time to inline SVG (light + dark, zero CDN) — prefer it over hand-built `.diag-*` whenever the topology is non-trivial. Requires `d2` (`make claude-post`). See reference.md.
+- **Navigation par nature du contenu** : séquentiel (étapes, timeline, récit) → scroll ; parallèle (variantes, scénarios, par-fichier — le lecteur compare, il ne lit pas dans l'ordre) → tabs (`data-np="tabs"`) ; détail optionnel (annexe, données brutes) → fold. Un doc dont les sections s'empilent alors qu'elles se comparent est aussi cassé qu'un mur de `<p>`.
+- **Real architecture schemas → D2** (`<div data-np="d2">`, build-time inline SVG, requires `d2` via `make claude-post`). See reference.md.
 - **Accent discipline**: saturated `--np-accent` = the lone primary CTA + thin indicators only. Highlight blocks use `--np-bg-soft` + 4px accent left border, never an `--np-accent-bg` fill. Orange is never a primary action.
 - **Code blocks**: always `<figure class="code-block" data-file="…">` + `language-*` class. Escape `<`/`>` inside `.diff` content.
 - **Every interactive/editable doc exports**: copy buttons (`data-copy`, board exports) are the loop back into the agent — never ship a dead end.
@@ -62,9 +61,13 @@ Form follows data. The same skill produces an implementation plan, a review writ
 
 A caller skill that specifies a different path wins.
 
+## Multi-fichiers
+
+Un livrable reste un fichier autonome par défaut. Splitte en plusieurs `.html` inter-liés quand le doc sert **plusieurs lectures distinctes** (vue d'ensemble vs détail par sous-système, plan vs annexes de recherche, une page par étape d'un gros plan) — pas quand il est juste long : long + une seule lecture = sidebar, contenus parallèles = tabs. Si tu splittes : un fichier index (header + strip + liens vers chaque partie), liens **relatifs** entre fichiers (`./<slug>-partie.html`), même dossier, même date dans les slugs, et chaque partie reste lisible seule (son propre header + lien retour).
+
 ## Rich mode (`-m rich`)
 
-For docs whose answers must come back as typed data (open questions, decisions, tunable values, board ordering). The runtime auto-instruments prose as contenteditable (skip-zones: pre, table, diagrams, forms, `.static`), collects `form.rich-question` answers, `[data-token]` inputs and board state, and injects a sticky Approve/Reject gate that POSTs to `./submit` (clipboard fallback if no server). Contract on return: `approval_mode: "approved"` → start implementing immediately, no restating; `"rejected"` → don't implement, ask for direction. Serve with `rp <slug>` in background and give the user the URL (read it from stdout / `.rp-url` — never assume the port).
+For docs whose answers must come back as typed data (open questions, decisions, tunable values, board ordering). The runtime auto-instruments prose as contenteditable (skip-zones: pre, table, diagrams, forms, `.static`) and injects a sticky Approve/Reject gate that POSTs to `./submit` (clipboard fallback if no server). Contract on return: `approval_mode: "approved"` → start implementing immediately, no restating; `"rejected"` → don't implement, ask for direction. Serve with `rp <slug>` in background and give the user the URL (read it from stdout / `.rp-url` — never assume the port).
 
 ## Before declaring done
 

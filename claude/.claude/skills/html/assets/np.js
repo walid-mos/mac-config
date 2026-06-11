@@ -117,6 +117,49 @@
     }).join('');
   });
 
+  /* ---------- 5b. tabs — <div class="tabs" data-np="tabs"> ----------
+     Children carry data-tab="Label"; the runtime builds the tab-list.
+     data-active on a child preselects it (default: first). Without JS
+     the panels stack, labelled via CSS ::before.                      */
+  $$('.tabs[data-np="tabs"]').forEach(function (box) {
+    var panels = $$(':scope > [data-tab]', box);
+    if (!panels.length) return;
+    var list = document.createElement('div');
+    list.className = 'tab-list';
+    list.setAttribute('role', 'tablist');
+    var btns = panels.map(function (p, i) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'tab-btn';
+      b.setAttribute('role', 'tab');
+      b.textContent = p.getAttribute('data-tab');
+      b.addEventListener('click', function () { activate(i); });
+      list.appendChild(b);
+      p.setAttribute('role', 'tabpanel');
+      return b;
+    });
+    function activate(i) {
+      panels.forEach(function (p, j) {
+        p.classList.toggle('active', j === i);
+        btns[j].classList.toggle('active', j === i);
+        btns[j].setAttribute('aria-selected', j === i ? 'true' : 'false');
+      });
+      document.dispatchEvent(new CustomEvent('np:tab-shown', { detail: { panel: panels[i] } }));
+    }
+    list.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') return;
+      var cur = btns.indexOf(document.activeElement);
+      if (cur < 0) return;
+      var next = (cur + (ev.key === 'ArrowRight' ? 1 : btns.length - 1)) % btns.length;
+      btns[next].focus();
+      activate(next);
+    });
+    box.insertBefore(list, box.firstChild);
+    box.classList.add('tabs-ready');
+    var pre = panels.filter(function (p) { return p.hasAttribute('data-active'); });
+    activate(pre.length ? panels.indexOf(pre[0]) : 0);
+  });
+
   /* ---------- 6. generic copy buttons ----------
      <button class="copy-btn" data-copy="#selector">  → copies innerText of target
      <button class="copy-btn" data-copy-text="...">   → copies the literal payload   */
@@ -178,6 +221,21 @@
           el.textContent = src;
         });
         themed(e.detail.theme);
+      });
+      /* diagrams rendered while their tab was hidden have a broken size — re-render on first show */
+      document.addEventListener('np:tab-shown', function (e) {
+        var stale = $$('.mermaid', e.detail.panel).filter(function (el) {
+          var svg = el.querySelector('svg');
+          return svg && svg.getBoundingClientRect().width === 0;
+        });
+        if (!stale.length) return;
+        stale.forEach(function (el) {
+          var src = el.getAttribute('data-source') || el.textContent;
+          el.removeAttribute('data-processed');
+          el.setAttribute('data-source', src);
+          el.textContent = src;
+        });
+        mermaid.run({ nodes: stale });
       });
     }).catch(function () {});
   })();

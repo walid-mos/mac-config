@@ -35,6 +35,22 @@ Everything below is already styled by `np.css` and wired by `np.js`. Write the m
 <details class="fold"><summary>Titre repliable</summary><div class="fold-body">…</div></details>
 ```
 
+## Tabs
+
+Pour du contenu **parallèle** — variantes d'une même chose (options A/B/C, scénarios, par-fichier, par-environnement) que le lecteur compare au lieu de lire en séquence. Le runtime construit la barre d'onglets depuis les enfants `[data-tab]` ; sans JS les panneaux s'empilent avec leur label.
+
+```html
+<div class="tabs" data-np="tabs">
+  <div data-tab="Scénario bas">…n'importe quels blocs…</div>
+  <div data-tab="Scénario médian" data-active>…préselectionné…</div>
+  <div data-tab="Scénario haut">…</div>
+</div>
+```
+
+- Jamais pour du contenu séquentiel (étapes, timeline) — un onglet caché n'est pas un « plus tard », c'est un « peut-être jamais lu ».
+- Diagrammes dans un onglet : préférer D2 (SVG inline build-time, taille correcte même caché) ; mermaid est re-rendu au premier affichage de l'onglet.
+- Pas d'onglet fourre-tout « Autres » ; 2–6 onglets, labels courts.
+
 ## Code, diff, files
 
 ```html

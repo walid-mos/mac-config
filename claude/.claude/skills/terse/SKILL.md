@@ -2,8 +2,8 @@
 name: terse
 description: >
   Toggle of the global terse output mode (ON by default via ~/.claude/TERSE.md).
-  Invoke to switch the CURRENT conversation to normal verbose mode — full
-  explanations, pedagogy, no compression. Use when user invokes /terse, says
+  Invoke to switch the CURRENT conversation to normal verbose mode.
+  Use when user invokes /terse, says
   "normal mode", "stop terse", "explique en détail". Invoking again (or the
   user saying "terse") re-enables terse for the conversation.
 ---

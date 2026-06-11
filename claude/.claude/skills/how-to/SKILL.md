@@ -2,13 +2,9 @@
 name: how-to
 description: >-
   Answer an implementation question ("how do I do X with Y?") with
-  version-pinned, freshest-available documentation plus field evidence.
-  Detects the exact version of each relevant dependency in the current
-  project, fetches official docs matching that version, then
-  cross-references real-world reports (GitHub issues, Stack Overflow,
-  changelogs) for known bugs, pitfalls and prior art. Trigger on /how-to,
-  "comment je fais/implémente X", "how do I", "what's the right way to",
-  "quelle est la bonne façon de".
+  version-pinned official docs plus field evidence (known bugs, pitfalls,
+  prior art). Trigger on /how-to, "comment je fais/implémente X",
+  "how do I", "what's the right way to", "quelle est la bonne façon de".
 user-invocable: true
 ---
 
@@ -64,11 +60,10 @@ all, say so and use latest stable explicitly.
   docs (`legacy.reactjs.org` vs `react.dev`, `/docs/v4/`, `/en/14/`,
   readthedocs version switcher) — verify the page header states the
   version you pinned. A doc page that silently describes a newer major
-  is a wrong source.
+  is a wrong source; flag any version mismatch.
 - Fetch the **changelog / release notes** between the pinned version and
-  latest. This catches: APIs that don't exist yet in the project's
-  version, APIs deprecated since, and behavior changes that invalidate
-  older advice.
+  latest. This catches APIs missing/deprecated in the pinned version and
+  behavior changes that invalidate older advice.
 - Check each source's publication/update date. Reject anything that
   predates the pinned major version unless it's the official versioned
   doc itself.
@@ -98,20 +93,16 @@ Lead with the recommended approach. Then:
   project's existing style/idioms.
 - **Caveats from the field**: each known bug/footgun with its source
   link, date, and affected-version range. If field reports contradict
-  the official docs, say so explicitly — don't paper over it.
+  the official docs, say so explicitly.
 - **Version gap warning** when relevant: if the project is N majors
-  behind and the newer version changes the recommended approach, show
-  the pinned-version answer as primary and mention the upgrade path in
-  one short paragraph.
+  behind and the newer version changes the recommended approach, answer
+  for the pinned version and mention the upgrade path in one short
+  paragraph.
 - Every non-obvious claim carries an inline source link. No source =
   no claim.
 
 ## Hard rules
 
-- Never skip step 3 because the answer "is well known". Well-known
-  answers are exactly the ones training data gets stale on.
-- Never quote docs for a different major version than the one pinned
-  without flagging the mismatch.
 - A fetch failure is not an excuse to fall back to memory — retry,
   try the alternate doc mirror, or state plainly which claim is
   unverified.

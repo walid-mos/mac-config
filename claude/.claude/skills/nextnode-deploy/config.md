@@ -54,6 +54,13 @@ build_args = ["ANALYTICS_ID"]                # Optional, build only -- extra Git
 # ref = "ghcr.io/some-org/app:v1.2.3"        # Required when source = "upstream"
 # registry_auth_secret = "GHCR_READ_TOKEN"   # Optional, upstream only -- see field table
 
+[[deploy.cron]]                              # Optional (Hetzner only) -- scheduled HTTP jobs, table-array, see field table
+name = "cleanup"                             # Required -- kebab identifier, unique across jobs
+schedule = "0 3 * * *"                       # Required -- standard 5-field cron expression
+path = "/api/cron/cleanup"                   # Required -- absolute path; hit on the target service INTERNALLY
+method = "POST"                              # Optional -- "GET" | "POST" (default "POST")
+service = "web"                              # Optional -- target [deploy.services.<name>] (default: primary/first service)
+
 [[services.r2.buckets]]                      # Optional -- per-project R2 buckets, table-array, see field table
 name = "assets"                              # Bucket alias (kebab-case)
 cdn  = true                                  # Optional -- public CDN custom domain (default false)
@@ -68,6 +75,12 @@ migrate_command = "pnpm drizzle-kit migrate" # Optional -- shell run inside the 
 check_command = "pnpm drizzle-kit check"     # Optional -- shell run on the GH runner during quality
 
 [services.supabase]                          # Optional -- declarative gate, no fields. Pulls in the full self-hosted stack + R2 backups.
+
+[services.observability]                     # Optional (Hetzner only) -- self-hosted metrics + logs + alerting stack
+logs_retention = "30d"                       # Required -- VictoriaLogs retention, positive int + h/d/w/y suffix
+metrics_retention_months = 12                # Required -- VictoriaMetrics retention, integer months (1-120)
+logs_vhost = "logs.monitoring.nextnode.fr"   # Required -- Caddy tailnet front for log ingestion + LogsQL
+metrics_vhost = "metrics.monitoring.nextnode.fr" # Required -- Caddy tailnet front for vmui (ad-hoc PromQL)
 ```
 
 ## TypeScript types
@@ -86,6 +99,7 @@ interface ServicesConfig {
   readonly r2?: R2ServiceConfig
   readonly postgres?: PostgresServiceConfig
   readonly supabase?: SupabaseServiceConfig
+  readonly observability?: ObservabilityServiceConfig
 }
 
 interface R2ServiceConfig {
@@ -108,6 +122,13 @@ interface PostgresServiceConfig {
 // opts the project into the full Supabase stack + R2 backups alias. No
 // fields today; future knobs land here when there's a decision to expose.
 type SupabaseServiceConfig = Readonly<Record<string, never>>
+
+interface ObservabilityServiceConfig {
+  readonly logsRetention: string            // "30d" etc. (positive int + h/d/w/y)
+  readonly metricsRetentionMonths: number   // integer months, 1-120
+  readonly logsVhost: string                // tailnet host Caddy fronts VictoriaLogs
+  readonly metricsVhost: string             // tailnet host Caddy fronts VictoriaMetrics/vmui
+}
 
 interface ProjectSection {
   readonly name: string
@@ -160,6 +181,19 @@ interface HetznerVpsDeploySection extends BaseDeploySection {
   readonly secrets: ReadonlyArray<string>  // pull pool — see [deploy] field table
   readonly hetzner: HetznerDeployConfig
   readonly services: Readonly<Record<string, UserServiceConfig>>  // keyed by KEBAB instance name, at least one
+  readonly cron: ReadonlyArray<CronJobConfig>  // [[deploy.cron]] jobs; [] when none. Hetzner only.
+}
+
+const CRON_METHODS = ['GET', 'POST'] as const
+type CronMethod = (typeof CRON_METHODS)[number]
+const DEFAULT_CRON_METHOD: CronMethod = 'POST'
+
+interface CronJobConfig {
+  readonly name: string         // kebab, unique across jobs
+  readonly schedule: string     // standard 5-field cron expression
+  readonly path: string         // absolute path hit on the target service (http://<service>:<port><path>)
+  readonly method: CronMethod   // GET | POST (default POST)
+  readonly service?: string     // target [deploy.services.<name>]; omitted = primary (first declared)
 }
 
 interface CloudflarePagesDeploySection extends BaseDeploySection {
@@ -281,7 +315,7 @@ Defaults live in `DEFAULT_HETZNER_CONFIG` (`config/types.ts`). When target is `h
 
 ### `[deploy.volumes]` (optional, Hetzner only)
 
-Map of alias -> absolute mount path. Each alias is materialized as a Docker named volume on the VPS local SSD and mounted into the PRIMARY service (the first declared `[deploy.services.<name>]`). Alias is a kebab identifier; mount must be an absolute path. Cloudflare Pages ignores the field. See [hetzner-caller.md](hetzner-caller.md) for lifecycle (redeploys preserve, teardown preserves unless `wipeBackups`).
+Map of alias -> absolute mount path. Each alias is materialized as a Docker named volume on the VPS local SSD and mounted into the PRIMARY service (the first declared `[deploy.services.<name>]`). Alias is a kebab identifier; mount must be an absolute path. Cloudflare Pages ignores the field. See [hetzner-caller.md](hetzner-caller.md) for lifecycle (redeploys preserve, teardown preserves unless `--wipe-backups`).
 
 ### `[deploy.services.<name>]` (required when target is `hetzner-vps`, at least one)
 
@@ -324,6 +358,20 @@ Common fields:
 | `ref` | `string` | Yes | Full image ref (`<registry>/<repository>:<tag>`). Parsed through `parseImageRef` at validation time; a malformed ref fails plan, never as a broken `docker pull` on the VPS. |
 | `registry_auth_secret` | `string` | No | Repo/org secret NAME holding the registry password. Omit for public images. The VPS SSH session runs `docker login` with this value before pulling. |
 
+### `[[deploy.cron]]` (optional, Hetzner only)
+
+Scheduled HTTP jobs, declared as a **table-array**. Each entry fires a request at one of THIS project's services over the compose network, on a cron schedule. The infra renders all jobs into a single `cron` sidecar (alpine BusyBox `crond` + `wget`) in the compose file — no host port, no Docker socket, no app-image dependency, no external config. Runs in **both dev and prod**: each environment is its own compose stack with its own `cron` sidecar hitting its own app, so the two are isolated by construction (unlike the prod-only postgres backup loop). Forbidden on `cloudflare-pages` (a static site has no always-on runtime). See [cron-service.md](cron-service.md).
+
+| Field | Type | Required | Default | Description |
+| ----- | ---- | -------- | ------- | ----------- |
+| `name` | `string` | Yes | -- | Kebab identifier, unique across jobs. Becomes the crontab line's logical id. |
+| `schedule` | `string` | Yes | -- | Standard **5-field** cron expression (`min hour dom month dow`). Each field validated against its real range (minute 0–59, hour 0–23, dom 1–31, month 1–12, dow 0–7) + grammar (`*`, `N`, `N-M`, `*/STEP`, comma-lists). Out-of-range, inverted ranges (`5-1`), `*/0`, bare operators, and `@daily`-style macros fail loud at parse rather than silently never firing on the VPS. |
+| `path` | `string` | Yes | -- | Absolute request path (`/...`). Hit INTERNALLY as `http://<service>:<port><path>` — the dev never spells a host, because the public URL is infra-generated. **Single-quoted** into the wget command; cannot contain whitespace or quote characters (a query string like `?a=1&b=2` is safe, the quoting makes `&` inert). |
+| `method` | `"GET" \| "POST"` | No | `"POST"` | HTTP method. POST is the default (a cron usually TRIGGERS work; GET risks prefetch/cache). Kept to what BusyBox `wget` implements. |
+| `service` | `string` | No | primary service | Which `[deploy.services.<name>]` to hit. Must reference a declared service. Omitted = the primary (first declared) service. The name `cron` is **reserved** for the sidecar — a `[deploy.services.cron]` is rejected at parse. |
+
+The endpoint is the app's responsibility to make idempotent and (if needed) protect — the same `/api/...` route is also reachable publicly via Caddy.
+
 ### `[services.r2]` (optional)
 
 Per-project R2 (Cloudflare Object Storage) buckets, declared as a **table-array** (`[[services.r2.buckets]]`). The infra provisions one Cloudflare R2 bucket per declared alias, scoped per environment, plus a single API token (read+write) on every declared bucket. Each bucket opts into a public CDN custom domain with `cdn = true`. The runtime app reaches buckets by alias via env vars.
@@ -340,6 +388,19 @@ Injected into the deployed runtime as:
 - `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` (secret - routed via `DeployInput.secrets`, never `writeEnvVar`)
 
 See [r2-service.md](r2-service.md) for the full provisioning + runtime contract.
+
+### `[services.observability]` (optional, Hetzner only)
+
+Self-hosted metrics + logs + alerting stack, injected as compose sidecars on the monitoring VPS. Contributes no app env; provisions nothing external (volumes stay local). Secrets (`RESEND_API_KEY`, `HEALTHCHECKS_PING_URL`) flow through `[deploy].secrets` and are optional.
+
+| Field | Type | Required | Default | Description |
+| ----- | ---- | -------- | ------- | ----------- |
+| `logs_retention` | `string` | Yes | -- | VictoriaLogs `-retentionPeriod`: a positive integer + single unit suffix `h`/`d`/`w`/`y` (e.g. `"30d"`). |
+| `metrics_retention_months` | `number` | Yes | -- | VictoriaMetrics retention in whole months, integer `1`–`120`. |
+| `logs_vhost` | `string` | Yes | -- | Tailnet hostname Caddy fronts VictoriaLogs (ingestion + LogsQL) with. Internal, never public. |
+| `metrics_vhost` | `string` | Yes | -- | Tailnet hostname Caddy fronts VictoriaMetrics/vmui (ad-hoc PromQL) with. Internal, never public. |
+
+See [observability-service.md](observability-service.md) for the stack topology, golden-image exporters, and service discovery.
 
 ## CLI env vars
 

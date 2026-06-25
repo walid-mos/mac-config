@@ -37,7 +37,9 @@ plan ---+--- quality (matrix with prod-gate if prod)
         |
         +--- build-image (needs quality + image_source == "build")
         |
-        +--- migrate (needs provision + build-image + has_postgres == "true")
+        +--- detect-migration-changes (outputs migrations_changed)
+        |
+        +--- migrate (needs provision + build-image + has_postgres == "true" + migrations_changed == "true")
         |
         \--- deploy (needs provision + build-image + migrate)
 ```
@@ -58,8 +60,9 @@ Jobs:
 | `quality` | plan | Run lint/test/prod-gate matrix |
 | `provision` | plan + quality | `node src/index.ts provision` - ensure Hetzner VPS, Tailscale join, firewall, convergence (Caddy/Vector) |
 | `dns` | plan + quality + provision | `node src/index.ts dns` - reconcile Cloudflare DNS A records. **Only runs if `has_domain == 'true'`** |
-| `build-image` | plan + quality | `compute-image-ref` CLI renders `docker-bake.json` from `nextnode.toml` at the workspace root and emits `image_refs` (JSON Record) + `bake_file` (its basename). A single `docker/bake-action` (`source: .`, `files: <bake_file>`) runs all `build` targets in one shot, pushes to GHCR, uses GHA layer cache scoped per target. **Skipped when `image_source == "upstream"`** — plan's `upstream_image_refs` carries the refs instead. |
-| `migrate` | plan + provision + build-image | `node src/index.ts migrate-remote` — stage rollout + take pre-migrate R2 snapshot + run `migrate_command` in an ephemeral container on the project network. **Only runs if `has_postgres == 'true'`.** Receives `IMAGE_REFS` (JSON Record) — built path from `build-image`, upstream path from plan. |
+| `build-image` | plan + quality | `compute-image-ref` CLI renders `docker-bake.json` from `nextnode.toml` at the workspace root and emits `image_refs` (JSON Record) + `bake_file` (its basename). A single `docker/bake-action` (`source: .`, `files: <bake_file>`) runs all `build` targets in one shot, pushes to GHCR, uses a two-layer cache: a fast ephemeral GHA scope (listed first) + a durable registry scope (`type=registry,ref=ghcr.io/<repo>-<service>:buildcache`, `mode=max,ignore-error=true`) that survives GHA eviction and keeps layers warm across runs. **Skipped when `image_source == "upstream"`** — plan's `upstream_image_refs` carries the refs instead. |
+| `detect-migration-changes` | -- | `node src/index.ts detect-migration-changes` — compares the `base..head` git range against `migrations_folder` (default `drizzle/`) and emits `migrations_changed`. **Fails safe to `true`** on an undiffable range (first push, manual dispatch, shallow-clone git failure) so a needed migration is never skipped. |
+| `migrate` | plan + provision + build-image + detect-migration-changes | `node src/index.ts migrate-remote` — stage rollout + run `migrate_command` in an ephemeral container on the project network. No pre-migrate snapshot (wal-g continuous archiving covers it). **Only runs if `has_postgres == 'true'` AND `migrations_changed == 'true'`.** Receives `IMAGE_REFS` (JSON Record) — built path from `build-image`, upstream path from plan. |
 | `deploy` | plan + provision + build-image + migrate | `node src/index.ts deploy` - SSH to VPS, render per-service compose + `.env.<name>` files, docker compose pull, bring postgres up (phase 1), rotate user services (phase 2), reload Caddy. |
 
 Permissions (declared at workflow level): `contents: read`, `actions: read`, `packages: write` (GHCR push).
@@ -77,7 +80,7 @@ Secrets (all live at the **GitHub org level** on `NextNodeSolutions` - callers o
 
 **Image ref flow**: build path — `compute-image-ref` renders `docker-bake.json` from `nextnode.toml` (`renderBakeFile` in `domain/deploy/bake-file.ts`), writes it at the workspace root (`writeBakeFile` in `adapters/build-output/bake-file.ts`), and emits `image_refs` (JSON Record) + `bake_file` to `GITHUB_OUTPUT`; `docker/bake-action` consumes it with `source: .` + `files: <bake_file>`. Upstream path — `build-image` is skipped; `plan`'s `upstream_image_refs` is fed as `IMAGE_REFS`. Both paths produce the SAME JSON shape, consumed by `parseImageRefsEnv`. Projects never reference `ghcr.io/…` in their own code.
 
-**DNS reconciliation**: The `dns` job runs after provision and creates/updates Cloudflare A records — **one A record per routed service** (each `[deploy.services.<name>]` that declares a `url`). Internal projects point to the Tailscale CGNAT IP (unproxied). Public projects point to the VPS public IP (proxied in production, unproxied in development).
+**DNS reconciliation**: The `dns` job runs after provision and creates/updates Cloudflare A records — **one A record per routed service** (each `[deploy.services.<name>]` that declares a `url`). Internal projects point to the Tailscale CGNAT IP (never proxied). Public projects point to the VPS public IP: proxied in production only for the apex + one-label subdomains Universal SSL covers, grey-clouded (DNS-only) for two+ label subdomains so Caddy's origin cert serves them, unproxied in development. See [hetzner-vps.md](hetzner-vps.md).
 
 **Multi-service**: N services per project, with strict cross-service rules and per-service runtime primitives — see [multi-service.md](multi-service.md).
 

@@ -1,6 +1,10 @@
 # Golden Image Builder
 
-TypeScript-based Hetzner snapshot builder. Replaces the previous Packer-based pipeline. Spins up a temporary VPS, installs Docker + the standard tools, snapshots the disk, and labels the snapshot with a deterministic fingerprint so the next provision either reuses it or rebuilds.
+TypeScript-based Hetzner snapshot builder. Replaces the previous Packer-based pipeline. Spins up a temporary VPS, installs Docker + the standard tools + the baked-in monitoring exporters, snapshots the disk, and labels the snapshot with a deterministic fingerprint so the next provision either reuses it or rebuilds.
+
+## Baked-in monitoring exporters
+
+The image pre-installs the scrape targets the `[services.observability]` stack discovers over the tailnet, so a freshly-provisioned VPS is observable the moment it joins: **node_exporter** (binary, listens `:9100`), **cAdvisor** (pre-pulled image + a systemd unit, initially disabled, enabled at convergence with its tailnet bind IP). Every host is provisioned with a single `tag:server` Tailscale tag (the monitoring VPS distinguishes itself via R2 state labels, not a per-role tag). postgres-exporter is NOT baked — it ships as a per-project compose sidecar. See [observability-service.md](observability-service.md).
 
 ## Why a builder, not a base image
 

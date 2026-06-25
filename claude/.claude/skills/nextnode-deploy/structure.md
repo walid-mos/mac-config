@@ -32,10 +32,14 @@ Cross-cutting sub-skills:
 - `config.md` — `nextnode.toml` schema and loader
 - `multi-service.md` — N services per project: routing (DNS/Caddy/host ports), env isolation (`.env.<name>` + symmetric URL injection), source homogeneity, registry auth, depends_on gating, teardown
 - `deploy-env.md` — `DeployEnv`, `TargetEnv`, `DeployInput`, env merge order
-- `r2-service.md` — provider-agnostic services layer (currently R2 only)
+- `r2-service.md` — R2 buckets backing service (per-project object storage + CDN)
+- `postgres-service.md` — embedded/external postgres + dual pg_dump∥wal-g backups, migrations
+- `supabase-service.md` — full self-hosted Supabase stack + postgres-exporter
+- `observability-service.md` — `[services.observability]` metrics/logs/alerting stack + golden-image exporters
+- `cron-service.md` — `[[deploy.cron]]` scheduled-HTTP-job sidecar
 - `golden-image.md` — Hetzner golden image fingerprint + cache key
-- `pipeline.md` — quality matrix, prod-gate, publish-result
-- `hetzner-vps.md` — internal vs public mode, Caddy, firewall
+- `pipeline.md` — quality matrix, prod-gate, publish-result, migrate gating, bake cache
+- `hetzner-vps.md` — internal vs public mode, Caddy, firewall, DNS proxy-depth
 - `hetzner-caller.md` — what a caller repo provides (Dockerfile, nextnode.toml, workflows)
 
 Per-service domain primitives (`src/domain/hetzner/`):
@@ -43,7 +47,16 @@ Per-service domain primitives (`src/domain/hetzner/`):
 - `service-env.ts` — per-service runtime env: `buildServiceUrlEnv` (symmetric cross-service URL injection), `buildServiceSecretEnv` (least-privilege secret projection via `secretOrigins`), `selectBackingSecrets` (shared `.env` for DB/backup/migrate)
 - `service-upstreams.ts` — one Caddy upstream per routed service
 - `host-port.ts` — VPS-wide port allocation `[8080, 8200)` per routed service
-- `dns-records.ts` — one A record per routed service
+- `dns-records.ts` — one A record per routed service; `isCoveredByUniversalSsl` decides proxied (apex/one-label) vs grey-clouded (two+ labels) in prod
+- `compose-file.ts` (`buildPostgresServiceGroup`) — spreads backing-service sidecars (postgres/walg/backup, supabase, observability, cron) into the compose `services` map
+
+Backing-service domain primitives (`src/domain/services/`) — each contributes a `{public, secret}` `ServiceEnv` and/or compose sidecars, merged via `mergeServiceEnvs`:
+- `postgres.ts` — naming (`postgresProjectIdentifier`, `postgresBackupBucketName`, url-encoded `buildPostgresEmbeddedDatabaseUrl`), pg_dump GFS retention, restore selection, `NEXTNODE_POSTGRES_VERSION`
+- `postgres-walg.ts` — wal-g server (`archive_command`, restore-on-empty) + base-backup loop sidecar, `postgresWalgBucketName`, prod-only
+- `postgres-exporter.ts` — supabase (`DATA_SOURCE_NAME`) vs embedded (`DATA_SOURCE_URI`/`USER`/`PASS`) exporter sidecars
+- `observability.ts` — VictoriaLogs/Metrics + vmagent/vmalert + Alertmanager + blackbox stack (images/ports/volumes/mem caps); `observability.service.ts` contributes empty env
+- `cron.ts` — `buildCronScheduler` renders the `cron` BusyBox sidecar from `[[deploy.cron]]`
+- `r2.ts` / `supabase.ts` — R2 bucket env + Supabase stack
 
 Shared deploy domain primitives (`src/domain/deploy/`):
 - `domain.ts` — `resolveDeployDomain` (dev subdomain) + `computeSiteUrl` (single SITE_URL source, build + runtime)

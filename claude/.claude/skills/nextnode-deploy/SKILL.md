@@ -6,7 +6,7 @@ description: >-
   when a repo has nextnode.toml, @nextnode-solutions/infrastructure in
   package.json, or the user mentions NextNode deploys.
 user-invocable: true
-synced-at: 0d67405
+synced-at: f8e1ca0
 ---
 
 # @nextnode-solutions/infrastructure
@@ -25,16 +25,17 @@ Always read the actual code before answering - start with `packages/infrastructu
 | Command | Type | What it does |
 |---------|------|-------------|
 | `plan` | config | Parse `nextnode.toml`, output quality matrix + plan outputs |
+| `detect-migration-changes` | config | Compare `base..head` against `migrations_folder` (default `drizzle/`), emit `migrations_changed` to gate the `migrate` job. Fails safe to `true` on an undiffable range. See [pipeline.md](pipeline.md) |
 | `teardown-guard` | config | Validate teardown preconditions before destruction |
 | `provision` | deploy | Provision infra (Pages project + domains, or Hetzner VPS + R2 + CDN domains), then bootstrap auto-generated `[deploy].secrets` via `ensureGeneratedSecrets` |
 | `deploy` | deploy | Merge target/services/secrets envs, sync to target, deploy app |
 | `dns` | deploy | Reconcile Cloudflare DNS records (A for VPS, CNAME for Pages) |
-| `teardown` | deploy | Tear down provisioned infra; volumes preserved unless `wipeBackups`. See [multi-service.md](multi-service.md) teardown |
-| `migrate-remote` | deploy | Pre-migrate R2 snapshot + `migrate_command` in an ephemeral container, between `provision` and `deploy`. No-op without `[services.postgres]`. See [postgres-service.md](postgres-service.md) |
+| `teardown` | deploy | Tear down provisioned infra; captures a final wal-g backup first; volumes + both backup buckets preserved unless `--wipe-backups`. See [multi-service.md](multi-service.md) teardown |
+| `migrate-remote` | deploy | Run `migrate_command` in an ephemeral container between `provision` and `deploy` (no pre-migrate snapshot — wal-g covers it). No-op without `[services.postgres]`; gated by `detect-migration-changes` (`migrations_changed`). See [postgres-service.md](postgres-service.md) |
 | `seo-guard` | deploy | Inject `_headers` + `robots.txt` into build output for non-prod envs |
 | `prod-gate` | standalone | Verify dev pipeline passed before production deploy |
 | `publish-result` | standalone | Parse semantic-release output, write status/version/summary |
-| `compute-image-ref` | standalone | Resolve the per-service `image_refs` JSON Record, render `docker-bake.json` from `nextnode.toml`, emit `bake_file`. See [pipeline.md](pipeline.md) |
+| `compute-image-ref` | standalone | Resolve the per-service `image_refs` JSON Record, render `docker-bake.json` from `nextnode.toml` (two-layer cache per target: ephemeral GHA scope + durable GHCR `:buildcache` registry scope), emit `bake_file`. See [pipeline.md](pipeline.md) |
 | `build-golden-image` | standalone | Build + snapshot a Hetzner golden image (Docker preinstalled), keyed by deterministic fingerprint, prunes old snapshots. Replaces Packer. See [golden-image.md](golden-image.md) |
 | `recover` | standalone | Recover/rebuild VPS state from Hetzner labels when local state is lost |
 | `restore` | standalone | Restore a postgres backup from R2 by timestamp. Destructive (`pg_restore --clean`) - requires explicit `--yes`. See [postgres-service.md](postgres-service.md) |
@@ -63,8 +64,17 @@ Pluggable per-service abstraction in `domain/services/`. Each service contribute
 Currently registered:
 
 - **R2** (Cloudflare object storage). Declared as a table-array of `{ name, cdn }` buckets under `[[services.r2.buckets]]`; `cdn = true` attaches a public custom domain + `R2_BUCKET_<ALIAS>_URL`. See [r2-service.md](r2-service.md).
-- **Postgres**. Declared in `[services.postgres] mode = "embedded" | "external"` — embedded sidecar + daily R2 backups (GFS), or external `DATABASE_URL`. See [postgres-service.md](postgres-service.md).
+- **Postgres**. Declared in `[services.postgres] mode = "embedded" | "external"` — embedded sidecar + **dual prod backups** (daily pg_dump with GFS retention in `<project>-backups-dump` + continuous wal-g WAL archiving & daily base backups in `<project>-backups`), auto-restore on a fresh VPS, final backup before teardown; or external `DATABASE_URL`. See [postgres-service.md](postgres-service.md).
 - **Supabase**. Declared as an empty `[services.supabase]` table — full self-hosted stack (postgres + auth + storage + realtime + kong + studio) with auto-injected `backups` bucket and per-env secrets. See [supabase-service.md](supabase-service.md).
+- **Observability**. Declared in `[services.observability]` (`logs_retention`, `metrics_retention_months`, `logs_vhost`, `metrics_vhost`) — self-hosted VictoriaLogs + VictoriaMetrics + vmagent + vmalert + Alertmanager + blackbox, injected as compose sidecars, scraping golden-image exporters (node_exporter/cAdvisor/postgres-exporter) over the tailnet. No external provisioning. See [observability-service.md](observability-service.md).
+
+## Observability
+
+`[services.observability]` stands up a self-hosted metrics + logs + alerting stack (VictoriaLogs + VictoriaMetrics + vmagent + vmalert + Alertmanager + blackbox) as compose sidecars on the monitoring VPS. It registers in `SERVICE_NAMES` like other backing services but provisions nothing external — all state is local compose volumes, so `provision` is a no-op. vmagent (the only host-networked component) scrapes golden-image exporters (node_exporter `:9100`, cAdvisor `:9101`, postgres-exporter `:9187`) over the tailnet via http_sd on the primary app's `/api/sd/targets` + `/api/sd/probes`. Caddy fronts the `logs_vhost`/`metrics_vhost` on loopback (tailnet-only) and its JSON access logs feed VictoriaLogs. Secrets (`RESEND_API_KEY`, `HEALTHCHECKS_PING_URL`) flow through `[deploy].secrets` and are optional. See [observability-service.md](observability-service.md).
+
+## Scheduled jobs (cron)
+
+`[[deploy.cron]]` declares scheduled HTTP jobs **entirely in `nextnode.toml`** (Hetzner only). Each `{ name, schedule, path, method?, service? }` fires an internal request at one of the project's services (`http://<service>:<port><path>`, default = primary service) on a 5-field cron schedule. Validation: each schedule field is parsed against its real range + grammar (out-of-range, inverted ranges, `*/0`, macros fail loud); `path` must be absolute and free of whitespace/quotes (it is single-quoted into the wget command); the service name `cron` is reserved for the sidecar. `buildCronScheduler` (`domain/services/cron.ts`) renders all jobs into a single `cron` sidecar (alpine BusyBox `crond` + `wget`, single-quoted URLs) spread into the compose file by `renderComposeFile` — no host port, no Docker socket, no app-image dependency, no external config. Runs in **both dev and prod**, isolated per stack. Rejected on `cloudflare-pages`. NOT a `[services.*]` backing service — it contributes no env, just a compose sidecar. See [cron-service.md](cron-service.md).
 
 ## SEO guard
 
@@ -120,9 +130,12 @@ See [hetzner-caller.md](hetzner-caller.md) for what a project repo must provide 
 19. **Cross-service URLs are injected symmetrically with `https://` in the value** — every `.env.<service>` contains every routed sibling's `<NAME>_URL`, consumed verbatim. See [deploy-env.md](deploy-env.md).
 20. **Registry auth is homogeneous per deploy** — one token forwarded; upstream services must share one `registry_auth_secret` (or all omit it). See [multi-service.md](multi-service.md) Registry token.
 21. **Postgres-owning service is explicit** — exactly one service declares `needs = ["postgres"]`; `selectMigrationService` throws on zero or many. See [multi-service.md](multi-service.md).
-22. **Per-service teardown for DNS and Caddy; containers come down project-wide** — volumes preserved unless `wipeBackups`. See [multi-service.md](multi-service.md) teardown.
+22. **Per-service teardown for DNS and Caddy; containers come down project-wide** — volumes preserved unless `--wipe-backups`. See [multi-service.md](multi-service.md) teardown.
 23. **Two doors for config — build args vs runtime secrets — and they never cross** — secrets MUST NEVER be build args (they bake into image layers / `docker history`); build-time secrets use `RUN --mount=type=secret`. See [deploy-env.md](deploy-env.md) Build args.
 24. **Per-service secret projection is least-privilege by construction — no broadcast** — `buildServiceSecretEnv` routes USER secrets by own `secrets`, BACKING secrets by `needs` (provenance via `secretOrigins`); the DB/backup/migrate shared `.env` gets BACKING secrets only. See [deploy-env.md](deploy-env.md).
 25. **`[deploy].secrets` is the GLOBAL secret pool — injected into every service (both targets)** — folded into each service via `expandServiceSecrets`; this REVERSES the earlier rule that rejected `[deploy].secrets` for hetzner-vps. See [deploy-env.md](deploy-env.md) + [config.md](config.md).
 26. **`[deploy].secrets` entries are must-exist names OR `{name, generate, length}` auto-generated tables** — `ensureGeneratedSecrets` pushes absent values at provision, idempotent + non-rotating; GitHub freezes secrets at job start, so the contract is *provision → re-trigger deploy*. See [config.md](config.md).
 27. **R2 buckets are `{ name, cdn }` tables with an opt-in public CDN domain** — `cdn = true` attaches `<alias>.cdn.<deploy domain>` + `R2_BUCKET_<ALIAS>_URL`; the deploy domain is resolved ONCE upstream and threaded down. See [r2-service.md](r2-service.md).
+28. **Production VPS proxying depends on subdomain depth** — Cloudflare's free Universal SSL covers only the zone apex + a single-level wildcard, so a host two+ labels deep is grey-clouded (DNS-only) and Caddy's origin Let's Encrypt cert serves it. `isCoveredByUniversalSsl` decides; dev + internal records are never proxied. See [hetzner-vps.md](hetzner-vps.md).
+29. **Embedded postgres runs dual, prod-only backups; planned teardowns are zero-loss** — daily pg_dump (GFS, `<project>-backups-dump`) ∥ continuous wal-g WAL + base backups (`<project>-backups`); a fresh VPS auto-restores, and teardown captures a final backup first (aborts on failure). No pre-migrate snapshot. See [postgres-service.md](postgres-service.md).
+30. **Observability is a compose-only backing service** — no external provisioning, volumes stay local, `provision` is a no-op; all published ports bind loopback with Caddy (tailnet vhosts) as the trust boundary; secrets are render-time only, never app env. See [observability-service.md](observability-service.md).

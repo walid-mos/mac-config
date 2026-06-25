@@ -23,11 +23,14 @@ All in `config/validation/`:
 
 ### DNS (one record per routed service)
 
-`computeVpsDnsRecords` (`domain/hetzner/dns-records.ts`) emits **one A record per service that declares a `url`**. The hostname is `resolveDeployDomain(service.url, environment)`:
+`computeVpsDnsRecords` (`domain/hetzner/dns-records.ts`) emits **one A record per service that declares a `url`**. The hostname is `resolveDeployDomain(service.url, environment)`. Proxying depends on subdomain depth (`isCoveredByUniversalSsl`): Cloudflare's free Universal SSL covers only the zone apex + a single-level wildcard (`*.<zone>`), so a host two+ labels below the apex gets no edge cert and must stay grey-clouded (DNS-only) for Caddy's origin Let's Encrypt cert (valid at any depth) to serve it:
 
-- Internal (`project.internal = true`) → tailnet CGNAT IP, unproxied
-- Public production → VPS public IP, Cloudflare-proxied (TTL=1)
-- Public development → VPS public IP, unproxied (TTL=300)
+- Internal (`project.internal = true`) → tailnet CGNAT IP, never proxied
+- Public production, apex / one-label subdomain → VPS public IP, Cloudflare-proxied (TTL=1)
+- Public production, two+ label subdomain → VPS public IP, grey-clouded (DNS-only, TTL=300, Caddy origin cert)
+- Public development (any depth) → VPS public IP, unproxied (TTL=300)
+
+Example: under zone `nextnode.fr`, `fleurs.nextnode.fr` is proxied (covered by `*.nextnode.fr`) but `admin.fleurs.nextnode.fr` is grey-clouded.
 
 Services without `url` get no DNS record — they're internal-only, reachable by siblings as `<service-name>:<port>` on the compose network.
 
@@ -65,7 +68,7 @@ Plan outputs (`adapters/github/plan-outputs.ts`):
 - `image_source = "build" | "upstream" | ""`
 - `upstream_image_refs` = JSON Record `{<service>: {registry, repository, tag}}` (one entry per service when `image_source = "upstream"`)
 
-Build path: `compute-image-ref` renders `docker-bake.json` from `nextnode.toml` (one bake target per `build` service, carrying each target's `context` / `dockerfile` / optional stage `target` / `tags` / GHA `cache-from` / `cache-to`) at the workspace root and writes `image_refs` (same JSON Record shape, one entry per `build` service) + `bake_file` (its basename). A single `docker/bake-action` (`source: .`, `files: <bake_file>`) builds + pushes every service image to `ghcr.io/<owner>/<repo>-<service>:sha-<7>`.
+Build path: `compute-image-ref` renders `docker-bake.json` from `nextnode.toml` (one bake target per `build` service, carrying each target's `context` / `dockerfile` / optional stage `target` / `tags` / two-layer `cache-from` + `cache-to`: a fast ephemeral GHA scope (`type=gha,scope=<name>`, listed first) **plus** a durable registry scope (`type=registry,ref=ghcr.io/<owner>/<repo>-<service>:buildcache`, exported `mode=max,ignore-error=true`) that survives GHA's ~10GB eviction and keeps layers warm across runs) at the workspace root and writes `image_refs` (same JSON Record shape, one entry per `build` service) + `bake_file` (its basename). A single `docker/bake-action` (`source: .`, `files: <bake_file>`) builds + pushes every service image to `ghcr.io/<owner>/<repo>-<service>:sha-<7>`.
 
 Both paths feed the deploy job via `IMAGE_REFS` → `parseImageRefsEnv` (consumer is identical on either path). The legacy single-string `IMAGE_REF` / `image_ref` output was removed (`refactor(infrastructure): drop legacy deploy.image schema and image_ref output`), and the `bake_targets` CSV + `bake_set` multiline outputs were replaced by the rendered `bake_file` (`feat(infrastructure): render docker-bake.json from nextnode.toml as the single build source`) — re-introducing a bare ref breaks `parseImageRefsEnv` and the upstream path.
 
@@ -126,7 +129,7 @@ Anything new in these areas needs a runtime change first (validation, rendering,
 - **Containers**: project-wide `docker compose down --remove-orphans` on the rendered compose file (rotates all services down in one shot)
 - **DNS**: one Cloudflare DNS removal per routed service (looped over `computeVpsDnsLookups`)
 - **Caddy**: per-service upstream + route + cert subject scrubbed from the shared Caddy config (commits `f28710e`, `53c3a45`); if this was the last project on the VPS, Caddy is reset to an empty config
-- **Volumes**: preserved by default (`--remove-orphans` only). Pass `wipeBackups` to also `docker compose down -v` (drops named volumes) + delete R2 backup buckets.
+- **Volumes**: preserved by default (`--remove-orphans` only). Pass `--wipe-backups` to also `docker compose down -v` (drops named volumes) + delete BOTH R2 backup buckets (`<project>-backups` wal-g + `<project>-backups-dump` pg_dump). A planned teardown first captures a final wal-g backup (see [postgres-service.md](postgres-service.md) Teardown).
 - **Bind mount**: `/opt/apps/<project>/<environment>` removed (compose file + every `.env.<service>` gone with it)
 
 ## Cross-phase compose identity

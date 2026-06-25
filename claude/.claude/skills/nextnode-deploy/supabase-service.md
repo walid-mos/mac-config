@@ -165,10 +165,12 @@ The user app:
 
 `buildPostgresExporterSidecar()` adds a `postgres-exporter` service that scrapes `pg_stat_statements` (top `POSTGRES_EXPORTER_TOP_QUERIES_LIMIT = 50` queries) and exposes `:9187` to the Tailscale interface only. The central monitoring VM filters scrape targets by the `client-vps` Tailscale tag (`domain/monitoring/client-vps-relabel.ts`).
 
-Required scaffolding at the project compose root:
+The connection passes as a **single `DATA_SOURCE_NAME` DSN** (the prometheus community image's documented contract), with the password sourced from the base64 `PG_EXPORTER_PASSWORD` GitHub env-secret. Required scaffolding at the project compose root:
 
 - `00-pg-monitor.sql` (`POSTGRES_EXPORTER_INIT_FILENAME`) bootstrapped into `/docker-entrypoint-initdb.d/` to create the `postgres_exporter` SQL role with `PG_EXPORTER_PASSWORD`.
 - `pg-exporter-queries.yaml` (`renderPostgresExporterQueriesYaml`) mounted at `PG_EXPORTER_EXTEND_QUERY_PATH` for the custom query set.
+
+**Embedded-postgres variant** (`buildEmbeddedPostgresExporterSidecar`): the embedded mode's exporter instead splits the connection across `DATA_SOURCE_URI` (host/db, no scheme, no credentials), `DATA_SOURCE_USER`, and `DATA_SOURCE_PASS = ${POSTGRES_PASSWORD}` — reusing the db sidecar's password directly so a URL-reserved byte in it never has to be percent-encoded into userinfo. No dedicated role/init-SQL/custom queries (vanilla `postgres:<v>` lacks the `pg_stat_statements` preload). See [postgres-service.md](postgres-service.md).
 
 ## Rotation (`rotate-pg-exporter-password` standalone command)
 
@@ -200,8 +202,8 @@ R2 bucket creation rides on the standard R2 service factory (`createR2Service`) 
 Same shape as other compose-stack services:
 
 1. Stops + removes `app`, `db`, `auth`, `realtime`, `storage`, `kong`, `studio`, `supabase-backup`, `postgres-exporter`
-2. **Preserves `supabase-db-data` named volume by default** — destroying it would lose the entire customer database. Pass `wipeBackups` to drop the volume AND wipe the R2 backup objects
-3. R2 `backups` bucket is dropped only when `wipeBackups` is set
+2. **Preserves `supabase-db-data` named volume by default** — destroying it would lose the entire customer database. Pass `--wipe-backups` to drop the volume AND wipe the R2 backup objects
+3. R2 `backups` bucket is dropped only when `--wipe-backups` is set
 
 `teardown-guard` validates this is safe before destruction.
 

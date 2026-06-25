@@ -8,7 +8,7 @@ The `project.internal` config field (boolean, default `false`) controls whether 
 
 | Layer | Public (`internal: false`) | Internal (`internal: true`) |
 |-------|---------------------------|----------------------------|
-| **DNS** | One A record **per routed service** → VPS public IP, proxied (prod) / unproxied (dev) | One A record per routed service → Tailscale CGNAT IP, never proxied |
+| **DNS** | One A record **per routed service** → VPS public IP; in prod proxied for apex + one-label subdomains (Universal SSL covers them), grey-clouded for two+ label subdomains (Caddy origin cert); always unproxied in dev | One A record per routed service → Tailscale CGNAT IP, never proxied |
 | **Firewall** | HTTP/S open globally, SSH restricted to tailscale0 | All traffic restricted to tailscale0 interface |
 | **UFW** | `ufw allow 80/tcp`, `ufw allow 443/tcp` | `ufw allow in on tailscale0 to any port 80`, etc. |
 | **Caddy** | ACME TLS (via R2 cert storage) | Internal TLS (self-signed or internal CA) |
@@ -67,6 +67,8 @@ All Hetzner-specific business decisions live in `domain/hetzner/`:
 ### DNS records (`dns-records.ts`)
 
 `computeVpsDnsRecords(input)` - returns one Cloudflare A record per **routed** service. Record targets, proxy/TTL per mode, and the full routing model live in [multi-service.md](multi-service.md).
+
+**Proxying depends on subdomain depth** (`isCoveredByUniversalSsl`): Cloudflare's free Universal SSL edge cert covers only the zone apex + a single-level wildcard (`*.<zone>`). A production host one label below the apex is proxied (orange, TTL=1); a host **two or more** labels below gets no edge cert, so it is grey-clouded (DNS-only, TTL=300) and Caddy's origin Let's Encrypt cert (valid at any depth) serves it directly. Dev records are always unproxied; internal (tailnet) records are never proxied. E.g. under `nextnode.fr`: `fleurs.nextnode.fr` proxied, `admin.fleurs.nextnode.fr` grey-clouded.
 
 ### Firewall rules (`firewall-rules.ts`)
 

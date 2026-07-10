@@ -58,6 +58,117 @@ The infra injects these env vars into each service's per-service env file on the
 
 Every `build` service answers a liveness probe at `GET /healthz` on its declared `port`. The compose healthcheck runs `wget -q -O- http://localhost:<port>/healthz` every 10 s, times out at 3 s, and retries up to 6 times. `wget` and the `/healthz` route are guaranteed by the alpine / distroless-busybox bases NextNode build images ship on. `upstream` services are NOT probed (their base may answer neither). Once `depends_on` health gating is enforced, dependents will wait on this probe before starting.
 
+### Migrations (postgres-backed projects)
+
+When a project declares `[services.postgres]`, the CI `migrate` job runs
+`migrate_command` (default `pnpm drizzle-kit migrate`, see [config.md](config.md))
+inside an **ephemeral container built from the migration-owning service's image**
+(the service whose `needs = ["postgres"]`). Same image as the deploy — so the
+**caller's Dockerfile runtime stage MUST be able to run that command.** The infra
+does NOT build your Dockerfile and cannot inject tooling into it; it only runs the
+command in the image you ship.
+
+For the default drizzle-kit command, the runtime image must carry:
+
+- **`drizzle-kit` as a runtime `dependency`** (NOT `devDependencies`) — a `--prod`
+  install strips devDeps, so a kit left in `devDependencies` is absent at migrate
+  time and the command fails with exit 254. pnpm 10 ignores its build scripts, but
+  esbuild/its platform binary arrive via optionalDependencies, so `--ignore-scripts`
+  is fine.
+- **`drizzle.config.ts`** — `COPY --from=build /app/drizzle.config.ts ./`.
+- **the generated migrations folder** (`drizzle/`, or whatever `migrations_folder`
+  points at) — `COPY --from=build /app/drizzle ./drizzle`. Generate it with
+  `pnpm db:generate` and **commit it** — migrations are the DB source of truth, not
+  a build artifact. A schema with no generated migrations means nothing to apply.
+
+`migrate` reads only the config's `out` dir + `DATABASE_URL` (the `pg` driver, a
+runtime dep) — the schema TS files are NOT read at migrate time, so they need not
+be in the runtime image. App entrypoints MUST NOT run migrations on startup; the
+CI `migrate` job owns them (see [postgres-service.md](postgres-service.md)).
+
+Minimal runtime-stage additions:
+
+```dockerfile
+# after the --prod install + `COPY --from=build /app/dist ./dist`
+COPY --from=build /app/drizzle.config.ts ./drizzle.config.ts
+COPY --from=build /app/drizzle ./drizzle
+```
+
+### Runtime data assets (files read from disk)
+
+Same trap as migrations, different files: **anything the app reads from disk at
+runtime via `fs` — `readFile`, `readdir`, `createReadStream` — is invisible to
+the bundler and absent from a `dist`-only runtime stage.** Astro/Vite/esbuild
+only follow the `import` graph; a path passed to `fs.readFile(resolve(...))` is
+an opaque string, never bundled. A runtime stage that copies only `dist` + prod
+`node_modules` ships none of it, and the app throws `ENOENT` at request time —
+often *after* charging the user (the credit refund fires, but the feature is
+dead, and the error surfaces only in logs, not in monitoring counters).
+
+Real example (stylot, fixed in PR #21): `data/doctrine/*.md` (LLM voice/format
+prompts) loaded via `readFile(resolve(HERE, '../../../data/doctrine', ...))` —
+tracked in git, present at build, but the runtime stage never copied `data/`, so
+every email/tweet generation failed with `ENOENT ... voice.md`.
+
+Copy every runtime-read directory explicitly, after the `dist` copy:
+
+```dockerfile
+COPY --from=build /app/data ./data   # doctrine, prompt/email templates, seed JSON
+```
+
+**Checklist — run before any deploy that changes the build or adds a disk read:**
+
+- [ ] **Grep the source for runtime disk reads** — `rg "readFile|readdir|createReadStream" src` (skip `*.test.ts`). For each hit whose path is NOT under `node_modules`, a temp dir, or a user upload, the referenced directory MUST be `COPY`'d into the runtime stage.
+- [ ] **Resolve each path against the runtime layout.** Compiled code lives in `dist/`, so `resolve(dirname(fileURLToPath(import.meta.url)), '../../../data')` lands at `/app/data` at runtime — the dir the Dockerfile must copy. A path resolving outside `/app` is a separate bug.
+- [ ] **Required asset → must ship; optional asset → must degrade gracefully.** A gitignored local-only artifact (e.g. `data/recent-tweets.json`) stays out of the image, but its reader MUST `try/catch` → warn + fallback, never throw. A *required* asset must not use that pattern; copy it.
+- [ ] **No `.md`/`.json`/`.txt` assumed bundled.** Only `import`ed modules (incl. Vite `?raw` / `?url`) are bundled; raw `fs` reads are not.
+- [ ] **`.dockerignore` does not exclude the asset dir.** Confirm the path survives the `COPY . .` into the build stage — a denylist that over-matches (`data/`) silently re-creates the bug.
+- [ ] **Smoke-test a real feature endpoint, not just `GET /`** — see the Definition of Done note; the homepage 200s while the asset-dependent route `ENOENT`s.
+
+## Runtime image size — dependency hygiene
+
+The runtime stage runs `pnpm install --prod`, which ships **everything in
+`dependencies`**. A build- or dev-only package left in `dependencies` bloats the
+image with code the server never loads — and image size is paid on every build
+(GHCR push + cache export), every VPS pull, and every container start.
+
+Rules:
+
+- **`dependencies` = what the running server imports; everything else →
+  `devDependencies`.** Build tooling (`tailwindcss` and framework Vite/PostCSS
+  plugins like `@tailwindcss/vite` — CSS is compiled into `dist` at build, the
+  runtime serves it static), test/lint/format tools, and `@types/*` do NOT
+  belong in `dependencies`. Keep genuine runtime helpers (e.g. `tailwind-merge`).
+- **A dep loaded only behind a dev-only flag is dev-only** even though it's
+  `import`ed in `src/`. If the import is dynamic AND gated by a flag that throws
+  in production, the path never runs on the server. Real example (stylot, PR
+  #24): `@anthropic-ai/claude-agent-sdk` — a **222 MB** native binary loaded only
+  behind `ACTIVE_LOCAL_CLAUDE` (which throws in prod). Moving it + `tailwindcss`
+  + `@tailwindcss/vite` to `devDependencies` cut the image **1.07 GB → 727 MB
+  (−32%)**, zero behavior change — prod inference uses DeepSeek/xAI via API and
+  never touches the SDK.
+- **Exception — the migrate CLI stays runtime.** `drizzle-kit` for the default
+  `pnpm drizzle-kit migrate` MUST remain a `dependency` (see Migrations above) —
+  the ephemeral migrate container runs it. A drizzle-orm programmatic migrator
+  (`migrate_command = "node migrate.mjs"` over `drizzle-orm/<driver>/migrator`)
+  lets it move to `devDependencies`, but only if nothing else pulls it
+  transitively — `better-auth` depends on `drizzle-kit`, so on stylot the win was
+  zero. Measure before trading the CLI for a custom runner.
+- **Reclassification cannot remove a transitive runtime peer.** A heavy package
+  pulled as a peer of a real runtime dep stays in `--prod` wherever you list the
+  direct dep. `astro` (and the ~110 MB of build tooling it drags — typescript,
+  sharp, shiki, esbuild ×N, rollup, lightningcss) is a peer of `@astrojs/node` /
+  `@astrojs/react`, so moving the direct `astro` to `devDependencies` is a no-op
+  (the peer reinstalls it). Shrinking that footprint needs **SSR bundling**
+  (`vite.ssr.noExternal`), not dependency reclassification.
+
+**Checklist — when adding a dependency or auditing image size:**
+
+- [ ] **Every `dependencies` entry is imported by code that runs on the server.** Build tools, test tools, type packages, and dev-only feature SDKs go in `devDependencies` — the `deps` stage installs `--prod=false`, so they stay available at build.
+- [ ] **A dynamically-imported, prod-gated dep is dev-only.** Grep its import site: behind an `if (DEV_FLAG)` / `import.meta.env.PROD` guard + `await import()` → `devDependencies`, never `dependencies`.
+- [ ] **Measure, don't guess** — `docker history <img>` for the per-layer sizes, `docker run --rm --entrypoint sh <img> -c 'du -sh /app/node_modules/.pnpm/* | sort -rh | head'` for the heaviest packages. The prod `node_modules` is almost always the dominant layer.
+- [ ] **Validate after slimming** — build the image, run the container, confirm it boots (`Server listening`) and a real route responds, before merging. A dep wrongly moved to `devDependencies` surfaces as `Cannot find package 'X'` at boot.
+
 ## Persistent volumes
 
 Containers can mount Docker named volumes for state that must survive a redeploy
@@ -216,8 +327,9 @@ What this catches that a green `pnpm build` does NOT:
 - **`HOST` binding for SSR servers.** `@astrojs/node` standalone (and most Node SSR runtimes) default to `localhost`/`127.0.0.1`, which Docker port-mapping cannot reach. Set `host: true` in the Astro config or export `HOST=0.0.0.0` in the runtime env.
 - **Workspace dep `dist/` not built.** Caught by Rule 6 already (topological filter), but the smoke test confirms every consumer resolves at runtime, not just at build time.
 - **Wrong working directory or entry path.** The Dockerfile's `WORKDIR` and `CMD` must match what `pnpm deploy` actually outputs. The smoke test surfaces this immediately.
+- **Missing runtime data assets read via `fs`.** A `dist`-only runtime stage omits any directory the app reads at request time (doctrine/prompt files, email templates, seed JSON). `GET /` still 200s while the feature endpoint that reads them throws `ENOENT` — so the smoke test MUST hit at least one asset-dependent endpoint, not just the homepage. See [Runtime data assets](#runtime-data-assets-files-read-from-disk).
 
-A green smoke test is mandatory before pushing - treat it like `pnpm test` for deploys.
+A green smoke test is mandatory before pushing - treat it like `pnpm test` for deploys. A `curl /` alone is NOT sufficient when the app reads files from disk: exercise the route that consumes the asset.
 
 ## Rules
 
@@ -230,3 +342,4 @@ A green smoke test is mandatory before pushing - treat it like `pnpm test` for d
 7. **Smoke-test the image with `docker build` + `docker run` locally before pushing a deploy** - Definition of Done for any change that triggers `deploy.yml`. See the pre-flight section above and [turborepo-docker.md](turborepo-docker.md#smoke-test).
 8. **All services in one project share the same `source`** - if a project genuinely needs both, split it into two `nextnode.toml`s (two workflows, two VPS silos) — there is no per-service auth/bake escape hatch.
 9. **Routed services need a unique `url` within `project.domain`** - one DNS record + Caddy upstream + host port per routed service. Services without `url` are internal-only on the compose network. Cross-service URLs are auto-injected into each `.env.<name>` as `<SIBLING_NAME>_URL=https://...` (symmetric, including self) — never hardcode peer hostnames in caller code.
+10. **Files read from disk at runtime must be explicitly `COPY`'d into the runtime stage** — the bundler only sees `import`s; `fs.readFile`/`readdir` paths (doctrine, prompts, templates, seed data) are absent from a `dist`-only image and throw `ENOENT` at request time, *after* the user is charged. Grep `readFile|readdir` and copy every referenced dir; keep a `.dockerignore` from over-matching it; smoke-test a real feature endpoint, not just `GET /`. See [Runtime data assets](#runtime-data-assets-files-read-from-disk).

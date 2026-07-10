@@ -2,7 +2,6 @@
   "permissions": {
     "defaultMode": "auto"
   },
-  "model": "claude-fable-5[1m]",
   "hooks": {
     "UserPromptSubmit": [
       {
@@ -37,6 +36,8 @@
     "type": "command",
     "command": "bash ~/.claude/statusline-command.sh"
   },
+  "effortLevel": "xhigh",
+  "skipWorkflowUsageWarning": true,
   "theme": "auto",
   "editorMode": "normal",
   "preferredNotifChannel": "auto",

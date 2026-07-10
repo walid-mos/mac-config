@@ -54,6 +54,11 @@ alias wtst="wt status"
 alias v="nvim"
 alias oc="opencode"
 
+# Mac Studio (hosts dans ~/.ssh/config ; connexion = fn autoloadée functions/studio)
+alias studio-local="studio macstudio-local"
+alias studio-vnc="open vnc://walid-mos@macstudio-de-walid.tail4df91e.ts.net"
+alias studio-vnc-local="open vnc://walid-mos@macstudio-de-walid.local"
+
 # Navigation - quick cd to important dirs
 alias cdev="cd ~/Development"
 alias cddl="cd ~/Downloads"

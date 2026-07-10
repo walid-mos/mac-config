@@ -1,0 +1,40 @@
+#!/bin/zsh
+# studio — SSH vers le Mac Studio + déverrouillage auto du trousseau distant
+# (SSH ne déverrouille jamais le login keychain ; git/Claude Code/codesign échoueraient).
+# Mdp lu dans le Keychain local (setup vérifié par `make zsh-post`) — jamais en argv ni sur disque.
+#
+# Usage: studio [host]   (défaut : macstudio)
+
+studio() {
+	emulate -L zsh
+
+	local host=${1:-macstudio}
+	local remote_command='security unlock-keychain && exec $SHELL -l'
+	local keychain_account=walid-mos
+	local keychain_service=macstudio-unlock
+
+	local password
+	if ! password=$(security find-generic-password -a $keychain_account -s $keychain_service -w 2>/dev/null); then
+		print -u2 "studio : mdp absent du Keychain local, déverrouillage manuel — setup : security add-generic-password -a $keychain_account -s $keychain_service -w"
+		ssh -t $host $remote_command
+		return
+	fi
+
+	STUDIO_KEYCHAIN_PW=$password STUDIO_SSH_HOST=$host STUDIO_REMOTE_CMD=$remote_command expect -c '
+		set timeout 20
+		# expect ne relaie pas SIGWINCH au pty spawné
+		trap {
+			stty rows [stty rows] columns [stty columns] < $spawn_out(slave,name)
+		} WINCH
+		spawn ssh -t $env(STUDIO_SSH_HOST) $env(STUDIO_REMOTE_CMD)
+		stty rows [stty rows] columns [stty columns] < $spawn_out(slave,name)
+		expect {
+			"password to unlock" {
+				send -- "$env(STUDIO_KEYCHAIN_PW)\r"
+				interact
+			}
+			timeout { puts stderr "studio : prompt de déverrouillage jamais reçu"; exit 1 }
+			eof { exit 1 }
+		}
+	'
+}

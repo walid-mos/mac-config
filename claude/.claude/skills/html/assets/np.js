@@ -38,35 +38,140 @@
     if (el.textContent.trim() === '') el.innerHTML = el.classList.contains('dashed') ? ARROW_DASHED : ARROW;
   });
 
-  /* ---------- 3. sidebar — auto-generated from section[id] > h2 ---------- */
+  /* ---------- 3. navigation — scrollspy sidebar OR multipage router ----------
+     scroll mode : anchor links + scrollspy. Short / sequential docs.
+     pages mode  : each domain (section[data-group]) — or each section when
+                   no groups — becomes a swappable page. The sidebar is a
+                   router, not a scrollbar: one viewport per view, no long
+                   scroll. Auto-on when any section carries data-group or
+                   there are >=6 sections; force with body[data-nav].         */
   (function () {
-    var layout = $('.layout');
-    var aside = $('.sidebar');
-    if (!layout || !aside) return;
-    var secs = $$('section[id]').filter(function (s) { return s.querySelector('h2'); });
-    var want = document.body.getAttribute('data-sidebar');
-    if (want === 'off' || (want !== 'on' && secs.length < 6)) return;
-    layout.classList.add('has-sidebar');
+    var layout = $('.layout'), main = $('.main'), aside = $('.sidebar');
+    if (!layout || !main || !aside) return;
+    var secs = $$(':scope > section[id]', main).filter(function (s) { return s.querySelector('h2'); });
+    var want = document.body.getAttribute('data-sidebar');   // on | off | (auto)
+    var navAttr = document.body.getAttribute('data-nav');    // pages | scroll | (auto)
+    if (want === 'off') return;
+    var hasGroups = secs.some(function (s) { return s.getAttribute('data-group'); });
+    var paged = navAttr === 'pages' || (navAttr !== 'scroll' && hasGroups);  // domains drive multipage
+    if (!paged && want !== 'on' && secs.length < 6) return;   // tiny scroll doc: no chrome
+
     var brand = document.body.getAttribute('data-brand') || 'NextNode';
-    var html = '<div class="brand">' + esc(brand) + '<span class="dot">.</span></div>'
-             + '<div class="sub">' + esc(document.title) + '</div><nav>';
-    secs.forEach(function (s, i) {
+    function secTitle(s) {
       var h = s.querySelector('h2').cloneNode(true);
-      var num = h.querySelector('.num'); if (num) num.remove();
-      html += '<a href="#' + s.id + '"><span class="n">' + String(i + 1).padStart(2, '0') + '</span>' + esc(h.textContent.trim()) + '</a>';
-    });
-    aside.innerHTML = html + '</nav>';
-    var links = $$('nav a', aside);
-    var map = {};
-    links.forEach(function (a) { map[a.getAttribute('href').slice(1)] = a; });
-    var obs = new IntersectionObserver(function (entries) {
-      entries.forEach(function (e) {
-        if (!e.isIntersecting) return;
-        links.forEach(function (l) { l.classList.remove('active'); });
-        if (map[e.target.id]) map[e.target.id].classList.add('active');
+      var n = h.querySelector('.num'); if (n) n.remove();
+      return h.textContent.trim();
+    }
+    function slug(s) {
+      return String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    }
+    var head = '<div class="brand">' + esc(brand) + '<span class="dot">.</span></div>'
+             + '<div class="sub">' + esc(document.title) + '</div>';
+
+    /* ---- scroll mode ---- */
+    if (!paged) {
+      layout.classList.add('has-sidebar');
+      var html = head + '<nav>';
+      secs.forEach(function (s, i) {
+        html += '<a href="#' + s.id + '"><span class="n">' + String(i + 1).padStart(2, '0') + '</span>' + esc(secTitle(s)) + '</a>';
       });
-    }, { rootMargin: '-20% 0px -70% 0px' });
-    secs.forEach(function (s) { obs.observe(s); });
+      aside.innerHTML = html + '</nav>';
+      var links = $$('nav a', aside), map = {};
+      links.forEach(function (a) { map[a.getAttribute('href').slice(1)] = a; });
+      var obs = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (!e.isIntersecting) return;
+          links.forEach(function (l) { l.classList.remove('active'); });
+          if (map[e.target.id]) map[e.target.id].classList.add('active');
+        });
+      }, { rootMargin: '-20% 0px -70% 0px' });
+      secs.forEach(function (s) { obs.observe(s); });
+      return;
+    }
+
+    /* ---- pages mode: partition main's children into pages ----
+       A section with data-group joins/continues that group's page; a run
+       of same-group sections is one page. Sections without a group are one
+       page each. The header + any loose intro blocks (tldr, strip) become
+       the first "overview" page. style/script stay global (unwrapped).      */
+    var pages = [], cur = null, curKey = null;
+    $$(':scope > *', main).forEach(function (node) {
+      var tag = node.tagName;
+      if (tag === 'STYLE' || tag === 'LINK') return;
+      if (tag === 'SCRIPT' && node.getAttribute('data-np') !== 'board') return;
+      if (tag === 'SECTION' && node.id && node.querySelector('h2')) {
+        var g = node.getAttribute('data-group');
+        var key = g || ('__' + node.id);
+        if (!cur || key !== curKey) { cur = { label: g || secTitle(node), group: g, nodes: [], sections: [] }; curKey = key; pages.push(cur); }
+        cur.sections.push(node); cur.nodes.push(node);
+      } else {
+        if (!cur) { cur = { label: '', group: null, nodes: [], sections: [] }; curKey = '__intro'; pages.push(cur); }
+        cur.nodes.push(node);
+      }
+    });
+    if (pages.length < 2) return;   // nothing to page — leave as plain scroll
+    layout.classList.add('has-sidebar');
+    document.body.classList.add('np-paged');
+
+    var seen = {};
+    pages.forEach(function (p, i) {
+      if (!p.label) { var h1 = p.nodes.map(function (n) { return n.querySelector ? n.querySelector('h1') : null; }).filter(Boolean)[0]; p.label = h1 ? h1.textContent.trim() : 'Aperçu'; }
+      var base = 'page-' + (slug(p.label) || (i + 1)), id = base, k = 2;
+      while (seen[id]) id = base + '-' + (k++);
+      seen[id] = 1; p.id = id;
+      var wrap = document.createElement('div');
+      wrap.className = 'np-page'; wrap.id = id;
+      p.nodes[0].parentNode.insertBefore(wrap, p.nodes[0]);
+      p.nodes.forEach(function (n) { wrap.appendChild(n); });
+      p.el = wrap;
+    });
+
+    var nhtml = head + '<nav class="np-router">';
+    pages.forEach(function (p, i) {
+      nhtml += '<a class="pg" href="#' + p.id + '" data-page="' + p.id + '"><span class="n">' + String(i + 1).padStart(2, '0') + '</span>' + esc(p.label) + '</a>';
+      if (p.sections.length > 1) {
+        nhtml += '<div class="subs">';
+        p.sections.forEach(function (s) { nhtml += '<a class="sub" href="#' + s.id + '" data-page="' + p.id + '" data-sec="' + s.id + '">' + esc(secTitle(s)) + '</a>'; });
+        nhtml += '</div>';
+      }
+    });
+    aside.innerHTML = nhtml + '</nav>';
+
+    pages.forEach(function (p, i) {
+      var f = document.createElement('nav'); f.className = 'np-page-nav';
+      f.innerHTML = (i > 0 ? '<a class="prev" href="#' + pages[i - 1].id + '" data-page="' + pages[i - 1].id + '"><span class="hint">Précédent</span>' + esc(pages[i - 1].label) + '</a>' : '<span></span>')
+                  + (i < pages.length - 1 ? '<a class="next" href="#' + pages[i + 1].id + '" data-page="' + pages[i + 1].id + '"><span class="hint">Suivant</span>' + esc(pages[i + 1].label) + '</a>' : '<span></span>');
+      p.el.appendChild(f);
+    });
+
+    var byId = {}; pages.forEach(function (p) { byId[p.id] = p; });
+    var pgLinks = $$('a.pg[data-page]', aside);
+    function show(id, secId, push) {
+      var p = byId[id] || pages[0]; id = p.id;
+      pages.forEach(function (q) { q.el.classList.toggle('active', q === p); });
+      pgLinks.forEach(function (a) { a.classList.toggle('active', a.getAttribute('data-page') === id); });
+      if (push !== false) { try { history.replaceState(null, '', '#' + (secId || id)); } catch (e) {} }
+      var target = secId && document.getElementById(secId);
+      if (target) target.scrollIntoView({ block: 'start' }); else window.scrollTo(0, 0);
+      document.dispatchEvent(new CustomEvent('np:tab-shown', { detail: { panel: p.el } }));
+      document.dispatchEvent(new CustomEvent('np:page-shown', { detail: { page: p.el, id: id } }));
+    }
+    function resolve() {
+      var h = location.hash.slice(1);
+      if (byId[h]) return show(h, null, false);
+      var el = h && document.getElementById(h);
+      var wrap = el && el.closest('.np-page');
+      if (wrap) return show(wrap.id, h, false);
+      show(pages[0].id, null, false);
+    }
+    document.addEventListener('click', function (ev) {
+      var a = ev.target.closest('a[data-page]'); if (!a) return;
+      ev.preventDefault();
+      show(a.getAttribute('data-page'), a.getAttribute('data-sec') || null, true);
+    });
+    window.addEventListener('hashchange', resolve);
+    resolve();
   })();
 
   /* ---------- 4. code-block heads — built from data-file / data-lang ---------- */
@@ -374,10 +479,98 @@
     }
     var gate = document.createElement('footer');
     gate.className = 'rp-gate';
-    gate.innerHTML = '<button type="button" class="np-btn ghost" id="rp-reject">Reject</button>'
+    gate.innerHTML = '<span class="rp-progress" aria-live="polite"></span>'
+                   + '<button type="button" class="np-btn ghost" id="rp-reject">Reject</button>'
                    + '<button type="button" class="np-btn primary" id="rp-approve">Approve</button>';
     document.body.appendChild(gate);
     $('#rp-approve').addEventListener('click', function () { submit('approved'); });
     $('#rp-reject').addEventListener('click', function () { submit('rejected'); });
+
+    /* ---- questions: pre-pick the recommendation, scannable overview, live
+            progress. Answering becomes "review the defaults, override the few
+            you disagree with" instead of "fill N blank forms". ---- */
+    var main = $('.main');
+    var qs = $$('form.rich-question');
+    function answerOf(f) {
+      var picks = $$('input:checked', f).map(function (inp) {
+        var l = inp.closest('label'); var n = l && l.querySelector('.cax-name');  // compare-axes: read only the option name
+        return ((n || l || inp).textContent || inp.value).trim();
+      });
+      var notes = $$('textarea', f).map(function (t) { return t.value.trim(); }).filter(Boolean);
+      return picks.concat(notes).join(' · ') || '—';
+    }
+    qs.forEach(function (f, i) {
+      f.setAttribute('data-qn', i + 1);
+      if (!f.id) f.id = 'rq-' + (f.getAttribute('data-question-id') || (i + 1));
+      var rec = $('label.opt[data-recommended] input', f);
+      if (rec && !$$('input:checked', f).length) rec.checked = true;     // land on the reco
+    });
+    var snapshot = qs.map(answerOf);
+    var idxMeta = null, prog = $('.rp-progress', gate), groups = null;
+    function buildLi(f, i) {
+      var qt = ((f.querySelector('.q') || {}).textContent || ('Décision ' + (i + 1))).trim();
+      var li = document.createElement('li');
+      li.innerHTML = '<a class="jump" href="#' + f.id + '" data-jump="' + f.id + '"><span class="dot"></span><span class="num">' + (i + 1) + '</span><span class="qt"></span></a><span class="ans"></span>';
+      li.querySelector('.qt').textContent = qt;
+      f._li = li;
+      return li;
+    }
+    if (qs.length >= 3 && main) {
+      var idx = document.createElement('details');
+      idx.className = 'rq-index'; idx.open = true;
+      idx.innerHTML = '<summary><b>' + qs.length + ' décisions</b> <span class="rq-meta"></span></summary>';
+      // group by enclosing section[data-group] (fallback: section h2, then "Décisions")
+      groups = []; var gmap = {};
+      qs.forEach(function (f, i) {
+        var sec = f.closest('section[data-group]') || f.closest('section[id]');
+        var h2 = sec && sec.querySelector('h2');
+        var key = (sec && sec.getAttribute('data-group')) || (h2 && h2.textContent.trim()) || (sec && sec.id) || 'Décisions';
+        if (!gmap[key]) { gmap[key] = { name: key, items: [], meta: null }; groups.push(gmap[key]); }
+        gmap[key].items.push({ f: f, i: i });
+      });
+      if (groups.length < 2) {                       // single domain → flat list
+        var ol = document.createElement('ol');
+        groups[0].items.forEach(function (it) { ol.appendChild(buildLi(it.f, it.i)); });
+        idx.appendChild(ol);
+      } else {                                        // many domains → collapsible per-domain index
+        var collapsed = qs.length > 14;               // huge interview → folded by default
+        groups.forEach(function (g) {
+          var d = document.createElement('details');
+          d.className = 'rq-group'; if (!collapsed) d.open = true;
+          d.innerHTML = '<summary><span class="gname"></span><span class="gcount"></span></summary>';
+          d.querySelector('.gname').textContent = g.name;
+          var gol = document.createElement('ol');
+          g.items.forEach(function (it) { gol.appendChild(buildLi(it.f, it.i)); });
+          d.appendChild(gol); idx.appendChild(d);
+          g.meta = d.querySelector('.gcount');
+        });
+      }
+      var hdr = main.querySelector('header');
+      if (hdr && hdr.parentNode) hdr.parentNode.insertBefore(idx, hdr.nextSibling);
+      else main.insertBefore(idx, main.firstChild);
+      idxMeta = $('.rq-meta', idx);
+      document.addEventListener('click', function (ev) {
+        var a = ev.target.closest('a[data-jump]'); if (!a) return;
+        var f = document.getElementById(a.getAttribute('data-jump'));
+        if (f) f.classList.add('rq-flash'), setTimeout(function () { f.classList.remove('rq-flash'); }, 900);
+      });
+    }
+    function refresh() {
+      var changed = 0;
+      qs.forEach(function (f, i) {
+        var now = answerOf(f), diff = now !== snapshot[i];
+        if (diff) changed++;
+        if (f._li) { f._li.classList.toggle('changed', diff); f._li.querySelector('.ans').textContent = now; }
+      });
+      var msg = qs.length + ' décision' + (qs.length > 1 ? 's' : '') + (changed ? ' · ' + changed + ' modifiée' + (changed > 1 ? 's' : '') : ' · toutes sur la reco');
+      if (prog) prog.textContent = msg;
+      if (idxMeta) idxMeta.textContent = changed ? changed + ' modifiée' + (changed > 1 ? 's' : '') : 'toutes sur la reco';
+      if (groups) groups.forEach(function (g) {
+        if (!g.meta) return;
+        var ch = g.items.reduce(function (n, it) { return n + (answerOf(it.f) !== snapshot[it.i] ? 1 : 0); }, 0);
+        g.meta.textContent = g.items.length + (ch ? ' · ' + ch + ' modif.' : '');
+      });
+    }
+    if (qs.length) { document.addEventListener('input', refresh); document.addEventListener('change', refresh); refresh(); }
   })();
 })();

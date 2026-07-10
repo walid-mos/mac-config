@@ -6,12 +6,16 @@
 #
 # Usage:
 #   build.sh <body.html> -t "Titre du document" -o docs/notes/2026-06-10-slug.html
-#            [-l fr] [-m static|rich] [-w normal|prose] [-s auto|on|off] [-b NextNode]
+#            [-l fr] [-m static|rich] [-w normal|prose] [-s auto|on|off]
+#            [-n auto|pages|scroll] [-b NextNode]
+#   -n pages : multipage router — each section[data-group] (or each section)
+#              becomes a swappable page. Kills the long scroll. Auto-on as soon
+#              as any section carries data-group; force with -n pages / -n scroll.
 set -euo pipefail
 
 ASSETS="$(cd "$(dirname "${BASH_SOURCE[0]}")/../assets" && pwd)"
 
-body="" out="" title="" lang="fr" mode="static" width="normal" sidebar="auto" brand=""
+body="" out="" title="" lang="fr" mode="static" width="normal" sidebar="auto" nav="auto" brand=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -t|--title)   title="$2"; shift 2 ;;
@@ -20,6 +24,7 @@ while [[ $# -gt 0 ]]; do
     -m|--mode)    mode="$2"; shift 2 ;;
     -w|--width)   width="$2"; shift 2 ;;
     -s|--sidebar) sidebar="$2"; shift 2 ;;
+    -n|--nav)     nav="$2"; shift 2 ;;
     -b|--brand)   brand="$2"; shift 2 ;;
     -h|--help)    grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*)           echo "unknown flag: $1" >&2; exit 1 ;;
@@ -113,6 +118,7 @@ attrs=""
 [[ "$mode" == "rich" ]]      && attrs+=" data-mode=\"rich\""
 [[ "$width" == "prose" ]]    && attrs+=" data-width=\"prose\""
 [[ "$sidebar" != "auto" ]]   && attrs+=" data-sidebar=\"$sidebar\""
+[[ "$nav" != "auto" ]]       && attrs+=" data-nav=\"$nav\""
 [[ -n "$brand" ]]            && attrs+=" data-brand=\"$(esc_html "$brand")\""
 
 mkdir -p "$(dirname "$out")"

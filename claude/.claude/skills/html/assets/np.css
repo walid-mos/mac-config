@@ -466,14 +466,98 @@ form.rich-question label.opt:hover { background: var(--np-bg); }
 form.rich-question input[type="radio"], form.rich-question input[type="checkbox"] { accent-color: var(--np-accent); margin-top: 3px; }
 form.rich-question textarea { width: 100%; min-height: 64px; font: inherit; font-size: 13px; padding: 8px 10px; border: 1px solid var(--np-border); border-radius: 6px; background: var(--np-bg); color: var(--np-text); resize: vertical; }
 
+/* ---------- pages / router (multipage feel — one view, no long scroll) ---------- */
+.np-paged .np-page { display: none; }
+.np-paged .np-page.active { display: block; animation: np-page-in .18s ease both; }
+@keyframes np-page-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.np-paged .np-page > section:first-child { margin-top: 6px; }
+.np-paged header { margin-bottom: 10px; }
+/* sidebar as router: page links + (when a page holds several sections) sub-links */
+.sidebar nav.np-router a.pg { font-weight: 600; color: var(--np-text); }
+.sidebar nav.np-router a.pg.active { background: var(--np-bg-soft); color: var(--np-accent-hover); }
+.sidebar nav.np-router .subs { display: none; margin: 1px 0 6px 22px; padding-left: 9px; border-left: 1px solid var(--np-border); flex-direction: column; gap: 1px; }
+.sidebar nav.np-router a.pg.active + .subs { display: flex; }
+.sidebar nav.np-router a.sub { font-size: 11.5px; padding: 3px 8px; }
+/* per-page prev/next footer */
+.np-page-nav { display: flex; justify-content: space-between; gap: 12px; margin-top: 44px; padding-top: 16px; border-top: 1px solid var(--np-border); }
+.np-page-nav a { display: flex; flex-direction: column; gap: 1px; max-width: 46%; overflow: hidden; padding: 8px 13px; border: 1px solid var(--np-border); border-radius: 8px; text-decoration: none; color: var(--np-text); font-size: 13.5px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+.np-page-nav a.next { margin-left: auto; text-align: right; }
+.np-page-nav a:hover { border-color: var(--np-accent); background: var(--np-bg-soft); color: var(--np-accent-hover); }
+.np-page-nav a .hint { font-family: var(--np-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--np-text-muted); font-weight: 500; }
+
+/* ---------- questions overview (rich, >=3 questions) ---------- */
+.rq-index { border: 1px solid var(--np-border); border-radius: 12px; background: var(--np-bg-soft); margin: 18px 0 26px; }
+.rq-index > summary { cursor: pointer; padding: 12px 16px; font-size: 14px; list-style: none; display: flex; align-items: center; gap: 10px; }
+.rq-index > summary::-webkit-details-marker { display: none; }
+.rq-index > summary::before { content: '▸'; color: var(--np-text-muted); transition: transform .15s; }
+.rq-index[open] > summary::before { transform: rotate(90deg); }
+.rq-index .rq-meta { font-family: var(--np-mono); font-size: 11px; color: var(--np-text-muted); }
+.rq-index ol { margin: 0; padding: 0 8px 8px; list-style: none; counter-reset: none; }
+.rq-index li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, auto); align-items: baseline; gap: 12px; padding: 5px 8px; border-top: 1px solid var(--np-border-soft); }
+.rq-index li .jump { display: flex; align-items: baseline; gap: 8px; text-decoration: none; color: var(--np-text); font-size: 13px; min-width: 0; }
+.rq-index li .jump:hover .qt { color: var(--np-accent-hover); }
+.rq-index li .num { font-family: var(--np-mono); font-size: 10.5px; color: var(--np-text-muted); flex: 0 0 auto; }
+.rq-index li .qt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.rq-index li .dot { width: 7px; height: 7px; border-radius: 99px; background: var(--np-border); flex: 0 0 auto; align-self: center; }
+.rq-index li.changed .dot { background: var(--np-accent); }
+.rq-index li .ans { font-family: var(--np-mono); font-size: 11px; color: var(--np-text-muted); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 46%; }
+.rq-index li.changed .ans { color: var(--np-accent-hover); }
+/* per-domain collapsible groups (many questions → an index of domains, not a flat wall) */
+.rq-index .rq-group { border-top: 1px solid var(--np-border); }
+.rq-index .rq-group > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px; padding: 8px 10px; font-family: var(--np-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--np-text-muted); }
+.rq-index .rq-group > summary::-webkit-details-marker { display: none; }
+.rq-index .rq-group > summary::before { content: '▸'; transition: transform .15s; }
+.rq-index .rq-group[open] > summary::before { transform: rotate(90deg); }
+.rq-index .rq-group .gname { font-weight: 700; color: var(--np-text); }
+.rq-index .rq-group .gcount { margin-left: auto; }
+.rq-index .rq-group > ol { padding: 0 8px 8px 14px; }
+form.rich-question.rq-flash { box-shadow: 0 0 0 2px var(--np-accent); transition: box-shadow .2s; }
+form.rich-question::before { content: 'Q' attr(data-qn); position: absolute; margin: -8px 0 0 -8px; font-family: var(--np-mono); font-size: 10px; color: var(--np-text-muted); }
+form.rich-question { position: relative; }
+/* recommended option: pre-checked, flagged inline so the default is obvious */
+form.rich-question label.opt[data-recommended] { border: 1px solid var(--np-accent); background: var(--np-accent-bg); }
+form.rich-question label.opt[data-recommended]::after { content: 'reco'; margin-left: auto; align-self: center; flex: 0 0 auto; font-family: var(--np-mono); font-size: 9.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--np-accent-hover); padding: 1px 6px; border: 1px solid var(--np-accent); border-radius: 99px; }
+.rp-gate .rp-progress { margin-right: auto; align-self: center; font-family: var(--np-mono); font-size: 12px; color: var(--np-text-muted); }
+
+/* ---------- rich question — compare-axes table (architectural / weighty choices) ----------
+   Options = columns (<th scope=col>), axes = rows (<th scope=row>): Comportement / Coût /
+   Conséquence… The reader sweeps ONE dimension across all options. Per-cell inline example +
+   colour-coded consequence make each choice decidable in full knowledge. A real <table> so it
+   is self-aligning (no cell-count desync), screen-reader-navigable (scope), and degrades to a
+   horizontal scroll — not a scramble — when narrow. Zero runtime change: the radio's
+   <label class="opt"> wraps only .cax-name, so the overview answer stays clean ("Redis").
+   Scales down: 2 cols + 1-2 rows for binary; bare .opt list for trivial yes/no. */
+.rich-question .rq-stake { font-size: 13px; color: var(--np-text-muted); margin: 2px 0 12px; line-height: 1.5; max-width: 82ch; }
+.rich-question .rq-schema { margin: 4px 0 14px; }
+.rich-question .rq-schema .diagram, .rich-question .rq-schema .d2-fig, .rich-question .rq-schema .mermaid { margin: 0; }
+.rich-question .rq-grid { width: 100%; table-layout: fixed; border-collapse: collapse; border: 1px solid var(--np-border); border-radius: var(--np-radius); overflow: hidden; margin: 12px 0 0; }
+.rich-question .rq-grid th, .rich-question .rq-grid td { border: 1px solid var(--np-border); padding: 10px 12px; font-size: 13px; line-height: 1.45; vertical-align: top; text-align: left; }
+.rich-question .rq-corner, .rich-question .rq-axis { width: 122px; background: var(--np-bg-soft); }
+.rich-question .rq-axis { font-family: var(--np-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--np-text-muted); font-weight: 700; vertical-align: middle; }
+.rich-question .rq-head { background: var(--np-bg-soft); text-transform: none; }
+.rich-question .rq-head label.opt { display: inline-flex; margin: 0; padding: 2px 7px; gap: 7px; font-size: 13px; align-items: center; max-width: 100%; }
+.rich-question .rq-head .cax-name { font-family: var(--np-display); font-weight: 800; font-size: 13.5px; color: var(--np-text); text-transform: none; letter-spacing: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rich-question .rq-head:has(label.opt[data-recommended]) { background: var(--np-accent-bg); }   /* reco column (fallback: inherited .opt[data-recommended] accent chip + ::after badge) */
+.rich-question .rq-head:has(input:checked) { box-shadow: inset 0 -3px 0 var(--np-accent); }     /* picked column underline (progressive) */
+.rich-question .rq-cell .ex { display: block; margin-top: 6px; font-family: var(--np-mono); font-size: 11px; color: var(--np-text-muted); background: var(--np-bg-soft); border: 1px solid var(--np-border-soft); border-radius: 4px; padding: 3px 7px; white-space: normal; word-break: break-word; }
+.rich-question .rq-cell.is-ok { border-left: 3px solid var(--np-success); }
+.rich-question .rq-cell.is-warn { border-left: 3px solid var(--np-warn); }
+.rich-question .rq-cell.is-bad { border-left: 3px solid var(--np-danger); }
+@media (max-width: 720px) {           /* keep the 2D compare — scroll horizontally, never scramble columns */
+  .rich-question.rq-axes { overflow-x: auto; }
+  .rich-question .rq-grid { min-width: 560px; }
+}
+
 /* ---------- theme toggle ---------- */
 .np-theme-toggle { position: fixed; top: 14px; right: 16px; z-index: 50; width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--np-border); background: var(--np-bg-soft); color: var(--np-text); cursor: pointer; font-size: 15px; box-shadow: var(--np-shadow-soft); }
 
 /* ---------- print ---------- */
 @media print {
-  .np-theme-toggle, .rp-gate, .sidebar, .copy-btn, .code-block__copy, .tabs .tab-list { display: none !important; }
+  .np-theme-toggle, .rp-gate, .sidebar, .copy-btn, .code-block__copy, .tabs .tab-list, .np-page-nav { display: none !important; }
   .layout.has-sidebar { grid-template-columns: 1fr; }
   .tabs.tabs-ready > [data-tab] { display: block !important; }
   .tabs.tabs-ready > [data-tab]::before { content: attr(data-tab); display: block; font-family: var(--np-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--np-text-muted); margin: 14px 0 6px; }
+  .np-paged .np-page { display: block !important; animation: none; }
+  .rq-index { display: none; }
   body { font-size: 12px; }
 }

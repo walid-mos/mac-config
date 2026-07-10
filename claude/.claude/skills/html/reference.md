@@ -23,7 +23,7 @@ Everything below is already styled by `np.css` and wired by `np.js`. Write the m
   <!-- 3–5 cells -->
 </div>
 
-<section id="contexte">
+<section id="contexte" data-group="Cadrage">
   <h2><span class="num">01</span>Contexte</h2>
   <p class="lead">Chapeau de section.</p>
   <p>Prose…</p>
@@ -34,6 +34,22 @@ Everything below is already styled by `np.css` and wired by `np.js`. Write the m
 
 <details class="fold"><summary>Titre repliable</summary><div class="fold-body">…</div></details>
 ```
+
+## Pages & domaines (routeur — anti long-scroll)
+
+Tague chaque `<section>` d'un livrable multi-domaines avec `data-group="Domaine"`. Le runtime passe en **mode pages** : un domaine = une page swappable, la sidebar devient un routeur, prev/next en bas. Une seule vue à l'écran, jamais un scroll d'une douzaine de sections.
+
+```html
+<section id="auth-jwt"      data-group="Auth">      <h2>JWT</h2>      …</section>
+<section id="auth-sessions" data-group="Auth">      <h2>Sessions</h2> …</section>  <!-- même domaine → même page, 2 sous-liens -->
+<section id="data-store"    data-group="Données">  <h2>Store</h2>    …</section>  <!-- nouvelle page -->
+<section id="ops-deploy"    data-group="Ops">      <h2>Deploy</h2>   …</section>
+```
+
+- Le `<header>` + blocs d'intro (`tldr`, `strip`) avant la 1ʳᵉ section forment la page **Aperçu** (label = `<h1>`).
+- Domaines consécutifs identiques = une page (plusieurs sections → sous-liens dans la sidebar). Sans `data-group`, un doc ≥6 sections garde le sidebar scrollspy.
+- Deep-links : `#<section-id>` ouvre la bonne page et y défile. Force avec `build.sh -n pages` / `-n scroll`.
+- Pour comparer des variantes **dans** une page → tabs (ci-dessous) ; pour ranger des thèmes distincts → pages. Domaines = pages, variantes = tabs.
 
 ## Tabs
 
@@ -216,20 +232,67 @@ Useful D2 idioms: `direction: right` · containers `a: Label { … }` · `shape:
 
 ## Rich mode (`build.sh -m rich`)
 
-Prose auto-becomes editable; the Approve/Reject gate and submission protocol are injected. You only write the questions:
+Prose auto-becomes editable; the Approve/Reject gate and submission protocol are injected. The runtime **pre-selects the recommended option**, flags it `reco`, and (≥3 questions) builds a scannable overview + live progress. You only write the questions.
+
+**Surface toutes les décisions, aucun plafond** — beaucoup de questions ⇒ `data-group` par domaine (pages + overview groupé/replié), c'est l'affichage qui scale (voir SKILL.md). Variantes d'UNE même décision → axes/options d'un seul form, pas N forms. Puis, par poids de la question :
+
+**Tier 1 — triviale (oui/non, reco claire).** Liste `.opt` nue + l'enjeu en une ligne.
 
 ```html
-<form class="rich-question" data-question-id="storage">
-  <div class="q">Où stocker les sessions ?</div>
-  <div class="recommended">Redis — TTL natif, déjà dans l'infra.</div>
-  <label class="opt"><input type="radio" name="storage" value="redis" checked> Redis</label>
-  <label class="opt"><input type="radio" name="storage" value="pg"> Postgres</label>
-  <label class="opt"><input type="radio" name="storage" value="skip"> Skip · re-grill later</label>
-  <textarea placeholder="Note libre (optionnel)"></textarea>
+<form class="rich-question" data-question-id="csrf">
+  <div class="q">Protection CSRF ?</div>                                   <!-- titre court, ≤6 mots → overview -->
+  <div class="recommended">Double-submit cookie — stateless, pas de store serveur.</div>
+  <label class="opt" data-recommended><input type="radio" name="csrf" value="ds"> Double-submit cookie</label>
+  <label class="opt"><input type="radio" name="csrf" value="syn"> Synchronizer token</label>
+  <textarea placeholder="Note libre (optionnel)"></textarea>      <!-- optionnel -->
 </form>
-<!-- checkbox quand les options se combinent ; jamais d'option inventée pour arrondir une liste -->
-<!-- exactement un checked par groupe radio ; name distinct par question -->
+<!-- checkbox si les options se combinent ; jamais d'option inventée pour arrondir -->
+```
 
+**Tier 2 — lourde / architecturale (le lecteur compare).** Composant **compare-axes** : une vraie `<table>` — options en colonnes (`<th scope="col">`), axes en lignes (`<th scope="row">`), **un exemple inline + une conséquence color-codée par cellule**, schéma optionnel. Table = auto-alignée (pas de décompte de colonnes à rater), navigable au lecteur d'écran, et scrollable horizontalement en étroit au lieu de mélanger les colonnes. Le `<label class="opt">` ne contient QUE `.cax-name` → l'overview reste propre (« Redis »).
+
+```html
+<form class="rich-question rq-axes" data-question-id="storage">
+  <div class="q">Où stocker les sessions ?</div>                          <!-- court ; PAS l'enjeu -->
+  <p class="rq-stake">~40k sessions, TTL 24 h, lues sur chaque requête auth. Fixe la latence du chemin d'auth.</p>
+  <div class="rq-schema">                                                  <!-- optionnel : seulement si la Q est spatiale -->
+    <div class="diagram"><div class="body"><div class="flow-row">
+      <span class="node">API ×N</span><span class="arrow"></span><span class="node accent">Session store</span>
+    </div></div></div>
+  </div>
+  <table class="rq-grid">
+    <thead><tr>
+      <td class="rq-corner"></td>
+      <th class="rq-head" scope="col"><label class="opt" data-recommended><input type="radio" name="storage" value="redis"><span class="cax-name">Redis</span></label></th>
+      <th class="rq-head" scope="col"><label class="opt"><input type="radio" name="storage" value="pg"><span class="cax-name">Postgres</span></label></th>
+      <th class="rq-head" scope="col"><label class="opt"><input type="radio" name="storage" value="mem"><span class="cax-name">In-memory</span></label></th>
+    </tr></thead>
+    <tbody>
+      <tr><th class="rq-axis" scope="row">Perf</th>
+        <td class="rq-cell">~0.3 ms<span class="ex">SETEX sess 86400 …</span></td>
+        <td class="rq-cell">~4 ms<span class="ex">SELECT … WHERE id=$1</span></td>
+        <td class="rq-cell">~0 ms<span class="ex">sessions.set(id, v)</span></td></tr>
+      <tr><th class="rq-axis" scope="row">Coût</th>
+        <td class="rq-cell">Déjà dans l'infra.</td>
+        <td class="rq-cell">Zéro service en plus.</td>
+        <td class="rq-cell">Zéro dépendance.</td></tr>
+      <tr><th class="rq-axis" scope="row">Conséquence</th>
+        <td class="rq-cell is-ok">Sub-ms, TTL gratuit. Volatile : re-login.</td>
+        <td class="rq-cell is-warn">+1 requête DB sur le chemin chaud.</td>
+        <td class="rq-cell is-bad">Casse en multi-instance.</td></tr>
+    </tbody>
+  </table>
+</form>
+<!-- .cax-name = SEUL contenu du label (overview propre "Redis") -->
+<!-- thead: 1 .rq-corner + 1 .rq-head par option. tbody: chaque <tr> = 1 .rq-axis + 1 .rq-cell par option -->
+<!-- conséquence : .is-ok / .is-warn / .is-bad = choix d'auteur délibéré (vert/orange/rouge), cohérent avec le verdict -->
+<!-- une ligne + un exemple par cellule ; quantitatif (latence, taille…) → un axe, pas un pill dans l'en-tête -->
+<!-- binaire non-triviale : même composant, 2 colonnes + 1-2 axes -->
+```
+
+**Tunables & verrous** (tous tiers) :
+
+```html
 <input data-token="accent-saturation" type="range" min="0" max="100" value="60">  <!-- tunable -->
 <textarea data-freeform placeholder="Notes libres"></textarea>  <!-- one per doc max -->
 <p class="static">Paragraphe verrouillé (jamais éditable).</p>

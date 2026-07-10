@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Le skill /improve de shadcn</title>
+<script>
+(function () {
+  try {
+    var stored = localStorage.getItem('np-theme');
+    var theme = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', theme);
+  } catch (e) {
+    document.documentElement.setAttribute('data-theme', 'light');
+  }
+})();
+</script>
+<style>
+/* ============================================================
+   np.css — NextNode HTML deliverables stylesheet
+   Single source of truth for every /html artifact.
+   Inlined into the final file by scripts/build.sh.
+   Token discipline: no color literal below the token blocks.
+   ============================================================ */
+
+:root {
+  /* Surfaces & text — base scale (mirrors nextnode-landing global.css) */
+  --np-bg:          oklch(98.4% 0.003 247.86);
+  --np-bg-soft:     oklch(96.8% 0.007 247.84);
+  --np-bg-edit:     #FFF8C5;
+  --np-text:        oklch(20.8% 0.042 265.76);
+  --np-text-muted:  oklch(55.4% 0.046 257.42);
+  --np-border:      oklch(92.9% 0.013 255.51);
+  --np-border-soft: oklch(96.8% 0.007 247.84);
+
+  /* Brand accent — OKLCH from landing (accent-500 ≠ teal-500) */
+  --np-accent:      oklch(70.4% 0.14 182.503);
+  --np-accent-bg:   oklch(95.3% 0.051 180.801);
+  --np-accent-hover:oklch(60% 0.118 184.704);
+
+  --np-highlight:   #F97316;
+  --np-highlight-bg:#FFEDD5;
+  --np-highlight-tx:#9A3412;
+  --np-success:     #16A34A;
+  --np-warn:        #D97706;
+  --np-danger:      #DC2626;
+  --np-add-bg:      #DCFCE7;
+  --np-add-text:    #166534;
+  --np-add-border:  #BBF7D0;
+  --np-del-bg:      #FEE2E2;
+  --np-del-text:    #991B1B;
+  --np-del-border:  #FECACA;
+  --np-edit-bg:     #FFF8C5;
+  --np-edit-text:   #854D0E;
+  --np-edit-border: #FDE68A;
+
+  --np-shadow-soft: 0 2px 6px rgba(0,0,0,.06);
+  --np-shadow-pop:  0 4px 16px rgba(0,0,0,.12);
+  --np-shadow-bar:  0 -2px 12px rgba(0,0,0,.04);
+  --np-shadow-modal:0 8px 32px rgba(0,0,0,.20);
+  --np-radius:      8px;
+  --np-mono:        "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --np-sans:        "DM Sans", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --np-display:     "Plus Jakarta Sans", "DM Sans", sans-serif;
+}
+
+[data-theme="dark"] {
+  --np-bg:          oklch(20.8% 0.042 265.76);
+  --np-bg-soft:     oklch(27.9% 0.041 260.03);
+  --np-bg-edit:     #3A2D04;
+  --np-text:        oklch(98.4% 0.003 247.86);
+  --np-text-muted:  oklch(70.4% 0.04 256.79);
+  --np-border:      oklch(37.2% 0.044 257.29);
+  --np-border-soft: oklch(27.9% 0.041 260.03);
+  --np-accent:      oklch(77.7% 0.152 181.912);
+  --np-accent-bg:   oklch(38.6% 0.063 188.416);
+  --np-accent-hover:oklch(85.5% 0.138 181.071);
+  --np-highlight:   #FB923C;
+  --np-highlight-bg:rgba(251,146,60,.18);
+  --np-highlight-tx:#FDBA74;
+  --np-success:     #4ADE80;
+  --np-warn:        #FBBF24;
+  --np-danger:      #F87171;
+  --np-add-bg:      rgba(74,222,128,.18);
+  --np-add-text:    #86EFAC;
+  --np-add-border:  rgba(74,222,128,.40);
+  --np-del-bg:      rgba(248,113,113,.18);
+  --np-del-text:    #FCA5A5;
+  --np-del-border:  rgba(248,113,113,.40);
+  --np-edit-bg:     rgba(251,191,36,.18);
+  --np-edit-text:   #FCD34D;
+  --np-edit-border: rgba(251,191,36,.40);
+  --np-shadow-soft: 0 2px 6px rgba(0,0,0,.40);
+  --np-shadow-pop:  0 4px 16px rgba(0,0,0,.55);
+  --np-shadow-bar:  0 -2px 12px rgba(0,0,0,.35);
+  --np-shadow-modal:0 8px 32px rgba(0,0,0,.65);
+}
+
+/* ---------- base ---------- */
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--np-bg);
+  color: var(--np-text);
+  font-family: var(--np-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, h4 { font-family: var(--np-display); line-height: 1.2; }
+a { color: var(--np-accent-hover); }
+hr { border: 0; border-top: 1px solid var(--np-border); margin: 32px 0; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--np-border); }
+th { font-family: var(--np-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--np-text-muted); }
+blockquote { margin: 14px 0; padding: 8px 16px; border-left: 3px solid var(--np-accent); background: var(--np-bg-soft); border-radius: 4px; color: var(--np-text-muted); }
+
+/* ---------- layout (shell-provided) ---------- */
+.layout { max-width: 1240px; margin: 0 auto; }
+.layout.has-sidebar { display: grid; grid-template-columns: 220px 1fr; gap: 0; }
+.main { padding: 36px 40px 120px; max-width: 1120px; min-width: 0; margin: 0 auto; }
+body[data-width="prose"] .main { max-width: 760px; }
+.sidebar { display: none; }
+.layout.has-sidebar .sidebar {
+  display: block;
+  position: sticky; top: 0; align-self: start; height: 100vh; overflow: auto;
+  padding: 24px 14px 40px; border-right: 1px solid var(--np-border);
+  font-size: 12.5px;
+}
+.sidebar .brand { font-family: var(--np-display); font-weight: 800; font-size: 15px; margin-bottom: 2px; }
+.sidebar .brand .dot { color: var(--np-accent); }
+.sidebar .sub { color: var(--np-text-muted); font-size: 11px; margin-bottom: 18px; }
+.sidebar nav a {
+  display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 6px;
+  color: var(--np-text-muted); text-decoration: none; line-height: 1.3;
+}
+.sidebar nav a:hover { background: var(--np-bg-soft); color: var(--np-text); }
+.sidebar nav a.active { background: var(--np-bg-soft); color: var(--np-accent-hover); font-weight: 600; }
+.sidebar nav a .n { font-family: var(--np-mono); font-size: 10px; opacity: .6; min-width: 16px; }
+.sidebar::-webkit-scrollbar { width: 5px; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--np-border); border-radius: 99px; }
+@media (max-width: 1024px) {
+  .layout.has-sidebar { grid-template-columns: 1fr; }
+  .layout.has-sidebar .sidebar { display: none; }
+  .main { padding: 28px 18px 80px; }
+}
+
+/* ---------- header ---------- */
+.eyebrow { font-family: var(--np-mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--np-accent-hover); }
+h1 { font-size: 33px; margin: 8px 0 4px; letter-spacing: -.02em; }
+.dek { color: var(--np-text-muted); font-size: 16px; max-width: 70ch; }
+.prompt-box {
+  margin: 18px 0 0; padding: 10px 14px; background: var(--np-bg-soft);
+  border-left: 3px solid var(--np-accent); border-radius: 4px;
+  font-size: 13.5px; color: var(--np-text-muted);
+}
+.prompt-box b { color: var(--np-text); font-weight: 600; }
+
+/* ---------- tldr ---------- */
+.tldr {
+  margin: 26px 0; padding: 16px 18px; background: var(--np-bg-soft);
+  border: 1px solid var(--np-border); border-radius: var(--np-radius);
+}
+.tldr p { margin: 0 0 8px; }
+.tldr p:last-child { margin: 0; }
+
+/* ---------- summary strip ---------- */
+.strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 22px 0 8px; }
+.strip .cell { padding: 12px; background: var(--np-bg-soft); border: 1px solid var(--np-border); border-radius: var(--np-radius); }
+.strip .k { font-family: var(--np-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--np-text-muted); }
+.strip .v { font-family: var(--np-display); font-weight: 700; font-size: 20px; margin-top: 4px; }
+.strip .v small { font-size: 12px; font-weight: 500; color: var(--np-text-muted); }
+
+/* ---------- sections ---------- */
+section { margin: 46px 0; scroll-margin-top: 20px; }
+section > h2 { font-size: 23px; margin: 0 0 4px; letter-spacing: -.01em; }
+section > h2 .num { font-family: var(--np-mono); font-size: 13px; color: var(--np-accent); margin-right: 8px; font-weight: 500; }
+section > .lead { color: var(--np-text-muted); margin: 0 0 18px; max-width: 76ch; }
+h3.sub { font-size: 15px; margin: 26px 0 10px; display: flex; align-items: center; gap: 8px; }
+
+/* ---------- callout ---------- */
+.callout { margin: 14px 0; padding: 12px 16px; background: var(--np-bg-soft); border-left: 4px solid var(--np-accent); border-radius: 4px; font-size: 13.5px; }
+.callout.warn { border-left-color: var(--np-warn); }
+.callout.danger { border-left-color: var(--np-danger); }
+.callout .ttl { font-weight: 700; display: block; margin-bottom: 2px; }
+
+/* ---------- legend ---------- */
+.legend { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; margin: 4px 0 24px; font-size: 12.5px; }
+.legend .item { display: inline-flex; align-items: center; gap: 7px; }
+.swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.swatch.accent { background: var(--np-accent); }
+.swatch.alt { background: var(--np-highlight); }
+.tag-accent { color: var(--np-accent-hover); font-weight: 700; }
+.tag-alt { color: var(--np-highlight-tx); font-weight: 700; }
+
+/* ---------- diagram base ---------- */
+.diagram { background: var(--np-bg-soft); border: 1px solid var(--np-border); border-radius: 12px; padding: 22px 18px 14px; margin: 14px 0 8px; }
+.diagram .body { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 4px; }
+/* shared caption rule — every figure-like block uses the same cap */
+.diagram .cap, .d2-fig .cap, .mockup figcaption, .mockup .mk-cap {
+  margin-top: 12px; padding-top: 8px; border-top: 1px dashed var(--np-border);
+  font-family: var(--np-mono); font-size: 10.5px; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--np-text-muted); text-align: center;
+}
+.mockup figcaption, .mockup .mk-cap { margin-top: 0; padding: 8px 12px; }
+
+/* nodes + arrows */
+.node {
+  font-family: var(--np-sans); font-size: 12.5px; line-height: 1.25;
+  padding: 8px 11px; border: 1px solid var(--np-border); border-radius: 7px;
+  background: var(--np-bg); color: var(--np-text); text-align: center; min-width: 84px; max-width: 170px;
+}
+.node .sk { font-family: var(--np-mono); font-size: 10px; color: var(--np-text-muted); display: block; margin-top: 3px; }
+.node.accent { border-color: var(--np-accent); }
+.node.accent .sk { color: var(--np-accent-hover); }
+.node.alt { border-color: var(--np-highlight); }
+.node.alt .sk { color: var(--np-highlight-tx); }
+.node.primary { background: var(--np-accent-bg); border: 1px solid var(--np-accent); color: var(--np-accent-hover); font-weight: 600; }
+.node.warning { border-color: var(--np-warn); }
+.node.muted { color: var(--np-text-muted); border-style: dashed; }
+.node.artifact { background: var(--np-bg-soft); border-style: dashed; }
+.node.term { border-radius: 99px; font-size: 11px; min-width: 0; padding: 6px 12px; }
+.node.mono { font-family: var(--np-mono); font-size: 11.5px; }
+.node-stack { display: flex; flex-direction: column; gap: 6px; }
+.arrow { display: inline-flex; align-items: center; color: var(--np-text-muted); flex: 0 0 auto; }
+.arrow.accent { color: var(--np-accent); }
+.arrow.alt { color: var(--np-highlight); }
+.arrow.danger { color: var(--np-danger); }
+.arrow.down { transform: rotate(90deg); }
+.arrow svg { display: block; }
+.flow-row { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px; }
+.flow-note { font-size: 11px; color: var(--np-text-muted); font-style: italic; margin-top: 6px; text-align: center; }
+
+/* ---------- diag-compare ---------- */
+.diag-compare { display: grid; grid-template-columns: 1fr 40px 1fr; align-items: stretch; gap: 0; margin: 14px 0; }
+.diag-compare .pane { background: var(--np-bg-soft); border: 1px solid var(--np-border); border-radius: 12px; padding: 16px 16px 18px; }
+.diag-compare .pane.a { border-top: 3px solid var(--np-highlight); }
+.diag-compare .pane.b { border-top: 3px solid var(--np-accent); }
+.diag-compare .pane h4 { margin: 0 0 10px; font-family: var(--np-display); font-size: 15px; display: flex; align-items: center; gap: 8px; }
+.diag-compare .pane ul { margin: 0; padding-left: 18px; font-size: 13px; }
+.diag-compare .pane li { margin: 5px 0; }
+.diag-compare .vs { display: flex; align-items: center; justify-content: center; font-family: var(--np-mono); font-size: 11px; color: var(--np-text-muted); }
+@media (max-width: 680px) { .diag-compare { grid-template-columns: 1fr; gap: 10px; } .diag-compare .vs { padding: 4px; } }
+
+/* ---------- diag-stack ---------- */
+.diag-stack { display: grid; gap: 8px; margin: 14px 0; }
+.layer { border: 1px solid var(--np-border); border-radius: 9px; padding: 12px 14px; background: var(--np-bg); }
+.layer .ttl { font-weight: 700; font-size: 13px; display: flex; gap: 8px; align-items: center; }
+.layer .desc { font-size: 12.5px; color: var(--np-text-muted); margin-top: 3px; }
+.layer.pure { border-left: 4px solid var(--np-accent); }
+.layer.muted { background: var(--np-bg-soft); border-left: 4px solid var(--np-text-muted); }
+.layer .chips { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 5px; }
+
+/* ---------- diag-tree ---------- */
+.diag-tree { font-family: var(--np-mono); font-size: 12.5px; line-height: 1.8; }
+.diag-tree .indent { padding-left: 22px; position: relative; }
+.diag-tree .indent::before { content: '├── '; color: var(--np-text-muted); position: absolute; left: 0; }
+.diag-tree .indent.last::before { content: '└── '; }
+.diag-tree .key { color: var(--np-accent-hover); }
+.diag-tree .val { color: var(--np-text-muted); }
+.diag-tree .out-of-scope { text-decoration: line-through; opacity: .5; }
+
+/* ---------- diag-kinds ---------- */
+.kinds { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 14px 0; }
+.kind-card { border: 1px solid var(--np-border); border-radius: 10px; padding: 14px; background: var(--np-bg-soft); }
+.kind-card.a { border-top: 3px solid var(--np-highlight); }
+.kind-card.b { border-top: 3px solid var(--np-accent); }
+.kind-card h4 { margin: 0 0 4px; font-size: 13px; font-family: var(--np-mono); text-transform: uppercase; letter-spacing: .06em; }
+.kind-card.a h4 { color: var(--np-highlight-tx); }
+.kind-card.b h4 { color: var(--np-accent-hover); }
+.kind-card .grp { margin: 9px 0 0; }
+.kind-card .grp .gh { font-size: 11px; font-family: var(--np-mono); text-transform: uppercase; letter-spacing: .05em; color: var(--np-text-muted); }
+.kind-card .grp .gl { font-size: 12.5px; margin-top: 2px; }
+@media (max-width: 680px) { .kinds { grid-template-columns: 1fr; } }
+
+/* ---------- diag-pool ---------- */
+.pool-box { border: 1.5px dashed var(--np-accent); border-radius: 10px; padding: 12px 14px; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.refs-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 12px; }
+.ref-box { border: 1px solid var(--np-border); border-radius: 8px; padding: 8px 12px; background: var(--np-bg); font-size: 12px; }
+.chip { display: inline-block; padding: 2px 9px; font-family: var(--np-mono); font-size: 11px; border: 1px solid var(--np-border); border-radius: 5px; background: var(--np-bg); }
+
+/* ---------- diag-timeline (versions / migration chips) ---------- */
+.diag-timeline { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px; }
+.ver-tag { font-family: var(--np-mono); font-size: 12px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--np-border); background: var(--np-bg); }
+.ver-tag.old { color: var(--np-text-muted); }
+.ver-tag.bump { border-color: var(--np-accent); color: var(--np-accent-hover); font-weight: 700; }
+.ver-tag.new { border-color: var(--np-success); color: var(--np-add-text); }
+
+/* ---------- vertical timeline (plans, post-mortems) ---------- */
+.timeline { margin: 14px 0; padding: 0; list-style: none; }
+.timeline > li { display: grid; grid-template-columns: 92px 22px 1fr; gap: 0 8px; }
+.timeline .when { font-family: var(--np-mono); font-size: 11.5px; color: var(--np-text-muted); text-align: right; padding-top: 3px; }
+.timeline .dotcol { position: relative; }
+.timeline .dotcol::before { content: ''; position: absolute; left: 50%; top: 4px; bottom: -4px; width: 1.5px; background: var(--np-border); transform: translateX(-50%); }
+.timeline > li:last-child .dotcol::before { display: none; }
+.timeline .dotcol::after { content: ''; position: absolute; left: 50%; top: 6px; width: 9px; height: 9px; border-radius: 99px; background: var(--np-accent); transform: translateX(-50%); }
+.timeline > li.muted .dotcol::after { background: var(--np-border); }
+.timeline .body { padding-bottom: 22px; }
+.timeline .body .ttl { font-weight: 700; font-size: 14px; }
+.timeline .body .desc { font-size: 13px; color: var(--np-text-muted); margin-top: 2px; }
+.timeline .body .tags { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 5px; }
+@media (max-width: 680px) { .timeline > li { grid-template-columns: 64px 18px 1fr; } }
+
+/* ---------- compare table ---------- */
+.ctable { border: 1px solid var(--np-border); border-radius: 12px; overflow: hidden; margin: 12px 0; }
+.crow { display: grid; grid-template-columns: 168px 1fr 1fr; }
+.crow > div { padding: 11px 13px; border-bottom: 1px solid var(--np-border); font-size: 13px; }
+.crow:last-child > div { border-bottom: 0; }
+.crow .axis { font-weight: 700; background: var(--np-bg-soft); border-right: 1px solid var(--np-border); font-size: 12.5px; }
+.crow .ca { border-right: 1px solid var(--np-border); }
+.crow.head > div { background: var(--np-bg-soft); font-family: var(--np-display); font-weight: 800; font-size: 13.5px; }
+.crow.head .ca { color: var(--np-highlight-tx); }
+.crow.head .cb { color: var(--np-accent-hover); }
+@media (max-width: 760px) {
+  .crow { grid-template-columns: 1fr; }
+  .crow > div { border-right: 0 !important; }
+  .crow .axis { border-bottom: 0; }
+}
+
+/* ---------- twocol (what-worked / what-didnt, conv / div) ---------- */
+.twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0; }
+.twocol .col { border: 1px solid var(--np-border); border-radius: 12px; padding: 16px; background: var(--np-bg-soft); }
+.twocol .col.good { border-top: 3px solid var(--np-success); }
+.twocol .col.bad { border-top: 3px solid var(--np-highlight); }
+.twocol .col h4 { margin: 0 0 10px; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.twocol .col ul { margin: 0; padding-left: 18px; font-size: 13px; }
+.twocol .col li { margin: 7px 0; }
+@media (max-width: 680px) { .twocol { grid-template-columns: 1fr; } }
+
+/* ---------- risk grid ---------- */
+.risk-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 14px 0; }
+.risk { border: 1px solid var(--np-border); border-radius: 10px; padding: 13px 15px; background: var(--np-bg-soft); }
+.risk .ttl { font-weight: 700; font-size: 13.5px; display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+.risk .desc { font-size: 12.5px; color: var(--np-text-muted); margin-top: 5px; }
+.risk .mit { font-size: 12.5px; margin-top: 7px; padding-top: 7px; border-top: 1px dashed var(--np-border); }
+.risk .mit::before { content: '↳ '; color: var(--np-accent); }
+
+/* ---------- svg semantic classes ---------- */
+.dsvg { width: 100%; height: auto; }
+.dsvg text { font-family: var(--np-mono); }
+.dsvg .disp { font-family: var(--np-display); font-weight: 700; }
+.dsvg .t-mut { fill: var(--np-text-muted); }
+.dsvg .t-acc { fill: var(--np-accent-hover); }
+.dsvg .t-dan { fill: var(--np-danger); }
+.dsvg .t-suc { fill: var(--np-success); }
+.dsvg .t-txt { fill: var(--np-text); }
+.dsvg .ax { stroke: var(--np-border); }
+.dsvg .band { fill: var(--np-accent-bg); }
+.dsvg .zl { stroke: var(--np-accent); }
+.dsvg .curve { fill: none; stroke: var(--np-highlight); }
+.dsvg .badbox { fill: var(--np-del-bg); stroke: var(--np-del-border); }
+.dsvg .goodbox { fill: var(--np-accent-bg); stroke: var(--np-accent); }
+.dsvg .box { fill: var(--np-bg); stroke: var(--np-border); }
+.dsvg .grid { fill: none; stroke: var(--np-border); }
+.dsvg .conn { stroke: var(--np-text-muted); fill: none; }
+.dsvg .conn-dashed { stroke: var(--np-text-muted); fill: none; stroke-dasharray: 4 3; }
+
+/* ---------- pills ---------- */
+.pill { display: inline-block; padding: 1px 8px; font-size: 11px; font-weight: 600; line-height: 1.6; border-radius: 999px; border: 1px solid var(--np-border); background: var(--np-bg-soft); color: var(--np-text-muted); letter-spacing: .01em; white-space: nowrap; }
+.pill.success { background: var(--np-add-bg); color: var(--np-add-text); border-color: var(--np-add-border); }
+.pill.warn { background: var(--np-edit-bg); color: var(--np-edit-text); border-color: var(--np-edit-border); }
+.pill.danger { background: var(--np-del-bg); color: var(--np-del-text); border-color: var(--np-del-border); }
+.pill.accent { background: var(--np-accent-bg); color: var(--np-accent-hover); border-color: var(--np-accent); }
+.pill.alt { background: var(--np-highlight-bg); color: var(--np-highlight-tx); border-color: var(--np-highlight); }
+.pill.mono { font-family: var(--np-mono); font-size: 10.5px; }
+
+/* ---------- code blocks ---------- */
+.code-block { margin: 14px 0; border: 1px solid var(--np-border); border-radius: var(--np-radius); overflow: hidden; background: var(--np-bg-soft); }
+.code-block__head { display: flex; align-items: center; gap: 12px; padding: 8px 12px; background: var(--np-bg); border-bottom: 1px solid var(--np-border); font-family: var(--np-mono); font-size: 12px; color: var(--np-text-muted); }
+.code-block__file { flex: 1; font-weight: 600; color: var(--np-text); }
+.code-block__lang { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--np-accent-hover); padding: 1px 6px; background: var(--np-accent-bg); border-radius: 3px; }
+.code-block__copy { font: inherit; font-size: 11px; padding: 2px 8px; background: transparent; border: 1px solid var(--np-border); border-radius: 4px; color: var(--np-text-muted); cursor: pointer; }
+.code-block__copy:hover { color: var(--np-accent-hover); border-color: var(--np-accent); }
+.code-block__copy.is-copied { color: var(--np-add-text); border-color: var(--np-add-border); }
+pre { margin: 0 0 14px; padding: 14px 16px; background: var(--np-bg-soft); border: 1px solid var(--np-border); border-radius: var(--np-radius); overflow-x: auto; font-family: var(--np-mono); font-size: 12.5px; line-height: 1.65; color: var(--np-text); tab-size: 2; }
+.code-block pre { margin: 0; border: 0; border-radius: 0; }
+pre code, pre code.hljs { background: transparent; padding: 0; font: inherit; color: inherit; }
+:not(pre) > code { font-family: var(--np-mono); font-size: .88em; padding: 1px 6px; background: var(--np-bg-soft); border: 1px solid var(--np-border); border-radius: 4px; color: var(--np-text); }
+
+/* ---------- diff ---------- */
+.diff { margin: 14px 0; font-family: var(--np-mono); font-size: 12.5px; line-height: 1.5; background: var(--np-bg-soft); border: 1px solid var(--np-border); border-radius: var(--np-radius); overflow: hidden; }
+.diff[data-file]::before { content: attr(data-file); display: block; padding: 8px 12px; background: var(--np-bg); border-bottom: 1px solid var(--np-border); font-weight: 600; }
+.diff .line { display: block; padding: 0 12px; white-space: pre; }
+.diff .line.hunk { color: var(--np-text-muted); background: var(--np-bg); }
+.diff .line.add { background: var(--np-add-bg); color: var(--np-add-text); }
+.diff .line.add::before { content: '+ '; opacity: .7; }
+.diff .line.del { background: var(--np-del-bg); color: var(--np-del-text); }
+.diff .line.del::before { content: '- '; opacity: .7; }
+.diff .line.ctx::before { content: '  '; }
+
+/* ---------- file tree ---------- */
+.file-tree { margin: 14px 0; font-family: var(--np-mono); font-size: 13px; line-height: 1.7; }
+.file-tree ul { list-style: none; margin: 0; padding-left: 18px; }
+.file-tree > ul { padding-left: 0; }
+.file-tree li { position: relative; }
+.file-tree li::before { position: absolute; left: -14px; color: var(--np-text-muted); }
+.file-tree li.dir::before { content: '▸'; }
+.file-tree li.file::before { content: '·'; }
+.file-tree .action { display: inline-block; margin-left: 8px; padding: 1px 6px; font-size: 10px; font-weight: 700; border-radius: 3px; letter-spacing: .04em; }
+.file-tree .action.create { background: var(--np-add-bg); color: var(--np-add-text); border: 1px solid var(--np-add-border); }
+.file-tree .action.edit { background: var(--np-edit-bg); color: var(--np-edit-text); border: 1px solid var(--np-edit-border); }
+.file-tree .action.delete { background: var(--np-del-bg); color: var(--np-del-text); border: 1px solid var(--np-del-border); }
+
+/* ---------- d2 (build-time rendered, light/dark variants) ---------- */
+.d2-fig { margin: 14px 0 8px; background: var(--np-bg-soft); border: 1px solid var(--np-border); border-radius: 12px; padding: 16px 12px 10px; }
+.d2-fig .d2-light, .d2-fig .d2-dark { display: flex; justify-content: center; }
+.d2-fig .d2-dark { display: none; }
+[data-theme="dark"] .d2-fig .d2-light { display: none; }
+[data-theme="dark"] .d2-fig .d2-dark { display: flex; }
+.d2-fig .d2-light > svg, .d2-fig .d2-dark > svg { max-width: 100%; height: auto; }
+
+/* ---------- mermaid ---------- */
+.mermaid { margin: 8px 0; text-align: center; background: var(--np-bg-soft); border: 1px solid var(--np-border); border-radius: 12px; padding: 18px; }
+.mermaid svg { max-width: 100%; height: auto; }
+
+/* ---------- mockup tile ---------- */
+.mockup { margin: 14px 0; border: 1px solid var(--np-border); border-radius: 10px; overflow: hidden; background: var(--np-bg); }
+.mockup .mk-bar { display: flex; gap: 5px; padding: 7px 10px; background: var(--np-bg-soft); border-bottom: 1px solid var(--np-border); }
+.mockup .mk-bar i { width: 9px; height: 9px; border-radius: 99px; background: var(--np-border); }
+.mockup .mk-body { padding: 16px; }
+
+/* ---------- next steps ---------- */
+.next-steps { border: 1px solid var(--np-border); border-radius: 12px; padding: 16px 18px; background: var(--np-bg-soft); }
+.next-steps ul { list-style: none; margin: 0 0 12px; padding: 0; }
+.next-steps li { display: flex; gap: 10px; align-items: flex-start; padding: 7px 0; border-bottom: 1px solid var(--np-border-soft); font-size: 13.5px; }
+.next-steps li:last-of-type { border-bottom: 0; }
+.next-steps li .mk { color: var(--np-accent); flex: 0 0 auto; font-family: var(--np-mono); }
+
+/* ---------- buttons ---------- */
+.np-btn { font: inherit; font-size: 13px; padding: 8px 18px; border-radius: 7px; cursor: pointer; border: 1px solid var(--np-border); background: var(--np-bg-soft); color: var(--np-text); }
+.np-btn.primary { background: var(--np-accent); border-color: var(--np-accent); color: var(--np-bg); font-weight: 700; }
+.np-btn.primary:hover { background: var(--np-accent-hover); border-color: var(--np-accent-hover); }
+.np-btn.outline { background: transparent; border: 1px solid var(--np-accent); color: var(--np-accent-hover); }
+.np-btn.outline:hover { background: var(--np-accent-bg); }
+.np-btn.ghost { background: transparent; color: var(--np-text-muted); }
+.np-btn.ghost:hover { color: var(--np-danger); border-color: var(--np-danger); }
+.copy-btn { font: inherit; font-size: 12px; padding: 6px 12px; background: transparent; border: 1px solid var(--np-accent); border-radius: 6px; color: var(--np-accent-hover); cursor: pointer; }
+.copy-btn:hover { background: var(--np-accent-bg); }
+.copy-btn.is-copied { color: var(--np-add-text); border-color: var(--np-add-border); }
+
+/* ---------- tabs (runtime builds the tab-list from [data-tab] children) ---------- */
+.tabs { margin: 14px 0; }
+.tabs .tab-list { display: flex; gap: 2px; flex-wrap: wrap; border-bottom: 1px solid var(--np-border); }
+.tabs .tab-btn { font: inherit; font-size: 13px; font-weight: 600; padding: 7px 14px; margin-bottom: -1px; background: transparent; border: 0; border-bottom: 2px solid transparent; color: var(--np-text-muted); cursor: pointer; }
+.tabs .tab-btn:hover { color: var(--np-text); }
+.tabs .tab-btn.active { color: var(--np-accent-hover); border-bottom-color: var(--np-accent); }
+.tabs > [data-tab] { padding-top: 14px; }
+.tabs.tabs-ready > [data-tab] { display: none; }
+.tabs.tabs-ready > [data-tab].active { display: block; }
+/* no-JS fallback: panels stack, each labelled by its data-tab */
+.tabs:not(.tabs-ready) > [data-tab]::before { content: attr(data-tab); display: block; font-family: var(--np-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--np-text-muted); margin: 14px 0 6px; }
+
+/* ---------- collapse (native details) ---------- */
+details.fold { border: 1px solid var(--np-border); border-radius: var(--np-radius); background: var(--np-bg-soft); margin: 10px 0; }
+details.fold > summary { cursor: pointer; padding: 10px 14px; font-weight: 600; font-size: 13.5px; list-style: none; display: flex; align-items: center; gap: 8px; }
+details.fold > summary::before { content: '▸'; color: var(--np-text-muted); transition: transform .15s; }
+details.fold[open] > summary::before { transform: rotate(90deg); }
+details.fold > .fold-body { padding: 0 14px 12px; font-size: 13.5px; }
+
+/* ---------- board (data-island rendered) ---------- */
+.board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(200px, 1fr); gap: 12px; margin: 14px 0; overflow-x: auto; padding-bottom: 6px; }
+.board .bcol { background: var(--np-bg-soft); border: 1px solid var(--np-border); border-radius: 10px; padding: 10px; min-height: 120px; }
+.board .bcol > h4 { margin: 0 0 8px; font-family: var(--np-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--np-text-muted); display: flex; justify-content: space-between; }
+.board .bcol.drag-over { border-color: var(--np-accent); background: var(--np-accent-bg); }
+.board .bcard { background: var(--np-bg); border: 1px solid var(--np-border); border-radius: 8px; padding: 9px 11px; margin-bottom: 8px; cursor: grab; font-size: 13px; box-shadow: var(--np-shadow-soft); }
+.board .bcard:active { cursor: grabbing; }
+.board .bcard .ttl { font-weight: 600; }
+.board .bcard .desc { font-size: 12px; color: var(--np-text-muted); margin-top: 3px; }
+.board .bcard .tags { margin-top: 6px; display: flex; gap: 4px; flex-wrap: wrap; }
+.board-actions { display: flex; gap: 8px; margin: 4px 0 14px; }
+
+/* ---------- rich mode ---------- */
+.rp-gate { position: fixed; bottom: 0; left: 0; right: 0; z-index: 60; display: flex; justify-content: flex-end; gap: 10px; padding: 12px 24px; background: var(--np-bg); border-top: 1px solid var(--np-border); box-shadow: var(--np-shadow-bar); }
+[contenteditable="true"]:hover { outline: 1px dashed var(--np-border); border-radius: 3px; }
+[contenteditable="true"]:focus { outline: 2px solid var(--np-accent); border-radius: 3px; background: var(--np-bg-edit); }
+[data-np-edited="1"] { background: var(--np-bg-edit); border-radius: 3px; }
+form.rich-question { border: 1px solid var(--np-border); border-radius: 12px; padding: 16px 18px; background: var(--np-bg-soft); margin: 14px 0; }
+form.rich-question .q { font-weight: 700; font-size: 14.5px; margin-bottom: 6px; }
+form.rich-question .recommended { background: var(--np-bg); border-left: 4px solid var(--np-accent); border-radius: 4px; padding: 9px 13px; font-size: 13px; margin: 10px 0; }
+form.rich-question .recommended::before { content: 'Recommandé'; display: block; font-family: var(--np-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--np-accent-hover); margin-bottom: 3px; }
+form.rich-question label.opt { display: flex; gap: 9px; align-items: flex-start; padding: 7px 9px; border-radius: 6px; font-size: 13.5px; cursor: pointer; }
+form.rich-question label.opt:hover { background: var(--np-bg); }
+form.rich-question input[type="radio"], form.rich-question input[type="checkbox"] { accent-color: var(--np-accent); margin-top: 3px; }
+form.rich-question textarea { width: 100%; min-height: 64px; font: inherit; font-size: 13px; padding: 8px 10px; border: 1px solid var(--np-border); border-radius: 6px; background: var(--np-bg); color: var(--np-text); resize: vertical; }
+
+/* ---------- theme toggle ---------- */
+.np-theme-toggle { position: fixed; top: 14px; right: 16px; z-index: 50; width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--np-border); background: var(--np-bg-soft); color: var(--np-text); cursor: pointer; font-size: 15px; box-shadow: var(--np-shadow-soft); }
+
+/* ---------- print ---------- */
+@media print {
+  .np-theme-toggle, .rp-gate, .sidebar, .copy-btn, .code-block__copy, .tabs .tab-list { display: none !important; }
+  .layout.has-sidebar { grid-template-columns: 1fr; }
+  .tabs.tabs-ready > [data-tab] { display: block !important; }
+  .tabs.tabs-ready > [data-tab]::before { content: attr(data-tab); display: block; font-family: var(--np-mono); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--np-text-muted); margin: 14px 0 6px; }
+  body { font-size: 12px; }
+}
+</style>
+</head>
+<body data-width="prose">
+<div class="layout">
+<aside class="sidebar"></aside>
+<main class="main">
+<header>
+  <div class="eyebrow">Research · Agent Skills</div>
+  <h1>Le skill <code>/improve</code> de shadcn</h1>
+  <p class="dek">Un advisor senior read-only : il audite le repo avec ton meilleur modèle et écrit des plans que des modèles moins chers exécutent.</p>
+  <div class="prompt-box"><b>Demande</b> — « Check le skill /improve de shadcn, fais-moi une explication de ce que j'y gagnerais à l'utiliser, les features… »</div>
+</header>
+
+<div class="tldr"><p><code>shadcn/improve</code> sépare l'intelligence de l'exécution : le modèle cher (Fable/Opus) fait le recon, l'audit 9 catégories, le tri des faux positifs et la rédaction de specs auto-portantes dans <code>plans/</code> ; un modèle cheap (Sonnet/Haiku) les exécute dans un worktree isolé, et l'advisor review le diff comme un tech lead. Tu y gagnes un backlog d'améliorations persistant, vérifié et priorisé par levier — pas une liste de suggestions jetables. Il ne touche jamais ton code lui-même.</p></div>
+
+<div class="strip">
+  <div class="cell"><div class="k">stars</div><div class="v">2,2<small>k</small></div></div>
+  <div class="cell"><div class="k">installs skills.sh</div><div class="v">6,8<small>k</small></div></div>
+  <div class="cell"><div class="k">catégories d'audit</div><div class="v">9</div></div>
+  <div class="cell"><div class="k">variantes</div><div class="v">10</div></div>
+  <div class="cell"><div class="k">licence</div><div class="v">MIT</div></div>
+</div>
+
+<section id="concept">
+  <h2><span class="num">01</span>Le concept : le plan est le produit</h2>
+  <p class="lead">Le skill n'implémente jamais rien. Il produit des specs assez bonnes pour qu'un modèle plus faible, sans aucun contexte de session, exécute sans improviser.</p>
+  <p>L'argument économique : l'intelligence d'un modèle haut de gamme compte là où elle compose — comprendre le codebase, juger ce qui vaut le coup, spécifier. L'exécution mécanique d'une spec précise, un modèle cheap la fait aussi bien. <code>/improve</code> matérialise cette frontière en fichiers markdown : n'importe quel agent (ou humain) peut les reprendre.</p>
+  <div class="diagram"><div class="body"><div class="flow-row">
+    <div class="node primary">Toi + modèle fort<span class="sk">/improve · advise</span></div>
+    <span class="arrow accent"></span>
+    <div class="node artifact">plans/001-….md<span class="sk">specs auto-portantes</span></div>
+    <span class="arrow"></span>
+    <div class="node alt">Modèle cheap<span class="sk">implémente · teste · ship</span></div>
+  </div></div><div class="cap">l'intelligence en amont, l'exécution en aval — le plan est l'interface</div></div>
+  <div class="callout"><span class="ttl">Règle dure</span> Seules écritures autorisées : <code>plans/</code>. Jamais d'édition de source, jamais de commande qui mute le working tree, jamais de secret reproduit (path + type seulement). Si tu lui demandes d'implémenter, il refuse et pointe le plan.</div>
+</section>
+
+<section id="pipeline">
+  <h2><span class="num">02</span>Le pipeline interne</h2>
+  <p class="lead">Cinq phases, dont une de vetting que la plupart des skills d'audit n'ont pas.</p>
+  <div class="diagram"><div class="body"><div class="flow-row">
+    <div class="node">Recon<span class="sk">stack · conventions · cmds</span></div>
+    <span class="arrow"></span>
+    <div class="node accent">Audit<span class="sk">subagents ∥ × 9 cat.</span></div>
+    <span class="arrow"></span>
+    <div class="node warning">Vet<span class="sk">relit chaque file:line</span></div>
+    <span class="arrow"></span>
+    <div class="node">Prioritize<span class="sk">impact ÷ effort × confiance</span></div>
+    <span class="arrow accent"></span>
+    <div class="node artifact">Plans<span class="sk">plans/ + index</span></div>
+  </div></div><div class="cap">recon → audit parallèle → vetting anti-faux-positifs → tri par levier → specs</div></div>
+  <p><b>Recon</b> extrait les commandes build/test/lint exactes du repo — elles deviennent les portes de vérification de chaque plan. Il ingère aussi les docs d'intention (ADRs, <code>CONTEXT.md</code>, <code>DESIGN.md</code>, PRD) pour ne pas re-signaler des tradeoffs déjà décidés.</p>
+  <p><b>Audit</b> fan-out des subagents read-only en parallèle sur neuf catégories : correctness, sécurité, perf, couverture de tests, dette technique, dépendances &amp; migrations, DX, docs, et <em>direction</em> (suggestions de features — chacune doit citer une preuve dans le repo, zéro idea-slop). Chaque finding porte <code>file:line</code>, impact, effort S/M/L, risque du fix et confiance.</p>
+  <p><b>Vet</b> est la phase différenciante : les subagents sur-rapportent, donc l'advisor rouvre lui-même chaque emplacement cité avant de te montrer quoi que ce soit. Les faux positifs tombent, les attributions fausses sont corrigées, et les rejets sont <em>enregistrés dans l'index</em> pour ne pas revenir au prochain run (ex. réel : <code>https_proxy</code> flaggé SSRF → rejeté « by-design, convention standard »).</p>
+  <p><b>Prioritize</b> te présente la table triée par levier ; tu choisis (« plan 1, 3 et 5 »), il n'écrit jamais 30 plans que personne n'a demandés. Les findings « direction » sont présentés à part — des options à peser, pas des bugs à ranker.</p>
+</section>
+
+<section id="commandes">
+  <h2><span class="num">03</span>Les variantes d'invocation</h2>
+  <p class="lead">Une commande, dix modes — du quick pass au cycle complet audit → exécution → réconciliation.</p>
+  <table>
+    <thead><tr><th>Invocation</th><th>Ce que ça fait</th></tr></thead>
+    <tbody>
+      <tr><td><code>/improve</code></td><td>Audit complet → findings priorisés → plans sur sélection.</td></tr>
+      <tr><td><code>/improve quick</code></td><td>Passe cheap : hotspots seulement, top ~6 findings HIGH-confidence, 0–1 subagent.</td></tr>
+      <tr><td><code>/improve deep</code></td><td>Exhaustif : tout le repo, ≤8 subagents, toutes catégories, y compris les items LOW-confidence.</td></tr>
+      <tr><td><code>/improve security</code></td><td>Audit focalisé une catégorie (aussi <code>perf</code>, <code>tests</code>, <code>bugs</code>…).</td></tr>
+      <tr><td><code>/improve branch</code></td><td>Scope = diff vs merge-base + leurs appelants. Findings tagués <code>introduced</code> vs <code>pre-existing</code>. Idéal avant PR.</td></tr>
+      <tr><td><code>/improve next</code></td><td>Direction produit : 4–6 suggestions de features, chacune avec preuve repo + tradeoffs + effort.</td></tr>
+      <tr><td><code>/improve plan &lt;desc&gt;</code></td><td>Skip l'audit, spécifie une seule chose que tu connais déjà.</td></tr>
+      <tr><td><code>/improve review-plan &lt;f&gt;</code></td><td>Critique un plan existant ; un subagent fresh-context le lit à froid pour traquer les ambiguïtés.</td></tr>
+      <tr><td><code>/improve execute &lt;plan&gt;</code></td><td>Dispatch un exécuteur cheap en worktree isolé, puis review tech-lead du diff.</td></tr>
+      <tr><td><code>/improve reconcile</code></td><td>Rafraîchit le backlog : vérifie les DONE, débloque les BLOCKED, retire les findings corrigés entre-temps.</td></tr>
+      <tr><td><code>--issues</code></td><td>Modificateur : publie aussi chaque plan en issue GitHub (avec garde-fou repo public + finding sensible).</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="plans">
+  <h2><span class="num">04</span>Ce qui rend les plans exécutables par un modèle faible</h2>
+  <p class="lead">Trois propriétés structurelles, écrites pour « le plus faible exécuteur plausible ».</p>
+  <div class="kinds">
+    <div class="kind-card b"><h4>Auto-portant</h4><div class="grp"><div class="gh">contient</div><div class="gl">paths exacts · extraits du code actuel · conventions du repo avec fichier exemplaire · commandes vérifiées au recon</div></div><div class="grp"><div class="gh">interdit</div><div class="gl">« comme discuté plus haut »</div></div></div>
+    <div class="kind-card b"><h4>Portes de vérification</h4><div class="grp"><div class="gh">chaque étape</div><div class="gl">se termine par une commande + sortie attendue</div></div><div class="grp"><div class="gh">done criteria</div><div class="gl">machine-checkables, jamais « ça marche correctement »</div></div></div>
+    <div class="kind-card b"><h4>Bornes dures</h4><div class="grp"><div class="gh">scope</div><div class="gl">in-scope / out-of-scope explicites, même pour ce qui « a l'air lié »</div></div><div class="grp"><div class="gh">STOP conditions</div><div class="gl">« si X, arrête et rapporte » — jamais d'improvisation</div></div></div>
+  </div>
+  <p>Chaque plan stampe le commit SHA contre lequel il a été écrit ; l'exécuteur lance un <em>drift check</em> mécanique (<code>git diff --stat &lt;SHA&gt;..HEAD -- &lt;scope&gt;</code>) avant de toucher quoi que ce soit. Le template impose aussi un test plan (modelé sur un test existant du repo), des notes de maintenance, et le workflow git du repo.</p>
+  <div class="file-tree"><ul>
+    <li class="dir">plans/<ul>
+      <li class="file">README.md <span class="action edit">INDEX</span> — ordre d'exécution, graphe de dépendances, statuts (TODO/DONE/BLOCKED/REJECTED), findings rejetés</li>
+      <li class="file">001-fix-n-plus-one.md <span class="action create">PLAN</span></li>
+      <li class="file">002-extract-shadow-config.md <span class="action create">PLAN</span></li>
+    </ul></li>
+  </ul></div>
+</section>
+
+<section id="boucle">
+  <h2><span class="num">05</span>La boucle fermée : execute, reconcile, issues</h2>
+  <p class="lead">Les plans ne sont pas fire-and-forget — c'est ce qui distingue le skill d'un générateur de TODO.</p>
+  <div class="mermaid">graph LR
+  P[plan NNN] --> D[Executor cheap<br/>worktree isolé]
+  D --> R{Review advisor}
+  R -- criteria OK, scope clean --> A[APPROVE<br/>merge = ta décision]
+  R -- gaps corrigeables --> V[REVISE<br/>max 2 rounds]
+  V --> D
+  R -- STOP / scope violé --> B[BLOCK<br/>plan raffiné]</div>
+  <p>La review d'<code>execute</code> ne fait pas confiance au rapport de l'exécuteur : l'advisor <b>re-lance chaque done criterion</b> dans le worktree, vérifie la conformité de scope au diff près, lit le diff complet contre l'intention, et <b>audite les nouveaux tests</b> (un test qui n'asserte rien passe <code>pnpm test</code> et ne prouve rien). Les déviations documentées sont jugées sur le fond ; les déviations silencieuses échouent la review. Il ne merge, push ni commit jamais sur ta branche.</p>
+  <p><code>reconcile</code> traite l'entre-sessions : spot-check des DONE sur le HEAD courant, investigation des BLOCKED avec réécriture du plan autour de l'obstacle, refresh des TODO driftés, retrait des findings corrigés indépendamment.</p>
+</section>
+
+<section id="gains">
+  <h2><span class="num">06</span>Ce que tu y gagnes — et les limites</h2>
+  <p class="lead">Mappé sur ton setup : tu as déjà <code>/architecture</code>, <code>/code-review</code> et <code>/simplify</code> — <code>/improve</code> ne les remplace pas, il couvre l'étage au-dessus.</p>
+  <div class="twocol">
+    <div class="col good"><h4>✅ Gains réels</h4><ul>
+      <li><b>Économie de tokens structurelle</b> : Fable/Opus pour juger, Sonnet/Haiku pour taper. Sur un backlog de 5–10 plans, l'écart de coût est significatif.</li>
+      <li><b>Backlog persistant</b> : <code>plans/</code> + index avec statuts survit aux sessions. Tes audits actuels (<code>/architecture</code>) produisent un rapport jetable ; ici les findings rejetés sont mémorisés et ne reviennent pas.</li>
+      <li><b>Vetting anti-bruit</b> : la phase Vet relit chaque <code>file:line</code> cité avant de te montrer la table — moins de faux positifs que les audits subagents bruts.</li>
+      <li><b>9 catégories en un run</b>, dont « direction » (features ancrées dans le code, pas du brainstorm générique) — aucun de tes skills actuels ne couvre ça.</li>
+      <li><b>Read-only garanti</b> : auditable sur un repo client NextNode sans risque de mutation ; exécution confinée en worktree jetable, merge toujours manuel.</li>
+      <li><b>Interopérable</b> : plans en markdown pur + <code>--issues</code> → exploitables par Cursor, Codex, un humain, ou un agent cloud.</li>
+    </ul></div>
+    <div class="col bad"><h4>⚠️ Limites</h4><ul>
+      <li><b>Coût d'entrée</b> : un run <code>standard</code> = recon + ≤4 subagents + vetting ; <code>deep</code> = ≤8. Sur un petit repo, <code>/improve quick</code> suffit — le mode complet est calibré pour des codebases conséquentes.</li>
+      <li><b>Friction sur micro-fix</b> : il refuse d'implémenter directement, même un one-liner. Pour « corrige ce bug », ton workflow normal reste plus court.</li>
+      <li><b>Recouvrement partiel</b> avec <code>/code-review</code> (<code>improve branch</code> vs review de diff) et <code>/architecture</code> (catégorie tech-debt) — choisis par intention : ship une PR → <code>/code-review</code> ; construire un backlog → <code>/improve</code>.</li>
+      <li><b>Pollution du repo</b> : <code>plans/</code> vit à la racine. Sur un repo partagé, à gitignorer ou committer en connaissance de cause.</li>
+      <li><b>execute</b> requiert un host capable de spawner des subagents en worktree (Claude Code ✅, d'autres agents pas forcément).</li>
+    </ul></div>
+  </div>
+</section>
+
+<section id="verdict">
+  <h2><span class="num">07</span>Verdict et installation</h2>
+  <p>À adopter si tu veux un <b>backlog d'améliorations entretenu</b> sur tes repos NextNode : un <code>/improve</code> périodique + <code>reconcile</code> donne une vue priorisée et vérifiée de la dette, et <code>execute</code> délègue le mécanique à Sonnet/Haiku pendant que tu review. À ignorer pour les fixes ponctuels — tes skills existants y sont plus directs. Le pattern plan-template (extraits du code actuel, portes de vérification, STOP conditions, drift check par SHA) vaut aussi le vol pour tes propres skills de handoff.</p>
+  <div class="next-steps" id="install">
+    <ul>
+      <li><span class="mk">→</span> Installer : <code>npx skills add shadcn/improve</code></li>
+      <li><span class="mk">→</span> Premier run cheap sur un repo réel : <code>/improve quick</code>, puis sélectionner 2–3 findings.</li>
+      <li><span class="mk">→</span> Tester la boucle complète : <code>/improve execute 001</code> avec Sonnet, juger la qualité de la review.</li>
+      <li><span class="mk">→</span> Décider du sort de <code>plans/</code> (committer vs gitignore) avant de l'adopter sur les repos partagés.</li>
+    </ul>
+    <button class="copy-btn" type="button" data-copy-text="npx skills add shadcn/improve">Copier la commande d'install</button>
+  </div>
+  <h3>Sources</h3>
+  <ul>
+    <li><a href="https://github.com/shadcn/improve">github.com/shadcn/improve</a> — README, SKILL.md, références (audit-playbook, plan-template, closing-the-loop), exemple de plan généré contre shadcn/ui. 2,2k stars, dernier push 2026-06-12.</li>
+    <li><a href="https://skills.sh/shadcn">skills.sh/shadcn</a> — 6,8k installs.</li>
+    <li><a href="https://ui.shadcn.com/docs/skills">ui.shadcn.com/docs/skills</a> — le skill <code>shadcn</code> (UI), distinct : <code>/improve</code> est sur le compte perso de shadcn, pas dans shadcn-ui/ui.</li>
+  </ul>
+</section>
+</main>
+</div>
+<script>
+/* ============================================================
+   np.js — NextNode HTML deliverables runtime
+   Inlined at end of <body> by scripts/build.sh.
+   Every module is a no-op when its target markup is absent.
+   Zero CDN except lazy-loaded highlight.js / mermaid, and only
+   when the page actually contains their target blocks.
+   ============================================================ */
+(function () {
+  'use strict';
+  var $  = function (s, c) { return (c || document).querySelector(s); };
+  var $$ = function (s, c) { return Array.prototype.slice.call((c || document).querySelectorAll(s)); };
+  var esc = function (s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  };
+
+  /* ---------- 1. theme toggle (button auto-injected; anti-FOUC ran in <head>) ---------- */
+  var toggle = document.createElement('button');
+  toggle.className = 'np-theme-toggle';
+  toggle.type = 'button';
+  toggle.setAttribute('aria-label', 'Toggle theme');
+  function paintToggle() {
+    toggle.textContent = (document.documentElement.getAttribute('data-theme') === 'dark') ? '☀' : '☾';
+  }
+  paintToggle();
+  toggle.addEventListener('click', function () {
+    var next = (document.documentElement.getAttribute('data-theme') === 'dark') ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('np-theme', next); } catch (e) {}
+    paintToggle();
+    document.dispatchEvent(new CustomEvent('np:theme-change', { detail: { theme: next } }));
+  });
+  document.body.appendChild(toggle);
+
+  /* ---------- 2. arrows — empty .arrow spans get the canonical SVG ---------- */
+  var ARROW = '<svg width="34" height="10" viewBox="0 0 34 10" aria-hidden="true"><line x1="0" y1="5" x2="26" y2="5" stroke="currentColor" stroke-width="1.5"/><path d="M26 1 L32 5 L26 9 Z" fill="currentColor"/></svg>';
+  var ARROW_DASHED = '<svg width="34" height="10" viewBox="0 0 34 10" aria-hidden="true"><line x1="0" y1="5" x2="26" y2="5" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3"/><path d="M26 1 L32 5 L26 9 Z" fill="currentColor"/></svg>';
+  $$('.arrow').forEach(function (el) {
+    if (el.textContent.trim() === '') el.innerHTML = el.classList.contains('dashed') ? ARROW_DASHED : ARROW;
+  });
+
+  /* ---------- 3. sidebar — auto-generated from section[id] > h2 ---------- */
+  (function () {
+    var layout = $('.layout');
+    var aside = $('.sidebar');
+    if (!layout || !aside) return;
+    var secs = $$('section[id]').filter(function (s) { return s.querySelector('h2'); });
+    var want = document.body.getAttribute('data-sidebar');
+    if (want === 'off' || (want !== 'on' && secs.length < 6)) return;
+    layout.classList.add('has-sidebar');
+    var brand = document.body.getAttribute('data-brand') || 'NextNode';
+    var html = '<div class="brand">' + esc(brand) + '<span class="dot">.</span></div>'
+             + '<div class="sub">' + esc(document.title) + '</div><nav>';
+    secs.forEach(function (s, i) {
+      var h = s.querySelector('h2').cloneNode(true);
+      var num = h.querySelector('.num'); if (num) num.remove();
+      html += '<a href="#' + s.id + '"><span class="n">' + String(i + 1).padStart(2, '0') + '</span>' + esc(h.textContent.trim()) + '</a>';
+    });
+    aside.innerHTML = html + '</nav>';
+    var links = $$('nav a', aside);
+    var map = {};
+    links.forEach(function (a) { map[a.getAttribute('href').slice(1)] = a; });
+    var obs = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        links.forEach(function (l) { l.classList.remove('active'); });
+        if (map[e.target.id]) map[e.target.id].classList.add('active');
+      });
+    }, { rootMargin: '-20% 0px -70% 0px' });
+    secs.forEach(function (s) { obs.observe(s); });
+  })();
+
+  /* ---------- 4. code-block heads — built from data-file / data-lang ---------- */
+  $$('figure.code-block').forEach(function (fig) {
+    if (fig.querySelector('.code-block__head')) {
+      if (!fig.querySelector('.code-block__copy')) {
+        var head = fig.querySelector('.code-block__head');
+        var b = document.createElement('button');
+        b.className = 'code-block__copy'; b.type = 'button'; b.textContent = 'Copy';
+        head.appendChild(b);
+      }
+      return;
+    }
+    var cap = document.createElement('figcaption');
+    cap.className = 'code-block__head';
+    var file = fig.getAttribute('data-file');
+    var lang = fig.getAttribute('data-lang')
+            || (fig.querySelector('code[class*="language-"]') || { className: '' }).className.replace(/.*language-(\w+).*/, '$1');
+    cap.innerHTML = (file ? '<span class="code-block__file"></span>' : '<span class="code-block__file" style="opacity:.5">snippet</span>')
+                  + (lang ? '<span class="code-block__lang"></span>' : '')
+                  + '<button class="code-block__copy" type="button" aria-label="Copy code">Copy</button>';
+    if (file) cap.querySelector('.code-block__file').textContent = file;
+    if (lang) cap.querySelector('.code-block__lang').textContent = lang;
+    fig.insertBefore(cap, fig.firstChild);
+  });
+  function flashCopied(btn, label) {
+    var prev = btn.textContent;
+    btn.textContent = label || 'Copié ✓';
+    btn.classList.add('is-copied');
+    setTimeout(function () { btn.textContent = prev; btn.classList.remove('is-copied'); }, 1300);
+  }
+  document.addEventListener('click', function (ev) {
+    var btn = ev.target.closest('.code-block__copy');
+    if (!btn) return;
+    var code = btn.closest('.code-block');
+    code = code && code.querySelector('pre code');
+    if (!code) return;
+    navigator.clipboard.writeText(code.innerText).then(function () { flashCopied(btn, 'Copied'); }).catch(function () {});
+  });
+
+  /* ---------- 5. diff parser ---------- */
+  $$('.diff').forEach(function (el) {
+    var raw = el.textContent.replace(/^\n/, '').trimEnd();
+    el.innerHTML = raw.split('\n').map(function (l) {
+      var cls = l.indexOf('@@') === 0 ? 'hunk' : l.charAt(0) === '+' ? 'add' : l.charAt(0) === '-' ? 'del' : 'ctx';
+      var body = (cls === 'add' || cls === 'del') ? l.slice(1) : l;
+      return '<span class="line ' + cls + '">' + esc(body) + '</span>';
+    }).join('');
+  });
+
+  /* ---------- 5b. tabs — <div class="tabs" data-np="tabs"> ----------
+     Children carry data-tab="Label"; the runtime builds the tab-list.
+     data-active on a child preselects it (default: first). Without JS
+     the panels stack, labelled via CSS ::before.                      */
+  $$('.tabs[data-np="tabs"]').forEach(function (box) {
+    var panels = $$(':scope > [data-tab]', box);
+    if (!panels.length) return;
+    var list = document.createElement('div');
+    list.className = 'tab-list';
+    list.setAttribute('role', 'tablist');
+    var btns = panels.map(function (p, i) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'tab-btn';
+      b.setAttribute('role', 'tab');
+      b.textContent = p.getAttribute('data-tab');
+      b.addEventListener('click', function () { activate(i); });
+      list.appendChild(b);
+      p.setAttribute('role', 'tabpanel');
+      return b;
+    });
+    function activate(i) {
+      panels.forEach(function (p, j) {
+        p.classList.toggle('active', j === i);
+        btns[j].classList.toggle('active', j === i);
+        btns[j].setAttribute('aria-selected', j === i ? 'true' : 'false');
+      });
+      document.dispatchEvent(new CustomEvent('np:tab-shown', { detail: { panel: panels[i] } }));
+    }
+    list.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') return;
+      var cur = btns.indexOf(document.activeElement);
+      if (cur < 0) return;
+      var next = (cur + (ev.key === 'ArrowRight' ? 1 : btns.length - 1)) % btns.length;
+      btns[next].focus();
+      activate(next);
+    });
+    box.insertBefore(list, box.firstChild);
+    box.classList.add('tabs-ready');
+    var pre = panels.filter(function (p) { return p.hasAttribute('data-active'); });
+    activate(pre.length ? panels.indexOf(pre[0]) : 0);
+  });
+
+  /* ---------- 6. generic copy buttons ----------
+     <button class="copy-btn" data-copy="#selector">  → copies innerText of target
+     <button class="copy-btn" data-copy-text="...">   → copies the literal payload   */
+  document.addEventListener('click', function (ev) {
+    var btn = ev.target.closest('[data-copy], [data-copy-text]');
+    if (!btn) return;
+    var txt = btn.getAttribute('data-copy-text');
+    if (txt == null) {
+      var target = $(btn.getAttribute('data-copy'));
+      if (!target) return;
+      txt = target.innerText;
+    }
+    navigator.clipboard.writeText(txt).then(function () { flashCopied(btn); }).catch(function () {});
+  });
+
+  /* ---------- 7. highlight.js — lazy CDN, only if a language-tagged block exists ---------- */
+  (function () {
+    if (!$('pre > code[class*="language-"]')) return;
+    var base = 'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/';
+    ['light', 'dark'].forEach(function (t) {
+      var l = document.createElement('link');
+      l.id = 'hljs-' + t; l.rel = 'stylesheet';
+      l.href = base + 'styles/atom-one-' + t + '.min.css';
+      document.head.appendChild(l);
+    });
+    function applyTheme(t) {
+      $('#hljs-light').disabled = (t === 'dark');
+      $('#hljs-dark').disabled = (t !== 'dark');
+    }
+    var s = document.createElement('script');
+    s.src = base + 'highlight.min.js';
+    s.onload = function () {
+      window.hljs.highlightAll();
+      applyTheme(document.documentElement.getAttribute('data-theme') || 'light');
+    };
+    document.head.appendChild(s);
+    document.addEventListener('np:theme-change', function (e) { if (window.hljs) applyTheme(e.detail.theme); });
+  })();
+
+  /* ---------- 8. mermaid — lazy CDN, only if a .mermaid block exists ---------- */
+  (function () {
+    if (!$('.mermaid')) return;
+    import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs').then(function (mod) {
+      var mermaid = mod.default;
+      function themed(t) {
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: t === 'dark' ? 'dark' : 'default',
+          themeVariables: { fontFamily: 'DM Sans, sans-serif' }
+        });
+        mermaid.run({ querySelector: '.mermaid' });
+      }
+      themed(document.documentElement.getAttribute('data-theme') || 'light');
+      document.addEventListener('np:theme-change', function (e) {
+        $$('.mermaid').forEach(function (el) {
+          var src = el.getAttribute('data-source') || el.textContent;
+          el.removeAttribute('data-processed');
+          el.setAttribute('data-source', src);
+          el.textContent = src;
+        });
+        themed(e.detail.theme);
+      });
+      /* diagrams rendered while their tab was hidden have a broken size — re-render on first show */
+      document.addEventListener('np:tab-shown', function (e) {
+        var stale = $$('.mermaid', e.detail.panel).filter(function (el) {
+          var svg = el.querySelector('svg');
+          return svg && svg.getBoundingClientRect().width === 0;
+        });
+        if (!stale.length) return;
+        stale.forEach(function (el) {
+          var src = el.getAttribute('data-source') || el.textContent;
+          el.removeAttribute('data-processed');
+          el.setAttribute('data-source', src);
+          el.textContent = src;
+        });
+        mermaid.run({ nodes: stale });
+      });
+    }).catch(function () {});
+  })();
+
+  /* ---------- 9. board — rendered from a JSON data-island ----------
+     script[type="application/json"][data-np="board"] containing
+     {"columns":["Now","Next"], "cards":[{id,title,desc?,tags?,col}]}
+     Drag cards between columns; export as markdown or JSON.
+     NOTE: this file is inlined inside a script tag — never write a
+     literal closing script tag anywhere in it, comments included.  */
+  $$('script[type="application/json"][data-np="board"]').forEach(function (island, bi) {
+    var data;
+    try { data = JSON.parse(island.textContent); } catch (e) { return; }
+    var wrap = document.createElement('div');
+    var board = document.createElement('div');
+    board.className = 'board';
+    var byId = {};
+    (data.cards || []).forEach(function (c) { byId[c.id] = c; });
+    data.columns.forEach(function (col) {
+      var bcol = document.createElement('div');
+      bcol.className = 'bcol';
+      bcol.setAttribute('data-col', col);
+      bcol.innerHTML = '<h4><span>' + esc(col) + '</span><span class="cnt"></span></h4>';
+      (data.cards || []).filter(function (c) { return c.col === col; }).forEach(function (c) {
+        bcol.appendChild(renderCard(c));
+      });
+      bcol.addEventListener('dragover', function (ev) { ev.preventDefault(); bcol.classList.add('drag-over'); });
+      bcol.addEventListener('dragleave', function () { bcol.classList.remove('drag-over'); });
+      bcol.addEventListener('drop', function (ev) {
+        ev.preventDefault();
+        bcol.classList.remove('drag-over');
+        var id = ev.dataTransfer.getData('text/plain');
+        var card = board.querySelector('[data-id="' + id + '"]');
+        if (card) { bcol.appendChild(card); if (byId[id]) byId[id].col = col; counts(); }
+      });
+      board.appendChild(bcol);
+    });
+    function renderCard(c) {
+      var el = document.createElement('div');
+      el.className = 'bcard';
+      el.draggable = true;
+      el.setAttribute('data-id', c.id);
+      el.innerHTML = '<div class="ttl"></div>'
+        + (c.desc ? '<div class="desc"></div>' : '')
+        + (c.tags && c.tags.length ? '<div class="tags">' + c.tags.map(function (t) { return '<span class="pill mono">' + esc(t) + '</span>'; }).join('') + '</div>' : '');
+      el.querySelector('.ttl').textContent = c.title;
+      if (c.desc) el.querySelector('.desc').textContent = c.desc;
+      el.addEventListener('dragstart', function (ev) { ev.dataTransfer.setData('text/plain', c.id); });
+      return el;
+    }
+    function counts() {
+      $$('.bcol', board).forEach(function (bcol) {
+        bcol.querySelector('.cnt').textContent = $$('.bcard', bcol).length;
+      });
+    }
+    function state() {
+      return data.columns.map(function (col) {
+        var bcol = board.querySelector('[data-col="' + col + '"]');
+        return { column: col, cards: $$('.bcard', bcol).map(function (el) { return byId[el.getAttribute('data-id')]; }) };
+      });
+    }
+    var actions = document.createElement('div');
+    actions.className = 'board-actions';
+    actions.innerHTML = '<button class="copy-btn" type="button" data-board-md>Copier en markdown</button>'
+                      + '<button class="copy-btn" type="button" data-board-json>Copier en JSON</button>';
+    actions.querySelector('[data-board-md]').addEventListener('click', function (ev) {
+      var md = state().map(function (g) {
+        return '## ' + g.column + '\n' + g.cards.map(function (c) { return '- ' + c.title + (c.desc ? ' — ' + c.desc : ''); }).join('\n');
+      }).join('\n\n');
+      navigator.clipboard.writeText(md).then(function () { flashCopied(ev.target); }).catch(function () {});
+    });
+    actions.querySelector('[data-board-json]').addEventListener('click', function (ev) {
+      navigator.clipboard.writeText(JSON.stringify(state(), null, 2)).then(function () { flashCopied(ev.target); }).catch(function () {});
+    });
+    wrap.appendChild(board);
+    wrap.appendChild(actions);
+    island.parentNode.replaceChild(wrap, island);
+    counts();
+    window.__npBoards = window.__npBoards || [];
+    window.__npBoards[bi] = state;
+  });
+
+  /* ---------- 10. rich mode — <body data-mode="rich"> ----------
+     Auto-instruments prose as contenteditable (outside skip-zones),
+     collects forms .rich-question, [data-token] inputs, boards and
+     edits, then POSTs to ./submit with approval_mode. Approve and
+     Reject map to explicit next-action contracts for Claude.      */
+  (function () {
+    if (document.body.getAttribute('data-mode') !== 'rich') return;
+    var SKIP = 'pre, table, .mermaid, .diff, .file-tree, .diagram, .mockup, form, .static, [contenteditable]';
+    $$('section p, section li').forEach(function (el) {
+      if (el.closest(SKIP)) return;
+      el.setAttribute('contenteditable', 'true');
+      el.setAttribute('data-np-orig', el.innerText);
+      el.addEventListener('input', function () {
+        el.setAttribute('data-np-edited', el.innerText !== el.getAttribute('data-np-orig') ? '1' : '0');
+      });
+    });
+    function collectState() {
+      var out = { decisions: {}, edits: {}, tokens: {}, freeform: '' };
+      $$('form.rich-question').forEach(function (f, i) {
+        var id = f.getAttribute('data-question-id') || (f.querySelector('[name]') || {}).name || 'q' + (i + 1);
+        var radios = $$('input[type="radio"]:checked', f).map(function (r) { return r.value; });
+        var checks = $$('input[type="checkbox"]:checked', f).map(function (c) { return c.value; });
+        var text = $$('textarea', f).map(function (t) { return t.value.trim(); }).filter(Boolean).join('\n');
+        var v = {};
+        if (radios.length) v.choice = radios[0];
+        if (checks.length) v.choices = checks;
+        if (text) v.freetext = text;
+        out.decisions[id] = v;
+      });
+      $$('[data-np-edited="1"]').forEach(function (el, i) {
+        var id = el.id || (el.closest('section[id]') || {}).id || 'edit';
+        out.edits[id + '/' + i] = el.innerText;
+      });
+      $$('[data-token]').forEach(function (inp) { out.tokens[inp.getAttribute('data-token')] = inp.value; });
+      var ff = $('[data-freeform]');
+      if (ff && ff.value.trim()) out.freeform = ff.value.trim();
+      if (window.__npBoards) out.boards = window.__npBoards.map(function (fn) { return fn(); });
+      return out;
+    }
+    function submit(mode) {
+      var payload = collectState();
+      payload.approval_mode = mode;
+      fetch('./submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(function (res) {
+        if (!res.ok) throw new Error('submit failed');
+        document.body.innerHTML = '<main style="padding:4rem;font-family:var(--np-sans)"><h1>✓ ' + (mode === 'rejected' ? 'Rejected' : 'Submitted') + '</h1><p>Return to Claude — you can close this tab.</p></main>';
+      }).catch(function () {
+        navigator.clipboard.writeText(JSON.stringify(payload, null, 2)).catch(function () {});
+        alert('Pas de serveur ./submit — la submission JSON a été copiée dans le presse-papier, colle-la dans Claude.');
+      });
+    }
+    var gate = document.createElement('footer');
+    gate.className = 'rp-gate';
+    gate.innerHTML = '<button type="button" class="np-btn ghost" id="rp-reject">Reject</button>'
+                   + '<button type="button" class="np-btn primary" id="rp-approve">Approve</button>';
+    document.body.appendChild(gate);
+    $('#rp-approve').addEventListener('click', function () { submit('approved'); });
+    $('#rp-reject').addEventListener('click', function () { submit('rejected'); });
+  })();
+})();
+</script>
+</body>
+</html>

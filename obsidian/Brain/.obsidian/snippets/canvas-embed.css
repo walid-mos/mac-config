@@ -1,0 +1,7 @@
+/* Embeds de canvas dans les notes (![[x.canvas]]) :
+   aperçu interactif haut et lisible au lieu du cadre par défaut. */
+.internal-embed.canvas-embed {
+	height: 520px;
+	max-height: 65vh;
+	border-radius: 8px;
+}

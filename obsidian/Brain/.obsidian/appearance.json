@@ -8,6 +8,7 @@
   "enabledCssSnippets": [
     "typography-rhythm",
     "ui-polish",
-    "colored-headings"
+    "colored-headings",
+    "canvas-embed"
   ]
 }

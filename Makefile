@@ -2,12 +2,12 @@ SHELL := /usr/bin/env bash
 STOW := stow -t $(HOME)
 PACKAGES := claude cmux colima docker ghostty languages nvim opencode rectangle rp rtk starship zsh
 
-# Obsidian : le vault vit dans iCloud (symlinks Stow peu fiables là-bas),
-# la config est donc copiée par make, pas stowée.
-OBSIDIAN_VAULT := $(HOME)/Library/Mobile Documents/iCloud~md~obsidian/Documents/Brain/.obsidian
-OBSIDIAN_PKG := obsidian/Brain/.obsidian
-OBSIDIAN_CONF := app.json appearance.json core-plugins.json community-plugins.json graph.json
-OBSIDIAN_PLUGIN_DATA := obsidian-style-settings obsidian-hider obsidian-icon-folder settings-search
+# Obsidian : le vault vit dans iCloud, seule la config .obsidian est stowée
+# (symlinks relatifs → portables entre machines). Les binaires (thème, plugins,
+# fonts) ne sont pas versionnés : obsidian-post les installe.
+OBSIDIAN_VAULT_DIR := $(HOME)/Library/Mobile Documents/iCloud~md~obsidian/Documents/Brain
+OBSIDIAN_VAULT := $(OBSIDIAN_VAULT_DIR)/.obsidian
+OBSIDIAN_PLUGIN_DATA := obsidian-style-settings obsidian-hider obsidian-icon-folder settings-search shiki-highlighter
 
 .PHONY: help install all unstow restow $(PACKAGES) claude-post rp-post rtk-post obsidian obsidian-save obsidian-post
 
@@ -19,8 +19,8 @@ help:
 	@echo "  restow       Restow every package (-R)"
 	@echo "  <package>    Stow a single package (e.g. make nvim)"
 	@echo ""
-	@echo "  obsidian       Pousse la config versionnée vers le vault Brain (iCloud)"
-	@echo "  obsidian-save  Rapatrie la config du vault dans le repo (avant commit)"
+	@echo "  obsidian       Stow la config versionnée dans le vault Brain (iCloud)"
+	@echo "  obsidian-save  Ré-adopte (--adopt) les fichiers qu'Obsidian a dé-symlinkés"
 	@echo "  obsidian-post  Installe thème AnuPpuccin, plugins communautaires et fonts"
 	@echo ""
 	@echo "Packages: $(PACKAGES)"
@@ -49,27 +49,13 @@ rp-post:
 	@echo "rp ready: \`rp <slug>\` will serve plan.html and wait for /submit"
 
 obsidian:
-	@mkdir -p "$(OBSIDIAN_VAULT)/snippets"
-	@for f in $(OBSIDIAN_CONF); do cp "$(OBSIDIAN_PKG)/$$f" "$(OBSIDIAN_VAULT)/$$f"; done
-	@rsync -a --delete "$(OBSIDIAN_PKG)/snippets/" "$(OBSIDIAN_VAULT)/snippets/"
-	@for id in $(OBSIDIAN_PLUGIN_DATA); do \
-		if [ -f "$(OBSIDIAN_PKG)/plugins/$$id/data.json" ]; then \
-			mkdir -p "$(OBSIDIAN_VAULT)/plugins/$$id"; \
-			cp "$(OBSIDIAN_PKG)/plugins/$$id/data.json" "$(OBSIDIAN_VAULT)/plugins/$$id/data.json"; \
-		fi; \
-	done
-	@echo "config Obsidian poussée vers le vault Brain"
+	@for id in $(OBSIDIAN_PLUGIN_DATA); do mkdir -p "$(OBSIDIAN_VAULT)/plugins/$$id"; done
+	@stow -d obsidian -t "$(OBSIDIAN_VAULT_DIR)" -R Brain
+	@echo "config Obsidian stowée (symlinks) dans le vault Brain"
 
 obsidian-save:
-	@for f in $(OBSIDIAN_CONF); do cp "$(OBSIDIAN_VAULT)/$$f" "$(OBSIDIAN_PKG)/$$f" 2>/dev/null || true; done
-	@rsync -a --delete "$(OBSIDIAN_VAULT)/snippets/" "$(OBSIDIAN_PKG)/snippets/"
-	@for id in $(OBSIDIAN_PLUGIN_DATA); do \
-		if [ -f "$(OBSIDIAN_VAULT)/plugins/$$id/data.json" ]; then \
-			mkdir -p "$(OBSIDIAN_PKG)/plugins/$$id"; \
-			cp "$(OBSIDIAN_VAULT)/plugins/$$id/data.json" "$(OBSIDIAN_PKG)/plugins/$$id/data.json"; \
-		fi; \
-	done
-	@echo "config du vault rapatriée dans le repo — pense à committer"
+	@stow -d obsidian -t "$(OBSIDIAN_VAULT_DIR)" --adopt -R Brain
+	@echo "fichiers dé-symlinkés par Obsidian ré-adoptés dans le repo — vérifie git diff avant commit"
 
 obsidian-post:
 	@mkdir -p "$(OBSIDIAN_VAULT)/themes/AnuPpuccin" "$(OBSIDIAN_VAULT)/plugins"
@@ -81,6 +67,7 @@ obsidian-post:
 		obsidian-hider=kepano/obsidian-hider \
 		obsidian-icon-folder=florianwoelki/obsidian-iconize \
 		settings-search=javalent/settings-search \
+		shiki-highlighter=mprojectscode/obsidian-shiki-plugin \
 	; do \
 		id=$${spec%%=*}; repo=$${spec#*=}; dir="$(OBSIDIAN_VAULT)/plugins/$$id"; \
 		echo "→ plugin $$id"; mkdir -p "$$dir"; \

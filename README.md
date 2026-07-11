@@ -22,7 +22,7 @@ Chaque dossier de premier niveau est un **package Stow** dont l'arborescence int
 └── zsh/                  # .zshenv, .zshrc, .zprofile, .config/zsh
 ```
 
-**Exception `obsidian/`** : le vault vit dans iCloud (`~/Library/Mobile Documents/iCloud~md~obsidian/Documents/Brain`), où les symlinks Stow sont peu fiables. La config (`app.json`, `appearance.json`, snippets, réglages de plugins) est donc **copiée** par `make obsidian`, rapatriée par `make obsidian-save` avant commit, et les binaires (thème AnuPpuccin, plugins communautaires, fonts) sont installés par `make obsidian-post`.
+**Package `obsidian/`** : le vault reste dans iCloud (`~/Library/Mobile Documents/iCloud~md~obsidian/Documents/Brain`), seule sa config `.obsidian` est stowée — cible custom, donc via `make obsidian` (symlinks relatifs, portables entre machines). Les binaires non versionnés (thème AnuPpuccin, plugins communautaires, fonts) sont installés par `make obsidian-post`. Si Obsidian remplace un symlink par un vrai fichier en sauvegardant ses réglages, `make obsidian-save` (`stow --adopt`) ré-adopte le fichier dans le repo — vérifier le `git diff` puis committer.
 
 ## Bootstrap d'une nouvelle machine
 
@@ -42,8 +42,8 @@ make install
 | `make <package>`  | Stow un seul package (`make nvim`, `make zsh`, …)                     |
 | `make restow`     | Rebuild les symlinks (utile après ajout/suppression de fichiers)      |
 | `make unstow`     | Supprime tous les symlinks                                            |
-| `make obsidian`   | Pousse la config versionnée vers le vault Brain (copie, pas de stow)  |
-| `make obsidian-save` | Rapatrie la config du vault dans le repo (avant commit)            |
+| `make obsidian`   | Stow la config `.obsidian` dans le vault Brain (cible custom iCloud) |
+| `make obsidian-save` | `stow --adopt` : ré-adopte les fichiers qu'Obsidian a dé-symlinkés |
 | `make obsidian-post` | Installe thème AnuPpuccin, plugins communautaires et fonts         |
 | `make help`       | Affiche l'aide                                                        |
 

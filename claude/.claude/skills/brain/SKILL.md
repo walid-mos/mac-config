@@ -71,8 +71,14 @@ duplicate.
 
 ### 5. Write the note
 
-Filename = the note's title, natural casing, `.md`. Meeting notes:
-`Meetings/YYYY-MM-DD <personne ou sujet>.md`.
+Filename = the note's title, natural casing, `.md`. NEVER prefix with the
+folder's name (`Odin/Cheatsheet syntaxe.md`, not
+`Odin/Odin — Cheatsheet syntaxe.md`) — the path already carries that
+context. Meeting notes: `Meetings/YYYY-MM-DD <personne ou sujet>.md`.
+
+NO `# H1` repeating the title in the body — Obsidian shows the filename as
+inline title, an H1 duplicates it on screen. The body starts directly at
+the content; headings inside the note start at `##`.
 
 Frontmatter (get the timestamp via `date +%Y-%m-%dT%H:%M:%S`):
 
@@ -83,7 +89,7 @@ source: claude-code
 tags: [<voir _Conventions.md>]
 ---
 
-# <Titre>
+<contenu directement — pas de # H1>
 ```
 
 Tags come from the conventions list: `client/<slug>`, `project/<slug>`,

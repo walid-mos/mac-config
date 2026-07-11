@@ -1,6 +1,10 @@
 # Starship prompt configuration
 # https://starship.rs/config/
 
+# Default 500ms trips on cold binary execs (Gatekeeper check after a brew
+# upgrade) and spams "Executing command timed out" warnings
+command_timeout = 2000
+
 # Disable built-in nodejs module (runs node --version via fnm shim = slow)
 [nodejs]
 disabled = true

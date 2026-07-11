@@ -114,3 +114,11 @@ Body rules:
 
 Report the full path written (and whether it was a create or an update) so
 the user can jump to it in Obsidian.
+
+## Canvas deliverables (`.canvas`) and cours
+
+When the deliverable is a visual concept map ("canvas", "schéma",
+"carte mentale") or a "cours", read `_Canvas.md` at the vault root
+BEFORE writing — like `_Conventions.md`, it is the live source of
+truth (layout rules, cours pattern, embed syntax) shared with Hermes.
+Folder and filename rules above still apply.

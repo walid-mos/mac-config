@@ -1,0 +1,10 @@
+{
+  "0. Inbox": "LiInbox",
+  "1. Daily": "LiCalendarDays",
+  "2. NextNode": "LiBriefcase",
+  "3. My Projects": "LiRocket",
+  "4. Ideas": "LiLightbulb",
+  "5. Reference": "LiBookOpen",
+  "6. Personal": "LiHeart",
+  "7. Archive": "LiArchive"
+}

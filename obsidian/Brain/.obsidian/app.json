@@ -1,0 +1,13 @@
+{
+  "readableLineLength": true,
+  "showInlineTitle": true,
+  "foldHeading": true,
+  "foldIndent": true,
+  "strictLineBreaks": false,
+  "propertiesInDocument": "hidden",
+  "alwaysUpdateLinks": true,
+  "useMarkdownLinks": false,
+  "newFileLocation": "folder",
+  "newFileFolderPath": "0. Inbox",
+  "showUnsupportedFiles": false
+}

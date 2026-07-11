@@ -17,9 +17,12 @@ Chaque dossier de premier niveau est un **package Stow** dont l'arborescence int
 ├── nvim/.config/nvim/    # config Neovim
 ├── opencode/.config/opencode
 ├── rectangle/Library/    # config Rectangle (window manager)
+├── obsidian/Brain/       # config du vault Obsidian « Brain » (voir ci-dessous)
 ├── starship/.config/     # prompt
 └── zsh/                  # .zshenv, .zshrc, .zprofile, .config/zsh
 ```
+
+**Exception `obsidian/`** : le vault vit dans iCloud (`~/Library/Mobile Documents/iCloud~md~obsidian/Documents/Brain`), où les symlinks Stow sont peu fiables. La config (`app.json`, `appearance.json`, snippets, réglages de plugins) est donc **copiée** par `make obsidian`, rapatriée par `make obsidian-save` avant commit, et les binaires (thème AnuPpuccin, plugins communautaires, fonts) sont installés par `make obsidian-post`.
 
 ## Bootstrap d'une nouvelle machine
 
@@ -39,6 +42,9 @@ make install
 | `make <package>`  | Stow un seul package (`make nvim`, `make zsh`, …)                     |
 | `make restow`     | Rebuild les symlinks (utile après ajout/suppression de fichiers)      |
 | `make unstow`     | Supprime tous les symlinks                                            |
+| `make obsidian`   | Pousse la config versionnée vers le vault Brain (copie, pas de stow)  |
+| `make obsidian-save` | Rapatrie la config du vault dans le repo (avant commit)            |
+| `make obsidian-post` | Installe thème AnuPpuccin, plugins communautaires et fonts         |
 | `make help`       | Affiche l'aide                                                        |
 
 ## Conventions

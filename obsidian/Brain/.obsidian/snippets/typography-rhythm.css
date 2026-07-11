@@ -1,0 +1,28 @@
+/* Rythme vertical de lecture.
+   Règle : espace au-dessus d'un titre ≈ 3× le corps, en dessous ≈ 1×.
+   Variables officielles Obsidian — s'appliquent en lecture et live preview. */
+
+body {
+  --p-spacing: 0.85em;
+  --heading-spacing: 2.4em;
+  --line-height-normal: 1.6;
+}
+
+/* Live preview : respiration au-dessus des titres (les variables ne couvrent
+   pas le padding des lignes HyperMD). */
+.markdown-source-view.mod-cm6 .HyperMD-header-1 {
+  padding-top: 1.6em !important;
+}
+.markdown-source-view.mod-cm6 .HyperMD-header-2 {
+  padding-top: 1.3em !important;
+}
+.markdown-source-view.mod-cm6 .HyperMD-header-3,
+.markdown-source-view.mod-cm6 .HyperMD-header-4 {
+  padding-top: 1em !important;
+}
+
+/* Titre inline : ancre visuelle plus nette au-dessus du contenu. */
+body {
+  --inline-title-weight: 700;
+  --inline-title-margin-bottom: 0.6em;
+}

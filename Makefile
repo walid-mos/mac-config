@@ -2,7 +2,7 @@ SHELL := /usr/bin/env bash
 STOW := stow -t $(HOME)
 PACKAGES := claude cmux colima docker ghostty languages nvim opencode rectangle rp rtk starship zsh
 
-.PHONY: help install all unstow restow $(PACKAGES) claude-post rp-post rtk-post zsh-post
+.PHONY: help install all unstow restow $(PACKAGES) claude-post rp-post rtk-post
 
 help:
 	@echo "Targets:"
@@ -14,7 +14,7 @@ help:
 	@echo ""
 	@echo "Packages: $(PACKAGES)"
 
-install all: $(PACKAGES) claude-post rp-post rtk-post zsh-post
+install all: $(PACKAGES) claude-post rp-post rtk-post
 
 unstow:
 	@for pkg in $(PACKAGES); do $(STOW) -D $$pkg; done
@@ -36,11 +36,6 @@ claude-post:
 rp-post:
 	@command -v node >/dev/null || { echo "node not found — install it (fnm install --lts) so 'rp' can serve plan.html"; exit 0; }
 	@echo "rp ready: \`rp <slug>\` will serve plan.html and wait for /submit"
-
-zsh-post:
-	@security find-generic-password -a walid-mos -s macstudio-unlock >/dev/null 2>&1 \
-		&& echo "studio prêt: mdp du Mac Studio présent dans le Keychain local" \
-		|| echo "studio: mdp du Mac Studio absent — lance: security add-generic-password -a walid-mos -s macstudio-unlock -w"
 
 rtk-post:
 	@if ! command -v rtk >/dev/null; then \

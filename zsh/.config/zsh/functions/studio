@@ -1,7 +1,14 @@
 #!/bin/zsh
 # studio — SSH vers le Mac Studio + déverrouillage auto du trousseau distant
 # (SSH ne déverrouille jamais le login keychain ; git/Claude Code/codesign échoueraient).
-# Mdp lu dans le Keychain local (setup vérifié par `make zsh-post`) — jamais en argv ni sur disque.
+#
+# Sans tty, `security unlock-keychain` ne peut pas prompter et securityd
+# déverrouille via la session console ouverte du Studio — aucun mdp requis.
+# L'état du trousseau est lié à la connexion SSH (session de sécurité), pas au
+# canal : on déverrouille donc sur un canal sans tty d'une connexion ControlMaster,
+# puis on ouvre la session interactive sur la MÊME connexion (mux).
+# (L'ancien relais expect — Tcl 8.5, strings UCS-2 — mangeait les codepoints
+# > U+FFFF en mode interact, ce qui cassait les glyphes Nerd Fonts v3, plan 15.)
 #
 # Usage: studio [host]   (défaut : macstudio)
 
@@ -9,32 +16,9 @@ studio() {
 	emulate -L zsh
 
 	local host=${1:-macstudio}
-	local remote_command='security unlock-keychain && exec $SHELL -l'
-	local keychain_account=walid-mos
-	local keychain_service=macstudio-unlock
+	local -a mux=(-o ControlMaster=auto -o "ControlPath=$HOME/.ssh/studio-%C" -o ControlPersist=60)
 
-	local password
-	if ! password=$(security find-generic-password -a $keychain_account -s $keychain_service -w 2>/dev/null); then
-		print -u2 "studio : mdp absent du Keychain local, déverrouillage manuel — setup : security add-generic-password -a $keychain_account -s $keychain_service -w"
-		ssh -t $host $remote_command
-		return
-	fi
-
-	STUDIO_KEYCHAIN_PW=$password STUDIO_SSH_HOST=$host STUDIO_REMOTE_CMD=$remote_command expect -c '
-		set timeout 20
-		# expect ne relaie pas SIGWINCH au pty spawné
-		trap {
-			stty rows [stty rows] columns [stty columns] < $spawn_out(slave,name)
-		} WINCH
-		spawn ssh -t $env(STUDIO_SSH_HOST) $env(STUDIO_REMOTE_CMD)
-		stty rows [stty rows] columns [stty columns] < $spawn_out(slave,name)
-		expect {
-			"password to unlock" {
-				send -- "$env(STUDIO_KEYCHAIN_PW)\r"
-				interact
-			}
-			timeout { puts stderr "studio : prompt de déverrouillage jamais reçu"; exit 1 }
-			eof { exit 1 }
-		}
-	'
+	ssh $mux $host 'security unlock-keychain' </dev/null >/dev/null 2>&1 \
+		|| print -u2 "studio : déverrouillage du trousseau distant échoué (session console fermée ?)"
+	ssh $mux -t $host
 }

@@ -4,6 +4,10 @@
 #
 # Sans tty, `security unlock-keychain` ne peut pas prompter et securityd
 # déverrouille via la session console ouverte du Studio — aucun mdp requis.
+# Session console fermée (reboot, logout) : fallback avec le mdp de session du
+# Studio lu depuis le trousseau LOCAL (entrée `studio-keychain`, créée par
+# `security add-generic-password -a walid-mos -s studio-keychain -T /usr/bin/security -w`)
+# et passé par stdin — jamais en clair dans le repo ni l'historique.
 # L'état du trousseau est lié à la connexion SSH (session de sécurité), pas au
 # canal : on déverrouille donc sur un canal sans tty d'une connexion ControlMaster,
 # puis on ouvre la session interactive sur la MÊME connexion (mux).
@@ -19,6 +23,8 @@ studio() {
 	local -a mux=(-o ControlMaster=auto -o "ControlPath=$HOME/.ssh/studio-%C" -o ControlPersist=60)
 
 	ssh $mux $host 'security unlock-keychain' </dev/null >/dev/null 2>&1 \
-		|| print -u2 "studio : déverrouillage du trousseau distant échoué (session console fermée ?)"
+		|| security find-generic-password -s studio-keychain -w 2>/dev/null \
+			| ssh $mux $host 'IFS= read -r pw; security unlock-keychain -p "$pw"' >/dev/null 2>&1 \
+		|| print -u2 "studio : déverrouillage du trousseau distant échoué (secret local studio-keychain absent ou mdp incorrect ?)"
 	ssh $mux -t $host
 }

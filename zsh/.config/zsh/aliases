@@ -65,5 +65,13 @@ alias cddl="cd ~/Downloads"
 alias cdstow="cd ~/.stow_repository"
 alias cdcfg="cd ~/.config"
 
-
-
+# =============================================================================
+# Accor Hotel
+# =============================================================================
+# Zscaler - connexion manuelle pour les ressources Accor. Auto-démarrage au boot
+# coupé via `launchctl disable ... com.zscaler.tray` (persiste au reboot).
+# off  = démonte le tunnel (arrêt des daemons root) -> zéro capture de trafic.
+# on   = redémarre les daemons + l'app ; réutilise le token SSO en cache
+#        (bootout ne l'efface pas) donc pas de re-login tant qu'il est valide.
+alias zscaler-off="sudo launchctl bootout system/com.zscaler.tunnel 2>/dev/null; sudo launchctl bootout system/com.zscaler.service 2>/dev/null; launchctl bootout gui/\$(id -u)/com.zscaler.tray 2>/dev/null; pkill -f Zscaler.app 2>/dev/null; echo 'Zscaler déconnecté'"
+alias zscaler-on="sudo launchctl bootstrap system /Library/LaunchDaemons/com.zscaler.service.plist 2>/dev/null; sudo launchctl bootstrap system /Library/LaunchDaemons/com.zscaler.tunnel.plist 2>/dev/null; open -a Zscaler && echo 'Zscaler reconnecté'"

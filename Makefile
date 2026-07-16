@@ -9,7 +9,7 @@ OBSIDIAN_VAULT_DIR := $(HOME)/Library/Mobile Documents/iCloud~md~obsidian/Docume
 OBSIDIAN_VAULT := $(OBSIDIAN_VAULT_DIR)/.obsidian
 OBSIDIAN_PLUGIN_DATA := obsidian-style-settings obsidian-hider obsidian-icon-folder settings-search shiki-highlighter
 
-.PHONY: help install all unstow restow $(PACKAGES) claude-post rp-post rtk-post obsidian obsidian-save obsidian-post
+.PHONY: help install all unstow restow $(PACKAGES) claude-post nvim-post rp-post rtk-post obsidian obsidian-save obsidian-post
 
 help:
 	@echo "Targets:"
@@ -25,7 +25,7 @@ help:
 	@echo ""
 	@echo "Packages: $(PACKAGES)"
 
-install all: $(PACKAGES) claude-post rp-post rtk-post obsidian obsidian-post
+install all: $(PACKAGES) claude-post nvim-post rp-post rtk-post obsidian obsidian-post
 
 unstow:
 	@for pkg in $(PACKAGES); do $(STOW) -D $$pkg; done
@@ -43,6 +43,14 @@ claude-post:
 	fi
 	@command -v d2 >/dev/null && echo "d2 prêt: le skill /html rend les blocs data-np=\"d2\" au build" \
 		|| echo "d2 non installé — les blocs d2 feront échouer build.sh"
+
+nvim-post:
+	@if ! command -v rg >/dev/null; then \
+		if command -v brew >/dev/null; then brew install ripgrep; \
+		else echo "ripgrep introuvable et brew indisponible — installe-le à la main (https://github.com/BurntSushi/ripgrep)"; fi; \
+	fi
+	@command -v rg >/dev/null && echo "ripgrep prêt: telescope live_grep/grep_string opérationnels" \
+		|| echo "ripgrep non installé — telescope live_grep échouera"
 
 rp-post:
 	@command -v node >/dev/null || { echo "node not found — install it (fnm install --lts) so 'rp' can serve plan.html"; exit 0; }

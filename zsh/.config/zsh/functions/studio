@@ -1,6 +1,8 @@
 #!/bin/zsh
-# studio — SSH vers le Mac Studio + déverrouillage auto du trousseau distant
-# (SSH ne déverrouille jamais le login keychain ; git/Claude Code/codesign échoueraient).
+# studio — mosh vers le Mac Studio : session « infinie » (survit à la veille du
+# laptop, aux changements de réseau et aux coupures) + déverrouillage auto du
+# trousseau distant (SSH ne déverrouille jamais le login keychain ;
+# git/Claude Code/codesign échoueraient).
 #
 # Sans tty, `security unlock-keychain` ne peut pas prompter et securityd
 # déverrouille via la session console ouverte du Studio — aucun mdp requis.
@@ -10,9 +12,11 @@
 # et passé par stdin — jamais en clair dans le repo ni l'historique.
 # L'état du trousseau est lié à la connexion SSH (session de sécurité), pas au
 # canal : on déverrouille donc sur un canal sans tty d'une connexion ControlMaster,
-# puis on ouvre la session interactive sur la MÊME connexion (mux).
-# (L'ancien relais expect — Tcl 8.5, strings UCS-2 — mangeait les codepoints
-# > U+FFFF en mode interact, ce qui cassait les glyphes Nerd Fonts v3, plan 15.)
+# puis mosh bootstrap sur la MÊME connexion (--ssh mux) — mosh-server et le shell
+# qu'il lance héritent du trousseau déverrouillé pour toute leur durée de vie,
+# reconnexions comprises.
+# Chemin absolu /opt/homebrew : mosh-server est lancé hors shell interactif,
+# donc sans le PATH Homebrew.
 #
 # Usage: studio [host]   (défaut : macstudio)
 
@@ -26,5 +30,5 @@ studio() {
 		|| security find-generic-password -s studio-keychain -w 2>/dev/null \
 			| ssh $mux $host 'IFS= read -r pw; security unlock-keychain -p "$pw"' >/dev/null 2>&1 \
 		|| print -u2 "studio : déverrouillage du trousseau distant échoué (secret local studio-keychain absent ou mdp incorrect ?)"
-	ssh $mux -t $host
+	mosh --ssh="ssh $mux" --server=/opt/homebrew/bin/mosh-server $host
 }

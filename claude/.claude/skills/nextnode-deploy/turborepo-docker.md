@@ -29,7 +29,7 @@ RUN corepack enable pnpm
 # Stage 1 - Prune the monorepo to <target>'s dependency subgraph.
 # `turbo prune --docker` writes /repo/out/{json,full,pnpm-lock.yaml,...}.
 FROM base AS prepare
-RUN pnpm add -g turbo
+RUN npm i -g turbo
 COPY . .
 RUN turbo prune @org/app --docker
 
@@ -39,7 +39,14 @@ RUN turbo prune @org/app --docker
 FROM base AS deps
 COPY --from=prepare /repo/out/json/ ./
 COPY --from=prepare /repo/out/pnpm-lock.yaml ./pnpm-lock.yaml
+COPY --from=prepare /repo/out/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY .npmrc ./
+# The root `prepare` script (node .husky/install.mjs) runs on every install,
+# but turbo prune only outputs manifests - without the file it crashes with
+# "Cannot find module" before its own guard can run. Copy the guard and let
+# CI=true make it exit 0, exactly as on a CI runner.
+COPY .husky/install.mjs .husky/install.mjs
+ENV CI=true
 RUN pnpm install --frozen-lockfile
 
 # Stage 3 - Build via turbo (respects ^build topology + cache).
@@ -56,9 +63,19 @@ WORKDIR /app
 RUN corepack enable pnpm
 COPY --from=prepare /repo/out/json/ ./
 COPY --from=prepare /repo/out/pnpm-lock.yaml ./pnpm-lock.yaml
+COPY --from=prepare /repo/out/pnpm-workspace.yaml ./pnpm-workspace.yaml
+COPY .npmrc ./
+# NODE_ENV=production makes the husky prepare guard exit 0.
+COPY .husky/install.mjs .husky/install.mjs
 RUN pnpm install --frozen-lockfile --prod
-COPY --from=build /repo/packages/app/dist ./dist
-COPY --from=build /repo/packages/app/package.json ./
+# Keep the workspace layout and run from the package dir: pnpm links each
+# package's deps at <pkgdir>/node_modules, so a dist moved to /app root
+# cannot resolve its runtime imports.
+COPY --from=build /repo/packages/app/dist ./packages/app/dist
+WORKDIR /app/packages/app
+# @astrojs/node standalone binds localhost by default - unreachable through
+# Docker port-mapping.
+ENV HOST=0.0.0.0
 EXPOSE 3000
 CMD ["node", "dist/server/entry.mjs"]
 ```
@@ -72,6 +89,16 @@ CMD ["node", "dist/server/entry.mjs"]
 | `deps` | Cacheable install. Copies *only* manifests + lockfile - layer is invalidated only when a `package.json` actually changes. |
 | `build` | Adds source on top of `deps`, runs the actual build via `turbo`. Source edits invalidate this layer but not `deps`. |
 | `runtime` | Fresh `node:24-alpine` base. Runs `pnpm install --prod` on the pruned manifests, then copies only the built artefact. Prod deps only — no turbo, no dev deps, no source. |
+
+## Gotchas (field-tested on studiobymina)
+
+Symptom → cause → fix. Each one produced a failed build before landing in the reference above — do not "simplify" them away.
+
+1. **`ERROR: The configured global bin directory "/pnpm/bin" is not in PATH`** on `pnpm add -g turbo`. pnpm ≥ 11 resolves the global bin dir to `$PNPM_HOME/bin` and refuses without shell setup. Fix: `npm i -g turbo` in `prepare` (what the official Turborepo guide does) — nothing else depends on a global bin, so no `PNPM_HOME` config anywhere.
+2. **`Cannot find module '/repo/.husky/install.mjs'`** during `pnpm install`. NextNode repos have a root `prepare` script (`node .husky/install.mjs`, the husky CI/prod guard) and `turbo prune` outputs only manifests, so the guard file is absent and `prepare` crashes before its own guard logic runs. Fix: `COPY .husky/install.mjs .husky/install.mjs` before each install; `ENV CI=true` (deps) and `NODE_ENV=production` (runtime) make it exit 0. House choice: do NOT reach for `--ignore-scripts` — the guard is designed for exactly this, and lifecycle scripts of allowlisted deps (esbuild) keep working.
+3. **Workspace packages not linked at install.** `out/pnpm-workspace.yaml` must be copied alongside `out/json/` + the lockfile in BOTH `deps` and `runtime` — without it pnpm does a single-package install and workspace deps silently vanish.
+4. **`ERR_MODULE_NOT_FOUND` at container start** after copying `dist` to the image root. pnpm links each package's deps at `<pkgdir>/node_modules`; the server must live at (and run from) the package's path — copy `dist` to `./<pkgdir>/dist` and set `WORKDIR /app/<pkgdir>`.
+5. **Connection reset through `-p 3000:3000` while logs say `Server listening`.** Node SSR servers (incl. `@astrojs/node` standalone) bind localhost by default. Fix: `ENV HOST=0.0.0.0` in `runtime`.
 
 ## `.dockerignore` (mandatory)
 

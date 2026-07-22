@@ -74,7 +74,9 @@ migrations_folder = "drizzle"                # Optional (default: "drizzle")
 migrate_command = "pnpm drizzle-kit migrate" # Optional -- shell run inside the ephemeral migrate container on the VPS
 check_command = "pnpm drizzle-kit check"     # Optional -- shell run on the GH runner during quality
 
-[services.supabase]                          # Optional -- declarative gate, no fields. Pulls in the full self-hosted stack + R2 backups.
+[services.planetscale]                       # Optional (Cloudflare Workers only) -- managed PlanetScale Postgres reached via Hyperdrive (env.HYPERDRIVE)
+cluster_size = "PS-10"                        # Optional -- opaque PlanetScale SKU; org default when omitted
+region = "eu-west"                            # Optional -- opaque PlanetScale region slug; org default when omitted
 
 [services.observability]                     # Optional (Hetzner only) -- self-hosted metrics + logs + alerting stack
 logs_retention = "30d"                       # Required -- VictoriaLogs retention, positive int + h/d/w/y suffix
@@ -98,8 +100,32 @@ interface NextNodeConfig {
 interface ServicesConfig {
   readonly r2?: R2ServiceConfig
   readonly postgres?: PostgresServiceConfig
-  readonly supabase?: SupabaseServiceConfig
   readonly observability?: ObservabilityServiceConfig
+  readonly d1?: D1ServiceConfig                    // cloudflare-workers only
+  readonly kv?: KvServiceConfig                    // cloudflare-workers only
+  readonly queues?: QueuesServiceConfig            // cloudflare-workers only
+  readonly planetscale?: PlanetscaleServiceConfig  // cloudflare-workers only
+}
+
+// --- Cloudflare Workers backing services (cloudflare-workers target only) ---
+// Registered in SERVICE_NAMES alongside r2/postgres/observability; D1/KV/Queues/
+// PlanetScale are realized by the workers Terraform block, not the per-service
+// CLI factories.
+
+interface D1ServiceConfig {
+  readonly migrationsFolder: string   // default "drizzle" (DEFAULT_MIGRATIONS_FOLDER)
+  readonly checkCommand?: string      // filesystem-only migrations check on the GH runner
+}
+
+interface KvNamespaceConfig { readonly name: string }   // [[services.kv.namespaces]]
+interface KvServiceConfig { readonly namespaces: ReadonlyArray<KvNamespaceConfig> }
+
+interface QueueConfig { readonly name: string }         // [[services.queues]]
+interface QueuesServiceConfig { readonly queues: ReadonlyArray<QueueConfig> }
+
+interface PlanetscaleServiceConfig {                     // [services.planetscale]
+  readonly clusterSize?: string   // opaque PlanetScale SKU; org default when omitted
+  readonly region?: string        // opaque PlanetScale region slug; org default when omitted
 }
 
 interface R2ServiceConfig {
@@ -117,11 +143,6 @@ interface PostgresServiceConfig {
   readonly migrateCommand?: string
   readonly checkCommand?: string
 }
-
-// `[services.supabase]` is a declarative gate -- the presence of the table
-// opts the project into the full Supabase stack + R2 backups alias. No
-// fields today; future knobs land here when there's a decision to expose.
-type SupabaseServiceConfig = Readonly<Record<string, never>>
 
 interface ObservabilityServiceConfig {
   readonly logsRetention: string            // "30d" etc. (positive int + h/d/w/y)
@@ -153,7 +174,7 @@ interface EnvironmentSection {
   readonly development: boolean
 }
 
-type DeployTargetType = "hetzner-vps" | "cloudflare-pages"
+type DeployTargetType = "hetzner-vps" | "cloudflare-pages" | "cloudflare-workers"
 type DeployableProjectType = "app" | "static"
 
 interface DeployVolume {
@@ -201,7 +222,28 @@ interface CloudflarePagesDeploySection extends BaseDeploySection {
   readonly secrets: ReadonlyArray<string>  // the pool IS [deploy].secrets
 }
 
-type DeploySection = HetznerVpsDeploySection | CloudflarePagesDeploySection
+// A single Worker declared under [deploy.services.<name>] on the
+// cloudflare-workers target. A Worker is not a container — no port/source/image —
+// so the shape is the runtime-wiring subset plus the bundle `entry`.
+interface WorkerServiceConfig {
+  readonly url?: string
+  readonly secrets: ReadonlyArray<string>
+  readonly needs: ReadonlyArray<string>       // ["d1"] | ["kv"] | ["queues"] | ["r2"]
+  readonly dependsOn: ReadonlyArray<string>
+  readonly entry: string                       // default DEFAULT_WORKER_ENTRY = "dist/server/entry.mjs"
+}
+
+interface CloudflareWorkersDeploySection extends BaseDeploySection {
+  readonly target: "cloudflare-workers"
+  readonly secrets: ReadonlyArray<string>      // GLOBAL pool ∪ each service's own — same union as hetzner-vps
+  readonly services: Readonly<Record<string, WorkerServiceConfig>>  // one block = one Worker
+  readonly cron: ReadonlyArray<CronJobConfig>  // mapped to native Workers cron triggers
+}
+
+type DeploySection =
+  | HetznerVpsDeploySection
+  | CloudflarePagesDeploySection
+  | CloudflareWorkersDeploySection
 
 interface HetznerDeployConfig {
   readonly serverType: string
@@ -299,7 +341,7 @@ Deploy section is only valid for `app` and `static` project types. For `package`
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `target` | `"hetzner-vps" \| "cloudflare-pages"` | Inferred from type | Deploy target. `app` -> `hetzner-vps`, `static` -> `cloudflare-pages`. Can be overridden explicitly. |
+| `target` | `"hetzner-vps" \| "cloudflare-pages" \| "cloudflare-workers"` | Inferred from type | Deploy target. Inference (`DEFAULT_DEPLOY_TARGETS`): `app` -> `hetzner-vps`, `static` -> `cloudflare-pages`. `cloudflare-workers` is **never inferred** — an `app` project sets it explicitly to deploy N Workers on Cloudflare's edge instead of a VPS. See [cloudflare-workers.md](cloudflare-workers.md). |
 | `secrets` | `(string \| {name,generate,length})[]` | `[]` | **GLOBAL secret pool — both targets.** Each entry is a must-exist GitHub secret NAME (string) or a `{name, generate, length}` auto-generated table. For **hetzner-vps** the names are folded into every service (`expandServiceSecrets`); the pull pool = global ∪ every service's own `secrets`. For **cloudflare-pages** the pool IS this list. Generated entries also populate `deploy.generatedSecrets` (pushed at provision by `ensureGeneratedSecrets`). Generators (`domain/deploy/secret-generation.ts`): `token` → base64url (JWT/HS256 keys; 64 chars maps 1:1 to a byte), `password` → alphanumeric (rejection-sampled — 62 isn't a power of two, avoids modulo bias); `length` is the produced CHARACTER count. Duplicate names / unknown generators / lengths outside 8–256 fail at parse. |
 | `vps` | `string \| null` | `null` | Override the VPS hostname this project deploys onto. When `null`, the CLI resolves a shared default per environment (see `resolveVpsName`). Hetzner-only - Cloudflare ignores it. Used for projects that need a dedicated VPS (e.g. `monitoring` runs on its own internal VPS, not the shared one). |
 | `image` | n/a | n/a | **REMOVED.** The legacy `[deploy.image]` table was dropped; the validator surfaces `deploy.image is an unknown field — migrate to [deploy.services.<name>]`. |
@@ -358,9 +400,30 @@ Common fields:
 | `ref` | `string` | Yes | Full image ref (`<registry>/<repository>:<tag>`). Parsed through `parseImageRef` at validation time; a malformed ref fails plan, never as a broken `docker pull` on the VPS. |
 | `registry_auth_secret` | `string` | No | Repo/org secret NAME holding the registry password. Omit for public images. The VPS SSH session runs `docker login` with this value before pulling. |
 
+#### Cloudflare Workers variant (`target = "cloudflare-workers"`)
+
+On the `cloudflare-workers` target each `[deploy.services.<name>]` block is **one Worker**, not a container (`WorkerServiceConfig`). `url`, `secrets`, `needs`, `depends_on` keep their meaning; the only new field is `entry`, and every container knob is rejected.
+
+| Field | Type | Required | Default | Description |
+| ----- | ---- | -------- | ------- | ----------- |
+| `entry` | `string` | No | `"dist/server/entry.mjs"` | The bundle `main` wrangler deploys (`DEFAULT_WORKER_ENTRY`) — what `@astrojs/cloudflare` v14 emits, with its twin static-assets directory at `dist/client`. |
+| `observability` | `boolean` | No | `true` | Workers Logs toggle. The generated wrangler config always emits `observability: { enabled: <this> }`. Opt out with `false` on high-traffic Workers near the 20M-events/month Paid allowance. |
+
+Rejected container fields (`port`, `source`, `ref`, `registry_auth_secret`, `context`, `dockerfile`, `target`, `build_args`) each fail with:
+
+```
+deploy.services.<name>.<field> is not supported with deploy target "cloudflare-workers" (a Worker is not a container: <why>)
+```
+
+`needs` binds either a **backing service** or a **sibling Worker** into this Worker:
+- Backing service → its binding: `["d1"]` → `env.DB`, `["kv"]` → `KV_<ALIAS>`, `["queues"]` → `QUEUE_<ALIAS>`, `["r2"]` → `R2_<ALIAS>`, `["planetscale"]` → `env.HYPERDRIVE`.
+- Sibling Worker name → a **service binding** `env.<NAME_SNAKE>` (a `Fetcher`, RPC over Cloudflare's edge — no DNS/TLS/public hostname). This is the ONLY channel Workers reach each other on; there is no `<NAME>_URL` for a sibling Worker (contrast the VPS). The binding graph also orders the sequential deploy (a cycle throws).
+
+Cross-service rules for routed URLs are the VPS ones: `url` unique and within `project.domain`. See [cloudflare-workers.md](cloudflare-workers.md).
+
 ### `[[deploy.cron]]` (optional, Hetzner only)
 
-Scheduled HTTP jobs, declared as a **table-array**. Each entry fires a request at one of THIS project's services over the compose network, on a cron schedule. The infra renders all jobs into a single `cron` sidecar (alpine BusyBox `crond` + `wget`) in the compose file — no host port, no Docker socket, no app-image dependency, no external config. Runs in **both dev and prod**: each environment is its own compose stack with its own `cron` sidecar hitting its own app, so the two are isolated by construction (unlike the prod-only postgres backup loop). Forbidden on `cloudflare-pages` (a static site has no always-on runtime). See [cron-service.md](cron-service.md).
+Scheduled HTTP jobs, declared as a **table-array**. Each entry fires a request at one of THIS project's services over the compose network, on a cron schedule. The infra renders all jobs into a single `cron` sidecar (alpine BusyBox `crond` + `wget`) in the compose file — no host port, no Docker socket, no app-image dependency, no external config. Runs in **both dev and prod**: each environment is its own compose stack with its own `cron` sidecar hitting its own app, so the two are isolated by construction (unlike the prod-only postgres backup loop). Forbidden on `cloudflare-pages` (a static site has no always-on runtime). On `cloudflare-workers` the block is accepted but realized differently: only `schedule` + `service` reach the config (mapped to the target Worker's native `triggers.crons`, a workerd `scheduled` handler); `path`/`method` are the sidecar-only metadata and are unused there. See [cron-service.md](cron-service.md) and [cloudflare-workers.md](cloudflare-workers.md).
 
 | Field | Type | Required | Default | Description |
 | ----- | ---- | -------- | ------- | ----------- |
@@ -402,6 +465,56 @@ Self-hosted metrics + logs + alerting stack, injected as compose sidecars on the
 
 See [observability-service.md](observability-service.md) for the stack topology, golden-image exporters, and service discovery.
 
+### `[services.d1]` (optional, Cloudflare Workers only)
+
+A single D1 database, realized by the `cloudflare-workers` Terraform block as `<project>-<env>-d1` and bound as `env.DB` into every Worker that lists `needs = ["d1"]`. One DB per project — multiple would need per-service routing D1 does not warrant. See [cloudflare-workers.md](cloudflare-workers.md).
+
+| Field | Type | Required | Default | Description |
+| ----- | ---- | -------- | ------- | ----------- |
+| `migrations_folder` | `string` | No | `"drizzle"` | Drizzle migrations folder relative to `nextnode.toml`. Read by `wrangler d1 migrations apply --remote` (between provision and deploy) and by `detect-migration-changes` — the same folder postgres uses (`DEFAULT_MIGRATIONS_FOLDER`). |
+| `check_command` | `string` | No | -- | Shell command run on the GH runner during quality to validate the local migrations folder (no DB, filesystem-only). |
+
+### `[services.kv]` (optional, Cloudflare Workers only)
+
+KV namespaces, declared as a table-array `[[services.kv.namespaces]]`. Each is realized as `cloudflare_workers_kv_namespace` named `<project>-<env>-<alias>` and bound as `KV_<ALIAS_SNAKE>` into Workers that list `needs = ["kv"]`.
+
+| Field | Type | Required | Description |
+| ----- | ---- | -------- | ----------- |
+| `name` | `string` | Yes | Namespace alias (kebab). At least one namespace required when the block is present. Unique across namespaces. |
+
+### `[[services.queues]]` (optional, Cloudflare Workers only)
+
+Queues, declared directly as a table-array under `services`. Each is realized as `cloudflare_queue` named `<project>-<env>-<alias>` and bound as a producer `QUEUE_<ALIAS_SNAKE>` into Workers that list `needs = ["queues"]`.
+
+| Field | Type | Required | Description |
+| ----- | ---- | -------- | ----------- |
+| `name` | `string` | Yes | Queue alias (kebab). At least one queue required when the block is present. Unique across queues. |
+
+### `[services.planetscale]` (optional, Cloudflare Workers only)
+
+A managed PlanetScale Postgres database, materialized as `<project>-<env>-planetscale` and reached from every Worker with `needs = ["planetscale"]` through a Cloudflare Hyperdrive binding (`env.HYPERDRIVE`). The DB is created by a **create-if-absent API adapter** (the PlanetScale Terraform provider has no database resource); Terraform then owns the DML-only `hyperdrive` Postgres branch-role + the `cloudflare_hyperdrive_config`. Origin credentials live in Terraform state only — **no env var is projected** to the Worker. Both fields are opaque PlanetScale values passed verbatim; the org default applies when omitted. This is the only service **impliable from a bare `needs`** (`SERVICE_IMPLIABLE_FROM_NEEDS`): `needs = ["planetscale"]` alone provisions it with a synthesized empty config. Requires `PLANETSCALE_SERVICE_TOKEN_ID` + `PLANETSCALE_SERVICE_TOKEN` env when declared. See [cloudflare-workers.md](cloudflare-workers.md).
+
+| Field | Type | Required | Default | Description |
+| ----- | ---- | -------- | ------- | ----------- |
+| `cluster_size` | `string` | No | org default | Opaque PlanetScale SKU (e.g. `PS-10`), sent verbatim only when set. |
+| `region` | `string` | No | org default | Opaque PlanetScale region slug, sent verbatim only when set. |
+
+### Backing-service target support
+
+`SERVICE_SUPPORTED_TARGETS` (`config/service-config.ts`) declares which target realizes each backing service. Declaring a service under an unsupported target fails validation (`[services.<name>] is not supported with deploy target "<target>" (supported: ...)`):
+
+| Service | `hetzner-vps` | `cloudflare-pages` | `cloudflare-workers` |
+| ------- | :-----------: | :----------------: | :------------------: |
+| `r2` | yes | -- | yes (realized by Terraform) |
+| `postgres` | yes | -- | -- |
+| `observability` | yes | -- | -- |
+| `d1` | -- | -- | yes |
+| `kv` | -- | -- | yes |
+| `queues` | -- | -- | yes |
+| `planetscale` | -- | -- | yes |
+
+`r2` is the one multi-target backing service — the same `[[services.r2.buckets]]` block is realized by the imperative VPS adapter on `hetzner-vps` and by the Terraform block on `cloudflare-workers`.
+
 ## CLI env vars
 
 ### Hetzner commands (`provision`, `dns`, `deploy`)
@@ -425,6 +538,23 @@ See [observability-service.md](observability-service.md) for the stack topology,
 ### Cloudflare Pages commands (`provision`, `dns`, `deploy`)
 
 Subset of above: `PIPELINE_CONFIG_FILE`, `PIPELINE_ENVIRONMENT`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, and `ALL_SECRETS` (deploy, when `deploy.secrets` non-empty).
+
+### Cloudflare Workers commands (`provision`, `migrate-remote`, `deploy`, `teardown`, `plan-infra`)
+
+The Cloudflare subset above, plus the Terraform/HCP token and a few pipeline vars. No Hetzner/SSH/Tailscale vars. Full table in [cloudflare-workers.md](cloudflare-workers.md).
+
+| Var | Required by | Description |
+| --- | ----------- | ----------- |
+| `PIPELINE_CONFIG_FILE` | all | Path to `nextnode.toml` |
+| `PIPELINE_ENVIRONMENT` | all except `detect-migration-changes` | `development` / `production` |
+| `CLOUDFLARE_API_TOKEN` | provision, migrate, deploy, teardown, plan-infra | Cloudflare API token (wrangler + Terraform provider auth) |
+| `CLOUDFLARE_ACCOUNT_ID` | provision, migrate, deploy, teardown, plan-infra | Cloudflare account id |
+| `TF_TOKEN_app_terraform_io` | provision, migrate, deploy, teardown, plan-infra | HCP Terraform token, read natively by Terraform. Sourced from the `TF_API_TOKEN` org secret. |
+| `PLANETSCALE_SERVICE_TOKEN_ID` / `PLANETSCALE_SERVICE_TOKEN` | provision, teardown (only when `[services.planetscale]` is declared) | PlanetScale service-token id + secret for the create-if-absent DB API and the Terraform PlanetScale provider. |
+| `ALL_SECRETS` | provision, migrate, deploy | `toJSON(secrets)` — resolved secret pool, projected per Worker |
+| `PIPELINE_BASE_SHA` | `detect-migration-changes` | Base of the D1 migrations diff (`github.event.before`) |
+| `PIPELINE_PR_NUMBER` | `plan-infra` | PR to comment the Terraform diff on |
+| `TEARDOWN_CONFIRM` / `TEARDOWN_WIPE_DATA` | teardown | Project-name confirmation; data-wipe opt-in (required when D1/R2 declared) |
 
 ### `plan` command
 
@@ -481,6 +611,7 @@ Written to `GITHUB_OUTPUT` by `writePlanOutputs()`:
 | `has_prod_gate` | `hasProdGate(quality_matrix)` | quality job `infra:` input |
 | `has_domain` | `Boolean(config.project.domain)` | conditional dns job |
 | `has_postgres` | `Boolean(config.services.postgres)` | gates the `migrate` job on `deploy.yml` |
+| `has_d1` | `Boolean(config.services.d1)` | gates the `detect-migrations` + `migrate` jobs on `deploy-workers.yml` |
 | `domain` | `config.project.domain ?? ''` | downstream jobs needing the domain string |
 | `build_directory` | computed from config file path | SEO guard + wrangler deploy |
 | `package_dir` | path of `nextnode.toml`'s directory | downstream jobs (working-directory) |

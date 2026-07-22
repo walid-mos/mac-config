@@ -2,19 +2,22 @@
 
 ## Workflows
 
-Three reusable workflows + standalone ops workflows.
+Four reusable workflows + standalone ops workflows.
 
 **Reusable (called via `workflow_call` from caller repos)**:
 - `publish-package.yml` - `type=package`
 - `deploy.yml` - `type=app` (Hetzner VPS)
 - `deploy-static.yml` - `type=static` (Cloudflare Pages)
+- `deploy-workers.yml` - `type=app` with `target = "cloudflare-workers"` (Cloudflare Workers). See [cloudflare-workers.md](cloudflare-workers.md).
+- `plan-workers-diff.yml` - `workflow_call`, PR-only Terraform plan diff for the Workers target (below).
 
 **Standalone ops workflows (live in `NextNodeSolutions/core/.github/workflows/`)**:
 - `build-golden-image.yml` - `workflow_dispatch`. Triggers the `build-golden-image` CLI command. See [golden-image.md](golden-image.md).
 - `teardown-vps.yml` - `workflow_dispatch`. Tears down a Hetzner VPS (server + DNS + state).
 - `teardown-pages.yml` - `workflow_dispatch`. Tears down a Cloudflare Pages project (project + domains + R2 if any).
+- `teardown-workers.yml` - `workflow_dispatch`. Tears down a Cloudflare Workers project (Worker scripts via wrangler + `terraform destroy`; HCP workspace kept). See [cloudflare-workers.md](cloudflare-workers.md).
 
-Callers choose one of the three deploy workflows based on `type` (no runtime routing in YAML):
+Callers choose the deploy workflow: `type` selects package/app/static, and an `app` project on `target = "cloudflare-workers"` points at `deploy-workers.yml` instead of `deploy.yml` (no runtime routing in YAML):
 
 ### `publish-package.yml` (type=package)
 
@@ -67,14 +70,11 @@ Jobs:
 
 Permissions (declared at workflow level): `contents: read`, `actions: read`, `packages: write` (GHCR push).
 
-Secrets (all live at the **GitHub org level** on `NextNodeSolutions` - callers only need `secrets: inherit`, no per-repo configuration):
+Infra secrets live at the **GitHub org level** on `NextNodeSolutions` — callers only need `secrets: inherit`, no per-repo configuration. Do NOT maintain a secret list here: query it live and read the consuming workflow to know what each one is for. See [github-org.md](github-org.md) for the full layer model (org / repo-env / repo), retrieval commands, and the `nextnode-ci` GitHub App that mints `GH_TOKEN`.
 
-- `HETZNER_API_TOKEN`
-- `TS_OAUTH_CLIENT_ID`, `TS_OAUTH_SECRET` (Tailscale OAuth for runner + VPS join)
-- `DEPLOY_SSH_PRIVATE_KEY_B64` (base64-encoded SSH private key; public key derived at runtime)
-- `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
-- `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` (self-healed by `ensureR2Setup` and re-published as org secrets on rotation)
-- `NEXTNODE_APP_ID`, `NEXTNODE_APP_PRIVATE_KEY` (GitHub App for minting `GH_TOKEN` in provision)
+```sh
+gh secret list --org NextNodeSolutions
+```
 
 **Tailscale**: Both `provision` and `deploy` jobs connect the CI runner to the tailnet via `tailscale/github-action@v4` with OAuth credentials. SSH to the VPS goes through the tailnet IP - never the public IP.
 
@@ -115,9 +115,62 @@ Jobs:
 
 Plan outputs: see the full table in [config.md](config.md) → "Plan outputs".
 
+### `deploy-workers.yml` (type=app + `target = "cloudflare-workers"` - Cloudflare Workers)
+
+```
+plan ---+--- quality (matrix with prod-gate folded in when producing prod)
+        |
+        +--- provision (terraform apply; needs plan + quality)
+        |
+        +--- detect-migrations (needs plan; if has_d1)
+        |
+        +--- migrate (needs plan + provision + detect-migrations; if has_d1 && migrations_changed)
+        |
+        \--- deploy (needs plan + quality + provision + migrate)
+```
+
+Inputs: `environment` (required), `config_file` (default `nextnode.toml`), `dev_workflow_file` (default `deploy-dev.yml`) — the same contract as the other two.
+
+Jobs:
+
+| Job | Depends on | What it does |
+|-----|-----------|-------------|
+| `plan` | -- | Parse config, output `quality_matrix` + `project_name` + `has_prod_gate` + `has_domain` + `has_d1` + `package_dir` |
+| `quality` | plan | Run lint/test/**prod-gate** matrix — the prod gate is a matrix task (via `has_prod_gate` + `dev_workflow_file`), NOT a separate job |
+| `provision` | plan + quality | `node src/index.ts provision` — ensure the HCP workspace, `terraform apply` (D1/KV/Queues/R2 + DNS + Redirect Rules), map outputs → ServiceEnv. DNS is absorbed here — **no standalone `dns` job**. |
+| `detect-migrations` | plan | `node src/index.ts detect-migration-changes` — emit `migrations_changed` (base `PIPELINE_BASE_SHA`). Runs only if `has_d1 == 'true'`. Fails safe to `true` on an undiffable range. |
+| `migrate` | plan + provision + detect-migrations | `node src/index.ts migrate-remote` (the shared command; the Workers target dispatches it to `wrangler d1 migrations apply <db> --remote`) between provision and deploy. Runs only if `has_d1 == 'true'` AND `migrations_changed == 'true'`. |
+| `deploy` | plan + quality + provision + migrate | `node src/index.ts deploy` — build + inject SEO guard per service + generate the ephemeral `wrangler.json` + `wrangler deploy` (in `depends_on` order) + `/healthz` smoke check, all in one CLI step. **No separate `seo-guard` step.** |
+
+**No `build-image` job** (no Docker build), **no `dns` job** (folded into provision), **no `prod-gate` job** (folded into `quality`). Terraform is set up per job with `hashicorp/setup-terraform@v3` (`terraform_version: '~> 1.9'`, `terraform_wrapper: false`); `wrangler` runs via `npx --yes` from the app's devDependency.
+
+CLI env vars: the Cloudflare subset + `TF_TOKEN_app_terraform_io` (from the `TF_API_TOKEN` org secret), `ALL_SECRETS`, `GH_TOKEN`. **No Hetzner/SSH/Tailscale vars.** Full table in [config.md](config.md) → "Cloudflare Workers commands". See [cloudflare-workers.md](cloudflare-workers.md) for the caller convention (no Dockerfile, no committed wrangler config).
+
+### `teardown-workers.yml` (`workflow_dispatch`)
+
+Parity with `teardown-vps.yml` / `teardown-pages.yml`. Inputs: `repository` (target `owner/repo`), `environment` (choice), `confirm` (type the project name → `TEARDOWN_CONFIRM`), `wipe_data` (boolean → `TEARDOWN_WIPE_DATA`, **required when D1 or R2 is declared**), `config_file`. Sparse-checks-out the target repo, runs `teardown-guard` then `teardown` — deletes every Worker script via `wrangler delete --force`, then `terraform destroy`; the HCP workspace is kept so state history survives.
+
+### `plan-workers-diff.yml` (`workflow_call`)
+
+PR-only Terraform diff for the Workers target. Inputs `environment` + `config_file`; permission `pull-requests: write`. The caller triggers it on `nextnode.toml` changes and it runs `node src/index.ts plan-infra` (`terraform plan -detailed-exitcode`), commenting the create/update/delete diff on the PR (`PIPELINE_PR_NUMBER` + `GH_TOKEN`) so a reviewer sees the infra change before merge. The plan is env-specific (workspace `<project>-<env>`).
+
+```yaml
+# caller-repo/.github/workflows/plan-infra.yml
+on:
+  pull_request:
+    paths: ['**/nextnode.toml']
+jobs:
+  plan-infra:
+    uses: NextNodeSolutions/core/.github/workflows/plan-workers-diff.yml@main
+    with:
+      environment: development
+      config_file: apps/web/nextnode.toml
+    secrets: inherit
+```
+
 ## The `environment` input
 
-Both `deploy.yml` and `deploy-static.yml` are generic - the caller invokes them twice (once per env) from two thin caller-repo workflows:
+`deploy.yml`, `deploy-static.yml`, and `deploy-workers.yml` are all generic - the caller invokes one twice (once per env) from two thin caller-repo workflows:
 
 ```yaml
 # caller-repo/.github/workflows/deploy-dev.yml

@@ -117,7 +117,6 @@ Documented here so additions don't accidentally drift into multi-service territo
 |---------|------------------|----------------|
 | `[deploy.volumes]` mounts | Attached to the PRIMARY (first declared) service only | `domain/hetzner/compose-file.ts` (volumes block) |
 | Postgres database | One DB per project; `selectMigrationService` enforces exactly one owner | `domain/deploy/migration-service.ts` |
-| Supabase stack | One full stack per project; no per-service supabase | `domain/services/supabase.ts` |
 | Healthcheck command | Hardcoded wget probe on `<port>/healthz` — no per-service override yet | `domain/hetzner/compose-file.ts` |
 
 Anything new in these areas needs a runtime change first (validation, rendering, teardown), not just a schema addition.
@@ -134,6 +133,6 @@ Anything new in these areas needs a runtime change first (validation, rendering,
 
 ## Cross-phase compose identity
 
-Phase 1 (`stageRollout` → `bringUpDb`) and phase 2 (`bringUpApp`) BOTH render the compose file with the same inputs. Phase 2 is `docker compose up -d --remove-orphans` (no positional service args): every user service rotates to its new image while postgres/supabase stay untouched because their compose entries are byte-identical across phases.
+Phase 1 (`stageRollout` → `bringUpDb`) and phase 2 (`bringUpApp`) BOTH render the compose file with the same inputs. Phase 2 is `docker compose up -d --remove-orphans` (no positional service args): every user service rotates to its new image while the backing services (postgres, observability, cron) stay untouched because their compose entries are byte-identical across phases.
 
 Any change that makes a backing-service block differ across phases would recreate the DB phase 1 just `--wait`-ed healthy. Keep backing-service rendering deterministic.

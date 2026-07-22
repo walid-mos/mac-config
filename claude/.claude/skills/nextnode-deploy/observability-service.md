@@ -1,6 +1,6 @@
 # Observability Service (`[services.observability]`)
 
-Self-hosted metrics + logs + alerting, injected as a compose sidecar stack on the VPS alongside the app. It is the monitoring **control plane** — one VPS runs it (the Astro dashboard that also serves `/api/sd/*` to vmagent); every other VPS is a scrape target. Registered in `SERVICE_NAMES` like R2/Postgres/Supabase, but it provisions nothing external — all state lives in local compose volumes, so `provision` is a no-op (`SERVICE_REQUIRES_INFRA_STORAGE = false`).
+Self-hosted metrics + logs + alerting, injected as a compose sidecar stack on the VPS alongside the app. It is the monitoring **control plane** — one VPS runs it (the Astro dashboard that also serves `/api/sd/*` to vmagent); every other VPS is a scrape target. Registered in `SERVICE_NAMES` like R2/Postgres, but it provisions nothing external — all state lives in local compose volumes, so `provision` is a no-op (`SERVICE_REQUIRES_INFRA_STORAGE = false`).
 
 ## Config
 
@@ -53,9 +53,9 @@ Every VPS golden image pre-installs/pre-pulls three exporters, all bound to the 
 |----------|------|---------|-------|
 | node_exporter `v1.9.1` | `:9100` | `tailscale0` | machine: CPU/mem/disk/net/pressure |
 | cAdvisor `v0.49.1` | `:9101` | `${TS_IP}` (from `/etc/monitoring/env`, written at convergence) | per-container: CPU/mem/OOM/restarts |
-| postgres-exporter `v0.18.0` | `:9187` | `${TAILSCALE_IP}` (compose `.env`) | DB stats (Supabase/embedded only) |
+| postgres-exporter `v0.18.0` | `:9187` | `${TAILSCALE_IP}` (compose `.env`) | DB stats (embedded postgres only) |
 
-The monitoring VPS distinguishes itself from workload VPS via R2 state labels, not a per-role Tailscale tag (every host carries a single `tag:server`). See [golden-image.md](golden-image.md) and [supabase-service.md](supabase-service.md) for the postgres-exporter variants.
+The monitoring VPS distinguishes itself from workload VPS via R2 state labels, not a per-role Tailscale tag (every host carries a single `tag:server`). See [golden-image.md](golden-image.md). The embedded-postgres exporter (`DATA_SOURCE_URI`/`USER`/`PASS`) is now the only variant.
 
 ## Caddy integration + access logs
 

@@ -33,7 +33,7 @@ A job names a `path` and (optionally) a `service`, never a host. The infra resol
 - **`depends_on`** each distinct target service, gated by source: `service_healthy` for a `build` service (it exposes `/healthz`), `service_started` for an `upstream` one (no forced probe) — so the sidecar does not fire its first tick before the app is up.
 - **`restart: unless-stopped`** — the scheduler survives a single failed run.
 
-`renderComposeFile` spreads the sidecar into the compose `services` map (after postgres/supabase/observability). It rides the existing two-phase rollout, teardown (`docker compose down` rotates it with everything else), and Vector log capture (`crond -L /dev/stdout`) — no new provisioning, DNS, Caddy route, host port, or secret channel.
+`renderComposeFile` spreads the sidecar into the compose `services` map (after postgres/observability). It rides the existing two-phase rollout, teardown (`docker compose down` rotates it with everything else), and Vector log capture (`crond -L /dev/stdout`) — no new provisioning, DNS, Caddy route, host port, or secret channel.
 
 ## Dev vs prod
 

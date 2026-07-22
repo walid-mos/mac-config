@@ -80,8 +80,6 @@ A bucket with `cdn = true` is served publicly at `<alias>.cdn.<resolveDeployDoma
 - **Provision** (`cli/services/r2/ensure.ts` → `attachCustomDomains`): resolves the zone id ONCE (`lookupZoneId(extractRootDomain(deployDomain))`), attaches a custom domain to every `cdn` bucket, then `awaitR2DomainActive` polls `getR2CustomDomainStatus` until `ssl === "active"` (20 × 5s, fails loud) before the binding's `publicUrl` is persisted — so the stored URL actually serves. `ensure`'s `deployDomain: string | null` comes pre-resolved from `ctx.deployDomain`; `null` (no `project.domain`) ⇒ no bucket gets a domain.
 - **Teardown**: `project`-scope teardown detaches every `cdn` bucket's custom domain (`deleteR2CustomDomain`) — Cloudflare removes the auto-created CNAME with it. `vps` scope leaves R2 in place.
 
-The implicit supabase `backups` bucket is always `cdn: false` — internal, never public.
-
 ## Runtime contract (deploy command)
 
 `buildR2ServiceEnv(state)` projects the state to env:

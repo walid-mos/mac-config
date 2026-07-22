@@ -2,16 +2,17 @@
 name: nextnode-deploy
 description: >-
   NextNode infrastructure package (@nextnode-solutions/infrastructure).
-  Config-driven CI/CD CLI for Cloudflare Pages and Hetzner VPS deploys. Load
-  when a repo has nextnode.toml, @nextnode-solutions/infrastructure in
-  package.json, or the user mentions NextNode deploys.
+  Config-driven CI/CD CLI for Cloudflare Pages, Hetzner VPS, and Cloudflare
+  Workers deploys. Load when a repo has nextnode.toml,
+  @nextnode-solutions/infrastructure in package.json, or the user mentions
+  NextNode deploys.
 user-invocable: true
-synced-at: f8e1ca0
+synced-at: e2d2030
 ---
 
 # @nextnode-solutions/infrastructure
 
-Config-driven CI/CD CLI for NextNode projects. Reads `nextnode.toml`, runs quality gates, deploys to Cloudflare Pages or Hetzner VPS, parses publish results, and enforces prod gates.
+Config-driven CI/CD CLI for NextNode projects. Reads `nextnode.toml`, runs quality gates, deploys to Cloudflare Pages, Hetzner VPS, or Cloudflare Workers, parses publish results, and enforces prod gates.
 
 **Source**: `packages/infrastructure` in `@nextnode/core`
 **Binary**: runs via `node src/index.ts <command>` (Node 24 native TS)
@@ -27,19 +28,23 @@ Always read the actual code before answering - start with `packages/infrastructu
 | `plan` | config | Parse `nextnode.toml`, output quality matrix + plan outputs |
 | `detect-migration-changes` | config | Compare `base..head` against `migrations_folder` (default `drizzle/`), emit `migrations_changed` to gate the `migrate` job. Fails safe to `true` on an undiffable range. See [pipeline.md](pipeline.md) |
 | `teardown-guard` | config | Validate teardown preconditions before destruction |
-| `provision` | deploy | Provision infra (Pages project + domains, or Hetzner VPS + R2 + CDN domains), then bootstrap auto-generated `[deploy].secrets` via `ensureGeneratedSecrets` |
+| `provision` | deploy | Provision infra (Pages project + domains; Hetzner VPS + R2 + CDN domains; or Cloudflare Workers Terraform apply — D1/KV/Queues/R2 + PlanetScale/Hyperdrive + DNS/redirects), then bootstrap auto-generated `[deploy].secrets` via `ensureGeneratedSecrets` |
+| `plan-infra` | deploy | Cloudflare Workers only. `terraform init` + `terraform plan` (`-detailed-exitcode`); posts the create/update/delete diff as a PR comment when `PIPELINE_PR_NUMBER` is set, else to the step summary. See [cloudflare-workers.md](cloudflare-workers.md) |
 | `deploy` | deploy | Merge target/services/secrets envs, sync to target, deploy app |
 | `dns` | deploy | Reconcile Cloudflare DNS records (A for VPS, CNAME for Pages) |
 | `teardown` | deploy | Tear down provisioned infra; captures a final wal-g backup first; volumes + both backup buckets preserved unless `--wipe-backups`. See [multi-service.md](multi-service.md) teardown |
 | `migrate-remote` | deploy | Run `migrate_command` in an ephemeral container between `provision` and `deploy` (no pre-migrate snapshot — wal-g covers it). No-op without `[services.postgres]`; gated by `detect-migration-changes` (`migrations_changed`). See [postgres-service.md](postgres-service.md) |
 | `seo-guard` | deploy | Inject `_headers` + `robots.txt` into build output for non-prod envs |
+| `generate-worker-types` | deploy | Cloudflare Workers only (no-op elsewhere). Render `worker-configuration.d.ts` per Worker from the same `WranglerDocument` deploy uses, so `import { env } from 'cloudflare:workers'` is typed. Committed in the consumer repo; CI regenerates + `git diff --exit-code` guards drift. See [cloudflare-workers.md](cloudflare-workers.md) |
 | `prod-gate` | standalone | Verify dev pipeline passed before production deploy |
+| `publish` | standalone | Run `pnpm exec semantic-release` for a `type=package` project (with git release-push recovery on a failed tag push) |
 | `publish-result` | standalone | Parse semantic-release output, write status/version/summary |
 | `compute-image-ref` | standalone | Resolve the per-service `image_refs` JSON Record, render `docker-bake.json` from `nextnode.toml` (two-layer cache per target: ephemeral GHA scope + durable GHCR `:buildcache` registry scope), emit `bake_file`. See [pipeline.md](pipeline.md) |
 | `build-golden-image` | standalone | Build + snapshot a Hetzner golden image (Docker preinstalled), keyed by deterministic fingerprint, prunes old snapshots. Replaces Packer. See [golden-image.md](golden-image.md) |
 | `recover` | standalone | Recover/rebuild VPS state from Hetzner labels when local state is lost |
 | `restore` | standalone | Restore a postgres backup from R2 by timestamp. Destructive (`pg_restore --clean`) - requires explicit `--yes`. See [postgres-service.md](postgres-service.md) |
-| `rotate-pg-exporter-password` | standalone | Force-rotate the `PG_EXPORTER_PASSWORD` env-secret. Runbook in [supabase-service.md](supabase-service.md) |
+| `prune-backups` | standalone | Prune old postgres backups from the R2 backup bucket (GFS retention). Benign no-op when creds are absent or the bucket is wiped. See [postgres-service.md](postgres-service.md) |
+| `reconcile-tailnet-acl` | standalone | Reconcile the single Tailscale ACL grant the monitoring stack needs (scrape + Vector log push). Idempotent and NON-FATAL — a missing `acl` OAuth scope (403) is an actionable warning, never a deploy break. See [observability-service.md](observability-service.md) |
 
 Commands are registered in `index.ts` in three maps: `PLAN_COMMANDS`, `DEPLOY_COMMANDS`, `STANDALONE_COMMANDS`. Deploy commands receive a `DeployableConfig` and are skipped (logged "non-deployable project") for `type=package`.
 
@@ -55,18 +60,21 @@ See [config.md](config.md) for full schema, types, and env var reference.
 
 Provider-agnostic abstraction. See [deploy-env.md](deploy-env.md) and `src/domain/deploy/target.ts` for the full TS interface, env contract, and orchestration rules.
 
-Implemented targets: `CloudflarePagesTarget` (static sites) and `HetznerVpsTarget` (containerized apps). Workloads are declared per project under `[deploy.services.<name>]` — N services per project, everything keyed off the declared name. Per-service routing/env/image/teardown invariants live in [multi-service.md](multi-service.md); the Hetzner VPS architecture deep-dive in [hetzner-vps.md](hetzner-vps.md).
+Implemented targets: `CloudflarePagesTarget` (static sites), `HetznerVpsTarget` (containerized apps), and `CloudflareWorkersTarget` (N Workers on Cloudflare's edge, provisioned via Terraform + deployed via wrangler — `app` projects that set `target = "cloudflare-workers"` explicitly). Workloads are declared per project under `[deploy.services.<name>]` — N services per project, everything keyed off the declared name. Per-service routing/env/image/teardown invariants live in [multi-service.md](multi-service.md); the Hetzner VPS architecture deep-dive in [hetzner-vps.md](hetzner-vps.md); the Cloudflare Workers target deep-dive in [cloudflare-workers.md](cloudflare-workers.md).
 
 ## Backing services
 
 Pluggable per-service abstraction in `domain/services/`. Each service contributes a `{public, secret}` env block, just like a `DeployTarget` - they merge through the same primitive (`mergeServiceEnvs`) with collision detection. Registered services live in `SERVICE_NAMES` (`config/types.ts`) and force every service-aware site (validators, env merger, future routers) to handle them via mapped types.
 
-Currently registered:
+Currently registered (`SERVICE_NAMES`): `r2`, `postgres`, `observability`, `d1`, `kv`, `queues`, `planetscale`. `SERVICE_SUPPORTED_TARGETS` gates which target realizes each — `r2` spans `hetzner-vps` + `cloudflare-workers`; `postgres`/`observability` are `hetzner-vps` only; `d1`/`kv`/`queues`/`planetscale` are `cloudflare-workers` only.
 
-- **R2** (Cloudflare object storage). Declared as a table-array of `{ name, cdn }` buckets under `[[services.r2.buckets]]`; `cdn = true` attaches a public custom domain + `R2_BUCKET_<ALIAS>_URL`. See [r2-service.md](r2-service.md).
-- **Postgres**. Declared in `[services.postgres] mode = "embedded" | "external"` — embedded sidecar + **dual prod backups** (daily pg_dump with GFS retention in `<project>-backups-dump` + continuous wal-g WAL archiving & daily base backups in `<project>-backups`), auto-restore on a fresh VPS, final backup before teardown; or external `DATABASE_URL`. See [postgres-service.md](postgres-service.md).
-- **Supabase**. Declared as an empty `[services.supabase]` table — full self-hosted stack (postgres + auth + storage + realtime + kong + studio) with auto-injected `backups` bucket and per-env secrets. See [supabase-service.md](supabase-service.md).
-- **Observability**. Declared in `[services.observability]` (`logs_retention`, `metrics_retention_months`, `logs_vhost`, `metrics_vhost`) — self-hosted VictoriaLogs + VictoriaMetrics + vmagent + vmalert + Alertmanager + blackbox, injected as compose sidecars, scraping golden-image exporters (node_exporter/cAdvisor/postgres-exporter) over the tailnet. No external provisioning. See [observability-service.md](observability-service.md).
+- **R2** (Cloudflare object storage, both targets). Declared as a table-array of `{ name, cdn }` buckets under `[[services.r2.buckets]]`; `cdn = true` attaches a public custom domain + `R2_BUCKET_<ALIAS>_URL`. On Workers it is realized by the Terraform block instead of the imperative VPS adapter. See [r2-service.md](r2-service.md).
+- **Postgres** (Hetzner only). Declared in `[services.postgres] mode = "embedded" | "external"` — embedded sidecar + **dual prod backups** (daily pg_dump with GFS retention in `<project>-backups-dump` + continuous wal-g WAL archiving & daily base backups in `<project>-backups`), auto-restore on a fresh VPS, final backup before teardown; or external `DATABASE_URL`. See [postgres-service.md](postgres-service.md).
+- **Observability** (Hetzner only). Declared in `[services.observability]` (`logs_retention`, `metrics_retention_months`, `logs_vhost`, `metrics_vhost`) — self-hosted VictoriaLogs + VictoriaMetrics + vmagent + vmalert + Alertmanager + blackbox, injected as compose sidecars, scraping golden-image exporters (node_exporter/cAdvisor/postgres-exporter) over the tailnet. No external provisioning. See [observability-service.md](observability-service.md).
+- **D1 / KV / Queues** (Cloudflare Workers only). `[services.d1]` (single DB → `env.DB`), `[[services.kv.namespaces]]` (→ `KV_<ALIAS>`), `[[services.queues]]` (→ producer `QUEUE_<ALIAS>`). Terraform-backed (`SERVICE_DEFINITIONS` uses `terraformBackedServiceDefinition`); a Worker binds one by listing it in `needs`. See [cloudflare-workers.md](cloudflare-workers.md).
+- **PlanetScale** (Cloudflare Workers only). `[services.planetscale]` (`cluster_size`, `region`, both optional) → a managed PlanetScale Postgres DB `<project>-<env>-planetscale`, reached from every Worker with `needs = ["planetscale"]` through a Cloudflare Hyperdrive binding (`env.HYPERDRIVE`). Create-if-absent API adapter (the PlanetScale TF provider has no DB resource); Terraform owns the Postgres role + Hyperdrive config. The only service impliable from a bare `needs` (`SERVICE_IMPLIABLE_FROM_NEEDS`). See [cloudflare-workers.md](cloudflare-workers.md).
+
+Supabase was a scaffolded backing service and was **removed** (`refactor(infrastructure): remove the incomplete supabase backing service`) — `grep supabase src` is empty. Do not document it as available.
 
 ## Observability
 
@@ -83,6 +91,13 @@ Prevents search engine indexing of non-production deploys. Runs after `pnpm buil
 - **Domain**: `computeSeoGuardFiles(environment)` - returns `_headers` (X-Robots-Tag: noindex) + `robots.txt` (Disallow: /) for non-prod, empty array for prod
 - **Adapter**: `injectFiles(buildDirectory, files)` - writes files to build output
 - **CLI**: `seoGuardCommand` - orchestrates domain + adapter, reads `BUILD_DIRECTORY` env var
+
+## GitHub org (secrets, nextnode-ci app, environments)
+
+See [github-org.md](github-org.md): the 3 secret layers (org / repo-env /
+repo) with live `gh` retrieval commands — never a maintained list —, the
+`nextnode-ci` GitHub App minting installation tokens for CI, environments,
+generated-secret bootstrap, CI debugging commands.
 
 ## Prod gate
 
@@ -118,8 +133,8 @@ See [hetzner-caller.md](hetzner-caller.md) for what a project repo must provide 
 7. **Strict layer rules apply** - domain is 100% pure (no IO/env/logger), adapters never make business decisions, CLI orchestrates. See `packages/infrastructure/CLAUDE.md` for the full enforcement table.
 8. **Postgres migrations run from CI, not from the app** — app entrypoints MUST NOT run migrations on startup. See [postgres-service.md](postgres-service.md) Migrations.
 9. **A postgres NextNode version is a fleet-wide pin** — `NEXTNODE_POSTGRES_VERSION` covers server + backup sidecar; `mode = "external"` users own theirs. See [postgres-service.md](postgres-service.md).
-10. **Project secrets are GitHub env-secrets, never org-secrets** — per-project credential → env-secret (`EnvSecretsAdapter`); cross-project credential → org-secret. Heuristic + canonical commit `7dcede5` in [supabase-service.md](supabase-service.md).
-11. **Idempotent provision skips on present; rotate is an explicit command** — auto-rotation would invalidate live tokens / split-brain initdb-baked roles. See [supabase-service.md](supabase-service.md) rules 4–5.
+10. **Project secrets are GitHub env-secrets, never org-secrets** — per-project credential → env-secret (`EnvSecretsAdapter`); cross-project credential (e.g. `TF_API_TOKEN`) → org-secret. See [github-org.md](github-org.md).
+11. **Idempotent provision skips on present; generated secrets never rotate** — `ensureGeneratedSecrets` pushes only ABSENT `{name, generate, length}` values (regenerating would invalidate live tokens / break DB connections); a present secret is left untouched. See rule 26 + [config.md](config.md).
 12. **Service name is declared, never hardcoded; N services per project** — the `[deploy.services.<name>]` key flows end-to-end (GHCR suffix, `.env.<name>`, ports, bake target, DNS, Caddy, depends_on, migrate); any literal `"app"` is a bug. See [multi-service.md](multi-service.md).
 13. **IMAGE_REFS is a JSON Record, not a bare ref** — plan emits `upstream_image_refs`, `compute-image-ref` emits `image_refs` + `bake_file`; a bare ref breaks `parseImageRefsEnv`. See [multi-service.md](multi-service.md) Image refs.
 14. **/healthz is scoped to `build` services; depends_on gating adapts** — upstream images are pulled verbatim and never probed; dependents gate on `service_healthy` (build) vs `service_started` (upstream). See [multi-service.md](multi-service.md).
@@ -139,3 +154,7 @@ See [hetzner-caller.md](hetzner-caller.md) for what a project repo must provide 
 28. **Production VPS proxying depends on subdomain depth** — Cloudflare's free Universal SSL covers only the zone apex + a single-level wildcard, so a host two+ labels deep is grey-clouded (DNS-only) and Caddy's origin Let's Encrypt cert serves it. `isCoveredByUniversalSsl` decides; dev + internal records are never proxied. See [hetzner-vps.md](hetzner-vps.md).
 29. **Embedded postgres runs dual, prod-only backups; planned teardowns are zero-loss** — daily pg_dump (GFS, `<project>-backups-dump`) ∥ continuous wal-g WAL + base backups (`<project>-backups`); a fresh VPS auto-restores, and teardown captures a final backup first (aborts on failure). No pre-migrate snapshot. See [postgres-service.md](postgres-service.md).
 30. **Observability is a compose-only backing service** — no external provisioning, volumes stay local, `provision` is a no-op; all published ports bind loopback with Caddy (tailnet vhosts) as the trust boundary; secrets are render-time only, never app env. See [observability-service.md](observability-service.md).
+31. **Workers reach each other on service bindings ONLY — never peer URLs** — `needs = ["<sibling-worker>"]` emits a `WranglerServiceBinding` (`binding = <NAME_SNAKE>`, `service = <project>-<env>-<sibling>`); at runtime `env.<NAME>` is a `Fetcher` (RPC, no DNS/TLS/public hostname). `buildWorkerVars` never injects a `<NAME>_URL` for a sibling worker (contrast the VPS). The binding graph also orders the sequential deploy (a cycle throws). See [cloudflare-workers.md](cloudflare-workers.md).
+32. **PlanetScale Postgres reaches Workers only through Hyperdrive** — `[services.planetscale]` → DB `<project>-<env>-planetscale` via a create-if-absent API adapter (no PlanetScale TF db resource); Terraform owns the DML-only `hyperdrive` Postgres role + the `cloudflare_hyperdrive_config`; `needs = ["planetscale"]` emits `env.HYPERDRIVE`. Origin credentials live in Terraform state only — **no env var is projected**. Needs `PLANETSCALE_SERVICE_TOKEN_ID` + `PLANETSCALE_SERVICE_TOKEN` when declared. See [cloudflare-workers.md](cloudflare-workers.md).
+33. **`worker-configuration.d.ts` is generated from the deploy wrangler doc, committed, and drift-guarded** — `generate-worker-types` renders the SAME `WranglerDocument` deploy uses (placeholder outputs, names only) into the app package root, so a binding can never be typed-but-not-deployed or vice versa. Runs at typecheck/build, never deploy; CI regenerates + `git diff --exit-code` (with `--intent-to-add`) fails on drift or a missing file. See [cloudflare-workers.md](cloudflare-workers.md).
+34. **Workers Logs are on by default** — the generated wrangler config always emits `observability: { enabled: <service.observability> }`, defaulting `true`. Opt out per Worker with `observability = false` in its `[deploy.services.<name>]` table (high-traffic Workers near the 20M-events/month Paid allowance). Distinct from the Hetzner `[services.observability]` VictoriaMetrics stack. See [cloudflare-workers.md](cloudflare-workers.md).

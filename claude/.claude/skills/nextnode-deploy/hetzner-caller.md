@@ -58,6 +58,16 @@ The infra injects these env vars into each service's per-service env file on the
 
 Every `build` service answers a liveness probe at `GET /healthz` on its declared `port`. The compose healthcheck runs `wget -q -O- http://localhost:<port>/healthz` every 10 s, times out at 3 s, and retries up to 6 times. `wget` and the `/healthz` route are guaranteed by the alpine / distroless-busybox bases NextNode build images ship on. `upstream` services are NOT probed (their base may answer neither). Once `depends_on` health gating is enforced, dependents will wait on this probe before starting.
 
+Canonical Astro route (`src/pages/healthz.ts`). `export const prerender` is exempt from `nextnode/boolean-naming` since standards 1.11.2 (framework-imposed export names allowlist, core PR #56); on older standards versions a targeted `// oxlint-disable-next-line nextnode/boolean-naming` is needed:
+
+```ts
+import type { APIRoute } from 'astro'
+
+export const prerender = false
+
+export const GET: APIRoute = () => new Response('ok')
+```
+
 ### Migrations (postgres-backed projects)
 
 When a project declares `[services.postgres]`, the CI `migrate` job runs

@@ -55,7 +55,7 @@ Prefer null checks, early returns, `??`, `?.` over `!`; prefer type-system fixes
 `arr[i]` is `T | undefined` - that is a proof-of-presence obligation, not noise to launder. Decide by *where* non-emptiness is known:
 
 - **Known at compile time** (literal array, statically-built collection): type it as a non-empty tuple `type NonEmptyArray<T> = readonly [T, ...T[]]`. Then `arr[0]` and `const [head] = arr` are `T`, and emptying the array fails to compile. No helper, no throw, no assertion.
-- **Known only at runtime** (fetch, `.filter()`, a parameter, user input): narrow the *value*, not the length. `if (arr[i] === undefined) ...` (or bind first: `const el = arr[i]; if (el === undefined) ...`) narrows to `T`. Never `!arr[i]` - a truthy check is falsy-unsafe, it rejects a present `0` / `''` / `false`. The length never narrows the element; `arr[i]!` only when a runtime invariant proves presence in one sentence.
+- **Known only at runtime** (fetch, `.filter()`, a parameter, user input): narrow the *value*, not the length. Both `!x` and `x === undefined` narrow to `T` at the type level - the compiler flags neither - so the guard is a runtime-correctness call, decided by one question: **can a present element be falsy?** Non-falsy element (an object, or a union excluding `0`/`''`/`false`) → use `!x`, shorter and safe. Falsy-capable element (`number[]`/`string[]`/`boolean[]`) → use `x === undefined`; `!x` compiles but throws on a legitimate present `0` / `''` / `false`. Bind or destructure first (`const el = arr[i]; if (el === undefined) ...`) or compare the access directly. The length never narrows the element; `arr[i]!` only when a runtime invariant proves presence in one sentence. If the element type itself includes `undefined` (`(T | undefined)[]`), no clean narrow exists - use `.length` / iterate.
 
 Do not write a `first()`-style helper that `throw`s to strip `| undefined` off a statically-known-non-empty array: that trades a compile-time truth for a runtime throw. Use the tuple.
 
@@ -75,4 +75,4 @@ Default to `type` (unions, intersections, tuples, mapped/conditional types, func
 | Domain type mixed with DB/HTTP/ORM type | AVOID | Separate modules; map at the boundary ([type-design.md](type-design.md)) |
 | Throwing for expected, recoverable failures | AVOID | Result / discriminated-union return ([error-handling.md](error-handling.md)) |
 | `first()`/throw to strip `\| undefined` off a statically-non-empty array | AVOID | Non-empty tuple `type NonEmptyArray<T> = readonly [T, ...T[]]` |
-| `!arr[i]` to guard an indexed access | AVOID | Narrow the value: `arr[i] === undefined` (falsy-safe) |
+| `!arr[i]` on a falsy-capable element (`number`/`string`/`bool`) | AVOID | `arr[i] === undefined`; `!x` is safe only for non-falsy (object) elements |

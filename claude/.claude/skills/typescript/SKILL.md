@@ -50,6 +50,15 @@ If a third-party type leaks `any` into our code, wrap it in a typed function tha
 
 Prefer null checks, early returns, `??`, `?.` over `!`; prefer type-system fixes (non-empty tuples, discriminated unions, type guards) when available. `!` is acceptable only when a runtime invariant guarantees non-null but TS can't see it - the bar is provability in one sentence (e.g. `map.get(key)!` right after `if (map.has(key))`). `if (!x) throw ...` already narrows; no `!` needed after.
 
+## Indexed access under `noUncheckedIndexedAccess`
+
+`arr[i]` is `T | undefined` - that is a proof-of-presence obligation, not noise to launder. Decide by *where* non-emptiness is known:
+
+- **Known at compile time** (literal array, statically-built collection): type it as a non-empty tuple `type NonEmptyArray<T> = readonly [T, ...T[]]`. Then `arr[0]` and `const [head] = arr` are `T`, and emptying the array fails to compile. No helper, no throw, no assertion.
+- **Known only at runtime** (fetch, `.filter()`, a parameter, user input): narrow the *value*, not the length. `if (arr[i] === undefined) ...` (or bind first: `const el = arr[i]; if (el === undefined) ...`) narrows to `T`. Never `!arr[i]` - a truthy check is falsy-unsafe, it rejects a present `0` / `''` / `false`. The length never narrows the element; `arr[i]!` only when a runtime invariant proves presence in one sentence.
+
+Do not write a `first()`-style helper that `throw`s to strip `| undefined` off a statically-known-non-empty array: that trades a compile-time truth for a runtime throw. Use the tuple.
+
 ## `type` vs `interface`
 
 Default to `type` (unions, intersections, tuples, mapped/conditional types, function signatures). `interface` only for declaration merging (augmenting a third-party type) or an open contract meant to be extended via `extends`. Don't mix styles arbitrarily within a module.
@@ -65,3 +74,5 @@ Default to `type` (unions, intersections, tuples, mapped/conditional types, func
 | Hand-rolled clone of an existing type | AVOID | Derive with `Pick`/`Omit`/`Partial`/`ReturnType` ([type-design.md](type-design.md)) |
 | Domain type mixed with DB/HTTP/ORM type | AVOID | Separate modules; map at the boundary ([type-design.md](type-design.md)) |
 | Throwing for expected, recoverable failures | AVOID | Result / discriminated-union return ([error-handling.md](error-handling.md)) |
+| `first()`/throw to strip `\| undefined` off a statically-non-empty array | AVOID | Non-empty tuple `type NonEmptyArray<T> = readonly [T, ...T[]]` |
+| `!arr[i]` to guard an indexed access | AVOID | Narrow the value: `arr[i] === undefined` (falsy-safe) |

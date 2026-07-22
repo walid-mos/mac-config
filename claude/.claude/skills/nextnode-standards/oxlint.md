@@ -92,7 +92,7 @@ Type-aware rules activate only with `oxlint --type-aware` (requires `oxlint-tsgo
 | `no-type-assertion` | error | Bans `as` casts (allows `as const`) |
 | `no-enum` | error | String literal unions over `enum` (`declare enum` exempt) |
 | `no-boolean-params` | error | Max 1 boolean param per function |
-| `boolean-naming` | error | Booleans read as questions (`is`/`has`/`can`/`should`...), no negated names |
+| `boolean-naming` | error | Booleans read as questions (`is`/`has`/`can`/`should`...), no negated names. Framework-imposed `export const` names exempt: `prerender`/`partial` (Astro), `dynamicParams`/`revalidate`/`experimental_ppr` (Next segment config). React/Hono/Express impose none |
 | `no-generic-names` | warn | Bans `data`, `info`, `result`, `item`, `value`, `temp`, `stuff` |
 | `no-em-dash` | error | No U+2014 in source files |
 | `no-use-effect` | warn | Every `useEffect` is flagged - justify or refactor (see react skill) |

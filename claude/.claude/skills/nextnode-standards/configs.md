@@ -80,6 +80,14 @@ pnpm add -D husky lint-staged better-sort-package-json
 pnpm exec husky init
 ```
 
+### husky — CI/prod guard (official pattern)
+
+`husky init` writes `"prepare": "husky"`, which breaks in CI/Docker/prod installs (hooks are useless there; `husky` may be absent after a `--prod` install or fail without `.git`). Do NOT use a shell one-liner like `[ -n "$CI" ] || husky` (non-portable, still crashes in prod). The official pattern is a `.husky/install.mjs` guard script + `"prepare": "node .husky/install.mjs"` — **fetch the CURRENT snippet from the official docs at scaffold time, never copy it from an existing repo or from this file** (avoids drift):
+
+→ https://typicode.github.io/husky/how-to.html#ci-server-and-docker
+
+After `husky init`, always replace the generated `prepare` with that pattern. Standard NextNode hooks: `commit-msg` → `pnpm commitlint --edit ${1}`, `pre-commit` → `pnpm lint-staged`, `pre-push` → `pnpm test`.
+
 ---
 
 ## oxfmt

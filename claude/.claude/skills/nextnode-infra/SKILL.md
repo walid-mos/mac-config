@@ -98,7 +98,7 @@ For the full CI/CD and backing-services checklist (nextnode.toml structure, Dock
 |-------|----------------|
 | `/nextnode-standards` | oxlint, oxfmt, TypeScript, Vitest, commitlint, lint-staged, semantic-release |
 | `/nextnode-logger` | Logger API, transports, testing utilities |
-| `/nextnode-deploy` | nextnode.toml, CI pipeline, deployment |
+| `/nextnode-deploy` | nextnode.toml, CI pipeline, deployment, GitHub org (secrets/`nextnode-ci` app → its `github-org.md`) |
 | `/nextnode-design` | Brand colors, typography, logos, UI conventions |
 
 ### MANDATORY dispatch

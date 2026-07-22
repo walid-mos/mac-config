@@ -22,8 +22,15 @@ this skill — do not ask for confirmation, launch.
 |---|---|---|
 | Orchestrator + final synthesis | **Fable (the main loop — you)** | Never delegate orchestration, dedup logic, or the final report. You write the workflow script, read the results, arbitrate, synthesize. |
 | Reading / search / inventory | **sonnet** | One reader per scope unit. Cheap, fast, exhaustive. |
-| Cross-cutting reasoning, specialist analysis | **opus**, `effort: 'high'` | Architecture rules, global dead-code, security, anything needing judgment across units. |
+| Cross-cutting reasoning, specialist analysis | **opus**, `effort: 'max'` | Architecture rules, global dead-code, security, anything needing judgment across units. |
 | Adversarial verification | **opus**, one agent per finding | Prompted to REFUTE, not confirm. |
+| Any other subagent (role not listed above) | **opus**, `effort: 'xhigh'` | Fallback default. |
+
+**Fable is reserved for the main loop.** No subagent ever runs on Fable —
+never pass `model: 'fable'` to `agent()` and never omit `model` (omission
+inherits the session model, i.e. Fable). Every `agent()` call sets `model`
+explicitly: `sonnet` or `opus` per the table; if the role doesn't map to a
+row, default to `model: 'opus', effort: 'xhigh'`.
 
 ## Pipeline (adapt phases to the task, keep the shape)
 
@@ -32,12 +39,25 @@ this skill — do not ask for confirmation, launch.
    zero overlap and 100 % coverage. Read the project's own rule documents
    (ARCHITECTURE.md, AGENTS.md, lint configs) yourself — you need them to
    judge findings at synthesis time.
+   **Deterministic tools first**: before designing any agent, run the
+   deterministic checks that answer part of the question outright —
+   compiler (`tsc -b`, not a possibly-hollow `typecheck` script: verify
+   the script actually checks files), linter, `grep`, build. Their green
+   output removes entire question classes from agent prompts (e.g. "does
+   this prop exist?" is answered by tsc, since .d.ts are its source).
+   Spawn agents ONLY for what these tools cannot decide: runtime
+   semantics, dead selectors/strings, doc-vs-code coherence, judgment.
 2. **Phase Lecture** — one sonnet agent per unit, all in a single
    `parallel()`. Each prompt must include the STRICT RULES block below.
 3. **Phase Analyse** — 1–3 opus specialists for cross-unit concerns the
    readers can't see (dependency directions, global dead code across
    packages, config vs code coherence). Run them in the same `parallel()`
    as the readers — no barrier between reading and analysis.
+   **Litmus test per analyst**: state in one sentence what it finds that
+   no deterministic tool can. No answer → delete the analyst. An agent
+   that re-derives compiler/linter output (e.g. reading node_modules
+   .d.ts to check prop existence) is redundant by construction: slower,
+   costlier, less reliable than the tool.
 4. **Dedup in plain code** (key = `file + title prefix`), never via an agent.
 5. **Phase Vérification** — one opus adversarial verifier per deduped
    finding, all parallel. Drop anything not confirmed.
@@ -81,6 +101,8 @@ procedures). Subjective or hypothetical → `isReal=false`. In doubt →
   the dedup step, which genuinely needs all findings at once.
 - `.filter(Boolean)` on every parallel result; agents can die.
 - `opts.phase` on every agent so progress groups correctly.
+- Explicit `model` on every agent — see role split; Fable stays in the
+  main loop only.
 - Carry corrected evidence: confirmed finding = `{...finding, severity:
   verdict.severity ?? finding.severity, evidence: verdict.correctedEvidence
   ?? finding.evidence}`.

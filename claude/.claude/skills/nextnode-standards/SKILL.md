@@ -101,3 +101,6 @@ And these package.json fields:
 | Skipping `astro check` on Astro projects | Run both `pnpm run lint` (oxlint) AND `pnpm astro check` |
 | Relying on extended tsconfig to inherit `exclude` | Add `"exclude": ["vitest.config.ts"]` in every project's own `tsconfig.json` |
 | Ranging or omitting `packageManager` field | Pin exact pnpm version matching the monorepo root `package.json` |
+| Copying a tooling pattern from an existing repo without checking upstream | ALWAYS fetch the current best practice from the tool's official docs (husky, pnpm, turbo, …) before scaffolding — patterns in older repos (and even in this skill) can lag upstream. Canonical example: the husky CI guard (`.husky/install.mjs`, see configs.md for the docs link) — not a `[ -n "$CI" ] \|\| husky` shell one-liner |
+| Scaffolding or pinning a new Astro app on astro 6 | New Astro apps ALWAYS use Astro 7 (`pnpm create astro@latest`); astro 6 is legacy-only for apps not yet migrated (peer range `^6.0.0 \|\| ^7.0.0` since core#55) |
+| Pinning a new project to TypeScript 5.x/6.x | New projects ALWAYS use TypeScript 7 (`typescript@^7`, native compiler, `tsc` drop-in); 5.x/6.x are legacy-only for repos not yet migrated. EXCEPTION: Astro apps stay on `^6` — `astro check` hard-fails on ts7 (missing programmatic API, see typescript.md for the upstream link) |

@@ -2,7 +2,7 @@
 # Aliases
 # =============================================================================
 
-alias szsh="source ~/.zshrc"
+alias szsh="source ~/.zshenv && source ~/.zshrc"
 alias getip="ifconfig | grep \"inet \" | grep -v 127.0.0.1"
 
 # Git - unalias OMZ conflicts

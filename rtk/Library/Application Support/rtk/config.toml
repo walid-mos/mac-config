@@ -8,8 +8,12 @@
 
 [hooks]
 # Commandes dont RTK NE réécrit PAS la sortie (passées telles quelles).
-exclude_commands = ["curl"]
+# "lint" : rtk lint suppose ESLint et REMPLACE la commande par `rtk lint` —
+# casse les projets oxlint (NextNode). Exclu tant que rtk ne détecte pas le linter.
+exclude_commands = ["curl", "pnpm lint", "pnpm run lint", "npm run lint", "yarn lint", "turbo run lint"]
 
 [tee]
 enabled = true        # conserve la sortie brute en cas d'échec
 mode = "failures"     # "failures" | "always" | "never"
+max_files = 20        # requis depuis rtk 0.42 — sans lui le TOML ne parse plus
+max_file_size = 1048576

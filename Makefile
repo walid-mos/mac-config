@@ -43,6 +43,11 @@ claude-post:
 	fi
 	@command -v d2 >/dev/null && echo "d2 prêt: le skill /html rend les blocs data-np=\"d2\" au build" \
 		|| echo "d2 non installé — les blocs d2 feront échouer build.sh"
+	@if command -v claude >/dev/null; then \
+		claude plugin list 2>/dev/null | grep -q impeccable \
+			|| { claude plugin marketplace add pbakaus/impeccable && claude plugin install impeccable@impeccable; }; \
+		echo "plugin impeccable prêt (design craft — anti-slop)"; \
+	else echo "claude introuvable — plugin impeccable non installé"; fi
 
 nvim-post:
 	@if ! command -v rg >/dev/null; then \

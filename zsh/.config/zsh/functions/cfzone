@@ -1,0 +1,79 @@
+#!/bin/zsh
+# cfzone — connecte un domaine Dynadot à Cloudflare juste après l'achat :
+# crée la zone Cloudflare, récupère les nameservers assignés et les pousse
+# chez Dynadot (set_ns). Idempotent : zone déjà existante → réutilisée.
+#
+# Sans argument, liste les domaines du compte Dynadot et propose une
+# sélection fzf (fallback : prompt).
+#
+# Prérequis (dans ~/.config/zsh/secrets) :
+#   CLOUDFLARE_API_TOKEN — permission Zone:Edit + Account:Read
+#   DYNADOT_API_KEY      — API activée côté Dynadot (et IP whitelistée si configurée)
+#
+# Usage: cfzone [domaine]
+
+cfzone() {
+	emulate -L zsh
+	setopt pipefail
+
+	[[ -z $CLOUDFLARE_API_TOKEN ]] && { print -u2 "cfzone : CLOUDFLARE_API_TOKEN manquant (~/.config/zsh/secrets)"; return 1 }
+	[[ -z $DYNADOT_API_KEY ]] && { print -u2 "cfzone : DYNADOT_API_KEY manquant (~/.config/zsh/secrets)"; return 1 }
+
+	local cf=https://api.cloudflare.com/client/v4
+	local -a auth=(-H "Authorization: Bearer $CLOUDFLARE_API_TOKEN")
+
+	local domain=$1
+	if [[ -z $domain ]]; then
+		local list
+		list=$(curl -fsS "https://api.dynadot.com/api3.json?key=$DYNADOT_API_KEY&command=list_domain") \
+			|| { print -u2 "cfzone : liste des domaines Dynadot inaccessible"; return 1 }
+		local err=$(jq -r 'first(.. | .Error? // empty)' <<<$list)
+		[[ -n $err ]] && { print -u2 "cfzone : API Dynadot — $err"; return 1 }
+		local -a domains
+		domains=(${(f)"$(jq -r '.. | .Name? // empty' <<<$list | sort -u)"})
+		if (( $#domains && $+commands[fzf] )); then
+			domain=$(print -l $domains | fzf --prompt='domaine à connecter > ')
+		else
+			(( $#domains )) && print -l $domains
+			read "domain?domaine à connecter : "
+		fi
+	fi
+	[[ -z $domain ]] && return 1
+
+	# La création de zone exige l'id de compte ; token mono-compte → premier résultat.
+	local account_id
+	account_id=$(curl -fsS $auth $cf/accounts | jq -re '.result[0].id') \
+		|| { print -u2 "cfzone : compte Cloudflare introuvable (permission Account:Read ?)"; return 1 }
+
+	local zone zone_id
+	local -a ns
+	zone=$(curl -sS -X POST $auth -H 'Content-Type: application/json' \
+		--data '{"name":"'$domain'","account":{"id":"'$account_id'"},"type":"full"}' $cf/zones)
+	if [[ $(jq -r '.success' <<<$zone) == true ]]; then
+		zone_id=$(jq -r '.result.id' <<<$zone)
+		ns=(${(f)"$(jq -r '.result.name_servers[]' <<<$zone)"})
+	elif jq -e '.errors[]? | select(.code == 1061)' <<<$zone >/dev/null; then
+		# 1061 = zone déjà présente sur le compte
+		zone=$(curl -fsS $auth "$cf/zones?name=$domain")
+		zone_id=$(jq -r '.result[0].id' <<<$zone)
+		ns=(${(f)"$(jq -r '.result[0].name_servers[]' <<<$zone)"})
+		print "cfzone : zone déjà existante, réutilisée"
+	else
+		print -u2 "cfzone : création de zone échouée — $(jq -c '.errors' <<<$zone)"
+		return 1
+	fi
+	(( $#ns >= 2 )) || { print -u2 "cfzone : nameservers Cloudflare introuvables"; return 1 }
+
+	local dyn
+	dyn=$(curl -fsS "https://api.dynadot.com/api3.json?key=$DYNADOT_API_KEY&command=set_ns&domain=$domain&ns0=$ns[1]&ns1=$ns[2]")
+	if [[ ${(L)$(jq -r 'first(.. | .Status? // empty)' <<<$dyn)} != success ]]; then
+		print -u2 "cfzone : set_ns Dynadot échoué — $dyn"
+		return 1
+	fi
+
+	# Demande à Cloudflare de re-vérifier les NS sans attendre le cycle automatique.
+	curl -fsS -X PUT $auth $cf/zones/$zone_id/activation_check >/dev/null 2>&1
+
+	print "✓ $domain → Cloudflare ($ns[1], $ns[2])"
+	print "  Activation en cours — propagation NS ~quelques minutes, mail Cloudflare à l'activation."
+}

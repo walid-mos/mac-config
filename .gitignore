@@ -24,6 +24,7 @@ colima/.config/colima/_store/
 colima/.config/colima/default/
 colima/.config/colima/ssh_config
 colima/.config/colima/docker.sock
+colima/.colima/
 
 # Docker CLI: ignore runtime data inside the stow package (only version config.json)
 docker/.docker/.token_seed

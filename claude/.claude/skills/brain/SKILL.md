@@ -56,18 +56,35 @@ symmetrical failures; run this procedure instead of guessing.
    note. No → stays inside the parent.
 3. **Substance threshold**: ≥ ~5 lines of its own material to deserve a
    note. Below that it stays inline — a stub pollutes more than it serves.
-4. **The main note becomes the hub**: it keeps the argument, the
-   reasoning, the integration and the trade-offs, and delegates to the
-   children the facts that are reusable outside its context.
-5. **Bidirectional links**: each child links the hub, the hub links each
-   child.
+4. **Two destinations, by reusability.** A fact about an outside entity
+   (tool, model, API, package) you would look up from an unrelated context
+   → `5. Reference/Dev/<Entity>.md`, which becomes its **owner**. Reasoning,
+   decisions and trade-offs specific to the subject → the subject's folder.
+5. **Source it, don't copy it.** The subject note never duplicates the
+   fact: it cites the owner inline, where it leans on it. Links are
+   bidirectional — each child links the spine, the spine links each child.
 6. **Never split to shorten.** A coherent line of reasoning stays one
    note however long it is. Cut on concept boundaries, never on size.
 
-Children land in `5. Reference/Dev/` when they are reusable facts about a
-tool / model / API, and in the hub's own folder when they are a study or a
-decision specific to the subject. Announce the split in the confirmation
-(step 7) so the user can challenge the boundaries.
+**Subject folder and spine note.** As soon as a subject outgrows one note
+it becomes a `<Sujet>/` folder:
+
+- **`<Sujet>.md` — the spine, homonymous with the folder.** The name is
+  mandatory: `[[Sujet]]` resolves to *that file* (never to the folder), so
+  renaming it to `index.md` or `_<Sujet>.md` breaks every inbound link. It
+  is also Obsidian's de-facto folder-note convention.
+- **Tag `hub` in its frontmatter** — the marker that tells it apart from
+  its children in the quick-switcher; `tag:#hub` lists every spine.
+- One note per concept, named by the **concept alone** — never prefixed
+  with the subject, the path already carries it.
+- In the spine, a **`## Notes du sujet`** section: one line per child with
+  its description, plus links to the outside reference notes.
+
+Same pattern as the "cours" in `_Canvas.md`. A subject folder is the one
+allowed **exception to max-depth-2**, and it does not nest further.
+
+Announce the split in the confirmation (step 7) so the user can challenge
+the boundaries.
 
 ### 4. Choose the destination folder
 
@@ -127,7 +144,9 @@ tags: [<voir _Conventions.md>]
 
 Tags come from the conventions list: `client/<slug>`, `project/<slug>`,
 `meeting`, `prospection`, `strategy`, `idea`, `reference`, `finance`,
-`health`, `journal`, `list`, `people`, `to-file`…
+`health`, `journal`, `list`, `people`, `to-file`… plus `hub` on a spine
+note, which adds to the type tag rather than replacing it
+(`tags: [idea, hub]`).
 
 Body rules:
 

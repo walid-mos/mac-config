@@ -9,7 +9,7 @@ OBSIDIAN_VAULT_DIR := $(HOME)/Library/Mobile Documents/iCloud~md~obsidian/Docume
 OBSIDIAN_VAULT := $(OBSIDIAN_VAULT_DIR)/.obsidian
 OBSIDIAN_PLUGIN_DATA := obsidian-style-settings obsidian-hider obsidian-icon-folder settings-search shiki-highlighter
 
-.PHONY: help install all unstow restow $(PACKAGES) claude-post nvim-post rp-post rtk-post obsidian obsidian-save obsidian-post
+.PHONY: help install all unstow restow $(PACKAGES) claude-post nvim-post rp-post rtk-post obsidian obsidian-save obsidian-post proxy-reset
 
 help:
 	@echo "Targets:"
@@ -22,6 +22,8 @@ help:
 	@echo "  obsidian       Stow la config versionnée dans le vault Brain (iCloud)"
 	@echo "  obsidian-save  Ré-adopte (--adopt) les fichiers qu'Obsidian a dé-symlinkés"
 	@echo "  obsidian-post  Installe thème AnuPpuccin, plugins communautaires et fonts"
+	@echo ""
+	@echo "  proxy-reset    Retire le PAC proxy laissé par Zscaler (rétablit le relais Apple)"
 	@echo ""
 	@echo "Packages: $(PACKAGES)"
 
@@ -102,3 +104,20 @@ rtk-post:
 	@command -v rtk >/dev/null && rtk init -g --auto-patch >/dev/null \
 		&& echo "rtk prêt: hook posé dans ~/.claude — redémarre Claude Code pour l'activer" \
 		|| echo "rtk non installé — étape ignorée"
+
+# Zscaler pose son PAC (127.0.0.1:9000/systemproxy-*.pac) sur tous les services
+# réseau et le laisse en place même arrêté ; macOS coupe alors le relais de
+# confidentialité Apple et Mail ne charge plus le contenu distant de façon privée.
+proxy-reset:
+	@if pgrep -i zscaler >/dev/null; then \
+		echo "Zscaler tourne — quitte-le d'abord, il repose son PAC au lancement"; exit 1; fi
+	@networksetup -listallnetworkservices | tail -n +2 | sed 's/^\*//' | while IFS= read -r svc; do \
+		url=$$(networksetup -getautoproxyurl "$$svc" 2>/dev/null | awk '/^URL:/ {print $$2}'); \
+		case "$$url" in \
+			*systemproxy-*.pac|*127.0.0.1:9000*) \
+				networksetup -setautoproxystate "$$svc" off && echo "PAC retiré : $$svc" ;; \
+		esac; \
+	done
+	@scutil --proxy | grep -q 'ProxyAutoConfigEnable : 0' \
+		&& echo "aucun PAC actif — relais Apple opérationnel" \
+		|| echo "un PAC reste actif (Réglages > Réseau > Proxies)"

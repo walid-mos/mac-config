@@ -178,8 +178,10 @@ One ephemeral `wrangler.json` per service, written for `wrangler deploy --config
 
 - `name: <project>-<env>-<service>` (`computeWorkerScriptName` — shared with teardown so both target the same script).
 - `main: <entry>`.
-- `compatibility_date: "2026-06-01"` (`DEFAULT_WORKERS_COMPATIBILITY_DATE` — a fixed date freezing the workerd behaviour set; a bump is deliberate).
+- `compatibility_date: "2026-07-14"` (`DEFAULT_WORKERS_COMPATIBILITY_DATE` — a fixed date freezing the workerd behaviour set; a bump is deliberate). MUST equal `WORKERS_COMPATIBILITY_DATE` in `@nextnode-solutions/standards/workers` (the local-dev pin); `compatibility-drift.test.ts` fails the build on divergence.
 - `compatibility_flags: ["nodejs_compat"]` (`WORKERS_COMPATIBILITY_FLAGS` — unlocks the Node built-ins `@astrojs/cloudflare` reaches for).
+
+**Local dev pins the same runtime.** Infrastructure is CI-only, so `wrangler dev` can't read this config. Each Workers app's `dev` script instead runs `nextnode-workers-dev` (shipped by `@nextnode-solutions/standards`), which checks the installed `workerd` is fresh enough, then injects the same `--compatibility-date`/`--compatibility-flags`. Wiring checklist + bump procedure: `nextnode-standards` skill, `workers.md`.
 - `workers_dev: false` — always; no worker answers on `<name>.workers.dev`.
 - `routes: [{ pattern: resolveDeployDomain(url, env), custom_domain: true }]` when `url` is set (dev prefixes `dev.<domain>`, SKILL.md rule 2). Omitted for internal workers.
 - `assets: { directory, binding: "ASSETS" }` when the entry ships static assets (derived from the `@astrojs/cloudflare` server/client convention).

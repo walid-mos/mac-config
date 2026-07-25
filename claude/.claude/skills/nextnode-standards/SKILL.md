@@ -40,6 +40,7 @@ Use the relevant sub-file for details:
 - [tsdown.md](tsdown.md) - bundler config base for publishable packages
 - [vitest.md](vitest.md) - test configs and all export paths (backend, frontend, astro, vite-plugin)
 - [configs.md](configs.md) - commitlint, lint-staged, oxfmt, Tailwind theme, editorconfig, .npmrc, semantic-release
+- [workers.md](workers.md) - `nextnode-workers-dev` bin + `./workers` export: fleet Cloudflare Workers compatibility date for local `wrangler dev`
 
 ---
 

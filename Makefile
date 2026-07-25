@@ -7,7 +7,7 @@ PACKAGES := claude cmux colima docker ghostty languages nvim opencode rectangle 
 # fonts) ne sont pas versionnés : obsidian-post les installe.
 OBSIDIAN_VAULT_DIR := $(HOME)/Library/Mobile Documents/iCloud~md~obsidian/Documents/Brain
 OBSIDIAN_VAULT := $(OBSIDIAN_VAULT_DIR)/.obsidian
-OBSIDIAN_PLUGIN_DATA := obsidian-style-settings obsidian-hider obsidian-icon-folder settings-search shiki-highlighter
+OBSIDIAN_PLUGIN_DATA := obsidian-style-settings obsidian-hider obsidian-icon-folder settings-search shiki-highlighter folder-notes
 
 .PHONY: help install all unstow restow $(PACKAGES) claude-post nvim-post rp-post rtk-post obsidian obsidian-save obsidian-post proxy-reset
 
@@ -83,6 +83,7 @@ obsidian-post:
 		obsidian-icon-folder=florianwoelki/obsidian-iconize \
 		settings-search=javalent/settings-search \
 		shiki-highlighter=mprojectscode/obsidian-shiki-plugin \
+		folder-notes=LostPaul/obsidian-folder-notes \
 	; do \
 		id=$${spec%%=*}; repo=$${spec#*=}; dir="$(OBSIDIAN_VAULT)/plugins/$$id"; \
 		echo "→ plugin $$id"; mkdir -p "$$dir"; \

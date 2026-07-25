@@ -27,6 +27,7 @@ user anything between the first ticket and the PR.
 - `--no-chrome` — sauter la vérification navigateur (sinon obligatoire dès
   qu'un ticket touche une surface web).
 - `--only <IDS>` — restreindre à une liste de tickets, séparés par des virgules.
+- `--stop-before-pr` — tout faire sauf ouvrir la PR.
 - `--dry-run` — produire le plan d'exécution et s'arrêter là.
 
 ## FORBIDDEN / MANDATORY
@@ -40,7 +41,8 @@ user anything between the first ticket and the PR.
 | Réduire le périmètre en silence | Livrer le reste en entier et dire explicitement ce qui est bloqué et pourquoi |
 | Inventer le contenu d'un ticket de mémoire | `retrieve_work_item` sur chacun, description lue avant d'écrire du code |
 | Travailler directement sur `main` | Worktree ou branche dédiée depuis `--base` |
-| Ouvrir la PR avant `/simplify` puis `/code-review` | Ordre imposé : dev → `/simplify` → `/code-review xhigh --fix` → `/pr` |
+| Ouvrir la PR avant `/simplify` puis la revue | Ordre imposé : dev → `/simplify` → revue adversariale → `/pr` |
+| Tenter `/code-review` (built-in `disable-model-invocation`) | Conduire la revue de [`review.md`](review.md), puis dire à l'utilisateur de lancer `/code-review xhigh --fix` lui-même |
 
 ## Phase 1 — Orient
 
@@ -105,11 +107,14 @@ Dans cet ordre, sans en sauter :
 
 1. `/simplify` sur le diff complet de l'épique — réutilisation, altitude,
    duplication.
-2. `/code-review xhigh --fix` — appliquer les correctifs, relancer les tests.
+2. **Revue adversariale** — voir [`review.md`](review.md) : agents par
+   dimension, passe de réfutation, correctifs en commits séparés.
+   `/code-review` est `disable-model-invocation` et **ne peut pas** être lancé
+   depuis `/ship` : ne pas essayer, ni via `Skill`, ni via `Bash`.
 3. Vérification finale : suite complète verte, et re-passage Chrome sur les
-   parcours si `/simplify` ou la review ont touché du code UI.
+   parcours si `/simplify` ou la revue ont touché du code UI.
 4. `/pr` — la description couvre l'épique entière et cite les identifiants des
-   tickets.
+   tickets. Sauf `--stop-before-pr`, qui s'arrête ici et rend la main.
 
 ## Definition of done
 
@@ -121,11 +126,13 @@ Ne rien annoncer comme fini tant que tout ceci n'est pas vrai :
 - Tests, lint et typecheck passent sur la branche finale — sortie réelle, pas
   une supposition.
 - Les parcours web ont été vus dans Chrome.
-- `/simplify` puis `/code-review xhigh --fix` ont tourné, dans cet ordre.
-- La PR est ouverte.
+- `/simplify` puis la revue adversariale ont tourné, dans cet ordre, et les
+  findings survivants sont corrigés et testés.
+- La PR est ouverte, sauf `--stop-before-pr`.
 
 ## Rapport final
 
 Une ligne par ticket (identifiant, titre, état, nombre de commits), l'URL de la
-PR, ce qui a été vérifié dans Chrome, et ce qui reste ouvert. Pas de récap du
-code écrit.
+PR, ce qui a été vérifié dans Chrome, ce que la revue adversariale a corrigé, et
+ce qui reste ouvert. Terminer par le rappel que `/code-review xhigh --fix` est à
+lancer manuellement. Pas de récap du code écrit.

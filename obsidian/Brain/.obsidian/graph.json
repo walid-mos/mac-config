@@ -9,35 +9,59 @@
   "colorGroups": [
     {
       "query": "tag:#meeting",
-      "color": { "a": 1, "rgb": 16429959 }
+      "color": {
+        "a": 1,
+        "rgb": 16429959
+      }
     },
     {
       "query": "tag:#client",
-      "color": { "a": 1, "rgb": 9024762 }
+      "color": {
+        "a": 1,
+        "rgb": 9024762
+      }
     },
     {
       "query": "tag:#project",
-      "color": { "a": 1, "rgb": 13346551 }
+      "color": {
+        "a": 1,
+        "rgb": 13346551
+      }
     },
     {
       "query": "tag:#idea",
-      "color": { "a": 1, "rgb": 16376495 }
+      "color": {
+        "a": 1,
+        "rgb": 16376495
+      }
     },
     {
       "query": "tag:#reference",
-      "color": { "a": 1, "rgb": 9757397 }
+      "color": {
+        "a": 1,
+        "rgb": 9757397
+      }
     },
     {
       "query": "tag:#people",
-      "color": { "a": 1, "rgb": 10937249 }
+      "color": {
+        "a": 1,
+        "rgb": 10937249
+      }
     },
     {
       "query": "tag:#journal",
-      "color": { "a": 1, "rgb": 15961000 }
+      "color": {
+        "a": 1,
+        "rgb": 15961000
+      }
     },
     {
       "query": "path:\"1. Daily\"",
-      "color": { "a": 1, "rgb": 11845374 }
+      "color": {
+        "a": 1,
+        "rgb": 11845374
+      }
     }
   ],
   "collapse-display": true,
@@ -50,6 +74,6 @@
   "repelStrength": 10,
   "linkStrength": 1,
   "linkDistance": 250,
-  "scale": 1,
+  "scale": 1.7820916862684415,
   "close": true
 }

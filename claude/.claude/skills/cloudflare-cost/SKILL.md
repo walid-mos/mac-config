@@ -27,7 +27,40 @@ A request is billed **the moment it enters the Worker** (invocation). Everything
 - **Wall-clock is free; only CPU time is billed.** `await fetch(slow)` costs ~nothing during the wait. Cost = computation (parsing, crypto, loops), not I/O waiting. Don't "optimize" away awaits; optimize away CPU.
 - **Egress is free.** Unlike AWS. Cost lives in operations, storage, and request count — never in bandwidth. Serving large assets from R2/Workers is cheap by design.
 
-## RULE 1 — Cap every invocation in `wrangler`
+## RULE 0 — Know which plan you are on before you emit a paid-only feature
+
+**Two independent plans**, and a project is routinely Free on one and paid on the other:
+
+- **Zone plan** (Free / Pro / Business / Enterprise) — per domain. Gates WAF custom rules and rate limiting rules.
+- **Workers plan** (Free / Paid) — per **account**. Gates the wrangler `limits` block, Queues, and the higher subrequest ceilings.
+
+**Default assumption: Free on both.** Emit the Free-compatible form unless the repo, the config, or the user states otherwise. A paid-only field is not "ignored on Free" — it is *refused*, and the refusal lands at `terraform apply` or `wrangler deploy`, i.e. after part of the infra has already been provisioned. Verify anything not listed below against the docs before designing around it (`developers.cloudflare.com/waf/rate-limiting-rules/` and `.../workers/wrangler/configuration/#limits` carry the availability tables).
+
+### What a Free ZONE cannot do
+
+Rate limiting rules (`http_ratelimit`):
+
+| | Free | First plan that has it |
+| --- | --- | --- |
+| Rules per zone | 1 | — |
+| Expression fields | `Path`, `Verified Bot` only | `Host` → Pro, `Method` → Business |
+| Counting period | 10 s only | 60 s → Pro |
+| Mitigation timeout | 10 s only | up to 1 h → Pro |
+| Counting characteristics | IP only (`cf.colo.id` is mandatory and implicit) | — |
+| Custom block response (`action_parameters.response`) | ✗ | Pro |
+| Custom counting expression | ✗ | Business |
+
+So a Free-plan rate limiting rule matches on **path only** — it cannot be scoped to one hostname, which means one rule for the whole zone. Design for that instead of writing a per-host rule that will be rejected.
+
+Custom rules (`http_request_firewall_custom`): 5 rules per zone, every action **except `log`** (Enterprise), no custom response (Pro+). `http.host` and `starts_with()` *are* available here — the gate above is specific to rate limiting rules.
+
+### What a Free WORKERS account cannot do
+
+- **The whole `limits` block is refused**: `wrangler deploy` fails with `CPU limits are not supported for the Free plan … [code: 100328]`. `limits` is inheritable, so a top-level block poisons every environment — remove it everywhere, not just in the env you are deploying.
+- CPU is fixed at 10 ms per invocation and not configurable; subrequests are 50 external + 1000 to Cloudflare services (paid: 10 000 external, configurable up to 10M).
+- `limits.subrequests` needs wrangler ≥ 4.62; below that the key is unknown and `cpu_ms` becomes mandatory whenever `limits` exists.
+
+## RULE 1 — Cap every invocation in `wrangler` (Workers Paid only)
 
 Without caps, one buggy invocation (infinite loop, runaway recursion, a Worker that `fetch`es itself, unbounded fan-out) bills up to the default 30 s of CPU and thousands of subrequests. Set explicit ceilings matched to the real workload:
 
@@ -38,6 +71,8 @@ subrequests = 10     # default 10000 (paid); bounds fan-out and self-recursion
 ```
 
 Raise only with a concrete reason. `waitUntil()` work runs after the response but **its CPU is billed in the same invocation** — count it against the cap, don't treat background work as free.
+
+**On Workers Free, emit no `limits` block at all** (see RULE 0): the deploy is refused, and the ceilings this rule buys are already imposed by the plan (10 ms CPU, 50 subrequests). This rule starts applying the day the account becomes Paid — which is also the day the default jumps to 30 s and 10 000, i.e. the day the cap actually matters.
 
 ## RULE 2 — Never write to KV or D1 on the hot path
 
@@ -85,12 +120,14 @@ The cheapest euro is the one never spent. The Cache API (`cache.put/match`) is *
 Because the Worker bills on entry, defend before it:
 
 - **WAF custom rules + rate-limiting rules + bot management** are the primary anti-cost defense (blocked = unbilled). The in-code Rate Limit binding (`env.RL.limit`) runs *inside* the Worker (already billed) — use it to protect origin/DB/LLM subrequests, not to save the invocation. Key it on a stable id (user/tenant), not IP.
+- **On a Free zone, that defense is one path-scoped rate limiting rule + five custom rules** (RULE 0). Spend them on the paths that actually cost — an expensive `POST` endpoint, an LLM route — and rely on the custom rules (which *can* match `http.host`) to close everything you do not intend to expose.
 - **Pages Functions bill as Workers requests.** Match only dynamic routes; don't invoke a Function on static-asset paths (static assets are free).
 - **LLM calls:** route through **AI Gateway** to get the only native hard spend cap on the platform.
 
 ## Pre-ship checklist
 
-- [ ] `limits.cpu_ms` and `limits.subrequests` set to real ceilings, not defaults.
+- [ ] Zone plan and Workers plan established (assume Free on both if unstated); no paid-only field emitted for a Free plan.
+- [ ] `limits.cpu_ms` and `limits.subrequests` set to real ceilings, not defaults — **and omitted entirely on Workers Free**.
 - [ ] No KV/D1 write per request; no KV `list` on the hot path.
 - [ ] Every D1 `WHERE`/`JOIN` column indexed; no `SELECT *` full scans.
 - [ ] DO WebSockets use `state.acceptWebSocket`; no heartbeat alarms.

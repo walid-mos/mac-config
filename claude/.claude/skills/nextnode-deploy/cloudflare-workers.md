@@ -69,6 +69,7 @@ A Worker is not a container, so the schema (`WorkerServiceConfig`) is the runtim
 | `depends_on` | Extra sibling ordering (on top of the `needs` binding graph) — deploy walks services in dependency order. |
 | `entry` | The bundle `main` wrangler deploys. Default `dist/server/entry.mjs` (`DEFAULT_WORKER_ENTRY`) — what `@astrojs/cloudflare` v14 emits, with its twin static-assets directory at `dist/client`. Overridable per service. |
 | `observability` | Workers Logs toggle, default `true`. The generated config always emits `observability: { enabled: <this> }`; set `false` to opt out on high-traffic Workers near the 20M-events/month Paid allowance. |
+| `rate_limit` / `public_paths` / `limits` / `[[rate_limiters]]` | The four barriers — see the zone-firewall section below, and check the plan gates before declaring any of them. |
 
 **Container-only fields are rejected** with an action-oriented message. The rejected keys are `port`, `source`, `ref`, `registry_auth_secret`, `context`, `dockerfile`, `target`, `build_args`. The template (`deploy-worker-services.ts`):
 
@@ -79,6 +80,42 @@ deploy.services.<name>.<field> is not supported with deploy target "cloudflare-w
 e.g. `build_args` → `... (a Worker is not a container: it has no Docker build - point \`entry\` at the bundle and drop \`build_args\`)`; `dockerfile` → `... it has no Dockerfile - drop \`dockerfile\``.
 
 Cross-service `url` rules carry over from the VPS target: each routed `url` is unique and within `project.domain` (SKILL.md rule 18). Worker-to-worker addressing does NOT use the VPS's symmetric `<NAME>_URL` injection (rule 19) — it is a service binding only (SKILL.md rule 31, see below).
+
+### Zone firewall: the four barriers around a Worker
+
+```toml
+[deploy.services.web]
+url = "example.com"
+public_paths = ["/webhooks/*", "/health"]  # absent = the whole worker is public
+
+[deploy.services.web.rate_limit]           # ZONE rate limiting rule (production only)
+paths = ["/api/contact"]                   # exact path, or a trailing "*"; a "*" elsewhere is refused
+methods = ["POST"]                         # optional
+requests_per_period = 5
+period = 60                                # default DEFAULT_RATE_LIMIT_PERIOD
+mitigation_timeout = 600                   # default DEFAULT_RATE_LIMIT_MITIGATION_TIMEOUT
+
+[deploy.services.web.limits]               # wrangler, both environments
+cpu_ms = 5000                              # default DEFAULT_WORKER_CPU_MS
+subrequests = 50                           # default DEFAULT_WORKER_SUBREQUESTS
+
+[[deploy.services.web.rate_limiters]]      # in-Worker binding env.RL_FORMS: RateLimit
+name = "forms"
+limit = 5
+period = 60                                # 10 or 60 only
+```
+
+`rate_limit` → a `cloudflare_ruleset` of phase `http_ratelimit` per worker; `public_paths` → ONE `http_request_firewall_custom` ruleset holding every worker's rule (a zone owns a single entry point per phase), blocking the negation of the declared paths. **Both are emitted in production only** — a dev and a prod workspace would overwrite each other's rules on every apply, the same reason Redirect Rules are production-only. The development deployment is therefore ungated on `dev.<host>`. A `terraform destroy` removes the rules with the environment.
+
+Refused at load (`config/validation/deploy-worker-firewall.ts` + `providers/cloudflare-workers.ts`): a barrier on a worker without `url` (a zone rule matches on the host), more than one `rate_limit` or more than five `public_paths` in the project, a path outside the grammar, a `period`/`mitigation_timeout` outside the accepted sets, a non-kebab or duplicate limiter name.
+
+**Plan gates — do not declare these blocks blind** (details in the `cloudflare-cost` skill, RULE 0):
+
+- **`rate_limit` needs a zone on Pro or above.** A Free zone gives a rate limiting rule only the `Path` field (`Host` is Pro, `Method` is Business), a single 10 s period, a single 10 s mitigation timeout, and no custom response — while the generator emits `http.host`, the declared period/timeout and a `429 application/json` body. On a Free zone the `cloudflare_ruleset.ratelimit_*` create is refused at `apply`.
+- **`limits` needs a Workers Paid account** (account-scoped, independent from the zone plan): `wrangler deploy` fails with `code: 100328` on Free. `limits.subrequests` additionally needs wrangler ≥ 4.62, and 50 is 1/200th of the paid platform default.
+- `public_paths` and `[[rate_limiters]]` work on Free.
+
+The limiter binding runs INSIDE the Worker — the request is already billed when it rejects. Its `namespace_id` hashes project + environment + worker + limiter name (ids are unique account-wide, so two bindings sharing one share their counters).
 
 ### Backing services realized by Terraform
 

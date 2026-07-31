@@ -69,9 +69,11 @@ alias cdcfg="cd ~/.config"
 # Accor Hotel
 # =============================================================================
 # Zscaler - connexion manuelle pour les ressources Accor. Auto-démarrage au boot
-# coupé via `launchctl disable ... com.zscaler.tray` (persiste au reboot).
-# off  = démonte le tunnel (arrêt des daemons root) -> zéro capture de trafic.
+# coupé via `launchctl disable` des seuls daemons service+tunnel (RunAtLoad=true) ;
+# le disable écrit dans la override DB de launchd donc persiste au reboot. On ne
+# disable PAS l'agent tray (gui) : ça forcerait une ré-auth SSO ; bootout suffit.
+# off  = disable + démonte le tunnel (arrêt des daemons root) -> zéro capture de trafic.
 # on   = redémarre les daemons + l'app ; réutilise le token SSO en cache
 #        (bootout ne l'efface pas) donc pas de re-login tant qu'il est valide.
-alias zscaler-off="sudo launchctl bootout system/com.zscaler.tunnel 2>/dev/null; sudo launchctl bootout system/com.zscaler.service 2>/dev/null; launchctl bootout gui/\$(id -u)/com.zscaler.tray 2>/dev/null; pkill -f Zscaler.app 2>/dev/null; echo 'Zscaler déconnecté'"
-alias zscaler-on="sudo launchctl bootstrap system /Library/LaunchDaemons/com.zscaler.service.plist 2>/dev/null; sudo launchctl bootstrap system /Library/LaunchDaemons/com.zscaler.tunnel.plist 2>/dev/null; open -a Zscaler && echo 'Zscaler reconnecté'"
+alias zscaler-off="sudo launchctl disable system/com.zscaler.service; sudo launchctl disable system/com.zscaler.tunnel; sudo launchctl bootout system/com.zscaler.tunnel 2>/dev/null; sudo launchctl bootout system/com.zscaler.service 2>/dev/null; launchctl bootout gui/\$(id -u)/com.zscaler.tray 2>/dev/null; pkill -f Zscaler.app 2>/dev/null; echo 'Zscaler déconnecté (persiste au reboot)'"
+alias zscaler-on="sudo launchctl enable system/com.zscaler.service; sudo launchctl enable system/com.zscaler.tunnel; sudo launchctl bootstrap system /Library/LaunchDaemons/com.zscaler.service.plist 2>/dev/null; sudo launchctl bootstrap system /Library/LaunchDaemons/com.zscaler.tunnel.plist 2>/dev/null; open -a Zscaler && echo 'Zscaler reconnecté'"

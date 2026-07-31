@@ -1,0 +1,14 @@
+{
+  "defaultProvider": "openrouter",
+  "defaultModel": "moonshotai/kimi-k3",
+  "defaultThinkingLevel": "medium",
+  "npmCommand": [
+    "pnpm"
+  ],
+  "quietStartup": true,
+  "enableAnalytics": false,
+  "enableInstallTelemetry": false,
+  "defaultProjectTrust": "ask",
+  "theme": "light",
+  "packages": []
+}

@@ -1,6 +1,11 @@
 SHELL := /usr/bin/env bash
 STOW := stow -t $(HOME)
-PACKAGES := claude cmux colima docker ghostty languages nvim opencode rectangle rp rtk starship zsh
+PACKAGES := claude cmux colima docker gh ghostty git homebrew languages nvim opencode pi rclone rectangle rp rtk starship zsh
+
+# Packages dont le dossier cible reçoit aussi des fichiers écrits par l'outil
+# (gh/hosts.yml, homebrew/trust.json.lock, …) : sans --no-folding Stow replierait
+# le dossier entier en symlink et l'outil écrirait ses secrets dans le repo.
+NOFOLD := gh git homebrew rclone
 
 # Obsidian : le vault vit dans iCloud, seule la config .obsidian est stowée
 # (symlinks relatifs → portables entre machines). Les binaires (thème, plugins,
@@ -9,7 +14,7 @@ OBSIDIAN_VAULT_DIR := $(HOME)/Library/Mobile Documents/iCloud~md~obsidian/Docume
 OBSIDIAN_VAULT := $(OBSIDIAN_VAULT_DIR)/.obsidian
 OBSIDIAN_PLUGIN_DATA := obsidian-style-settings obsidian-hider obsidian-icon-folder settings-search shiki-highlighter folder-notes
 
-.PHONY: help install all unstow restow $(PACKAGES) claude-post nvim-post rp-post rtk-post obsidian obsidian-save obsidian-post proxy-reset
+.PHONY: help install all unstow restow $(PACKAGES) claude-post nvim-post pi-dirs pi-post rp-post rtk-post obsidian obsidian-save obsidian-post proxy-reset
 
 help:
 	@echo "Targets:"
@@ -27,16 +32,18 @@ help:
 	@echo ""
 	@echo "Packages: $(PACKAGES)"
 
-install all: $(PACKAGES) claude-post nvim-post rp-post rtk-post obsidian obsidian-post
+install all: $(PACKAGES) claude-post nvim-post pi-post rp-post rtk-post obsidian obsidian-post
 
 unstow:
 	@for pkg in $(PACKAGES); do $(STOW) -D $$pkg; done
 
 restow:
-	@for pkg in $(PACKAGES); do $(STOW) -R $$pkg; done
+	@for pkg in $(PACKAGES); do \
+		if [[ " $(NOFOLD) " == *" $$pkg "* ]]; then $(STOW) --no-folding -R $$pkg; else $(STOW) -R $$pkg; fi; \
+	done
 
 $(PACKAGES):
-	$(STOW) $@
+	@if [[ " $(NOFOLD) " == *" $@ "* ]]; then $(STOW) --no-folding $@; else $(STOW) $@; fi
 
 claude-post:
 	@if ! command -v d2 >/dev/null; then \
@@ -58,6 +65,21 @@ nvim-post:
 	fi
 	@command -v rg >/dev/null && echo "ripgrep prêt: telescope live_grep/grep_string opérationnels" \
 		|| echo "ripgrep non installé — telescope live_grep échouera"
+
+# Sans ces dossiers, stow replierait ~/.pi/agent en symlink vers le repo et pi y
+# écrirait ses sessions et son auth.json.
+pi: | pi-dirs
+
+pi-dirs:
+	@mkdir -p "$(HOME)/.pi/agent/sessions" "$(HOME)/.pi/agent/extensions"
+
+pi-post:
+	@if ! command -v pi >/dev/null; then \
+		if command -v pnpm >/dev/null; then pnpm add -g @earendil-works/pi-coding-agent; \
+		else echo "pnpm introuvable — installe pi à la main (https://pi.dev)"; fi; \
+	fi
+	@command -v pi >/dev/null && echo "pi prêt: $$(pi --version) — \`pi\` puis /login pour l'auth" \
+		|| echo "pi non installé — étape ignorée"
 
 rp-post:
 	@command -v node >/dev/null || { echo "node not found — install it (fnm install --lts) so 'rp' can serve plan.html"; exit 0; }

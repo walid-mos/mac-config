@@ -15,8 +15,9 @@ node_modules/
 .pnpm-store/
 
 
-# Languages: built from source (nested git repos)
-languages/.config/languages/ols/
+# gh: seul config.yml est versionné, hosts.yml contient le token OAuth
+gh/.config/gh/*
+!gh/.config/gh/config.yml
 
 # Colima: ignore runtime data inside the stow package (only version _templates/)
 colima/.config/colima/_lima/
@@ -31,6 +32,10 @@ docker/.docker/.token_seed
 docker/.docker/.token_seed.lock
 docker/.docker/buildx/
 docker/.docker/contexts/
+
+# pi: only version settings.json; auth.json contient les tokens, le reste est du runtime
+pi/.pi/agent/*
+!pi/.pi/agent/settings.json
 
 # RTK: only version config.toml; ignore any runtime/cache data in the package
 rtk/Library/Application Support/rtk/*

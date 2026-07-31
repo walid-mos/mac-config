@@ -1,0 +1,7 @@
+{
+  "trustedformulae": [
+    "anomalyco/tap/opencode",
+    "jesseduffield/lazydocker/lazydocker",
+    "stripe/stripe-cli/stripe"
+  ]
+}

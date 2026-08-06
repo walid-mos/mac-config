@@ -1,11 +1,11 @@
 SHELL := /usr/bin/env bash
 STOW := stow -t $(HOME)
-PACKAGES := claude cmux colima docker gh ghostty git homebrew languages nvim opencode pi rclone rectangle rp rtk starship zsh
+PACKAGES := claude cmux colima docker gh ghostty git herdr homebrew languages nvim opencode pi rclone rectangle rp rtk starship zsh
 
 # Packages dont le dossier cible reçoit aussi des fichiers écrits par l'outil
 # (gh/hosts.yml, homebrew/trust.json.lock, …) : sans --no-folding Stow replierait
 # le dossier entier en symlink et l'outil écrirait ses secrets dans le repo.
-NOFOLD := gh git homebrew rclone
+NOFOLD := gh git herdr homebrew rclone
 
 # Obsidian : le vault vit dans iCloud, seule la config .obsidian est stowée
 # (symlinks relatifs → portables entre machines). Les binaires (thème, plugins,

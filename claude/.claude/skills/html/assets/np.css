@@ -453,6 +453,24 @@ details.fold > .fold-body { padding: 0 14px 12px; font-size: 13.5px; }
 .board-actions { display: flex; gap: 8px; margin: 4px 0 14px; }
 
 /* ---------- rich mode ---------- */
+/* Gate note — injected whenever the doc has no [data-freeform]. Pinned left so
+   the buttons keep their place; opening it widens a textarea, never wraps the
+   row. Approving with a caveat is the common case and must not need a detour
+   through the chat. */
+.rp-gate { align-items: center; }
+.rp-gate .rp-note { margin-right: auto; min-width: 0; }
+.rp-gate .rp-note > summary { display: inline-block; cursor: pointer; list-style: none; font-family: var(--np-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--np-text-muted); padding: 3px 0; }
+.rp-gate .rp-note > summary::-webkit-details-marker { display: none; }
+.rp-gate .rp-note > summary::before { content: '✎ '; }
+.rp-gate .rp-note > summary:hover { color: var(--np-accent-hover); }
+.rp-gate .rp-note[open] > summary { color: var(--np-accent-hover); }
+.rp-gate .rp-note textarea { width: min(460px, 46vw); min-height: 58px; margin-top: 6px; font: inherit; font-size: 13px; padding: 7px 9px; border: 1px solid var(--np-border); border-radius: 6px; background: var(--np-bg-soft); color: var(--np-text); resize: vertical; }
+
+/* In pages mode the gate carries the forward move until the last page, where
+   Approve takes the slot back — see np.js. Anchor, so the router's delegated
+   [data-page] handler drives it for free. */
+.rp-gate .rp-next { display: inline-flex; align-items: center; text-decoration: none; }
+.rp-gate .np-btn[hidden] { display: none; }
 .rp-gate { position: fixed; bottom: 0; left: 0; right: 0; z-index: 60; display: flex; justify-content: flex-end; gap: 10px; padding: 12px 24px; background: var(--np-bg); border-top: 1px solid var(--np-border); box-shadow: var(--np-shadow-bar); }
 [contenteditable="true"]:hover { outline: 1px dashed var(--np-border); border-radius: 3px; }
 [contenteditable="true"]:focus { outline: 2px solid var(--np-accent); border-radius: 3px; background: var(--np-bg-edit); }
@@ -465,6 +483,18 @@ form.rich-question label.opt { display: flex; gap: 9px; align-items: flex-start;
 form.rich-question label.opt:hover { background: var(--np-bg); }
 form.rich-question input[type="radio"], form.rich-question input[type="checkbox"] { accent-color: var(--np-accent); margin-top: 3px; }
 form.rich-question textarea { width: 100%; min-height: 64px; font: inherit; font-size: 13px; padding: 8px 10px; border: 1px solid var(--np-border); border-radius: 6px; background: var(--np-bg); color: var(--np-text); resize: vertical; }
+
+/* Comment zone — injected by the runtime on every question that has none. The
+   option set is never exhaustive by decree; this is where the answer the author
+   missed lands. Folded, so a reviewer scanning defaults never pays for it. */
+form.rich-question .rq-note { margin-top: 12px; }
+form.rich-question .rq-note > summary { display: inline-block; cursor: pointer; list-style: none; font-family: var(--np-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--np-text-muted); padding: 3px 0; }
+form.rich-question .rq-note > summary::-webkit-details-marker { display: none; }
+form.rich-question .rq-note > summary::before { content: '✎ '; }
+form.rich-question .rq-note > summary:hover { color: var(--np-accent-hover); }
+form.rich-question .rq-note textarea { margin-top: 7px; min-height: 56px; }
+form.rich-question[data-noted] { border-color: var(--np-accent); }
+form.rich-question[data-noted] .rq-note > summary { color: var(--np-accent-hover); }
 
 /* ---------- pages / router (multipage feel — one view, no long scroll) ---------- */
 .np-paged .np-page { display: none; }

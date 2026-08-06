@@ -24,8 +24,8 @@ Form follows data. The same skill produces an implementation plan, a review writ
    bash ~/.claude/skills/html/scripts/build.sh /tmp/<slug>.body.html \
      -t "Titre du document" -o docs/notes/<YYYY-MM-DD>-<slug>.html
    ```
-   Flags: `-l` lang (default `fr`) · `-m rich` feedback-loop mode · `-w prose` 760px reading width · `-s on|off` force sidebar (auto: shows at ≥6 `section[id]`) · `-n pages|scroll` force navigation (auto: pages as soon as a section carries `data-group`) · `-b` brand label.
-5. **Open it**: `open -g <path>` on macOS (background obligatoire — `open` nu vole le focus), `xdg-open` on Linux, or the Chrome MCP with a `file://` URL if connected.
+   Flags: `-l` lang (default `fr`) · `-m gate` validable depuis la page · `-m rich` gate + interview · `-w prose` 760px reading width · `-s on|off` force sidebar (auto: shows at ≥6 `section[id]`) · `-n pages|scroll` force navigation (auto: pages as soon as a section carries `data-group`) · `-b` brand label.
+5. **Ship it**: `-m static` → `open -g <path>` on macOS (background obligatoire — `open` nu vole le focus), `xdg-open` on Linux. `-m gate` / `-m rich` → **serve it** with `rp`, never `open -g` (see Gate mode).
 
 ## Shapes
 
@@ -70,13 +70,37 @@ A caller skill that specifies a different path wins.
 
 Un livrable reste un fichier autonome par défaut. Splitte en plusieurs `.html` inter-liés quand le doc sert **plusieurs lectures distinctes** (vue d'ensemble vs détail par sous-système, plan vs annexes de recherche, une page par étape d'un gros plan) — pas quand il est juste long : long + une seule lecture = sidebar, contenus parallèles = tabs. Si tu splittes : un fichier index (header + strip + liens vers chaque partie), liens **relatifs** entre fichiers (`./<slug>-partie.html`), même dossier, même date dans les slugs, et chaque partie reste lisible seule (son propre header + lien retour).
 
+## Gate mode (`-m gate`)
+
+**Tout livrable qui attend une décision se valide depuis la page, jamais dans le chat.** Un plan, une spec, un compte-rendu de décision, un audit dont tu attends un feu vert : `-m gate`, servi avec `rp`. La page reçoit la barre Approve/Reject, le POST vers `./submit`, la règle « Approve seulement sur la dernière page » et une zone de mot libre — sans rendre la prose éditable ni exiger de questions.
+
+- `-m static` (défaut) reste pour la référence pure : un doc qu'on consulte et qu'on ne valide pas.
+- `-m gate` : la boucle de retour, sans instrumentation. C'est le défaut attendu d'une spec ou d'un plan.
+- `-m rich` : la même barre, **plus** la prose éditable et les décisions typées. Pour interviewer, pas pour faire valider.
+- Dans les deux modes gatés, une zone `Ajouter un mot` est injectée dans la barre si le doc ne porte pas déjà un `[data-freeform]` : approuver avec une réserve (« ok mais change X ») est le cas courant et ne doit pas obliger à quitter la page.
+- **`open -g` sur un doc gaté est un bug** : la page ne trouve pas `./submit` et retombe sur le presse-papier. Sers-le.
+
 ## Rich mode (`-m rich`)
 
-For docs whose answers must come back as typed data (open questions, decisions, tunable values, board ordering). The runtime auto-instruments prose as contenteditable (skip-zones: pre, table, diagrams, forms, `.static`) and injects a sticky Approve/Reject gate that POSTs to `./submit` (clipboard fallback if no server). Contract on return: `approval_mode: "approved"` → start implementing immediately, no restating; `"rejected"` → don't implement, ask for direction. Serve with `rp <slug>` in background and give the user the URL (read it from stdout / `.rp-url` — never assume the port).
+For docs whose answers must come back as typed data (open questions, decisions, tunable values, board ordering). The runtime auto-instruments prose as contenteditable (skip-zones: pre, table, diagrams, forms, `.static`) and injects a sticky Approve/Reject gate that POSTs to `./submit` (clipboard fallback if no server). **En mode pages, Approve n'apparaît que sur la dernière page** — jusque-là son emplacement porte `Suivant · <page>`, parce que lire la page 2 sur 6 n'est pas approuver et qu'un bouton de soumission posé là ne sert qu'à déclencher un envoi accidentel. Reject reste disponible partout.
+
+**Servir, et être réveillé par la soumission.** `rp` bloque jusqu'à ce que la page POSTe, écrit `submission.json` à côté de `plan.html`, puis sort. Lance-le donc via **`Bash` avec `run_in_background: true`** : le harness te ré-invoque à sa sortie, et tu enchaînes sans que l'utilisateur ait à te dire « j'ai approuvé ».
+
+```
+Bash({ command: "rp <slug>", run_in_background: true, description: "Serve the rich plan" })
+```
+
+- **Jamais `rp <slug> &` ni `(rp <slug> &)`** — un `&` détache le process du harness : `rp` tourne, l'utilisateur approuve, et rien ne te revient. C'est le mode d'échec par défaut de cette étape.
+- N'utilise pas `Monitor` : il est fait pour N événements récurrents ; ici il n'y en a qu'un, et `rp` sort dessus.
+- Donne l'URL à l'utilisateur, lue sur stdout / `<dir>/.rp-url` — n'invente jamais le port.
+- Au réveil : lire `<dir>/submission.json`. `approval_mode: "approved"` → enchaîner immédiatement, sans reformuler ; `"rejected"` → ne rien implémenter, demander la direction. Une sortie sans `submission.json` est une erreur de `rp` (pas de `plan.html`, port pris) — la lire sur stdout et la corriger, pas relancer à l'aveugle.
+- `rp` exige littéralement `<dir>/plan.html`. Un skill appelant qui nomme ses documents autrement (`round-2.html`, `breakdown.html`) doit copier le document courant en `plan.html` avant de servir.
 
 **Surface TOUTES les décisions ouvertes — aucun plafond.** S'il y en a 600, montre les 600. Ne replie jamais une vraie question en « défaut énoncé » pour faire baisser un compteur : le problème n'a jamais été le *nombre*, c'est l'**affichage**. Un mur de 600 radios empilés est cassé ; 600 décisions bien rangées ne le sont pas. La seule règle de tri légitime est sémantique, pas quantitative : si plusieurs micro-choix sont *des facettes d'une même décision*, ce sont des axes/options d'UN form (compare-axes, tabs), pas N forms — mais c'est de la mise en forme, pas de la coupe.
 
 **L'affichage encaisse l'échelle, lui.** Pour beaucoup de questions, c'est la structure qui porte la charge, pas un cap : (1) `data-group` par domaine sur leurs sections → le routeur éclate en pages (~N questions/domaine, une vue par écran) ; (2) l'overview auto se **groupe par domaine et se replie** (index de domaines repliables, pas une liste plate de 600 lignes) ; (3) la progression de la gate compte le tout. Plus il y a de questions, plus `data-group` est obligatoire — c'est ça qui tue le scroll, pas la suppression de questions.
+
+**Tes options ne sont jamais exhaustives par décret.** Le runtime injecte sur **chaque** question une zone de commentaire repliée (`.rq-note`, libellée `✎ Commenter · proposer une option absente`) : c'est le canal officiel du désaccord et de la réponse que tu n'as pas vue. Tu n'as rien à écrire pour l'obtenir — n'écris un `<textarea>` toi-même que pour poser une invite spécifique, et surcharge libellé/invite avec `data-note-label` / `data-note-hint`. Une note remplie surligne la question, remonte tronquée dans l'overview, et part dans `decisions[<id>].freetext`. Corollaire de rédaction : si tu soupçonnes que la vraie réponse est hors de ton triplet, dis-le dans `.rq-stake` — ne la fais pas disparaître en énumérant trois options que tu as inventées.
 
 **Review-the-default, jamais fill-N-blanks.** Chaque question atterrit **pré-répondue sur ta reco** : marque l'option recommandée `<label class="opt" data-recommended>` (le runtime la coche, la badge `reco`, la remonte). Répondre = scanner, surcharger les rares désaccords. Le runtime auto-construit (≥3 questions) un **overview scannable** (chaque décision + sa réponse, point modifié/défaut, jump-link) + une progression live dans la gate. `.q` reste un **titre court (≤6 mots)** — l'enjeu va dans `.recommended` ou `.rq-stake`, jamais dans `.q` (sinon l'overview casse).
 
@@ -93,4 +117,4 @@ Quand l'interview couvre plusieurs domaines : `data-group` sur leurs sections �
 - **Navigation** : multi-domaines → `data-group` (→ pages, zéro long scroll) ; un doc qui reste un seul scroll vertical est le smell à corriger.
 - Body fragment contains no hex/oklch literal and no chrome duplication (`grep -nE '#[0-9A-Fa-f]{3,8}|oklch\(' /tmp/<slug>.body.html` → only hits inside an explicitly justified `<style>` are acceptable, ideally zero).
 - Built file opens without console errors; dark mode renders (toggle it once). Pages mode: each sidebar entry swaps the view; deep-links (`#section-id`) open the right page.
-- Rich mode : **toutes les décisions ouvertes sont surfacées** (aucune coupée pour un compteur) ; beaucoup de questions ⇒ `data-group` par domaine (pages + overview groupé/replié), jamais un mur empilé ; chaque `.q` ≤6 mots ; chaque question a une option `data-recommended` pré-sélectionnée ; les choix lourds utilisent `rq-axes` (exemple + conséquence par cellule, schéma si spatial), pas des radios nus ; `name` distincts ; overview + progression construits (≥3 questions).
+- Rich mode : **toutes les décisions ouvertes sont surfacées** (aucune coupée pour un compteur) ; beaucoup de questions ⇒ `data-group` par domaine (pages + overview groupé/replié), jamais un mur empilé ; chaque `.q` ≤6 mots ; chaque question a une option `data-recommended` pré-sélectionnée ; les choix lourds utilisent `rq-axes` (exemple + conséquence par cellule, schéma si spatial), pas des radios nus ; `name` distincts ; overview + progression construits (≥3 questions) ; chaque question porte sa zone de commentaire (auto — vérifie qu'elle apparaît, y compris sur les `rq-axes`).

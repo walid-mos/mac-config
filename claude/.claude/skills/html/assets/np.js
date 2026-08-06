@@ -429,9 +429,16 @@
      edits, then POSTs to ./submit with approval_mode. Approve and
      Reject map to explicit next-action contracts for Claude.      */
   (function () {
-    if (document.body.getAttribute('data-mode') !== 'rich') return;
+    /* Two modes share the gate. "gate": a read-only deliverable the reader
+       approves or rejects in place — no editing, no questions. "rich": the
+       same gate plus editable prose and typed decisions. Anything the reader
+       must decide on ships in one of them; a decision doc with no way back
+       to the agent is a dead end. */
+    var mode = document.body.getAttribute('data-mode');
+    if (mode !== 'rich' && mode !== 'gate') return;
+    var isRich = mode === 'rich';
     var SKIP = 'pre, table, .mermaid, .diff, .file-tree, .diagram, .mockup, form, .static, [contenteditable]';
-    $$('section p, section li').forEach(function (el) {
+    if (isRich) $$('section p, section li').forEach(function (el) {
       if (el.closest(SKIP)) return;
       el.setAttribute('contenteditable', 'true');
       el.setAttribute('data-np-orig', el.innerText);
@@ -481,29 +488,92 @@
     gate.className = 'rp-gate';
     gate.innerHTML = '<span class="rp-progress" aria-live="polite"></span>'
                    + '<button type="button" class="np-btn ghost" id="rp-reject">Reject</button>'
+                   + '<a class="np-btn primary rp-next" id="rp-next" href="#" data-page="" hidden>Suivant</a>'
                    + '<button type="button" class="np-btn primary" id="rp-approve">Approve</button>';
     document.body.appendChild(gate);
     $('#rp-approve').addEventListener('click', function () { submit('approved'); });
     $('#rp-reject').addEventListener('click', function () { submit('rejected'); });
+
+    /* A note channel, always. Approving with a caveat ("ok mais change X") is
+       the common case, and without this the reader has to leave the page to
+       say it. Skipped when the author already placed a [data-freeform]. */
+    if (!$('[data-freeform]')) {
+      var note = document.createElement('details');
+      note.className = 'rp-note';
+      note.innerHTML = '<summary>Ajouter un mot</summary>';
+      var ta = document.createElement('textarea');
+      ta.setAttribute('data-freeform', '');
+      ta.placeholder = isRich
+        ? 'Remarque générale, contrainte oubliée, changement de cap…'
+        : 'Ce que tu veux corriger, préciser ou rappeler avant que j’enchaîne…';
+      note.appendChild(ta);
+      gate.insertBefore(note, gate.firstChild);
+    }
+
+    /* In pages mode, Approve exists only on the last page: reading page 2 of 6 is
+       not approving, and a submit button sitting there invites the misfire. Until
+       then the same slot carries the forward move. Reject stays live everywhere —
+       walking away early is always legitimate. */
+    (function () {
+      var pgs = $$('.np-page');
+      if (pgs.length < 2) return;
+      var approve = $('#rp-approve'), nextBtn = $('#rp-next');
+      function syncGate(pageEl) {
+        var i = pgs.indexOf(pageEl);
+        if (i < 0) return;
+        var upcoming = pgs[i + 1];
+        approve.hidden = Boolean(upcoming);
+        nextBtn.hidden = !upcoming;
+        if (!upcoming) return;
+        nextBtn.setAttribute('data-page', upcoming.id);
+        nextBtn.setAttribute('href', '#' + upcoming.id);
+        var label = $('.np-router a.pg[data-page="' + upcoming.id + '"]');
+        nextBtn.textContent = 'Suivant · ' + ((label && label.textContent.replace(/^\s*\d+\s*/, '').trim()) || 'page ' + (i + 2));
+      }
+      document.addEventListener('np:page-shown', function (ev) { syncGate(ev.detail.page); });
+      syncGate($('.np-page.active') || pgs[0]);      // the router already fired before this listener existed
+    })();
 
     /* ---- questions: pre-pick the recommendation, scannable overview, live
             progress. Answering becomes "review the defaults, override the few
             you disagree with" instead of "fill N blank forms". ---- */
     var main = $('.main');
     var qs = $$('form.rich-question');
+    var NOTE_PREVIEW = 60;
     function answerOf(f) {
       var picks = $$('input:checked', f).map(function (inp) {
         var l = inp.closest('label'); var n = l && l.querySelector('.cax-name');  // compare-axes: read only the option name
         return ((n || l || inp).textContent || inp.value).trim();
       });
-      var notes = $$('textarea', f).map(function (t) { return t.value.trim(); }).filter(Boolean);
+      var notes = $$('textarea', f).map(function (t) { return t.value.trim(); }).filter(Boolean)
+        .map(function (t) {
+          var one = t.replace(/\s+/g, ' ');
+          return '✎ ' + (one.length > NOTE_PREVIEW ? one.slice(0, NOTE_PREVIEW - 1) + '…' : one);
+        });
       return picks.concat(notes).join(' · ') || '—';
+    }
+    /* Every question carries a comment zone, injected when the author wrote none:
+       the option set is never exhaustive by decree, and this is the channel for the
+       answer the author did not think of. Folded so it costs nothing to scan past. */
+    function addNote(f) {
+      if (f.querySelector('textarea')) return;
+      var note = document.createElement('details');
+      note.className = 'rq-note';
+      note.innerHTML = '<summary></summary>';
+      note.querySelector('summary').textContent =
+        f.getAttribute('data-note-label') || 'Commenter · proposer une option absente';
+      var ta = document.createElement('textarea');
+      ta.placeholder = f.getAttribute('data-note-hint')
+        || 'Désaccord, option manquante, contrainte que je n’ai pas vue…';
+      note.appendChild(ta);
+      f.appendChild(note);
     }
     qs.forEach(function (f, i) {
       f.setAttribute('data-qn', i + 1);
       if (!f.id) f.id = 'rq-' + (f.getAttribute('data-question-id') || (i + 1));
       var rec = $('label.opt[data-recommended] input', f);
       if (rec && !$$('input:checked', f).length) rec.checked = true;     // land on the reco
+      addNote(f);
     });
     var snapshot = qs.map(answerOf);
     var idxMeta = null, prog = $('.rp-progress', gate), groups = null;
@@ -560,6 +630,8 @@
       qs.forEach(function (f, i) {
         var now = answerOf(f), diff = now !== snapshot[i];
         if (diff) changed++;
+        var noted = $$('textarea', f).some(function (t) { return t.value.trim(); });
+        if (noted) f.setAttribute('data-noted', ''); else f.removeAttribute('data-noted');
         if (f._li) { f._li.classList.toggle('changed', diff); f._li.querySelector('.ans').textContent = now; }
       });
       var msg = qs.length + ' décision' + (qs.length > 1 ? 's' : '') + (changed ? ' · ' + changed + ' modifiée' + (changed > 1 ? 's' : '') : ' · toutes sur la reco');

@@ -6,7 +6,7 @@
 #
 # Usage:
 #   build.sh <body.html> -t "Titre du document" -o docs/notes/2026-06-10-slug.html
-#            [-l fr] [-m static|rich] [-w normal|prose] [-s auto|on|off]
+#            [-l fr] [-m static|gate|rich] [-w normal|prose] [-s auto|on|off]
 #            [-n auto|pages|scroll] [-b NextNode]
 #   -n pages : multipage router — each section[data-group] (or each section)
 #              becomes a swappable page. Kills the long scroll. Auto-on as soon
@@ -115,7 +115,7 @@ fi
 
 # --- assembly ----------------------------------------------------------
 attrs=""
-[[ "$mode" == "rich" ]]      && attrs+=" data-mode=\"rich\""
+[[ "$mode" == "rich" || "$mode" == "gate" ]] && attrs+=" data-mode=\"$mode\""
 [[ "$width" == "prose" ]]    && attrs+=" data-width=\"prose\""
 [[ "$sidebar" != "auto" ]]   && attrs+=" data-sidebar=\"$sidebar\""
 [[ "$nav" != "auto" ]]       && attrs+=" data-nav=\"$nav\""

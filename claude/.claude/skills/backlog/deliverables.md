@@ -7,8 +7,14 @@ fixes what that skill leaves to the caller: paths, shapes, and what goes in
 each document.
 
 All documents for one feature share `docs/interviews/<feature-slug>/`, in the
-target project's repo. Serve rich-mode documents with `rp <slug>` and give
-the user the URL; open read-only ones with `open -g`.
+target project's repo. Open read-only ones with `open -g`.
+
+Rich-mode documents are named per gate (`round-<n>.html`, `breakdown.html`)
+but `rp` serves one fixed filename: **copy the current document to
+`plan.html` in the same folder, then serve it** with `Bash(command: "rp
+<slug>", run_in_background: true)` — background-tracked, never `&`, so
+the approval wakes you and the gate advances on its own. Full protocol in the
+`html` skill's *Rich mode* section.
 
 ## Gate 2 — `round-<n>.html` (rich mode)
 
@@ -29,9 +35,12 @@ One document per interview round. Shape: rich-mode interview.
 - The **final round** appends a `Récapitulatif` section — every decision
   taken, one line each, editable — whose approval closes the grill.
 
-## Gate 3 — `spec.html` (read-only)
+## Gate 3 — `spec.html` (`-m gate`)
 
-Shape: research/explainer, `-w prose` if mostly text. Sections = the skeleton
+Shape: research/explainer, `-w prose` if mostly text. Built in **gate mode**
+and **served**, never `open -g`: the spec is approved from the page, with its
+note field, exactly like the other two gates. Approval there is what starts
+gate 4 — no chat round-trip. Sections = the skeleton
 in [`spec-template.md`](spec-template.md), each with an `id`; `data-group`
 only if the spec genuinely spans domains.
 

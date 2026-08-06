@@ -95,6 +95,7 @@ Type-aware rules activate only with `oxlint --type-aware` (requires `oxlint-tsgo
 | `boolean-naming` | error | Booleans read as questions (`is`/`has`/`can`/`should`...), no negated names. Framework-imposed `export const` names exempt: `prerender`/`partial` (Astro), `dynamicParams`/`revalidate`/`experimental_ppr` (Next segment config). React/Hono/Express impose none |
 | `no-generic-names` | warn | Bans `data`, `info`, `result`, `item`, `value`, `temp`, `stuff` |
 | `no-em-dash` | error | No U+2014 in source files |
+| `no-detached-tailwind` | error | Tailwind class lists must stay inline (`className`/`class`) or in a `cva`/`tv`/`cn`/`clsx`/`cx`/`twMerge` call - never detached in a variable, object or array. Heuristic: fires on strings with >=2 utility-looking tokens forming a majority |
 | `no-use-effect` | warn | Every `useEffect` is flagged - justify or refactor (see react skill) |
 | `max-props` | warn | Max 5 props on a PascalCase component |
 | `component-filename-match` | error | `UserCard.tsx` exports `UserCard` (index files exempt) |

@@ -49,6 +49,7 @@ Tague chaque `<section>` d'un livrable multi-domaines avec `data-group="Domaine"
 - Le `<header>` + blocs d'intro (`tldr`, `strip`) avant la 1ʳᵉ section forment la page **Aperçu** (label = `<h1>`).
 - Domaines consécutifs identiques = une page (plusieurs sections → sous-liens dans la sidebar). Sans `data-group`, un doc ≥6 sections garde le sidebar scrollspy.
 - Deep-links : `#<section-id>` ouvre la bonne page et y défile. Force avec `build.sh -n pages` / `-n scroll`.
+- En **rich mode**, la gate suit le routeur : `Suivant · <page>` tant qu'il reste des pages, `Approve` seulement sur la dernière. Rien à écrire — le runtime écoute `np:page-shown`. Corollaire : mets en dernière page ce qui clôt la lecture (récapitulatif, décisions transverses), c'est de là qu'on approuve.
 - Pour comparer des variantes **dans** une page → tabs (ci-dessous) ; pour ranger des thèmes distincts → pages. Domaines = pages, variantes = tabs.
 
 ## Tabs
@@ -244,10 +245,23 @@ Prose auto-becomes editable; the Approve/Reject gate and submission protocol are
   <div class="recommended">Double-submit cookie — stateless, pas de store serveur.</div>
   <label class="opt" data-recommended><input type="radio" name="csrf" value="ds"> Double-submit cookie</label>
   <label class="opt"><input type="radio" name="csrf" value="syn"> Synchronizer token</label>
-  <textarea placeholder="Note libre (optionnel)"></textarea>      <!-- optionnel -->
 </form>
 <!-- checkbox si les options se combinent ; jamais d'option inventée pour arrondir -->
 ```
+
+**Zone de commentaire — automatique, sur toutes les questions.** Le runtime ajoute à chaque `form.rich-question` sans `<textarea>` :
+
+```html
+<details class="rq-note">
+  <summary>Commenter · proposer une option absente</summary>
+  <textarea placeholder="Désaccord, option manquante, contrainte que je n'ai pas vue…"></textarea>
+</details>
+```
+
+- N'écris **pas** ce markup toi-même. Écris un `<textarea>` dans le form seulement pour poser une invite propre à la question (il supprime alors l'injection) ; sinon surcharge `data-note-label="…"` / `data-note-hint="…"` sur le `<form>`.
+- Vaut aussi pour `rq-axes` : la zone se place sous la table.
+- Une note non vide pose `data-noted` sur le form (bordure accent), s'affiche tronquée à 60 caractères dans l'overview après le choix, et part entière dans `decisions[<id>].freetext`.
+- C'est le canal du « aucune de tes options n'est la bonne » : ne compte pas sur une option `Autre` inventée pour le couvrir.
 
 **Tier 2 — lourde / architecturale (le lecteur compare).** Composant **compare-axes** : une vraie `<table>` — options en colonnes (`<th scope="col">`), axes en lignes (`<th scope="row">`), **un exemple inline + une conséquence color-codée par cellule**, schéma optionnel. Table = auto-alignée (pas de décompte de colonnes à rater), navigable au lecteur d'écran, et scrollable horizontalement en étroit au lieu de mélanger les colonnes. Le `<label class="opt">` ne contient QUE `.cax-name` → l'overview reste propre (« Redis »).
 

@@ -1,14 +1,25 @@
 {
-  "defaultProvider": "openrouter",
-  "defaultModel": "moonshotai/kimi-k3",
-  "defaultThinkingLevel": "medium",
+  "defaultProvider": "kimi-coding",
+  "defaultModel": "k3",
+  "defaultThinkingLevel": "max",
   "npmCommand": [
-    "pnpm"
+    "pnpm",
+    "--config.strict-dep-builds=false"
   ],
   "quietStartup": true,
   "enableAnalytics": false,
   "enableInstallTelemetry": false,
   "defaultProjectTrust": "ask",
-  "theme": "light",
-  "packages": []
+  "theme": "catppuccin-latte",
+  "packages": [
+    "npm:pi-web-access",
+    "git:github.com/EmilioAK/pi-claude-style-scroll"
+  ],
+  "enabledModels": [
+    "kimi-coding/k3",
+    "kimi-coding/k3-256k",
+    "openrouter/deepseek/deepseek-v4-flash",
+    "xai/grok-4.5"
+  ],
+  "hideThinkingBlock": true
 }

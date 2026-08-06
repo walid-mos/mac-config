@@ -66,12 +66,13 @@ nvim-post:
 	@command -v rg >/dev/null && echo "ripgrep prêt: telescope live_grep/grep_string opérationnels" \
 		|| echo "ripgrep non installé — telescope live_grep échouera"
 
-# Sans ces dossiers, stow replierait ~/.pi/agent en symlink vers le repo et pi y
-# écrirait ses sessions et son auth.json.
+# Sans ce dossier, stow replierait ~/.pi/agent en symlink vers le repo et pi y
+# écrirait ses sessions et son auth.json. extensions/skills/themes sont des
+# symlinks vers le repo : les nouveaux fichiers y sont versionnés d'office.
 pi: | pi-dirs
 
 pi-dirs:
-	@mkdir -p "$(HOME)/.pi/agent/sessions" "$(HOME)/.pi/agent/extensions"
+	@mkdir -p "$(HOME)/.pi/agent/sessions"
 
 pi-post:
 	@if ! command -v pi >/dev/null; then \

@@ -13,6 +13,7 @@ brew "fastfetch"
 brew "neovim"
 brew "tree-sitter-cli"
 brew "d2"
+brew "ripgrep"
 
 # Agents & LLM
 brew "herdr"
@@ -45,4 +46,9 @@ cask "google-chrome"
 cask "obsidian"
 cask "iina"
 cask "claude"
+cask "claude-code"
 cask "kitlangton-hex"
+
+# Fonts (vault Obsidian — obsidian-post les vérifie aussi)
+cask "font-ia-writer-quattro"
+cask "font-inter"

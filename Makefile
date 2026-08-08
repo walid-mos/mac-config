@@ -113,16 +113,28 @@ pi: | pi-dirs
 pi-dirs:
 	@mkdir -p "$(HOME)/.pi/agent/sessions"
 
+# pnpm installé par brew est un script `#!/usr/bin/env node` et node arrive via
+# fnm, pas via brew : sur un mac neuf on installe le LTS puis on lance pnpm au
+# travers de `fnm exec`. FNM_DIR/PNPM_HOME reprennent zsh/.config/zsh/conf.d.
+pi-post: export FNM_DIR := $(HOME)/.local/share/fnm
+pi-post: export PNPM_HOME := $(HOME)/.local/share/pnpm
+pi-post: export PATH := $(HOME)/.local/share/pnpm/bin:$(HOME)/.local/share/pnpm:$(PATH)
 pi-post:
 	@if ! command -v pi >/dev/null; then \
-		if command -v pnpm >/dev/null; then pnpm add -g @earendil-works/pi-coding-agent; \
-		else echo "pnpm introuvable — installe pi à la main (https://pi.dev)"; fi; \
+		if ! command -v pnpm >/dev/null; then echo "pnpm introuvable — installe pi à la main (https://pi.dev)"; \
+		elif command -v node >/dev/null; then pnpm add -g @earendil-works/pi-coding-agent; \
+		elif command -v fnm >/dev/null; then \
+			echo "→ node LTS via fnm"; \
+			fnm install --lts; \
+			fnm exec --using lts-latest -- pnpm add -g @earendil-works/pi-coding-agent; \
+		else echo "node et fnm introuvables — installe node puis relance make pi-post"; fi; \
 	fi
-	@command -v pi >/dev/null && echo "pi prêt: $$(pi --version) — \`pi\` puis /login pour l'auth" \
+	@command -v pi >/dev/null && echo "pi prêt — \`pi\` puis /login pour l'auth" \
 		|| echo "pi non installé — étape ignorée"
 
 rp-post:
-	@command -v node >/dev/null || { echo "node not found — install it (fnm install --lts) so 'rp' can serve plan.html"; exit 0; }
+	@command -v node >/dev/null || command -v fnm >/dev/null \
+		|| { echo "node not found — install it (fnm install --lts) so 'rp' can serve plan.html"; exit 0; }
 	@echo "rp ready: \`rp <slug>\` will serve plan.html and wait for /submit"
 
 obsidian:

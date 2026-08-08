@@ -46,5 +46,7 @@ pi/.pi/agent/*
 rtk/Library/Application Support/rtk/*
 !rtk/Library/Application Support/rtk/config.toml
 
-# languages: XDG_STATE_HOME runtime (zsh history, fnm multishells) — jamais versionné
+# languages: runtime XDG (jamais versionné) — seul .local/bin/ est authored
+# state = historique zsh + fnm multishells ; share = node-versions fnm + store pnpm (~650M)
 languages/.local/state/
+languages/.local/share/

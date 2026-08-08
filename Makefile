@@ -22,7 +22,7 @@ OBSIDIAN_VAULT_DIR := $(HOME)/Library/Mobile Documents/iCloud~md~obsidian/Docume
 OBSIDIAN_VAULT := $(OBSIDIAN_VAULT_DIR)/.obsidian
 OBSIDIAN_PLUGIN_DATA := obsidian-style-settings obsidian-hider obsidian-icon-folder settings-search shiki-highlighter folder-notes
 
-.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) claude-post nvim-post pi-dirs pi-post rp-post rtk-post rust-post obsidian obsidian-save obsidian-post proxy-reset
+.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) claude-post gh-post nvim-post pi-dirs pi-post rp-post rtk-post rust-post obsidian obsidian-save obsidian-post proxy-reset
 
 help:
 	@echo "Targets:"
@@ -71,7 +71,7 @@ brew-bundle:
 	@echo "→ brew bundle (Brewfile)"
 	@brew bundle --file=Brewfile
 
-install all: $(PACKAGES) claude-post nvim-post pi-post rp-post rtk-post rust-post obsidian obsidian-post
+install all: $(PACKAGES) claude-post gh-post nvim-post pi-post rp-post rtk-post rust-post obsidian obsidian-post
 
 unstow:
 	@for pkg in $(PACKAGES); do $(STOW) -D $$pkg; done
@@ -96,6 +96,19 @@ claude-post:
 			|| { claude plugin marketplace add pbakaus/impeccable && claude plugin install impeccable@impeccable; }; \
 		echo "plugin impeccable prêt (design craft — anti-slop)"; \
 	else echo "claude introuvable — plugin impeccable non installé"; fi
+
+# gh est un formula brew ; sa config est stowée par le package gh (hosts.yml, qui
+# contient le token OAuth, est gitignoré). L'auth `gh auth login` est interactive
+# et ne peut pas être automatisée ici. Rejouable : no-op si gh est déjà présent.
+gh-post:
+	@if ! command -v gh >/dev/null; then \
+		if command -v brew >/dev/null; then brew install gh; \
+		else echo "gh introuvable et brew indisponible — installe-le à la main (https://cli.github.com)"; fi; \
+	fi
+	@if command -v gh >/dev/null; then \
+		gh auth status >/dev/null 2>&1 && echo "gh prêt et authentifié" \
+			|| echo "gh installé — lance \`gh auth login\` pour t'authentifier (push/PR)"; \
+	else echo "gh non installé — étape ignorée"; fi
 
 nvim-post:
 	@if ! command -v rg >/dev/null; then \

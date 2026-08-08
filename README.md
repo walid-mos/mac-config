@@ -33,18 +33,40 @@ Chaque dossier de premier niveau est un **package Stow** dont l'arborescence int
 
 ## Bootstrap d'une nouvelle machine
 
+Sur un mac vierge (rien d'installé, pas même Homebrew ni git), **une seule commande**, sans clone préalable :
+
 ```bash
-git clone https://github.com/walid-mos/mac-config.git ~/.stow_repository
-cd ~/.stow_repository
-make install
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/walid-mos/mac-config/main/bootstrap.sh)"
 ```
 
-`make install` symlinke tous les packages dans `$HOME` puis exécute les post-hooks.
+`bootstrap.sh` installe les Xcode CLT (donc git), clone le repo dans `~/.stow_repository`, puis lance `make bootstrap`. Rien d'autre à taper.
+
+Si le repo est déjà cloné :
+
+```bash
+cd ~/.stow_repository && make bootstrap
+```
+
+`make bootstrap` enchaîne, de zéro et de façon idempotente :
+
+1. **Xcode Command Line Tools** — déclenche la pop-up d'install et attend qu'elle finisse (git, compilateur).
+2. **Homebrew** — script d'install officiel en mode non-interactif s'il manque.
+3. **`brew bundle`** — installe les formules et casks du `Brewfile` (voir ci-dessous).
+4. **`make install`** — stow tous les packages + post-hooks.
+
+La cible est rejouable : chaque étape détecte ce qui est déjà en place. Les deux préfixes brew (`/opt/homebrew/bin`, `/usr/local/bin`) sont ajoutés au `PATH` par le Makefile, donc `brew bundle` et les post-hooks trouvent le brew fraîchement installé sans relancer dans un nouveau shell.
+
+### Le `Brewfile`
+
+Liste éditée à la main des paquets d'un mac neuf (34 → sélection). **Ne pas régénérer via `brew bundle dump`** : le dump réinjecte les dépendances transitives et les apps perso volontairement exclues. Ajouter/retirer un paquet = éditer directement le `Brewfile`, puis `make brew-bundle`. Les post-hooks couvrent le hors-brew (pi via `pnpm`, plugin impeccable, init rtk, assets Obsidian).
+
 
 ## Cibles Makefile
 
 | Cible             | Effet                                                                 |
 |-------------------|-----------------------------------------------------------------------|
+| `make bootstrap`  | Mac neuf de zéro : Xcode CLT + Homebrew + `brew bundle` + `install`   |
+| `make brew-bundle`| Installe les paquets du `Brewfile` (formules + casks)                 |
 | `make`, `make install` | Stow tous les packages + lance tous les post-hooks                |
 | `make <package>`  | Stow un seul package (`make nvim`, `make zsh`, …)                     |
 | `make restow`     | Rebuild les symlinks (utile après ajout/suppression de fichiers)      |

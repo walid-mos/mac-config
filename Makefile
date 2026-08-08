@@ -1,4 +1,12 @@
 SHELL := /usr/bin/env bash
+
+# brew n'est pas dans le PATH du shell tant qu'un shellenv n'a pas été sourcé, et
+# chaque recette make tourne dans son propre sous-shell : sans ça, brew-bundle et
+# les post-hooks ne verraient pas le brew que brew-install vient d'installer.
+# Ajouter les deux préfixes (Apple Silicon / Intel) au PATH exporté couvre le
+# premier install sans relancer dans un nouveau shell — un dir absent est inerte.
+export PATH := /opt/homebrew/bin:/usr/local/bin:$(PATH)
+
 STOW := stow -t $(HOME)
 PACKAGES := claude cmux colima docker gh ghostty git herdr homebrew languages nvim opencode pi rclone rectangle rp rtk starship zsh
 
@@ -14,10 +22,12 @@ OBSIDIAN_VAULT_DIR := $(HOME)/Library/Mobile Documents/iCloud~md~obsidian/Docume
 OBSIDIAN_VAULT := $(OBSIDIAN_VAULT_DIR)/.obsidian
 OBSIDIAN_PLUGIN_DATA := obsidian-style-settings obsidian-hider obsidian-icon-folder settings-search shiki-highlighter folder-notes
 
-.PHONY: help install all unstow restow $(PACKAGES) claude-post nvim-post pi-dirs pi-post rp-post rtk-post obsidian obsidian-save obsidian-post proxy-reset
+.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) claude-post nvim-post pi-dirs pi-post rp-post rtk-post obsidian obsidian-save obsidian-post proxy-reset
 
 help:
 	@echo "Targets:"
+	@echo "  bootstrap    Mac neuf, de zéro : Xcode CLT + Homebrew + brew bundle + install"
+	@echo "  brew-bundle  Installe les paquets du Brewfile (formules + casks)"
 	@echo "  install      Stow every package and run all post-install hooks"
 	@echo "  all          Alias of install"
 	@echo "  unstow       Unstow every package"
@@ -31,6 +41,32 @@ help:
 	@echo "  proxy-reset    Retire le PAC proxy laissé par Zscaler (rétablit le relais Apple)"
 	@echo ""
 	@echo "Packages: $(PACKAGES)"
+
+# Point d'entrée mac neuf : chaque étape est idempotente, la cible est rejouable.
+# CLT et Homebrew posent les prérequis (git, compilateur, brew) avant tout stow.
+bootstrap: xcode-clt brew-install brew-bundle install
+	@echo "bootstrap terminé — ouvre un nouveau shell, puis lance 'pi' /login et rtk restart si besoin"
+
+# xcode-select --install déclenche une pop-up GUI asynchrone et rend la main
+# aussitôt ; on boucle jusqu'à ce que les CLT soient réellement présents.
+xcode-clt:
+	@if xcode-select -p >/dev/null 2>&1; then echo "Xcode CLT déjà présents"; else \
+		echo "→ installation des Xcode Command Line Tools (valide la fenêtre qui s'ouvre)"; \
+		xcode-select --install >/dev/null 2>&1 || true; \
+		until xcode-select -p >/dev/null 2>&1; do printf '.'; sleep 5; done; \
+		echo " CLT installés"; fi
+
+brew-install:
+	@if command -v brew >/dev/null; then echo "Homebrew déjà présent"; else \
+		echo "→ installation de Homebrew"; \
+		NONINTERACTIVE=1 /bin/bash -c "$$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"; fi
+	@command -v brew >/dev/null && echo "brew prêt: $$(brew --version | head -1)" \
+		|| { echo "brew introuvable après install — vérifie le log Homebrew ci-dessus"; exit 1; }
+
+brew-bundle:
+	@command -v brew >/dev/null || { echo "brew introuvable — lance 'make brew-install' d'abord"; exit 1; }
+	@echo "→ brew bundle (Brewfile)"
+	@brew bundle --file=Brewfile
 
 install all: $(PACKAGES) claude-post nvim-post pi-post rp-post rtk-post obsidian obsidian-post
 

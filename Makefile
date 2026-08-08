@@ -56,9 +56,12 @@ xcode-clt:
 		until xcode-select -p >/dev/null 2>&1; do printf '.'; sleep 5; done; \
 		echo " CLT installés"; fi
 
+# L'installeur Homebrew en NONINTERACTIVE vérifie sudo avec `sudo -n -v` et
+# aborte sans timestamp en cache — `sudo -v` interactif juste avant le fournit.
 brew-install:
 	@if command -v brew >/dev/null; then echo "Homebrew déjà présent"; else \
-		echo "→ installation de Homebrew"; \
+		echo "→ installation de Homebrew (mot de passe sudo requis)"; \
+		sudo -v; \
 		NONINTERACTIVE=1 /bin/bash -c "$$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"; fi
 	@command -v brew >/dev/null && echo "brew prêt: $$(brew --version | head -1)" \
 		|| { echo "brew introuvable après install — vérifie le log Homebrew ci-dessus"; exit 1; }

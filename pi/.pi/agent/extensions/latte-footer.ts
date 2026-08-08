@@ -1,0 +1,674 @@
+/**
+ * Latte Footer — powerline-style footer matching Catppuccin Latte.
+ *
+ * Line 1: [󰚩 model  thinking]  [ path   branch] ···· context bar + exact tokens · tokens · cost
+ * Line 2: provider quotas (kimi-coding 5h/weekly, openrouter credits) with reset times
+ *
+ * Toggle with /latte-footer. Icons are configurable below (Nerd Font).
+ * Quotas are polled every 5 min using the OAuth tokens from ~/.pi/agent/auth.json.
+ */
+
+import type { AssistantMessage } from "@earendil-works/pi-ai";
+import type {
+	ExtensionAPI,
+	ExtensionContext,
+	ReadonlyFooterDataProvider,
+	Theme,
+} from "@earendil-works/pi-coding-agent";
+import { truncateToWidth, visibleWidth, type TUI } from "@earendil-works/pi-tui";
+import { homedir } from "node:os";
+import { readFileSync } from "node:fs";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
+
+// ── Catppuccin Latte palette ──────────────────────────────────────────
+const LATTE = {
+	mauve: "#8839ef",
+	blue: "#1e66f5",
+	sapphire: "#209fb5",
+	teal: "#179299",
+	green: "#40a02b",
+	yellow: "#df8e1d",
+	peach: "#fe640b",
+	red: "#d20f39",
+	base: "#eff1f5", // pill text
+	surface1: "#bcc0cc",
+	subtext0: "#6c6f85",
+	overlay1: "#8c8fa1",
+};
+
+// ── Config ────────────────────────────────────────────────────────────
+const ICONS = {
+	model: "\u{f06a9}", // nf-md-robot
+	folder: "\u{f07b}", // nf-fa-folder
+	branch: "\u{e0a0}", // powerline branch
+	thinking: "\u{f0eb}", // nf-fa-lightbulb
+	context: "\u{f200}", // nf-fa-pie_chart
+	quota: "\u{f0109}", // nf-md-gauge
+	reset: "↺",
+};
+const PILL_LEFT = "\u{e0b6}";
+const PILL_RIGHT = "\u{e0b4}";
+const SEG_SEP = "\u{e0b0}"; // powerline hard separator between fused segments
+const BAR_WIDTH = 8;
+const BAR_FULL = "█";
+const BAR_EMPTY = "░";
+const QUOTA_POLL_MS = 5 * 60 * 1000;
+const GIT_POLL_MS = 4000;
+const AUTH_PATH = `${homedir()}/.pi/agent/auth.json`;
+
+const THINKING_COLORS: Record<string, string> = {
+	off: LATTE.overlay1,
+	minimal: LATTE.subtext0,
+	low: LATTE.sapphire,
+	medium: LATTE.blue,
+	high: LATTE.mauve,
+	xhigh: LATTE.peach,
+	max: LATTE.red,
+};
+
+// ── ANSI helpers (24-bit) ─────────────────────────────────────────────
+function rgb(hex: string): [number, number, number] {
+	const r = parseInt(hex.slice(1, 3), 16);
+	const g = parseInt(hex.slice(3, 5), 16);
+	const b = parseInt(hex.slice(5, 7), 16);
+	if (![r, g, b].every((n) => Number.isFinite(n))) return [108, 111, 133]; // LATTE.subtext0 fallback
+	return [r, g, b];
+}
+
+function finiteNumber(value: unknown): number | undefined {
+	const n = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+	return Number.isFinite(n) ? n : undefined;
+}
+function fgHex(hex: string, s: string): string {
+	const [r, g, b] = rgb(hex);
+	return `\x1b[38;2;${r};${g};${b}m${s}\x1b[39m`;
+}
+/** fg on bg, both hex. */
+function fgOn(fg: string, bg: string, s: string): string {
+	const [fr, fg_, fb] = rgb(fg);
+	const [br, bg_, bb] = rgb(bg);
+	return `\x1b[38;2;${fr};${fg_};${fb}m\x1b[48;2;${br};${bg_};${bb}m${s}\x1b[49m\x1b[39m`;
+}
+
+type Segment = { bg: string; fg?: string; label: string; icon?: string };
+
+/** Render fused powerline segments: rounded caps outside,  inside. */
+function powerline(segments: Segment[]): string {
+	if (segments.length === 0) return "";
+	let out = fgHex(segments[0]!.bg, PILL_LEFT);
+	for (let i = 0; i < segments.length; i++) {
+		const seg = segments[i]!;
+		const text = seg.icon ? ` ${seg.icon} ${seg.label} ` : ` ${seg.label} `;
+		out += fgOn(seg.fg ?? LATTE.base, seg.bg, text);
+		const next = segments[i + 1];
+		if (next) {
+			// hard separator: arrow in current bg color, on next segment's bg
+			out += fgOn(seg.bg, next.bg, SEG_SEP);
+		}
+	}
+	out += fgHex(segments[segments.length - 1]!.bg, PILL_RIGHT);
+	return out;
+}
+
+function fmtTokens(n: number): string {
+	if (n < 1000) return `${n}`;
+	if (n < 1_000_000) return `${(n / 1000).toFixed(1)}k`;
+	return `${(n / 1_000_000).toFixed(2)}M`;
+}
+
+function shortPath(cwd: string): string {
+	const home = homedir();
+	if (cwd === home) return "~";
+	if (cwd.startsWith(home + "/")) return "~/" + cwd.slice(home.length + 1);
+	return cwd;
+}
+
+/**
+ * Smooth RGB gradient by remaining ratio.
+ * Anchors: 100% green → 60% yellow → 40% peach → 20% red (held below).
+ */
+const QUOTA_STOPS: [number, string][] = [
+	[1.0, LATTE.green],
+	[0.6, LATTE.yellow],
+	[0.4, LATTE.peach],
+	[0.2, LATTE.red],
+];
+
+function lerpChannel(a: number, b: number, t: number): number {
+	return Math.round(a + (b - a) * t);
+}
+
+function quotaColor(remaining: number, limit: number): string {
+	if (!Number.isFinite(remaining) || !Number.isFinite(limit) || limit <= 0) return LATTE.subtext0;
+	const r = Math.max(0, Math.min(1, remaining / limit));
+
+	// Find bracketing stops (stops are sorted high → low)
+	let upper = QUOTA_STOPS[0]!;
+	let lower = QUOTA_STOPS[QUOTA_STOPS.length - 1]!;
+	for (let i = 0; i < QUOTA_STOPS.length - 1; i++) {
+		if (r <= QUOTA_STOPS[i]![0] && r >= QUOTA_STOPS[i + 1]![0]) {
+			upper = QUOTA_STOPS[i]!;
+			lower = QUOTA_STOPS[i + 1]!;
+			break;
+		}
+	}
+	if (r > upper[0]) return upper[1];
+	if (r < lower[0]) return lower[1];
+
+	const span = upper[0] - lower[0];
+	const t = span === 0 ? 0 : (r - lower[0]) / span;
+	const [ar, ag, ab] = rgb(upper[1]);
+	const [br, bg, bb] = rgb(lower[1]);
+	const toHex = (n: number) => n.toString(16).padStart(2, "0");
+	return `#${toHex(lerpChannel(br, ar, t))}${toHex(lerpChannel(bg, ag, t))}${toHex(lerpChannel(bb, ab, t))}`;
+}
+
+/** Color for credit balance (no limit to compare against): thresholds in $. */
+function balanceColor(balance: number): string {
+	if (balance >= 10) return LATTE.green;
+	if (balance >= 5) return LATTE.yellow;
+	if (balance >= 2) return LATTE.peach;
+	return LATTE.red;
+}
+
+/** Circle fraction dial by remaining ratio (visually distinct from context bar). */
+function quotaDial(ratio: number): string {
+	if (ratio > 0.87) return "●";
+	if (ratio > 0.62) return "◕";
+	if (ratio > 0.37) return "◑";
+	if (ratio > 0.12) return "◔";
+	return "○";
+}
+
+/** Dial + colored percentage of remaining quota. */
+function quotaGauge(remaining: number, limit: number): string {
+	if (!Number.isFinite(remaining) || !Number.isFinite(limit) || limit <= 0) {
+		return fgHex(LATTE.subtext0, "—");
+	}
+	// At hard zero remaining, still show 0% (not NaN / broken ANSI).
+	const ratio = Math.max(0, Math.min(1, remaining / limit));
+	const pct = Math.round(ratio * 100);
+	const color = quotaColor(remaining, limit);
+	return `${fgHex(color, quotaDial(ratio))} ${fgHex(color, `${pct}%`)}`;
+}
+
+/** Reset time: HH:MM if <24h away, else short date. */
+function fmtReset(iso: string): string {
+	const d = new Date(iso);
+	if (Number.isNaN(d.getTime())) return "?";
+	const diffH = (d.getTime() - Date.now()) / 3_600_000;
+	if (diffH < 24) {
+		return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+	}
+	return d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric" });
+}
+
+// ── Quota polling ─────────────────────────────────────────────────────
+type KimiQuota = {
+	fiveHour: { used: number; limit: number; remaining: number; reset: string };
+	weekly: { used: number; limit: number; remaining: number; reset: string };
+};
+type OpenRouterQuota = {
+	balance: number; // account credits remaining (total_credits - total_usage)
+	weekly?: { remaining: number; limit: number }; // per-key weekly spend cap, if set
+};
+type QuotaCache = { kimi?: KimiQuota; openrouter?: OpenRouterQuota; error?: boolean };
+
+function readToken(provider: string): string | undefined {
+	try {
+		const auth = JSON.parse(readFileSync(AUTH_PATH, "utf8"));
+		return auth[provider]?.access;
+	} catch {
+		return undefined;
+	}
+}
+
+async function fetchJson(url: string, token: string): Promise<any | undefined> {
+	try {
+		const res = await fetch(url, {
+			headers: { Authorization: `Bearer ${token}` },
+			signal: AbortSignal.timeout(8000),
+		});
+		if (!res.ok) return undefined;
+		return await res.json();
+	} catch {
+		return undefined;
+	}
+}
+
+function parseKimiWindow(detail: unknown, resetFallback?: unknown): KimiQuota["fiveHour"] | undefined {
+	if (!detail || typeof detail !== "object") return undefined;
+	const d = detail as Record<string, unknown>;
+	const used = finiteNumber(d.used) ?? 0;
+	const limit = finiteNumber(d.limit);
+	const remaining =
+		finiteNumber(d.remaining) ??
+		(limit !== undefined ? Math.max(0, limit - used) : undefined);
+	const resetRaw = d.resetTime ?? d.reset_time ?? d.resetAt ?? resetFallback;
+	const reset = typeof resetRaw === "string" ? resetRaw : "";
+	if (limit === undefined || remaining === undefined) return undefined;
+	return { used, limit, remaining, reset };
+}
+
+async function pollQuotas(): Promise<QuotaCache> {
+	const cache: QuotaCache = {};
+
+	const kimiToken = readToken("kimi-coding");
+	if (kimiToken) {
+		const data = await fetchJson("https://api.kimi.com/coding/v1/usages", kimiToken);
+		const limits: unknown[] = Array.isArray(data?.limits) ? data.limits : [];
+		const fiveHourRaw = limits.find((l: unknown) => {
+			const w = (l as { window?: { duration?: number; timeUnit?: string } })?.window;
+			return w?.duration === 300 && w?.timeUnit === "TIME_UNIT_MINUTE";
+		}) as { detail?: unknown } | undefined;
+		// Weekly may live under usage, or as a TIME_UNIT_WEEK/DAY limit entry.
+		const weeklyLimitRaw = limits.find((l: unknown) => {
+			const w = (l as { window?: { timeUnit?: string; duration?: number } })?.window;
+			const unit = w?.timeUnit ?? "";
+			return (
+				unit.includes("WEEK") ||
+				unit === "TIME_UNIT_DAY" && (w?.duration ?? 0) >= 7 ||
+				(w?.duration === 10080 && unit.includes("MINUTE"))
+			);
+		}) as { detail?: unknown } | undefined;
+		const fiveHour = parseKimiWindow(fiveHourRaw?.detail ?? fiveHourRaw);
+		const weekly =
+			parseKimiWindow(data?.usage) ??
+			parseKimiWindow(weeklyLimitRaw?.detail ?? weeklyLimitRaw);
+		if (fiveHour && weekly) {
+			cache.kimi = { fiveHour, weekly };
+		} else if (fiveHour) {
+			// Show 5h alone rather than nothing / NaN when weekly shape drifts at 0.
+			cache.kimi = {
+				fiveHour,
+				weekly: { used: 0, limit: 0, remaining: 0, reset: "" },
+			};
+		}
+	}
+
+	const orToken = readToken("openrouter");
+	if (orToken) {
+		const creditsData = await fetchJson("https://openrouter.ai/api/v1/credits", orToken);
+		const keyData = await fetchJson("https://openrouter.ai/api/v1/auth/key", orToken);
+		const c = creditsData?.data;
+		if (c && typeof c.total_credits === "number") {
+			const quota: OpenRouterQuota = {
+				balance: Math.max(0, c.total_credits - (c.total_usage ?? 0)),
+			};
+			const k = keyData?.data;
+			if (k && typeof k.limit === "number" && typeof k.limit_remaining === "number") {
+				quota.weekly = { remaining: k.limit_remaining, limit: k.limit };
+			}
+			cache.openrouter = quota;
+		}
+	}
+
+	return cache;
+}
+
+// ── Git status polling ──────────────────────────────────────────────
+type GitStatus = {
+	modified: number; // unstaged modified
+	staged: number; // staged (added/modified/renamed)
+	deleted: number; // unstaged deleted
+	untracked: number;
+	stash: number;
+	ahead: number;
+	behind: number;
+};
+
+/** Parse `git status --porcelain=v2 --branch` + stash list. Returns null outside a repo. */
+async function fetchGitStatus(cwd: string): Promise<GitStatus | null> {
+	try {
+		const [{ stdout }, { stdout: stashOut }] = await Promise.all([
+			execFileAsync("git", ["status", "--porcelain=v2", "--branch"], {
+				cwd,
+				timeout: 5000,
+			}),
+			execFileAsync("git", ["stash", "list"], { cwd, timeout: 5000 }),
+		]);
+		const status: GitStatus = {
+			modified: 0,
+			staged: 0,
+			deleted: 0,
+			untracked: 0,
+			stash: stashOut.trim() === "" ? 0 : stashOut.trim().split("\n").length,
+			ahead: 0,
+			behind: 0,
+		};
+		for (const line of stdout.split("\n")) {
+			if (line.startsWith("# branch.ab")) {
+				const m = line.match(/\+(\d+)\s+-(\d+)/);
+				if (m) {
+					status.ahead = Number(m[1]);
+					status.behind = Number(m[2]);
+				}
+				continue;
+			}
+			if (line.startsWith("? ")) {
+				status.untracked++;
+				continue;
+			}
+			// Ordinary entries: `1 <XY> ...`, renamed: `2 <XY> ...`
+			if (line.startsWith("1 ") || line.startsWith("2 ")) {
+				const xy = line.slice(2, 4);
+				const x = xy[0]!; // staged
+				const y = xy[1]!; // unstaged
+				if (x !== "." && x !== " ") status.staged++;
+				if (y === "M") status.modified++;
+				else if (y === "D") status.deleted++;
+			}
+		}
+		return status;
+	} catch {
+		return null;
+	}
+}
+
+const GIT_BAR_WIDTH = 10;
+
+/** Block glyph for a 0–1 fill ratio within one cell. "" when empty. */
+function ratioGlyph(ratio: number): string {
+	if (ratio <= 0) return "";
+	if (ratio <= 0.125) return "▁";
+	if (ratio <= 0.25) return "▂";
+	if (ratio <= 0.375) return "▃";
+	if (ratio <= 0.5) return "▄";
+	if (ratio <= 0.625) return "▅";
+	if (ratio <= 0.75) return "▆";
+	if (ratio <= 0.875) return "▇";
+	return "█";
+}
+
+/** Proportional ascii bar of the working tree: each change type gets a colored share. */
+function gitBar(s: GitStatus): string {
+	const frame = (inner: string) =>
+		fgHex(LATTE.subtext0, "▕") + inner + fgHex(LATTE.subtext0, "▏");
+	const cats: { count: number; color: string }[] = [
+		{ count: s.staged, color: LATTE.green },
+		{ count: s.modified, color: LATTE.yellow },
+		{ count: s.deleted, color: LATTE.red },
+		{ count: s.untracked, color: LATTE.overlay1 },
+	];
+	const total = cats.reduce((acc, c) => acc + c.count, 0);
+	if (total === 0) return frame(fgHex(LATTE.surface1, BAR_EMPTY.repeat(GIT_BAR_WIDTH)));
+
+	// Split the width proportionally (largest remainder), keeping a fractional
+	// leftover so the bar always spans the full width via one partial glyph.
+	const exact = cats.map((c) => (c.count / total) * GIT_BAR_WIDTH);
+	const floors = exact.map(Math.floor);
+	let used = floors.reduce((a, b) => a + b, 0);
+	const byRemainder = cats
+		.map((c, i) => ({ i, rem: exact[i]! - floors[i]! }))
+		.filter((r) => cats[r.i]!.count > 0)
+		.sort((a, b) => b.rem - a.rem);
+	for (const r of byRemainder) {
+		if (used >= GIT_BAR_WIDTH) break;
+		floors[r.i]!++;
+		used++;
+	}
+	let bar = "";
+	let partialColor: string | undefined;
+	let partialRatio = 0;
+	for (let i = 0; i < cats.length; i++) {
+		if (cats[i]!.count === 0) continue;
+		bar += fgHex(cats[i]!.color, BAR_FULL.repeat(floors[i]!));
+		const frac = exact[i]! - Math.floor(exact[i]!);
+		if (frac > 0.05) {
+			partialColor = cats[i]!.color;
+			partialRatio = frac;
+		}
+	}
+	if (partialColor) bar += fgHex(partialColor, ratioGlyph(partialRatio));
+	return frame(bar);
+}
+
+/** Left side of line 2: ascii-style git summary with proportional bar + counters. */
+function gitLine(s: GitStatus | null): string {
+	const dim = (t: string) => fgHex(LATTE.subtext0, t);
+	if (s === null) return `${dim("git")} ${dim("—")}`;
+	const clean =
+		s.staged + s.modified + s.deleted + s.untracked + s.stash + s.ahead + s.behind === 0;
+	if (clean) return `${dim("git")} ${fgHex(LATTE.green, "✓")}${dim(" clean")}`;
+	const counters: string[] = [];
+	if (s.ahead > 0) counters.push(fgHex(LATTE.mauve, `⇡${s.ahead}`));
+	if (s.behind > 0) counters.push(fgHex(LATTE.mauve, `⇣${s.behind}`));
+	if (s.staged > 0) counters.push(fgHex(LATTE.green, `+${s.staged}`));
+	if (s.modified > 0) counters.push(fgHex(LATTE.yellow, `~${s.modified}`));
+	if (s.deleted > 0) counters.push(fgHex(LATTE.red, `-${s.deleted}`));
+	if (s.untracked > 0) counters.push(fgHex(LATTE.overlay1, `?${s.untracked}`));
+	if (s.stash > 0) counters.push(fgHex(LATTE.sapphire, `≡${s.stash}`));
+	return `${dim("git")} ${gitBar(s)} ${counters.join(dim("·") + " ")}`;
+}
+
+export default function (pi: ExtensionAPI) {
+	let enabled = true;
+	let requestRender: (() => void) | undefined;
+	let quotaCache: QuotaCache = {};
+	let pollTimer: ReturnType<typeof setInterval> | undefined;
+	let gitCache: GitStatus | null = null;
+	let gitTimer: ReturnType<typeof setInterval> | undefined;
+	let gitCwd: string | undefined;
+	let footerInstalled = false;
+
+	async function refreshQuotas() {
+		quotaCache = await pollQuotas();
+		requestRender?.();
+	}
+
+	function startPolling() {
+		if (pollTimer) return;
+		refreshQuotas();
+		pollTimer = setInterval(refreshQuotas, QUOTA_POLL_MS);
+		pollTimer.unref?.();
+	}
+
+	async function refreshGit(cwd: string) {
+		gitCache = await fetchGitStatus(cwd);
+		requestRender?.();
+	}
+
+	function startGitPolling(cwd: string) {
+		gitCwd = cwd;
+		if (gitTimer) {
+			refreshGit(cwd);
+			return;
+		}
+		refreshGit(cwd);
+		gitTimer = setInterval(() => {
+			if (gitCwd) refreshGit(gitCwd);
+		}, GIT_POLL_MS);
+		gitTimer.unref?.();
+	}
+
+	function setup(ctx: ExtensionContext) {
+		if (!enabled) return;
+		startPolling();
+		startGitPolling(ctx.cwd ?? process.cwd());
+
+		// Only install the footer component once — re-setFooter on every
+		// session_start / toggle stacks ghost rows with the split-footer renderer.
+		if (footerInstalled) {
+			requestRender?.();
+			return;
+		}
+		footerInstalled = true;
+
+		ctx.ui.setFooter((tui: TUI, theme: Theme, footerData: ReadonlyFooterDataProvider) => {
+			requestRender = () => tui.requestRender();
+			const unsubBranch = footerData.onBranchChange(() => tui.requestRender());
+
+			return {
+				dispose() {
+					unsubBranch();
+					footerInstalled = false;
+					requestRender = undefined;
+				},
+				invalidate() {},
+				render(width: number): string[] {
+					// ── Line 1, left: model+thinking · path+branch ──
+					const model = ctx.model?.id || "no-model";
+					let thinking = "off";
+					try {
+						thinking = ctx.thinkingLevel ?? "off";
+					} catch {}
+					const modelGroup = powerline([
+						{ bg: LATTE.mauve, label: model, icon: ICONS.model },
+						{
+							bg: THINKING_COLORS[thinking] ?? LATTE.overlay1,
+							label: thinking,
+							icon: ICONS.thinking,
+						},
+					]);
+
+					const cwd = shortPath(ctx.cwd ?? process.cwd());
+					const branch = footerData.getGitBranch();
+					const pathSegs: Segment[] = [
+						{ bg: LATTE.teal, label: cwd, icon: ICONS.folder },
+					];
+					if (branch) pathSegs.push({ bg: LATTE.sapphire, label: branch, icon: ICONS.branch });
+					const pathGroup = powerline(pathSegs);
+
+					const left = `${modelGroup} ${pathGroup}`;
+
+					// ── Line 1, right: statuses · context bar + exact tokens · tokens · cost ──
+					let input = 0,
+						output = 0,
+						cost = 0;
+					for (const e of ctx.sessionManager.getBranch()) {
+						if (e.type === "message" && e.message.role === "assistant") {
+							const m = e.message as AssistantMessage;
+							input += m.usage.input;
+							output += m.usage.output;
+							cost += m.usage.cost.total;
+						}
+					}
+
+					let ctxPart = "";
+					const usage = ctx.getContextUsage?.();
+					if (usage?.percent != null) {
+						const pct = Math.round(usage.percent);
+						const filled = Math.round((usage.percent / 100) * BAR_WIDTH);
+						const barColor =
+							usage.percent < 50 ? LATTE.green : usage.percent < 80 ? LATTE.peach : LATTE.red;
+						const bar =
+							fgHex(barColor, BAR_FULL.repeat(filled)) +
+							fgHex(LATTE.surface1, BAR_EMPTY.repeat(BAR_WIDTH - filled));
+						const exact =
+							usage.tokens != null
+								? ` ${fgHex(LATTE.overlay1, `${fmtTokens(usage.tokens)}/${fmtTokens(usage.contextWindow)}`)}`
+								: "";
+						ctxPart = `${fgHex(LATTE.overlay1, ICONS.context)} ${bar} ${fgHex(barColor, `${pct}%`)}${exact}`;
+					}
+
+					const tokPart = theme.fg(
+						"dim",
+						`↑${fmtTokens(input)} ↓${fmtTokens(output)}  $${cost.toFixed(3)}`,
+					);
+
+					const statuses = [...footerData.getExtensionStatuses().values()].filter(Boolean);
+					const statusPart = statuses.join("  ");
+
+					const right = [statusPart, ctxPart, tokPart].filter(Boolean).join("  ");
+
+					const pad = " ".repeat(Math.max(1, width - visibleWidth(left) - visibleWidth(right)));
+					const line1 = truncateToWidth(left + pad + right, width);
+
+					// ── Line 2: git summary (left) · provider quota (right) ──
+					const lines = [line1];
+					const gitPart = gitLine(gitCache);
+					const dim = (s: string) => fgHex(LATTE.subtext0, s);
+					const provider = (ctx.model?.provider ?? "").toLowerCase();
+					// Show the active provider's quota; fall back to both if unmatched
+					const showKimi = provider.includes("kimi") || (!provider.includes("openrouter") && !provider);
+					const showOr = provider.includes("openrouter");
+					const showAll = !showKimi && !showOr;
+
+					const quotaParts: string[] = [];
+
+					if (quotaCache.kimi && (showKimi || showAll)) {
+						const { fiveHour, weekly } = quotaCache.kimi;
+						let part =
+							`${dim("kimi 5h")} ${quotaGauge(fiveHour.remaining, fiveHour.limit)}`;
+						if (fiveHour.reset) {
+							part += ` ${dim(`${ICONS.reset} ${fmtReset(fiveHour.reset)}`)}`;
+						}
+						// limit 0 = unknown / absent weekly — skip rather than emit junk
+						if (Number.isFinite(weekly.limit) && weekly.limit > 0) {
+							part +=
+								`   ${dim("sem")} ${quotaGauge(weekly.remaining, weekly.limit)}`;
+							if (weekly.reset) {
+								part += ` ${dim(`${ICONS.reset} ${fmtReset(weekly.reset)}`)}`;
+							}
+						}
+						quotaParts.push(part);
+					}
+
+					if (quotaCache.openrouter && (showOr || showAll)) {
+						const orq = quotaCache.openrouter;
+						const col = balanceColor(orq.balance);
+						let part =
+							`${dim("openrouter")} ${fgHex(col, "◉")} ${fgHex(col, `$${orq.balance.toFixed(2)}`)}` +
+							` ${dim("crédits")}`;
+						if (orq.weekly) {
+							part +=
+								`   ${dim("hebdo")} ${quotaGauge(orq.weekly.remaining, orq.weekly.limit)}`;
+						}
+						quotaParts.push(part);
+					}
+
+					{
+						const quotaContent =
+							quotaParts.length > 0
+								? `${fgHex(LATTE.overlay1, ICONS.quota)} ${quotaParts.join(dim("   ·   "))}`
+								: "";
+						const pad2 = " ".repeat(
+							Math.max(1, width - visibleWidth(gitPart) - visibleWidth(quotaContent)),
+						);
+						lines.push(truncateToWidth(gitPart + pad2 + quotaContent, width));
+					}
+
+					return lines;
+				},
+			};
+		});
+	}
+
+	pi.on("session_start", async (_event, ctx) => {
+		setup(ctx);
+	});
+
+	// Refresh stats after each turn
+	pi.on("turn_end", async () => requestRender?.());
+	pi.on("agent_end", async () => requestRender?.());
+	pi.on("thinking_level_select", async () => requestRender?.());
+	pi.on("model_select", async () => requestRender?.());
+
+	pi.registerCommand("latte-footer", {
+		description: "Toggle the Catppuccin Latte powerline footer",
+		handler: async (_args, ctx) => {
+			enabled = !enabled;
+			if (enabled) {
+				footerInstalled = false;
+				setup(ctx);
+				ctx.ui.notify("Latte footer enabled", "info");
+			} else {
+				ctx.ui.setFooter(undefined);
+				footerInstalled = false;
+				requestRender = undefined;
+				ctx.ui.notify("Default footer restored", "info");
+			}
+		},
+	});
+
+	pi.registerCommand("latte-quota", {
+		description: "Force-refresh provider quota display",
+		handler: async (_args, ctx) => {
+			await refreshQuotas();
+			ctx.ui.notify("Quotas refreshed", "info");
+		},
+	});
+}

@@ -1,7 +1,7 @@
 {
-  "defaultProvider": "kimi-coding",
-  "defaultModel": "k3",
-  "defaultThinkingLevel": "max",
+  "defaultProvider": "openrouter",
+  "defaultModel": "deepseek/deepseek-v4-flash",
+  "defaultThinkingLevel": "high",
   "npmCommand": [
     "pnpm",
     "--config.strict-dep-builds=false"
@@ -19,7 +19,7 @@
     "kimi-coding/k3",
     "kimi-coding/k3-256k",
     "openrouter/deepseek/deepseek-v4-flash",
-    "xai/grok-4.5"
+    "openrouter/x-ai/grok-4.5"
   ],
-  "hideThinkingBlock": true
+  "hideThinkingBlock": false
 }

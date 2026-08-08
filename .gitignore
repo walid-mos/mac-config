@@ -33,9 +33,14 @@ docker/.docker/.token_seed.lock
 docker/.docker/buildx/
 docker/.docker/contexts/
 
-# pi: only version settings.json; auth.json contient les tokens, le reste est du runtime
+# pi: version la config authored (settings, extensions, skills, themes, AGENTS.md) ;
+# auth.json contient les tokens, sessions/ et le reste sont du runtime
 pi/.pi/agent/*
 !pi/.pi/agent/settings.json
+!pi/.pi/agent/AGENTS.md
+!pi/.pi/agent/extensions/
+!pi/.pi/agent/skills/
+!pi/.pi/agent/themes/
 
 # RTK: only version config.toml; ignore any runtime/cache data in the package
 rtk/Library/Application Support/rtk/*

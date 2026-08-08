@@ -22,7 +22,7 @@ OBSIDIAN_VAULT_DIR := $(HOME)/Library/Mobile Documents/iCloud~md~obsidian/Docume
 OBSIDIAN_VAULT := $(OBSIDIAN_VAULT_DIR)/.obsidian
 OBSIDIAN_PLUGIN_DATA := obsidian-style-settings obsidian-hider obsidian-icon-folder settings-search shiki-highlighter folder-notes
 
-.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) claude-post nvim-post pi-dirs pi-post rp-post rtk-post obsidian obsidian-save obsidian-post proxy-reset
+.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) claude-post nvim-post pi-dirs pi-post rp-post rtk-post rust-post obsidian obsidian-save obsidian-post proxy-reset
 
 help:
 	@echo "Targets:"
@@ -71,7 +71,7 @@ brew-bundle:
 	@echo "→ brew bundle (Brewfile)"
 	@brew bundle --file=Brewfile
 
-install all: $(PACKAGES) claude-post nvim-post pi-post rp-post rtk-post obsidian obsidian-post
+install all: $(PACKAGES) claude-post nvim-post pi-post rp-post rtk-post rust-post obsidian obsidian-post
 
 unstow:
 	@for pkg in $(PACKAGES); do $(STOW) -D $$pkg; done
@@ -170,6 +170,17 @@ obsidian-post:
 		brew list --cask font-inter >/dev/null 2>&1 || brew install --cask font-inter; \
 	else echo "brew indisponible — installe les fonts iA Writer Quattro et Inter à la main"; fi
 	@echo "thème + plugins prêts — au premier lancement par machine : Settings → Community plugins → désactiver Restricted mode"
+
+# rustup gère sa propre toolchain (~/.rustup, ~/.cargo) hors Stow ; c'est lui qui
+# pose ~/.cargo/env sourcé par zsh/.zshenv. Installer non-interactif, profil par
+# défaut, toolchain stable. Rejouable : si cargo est déjà là on ne touche à rien.
+rust-post:
+	@if ! command -v cargo >/dev/null && [[ ! -f "$(HOME)/.cargo/env" ]]; then \
+		echo "→ installation de rustup (toolchain stable)"; \
+		curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-toolchain stable; \
+	fi
+	@[[ -f "$(HOME)/.cargo/env" ]] && echo "rust prêt: $$("$(HOME)/.cargo/bin/rustc" --version 2>/dev/null)" \
+		|| echo "rust non installé — étape ignorée"
 
 rtk-post:
 	@if ! command -v rtk >/dev/null; then \

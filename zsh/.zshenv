@@ -20,7 +20,7 @@ export PATH="$HOME/.local/bin:$PATH"
 
 # Custom functions
 fpath=(~/.config/zsh/functions $fpath)
-. "$HOME/.cargo/env"
+[[ -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"
 
 # Secrets (API keys, tokens) — loaded for ALL shells incl. non-interactive (hooks, scripts)
 [[ -f ~/.config/zsh/secrets ]] && source ~/.config/zsh/secrets

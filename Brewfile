@@ -38,6 +38,7 @@ brew "libpq"
 # Cloud & sync
 brew "flarectl"
 brew "rclone"
+cask "tailscale-app"
 
 # Casks
 cask "ghostty"

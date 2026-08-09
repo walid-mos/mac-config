@@ -1,78 +1,78 @@
 {
-  "agentPushNotifEnabled": true,
   "attribution": {
     "commit": "",
     "pr": ""
   },
-  "autoMemoryEnabled": false,
+  "permissions": {
+    "defaultMode": "auto"
+  },
+  "model": "claude-opus-4-8",
   "disableClaudeAiConnectors": true,
-  "editorMode": "normal",
-  "effortLevel": "high",
-  "enabledPlugins": {
-    "impeccable@impeccable": true
-  },
-  "extraKnownMarketplaces": {
-    "impeccable": {
-      "source": {
-        "repo": "pbakaus/impeccable",
-        "source": "github"
-      }
-    }
-  },
   "hooks": {
     "PreToolUse": [
       {
+        "matcher": "Bash",
         "hooks": [
           {
-            "command": "rtk hook claude",
-            "type": "command"
+            "type": "command",
+            "command": "rtk hook claude"
           },
           {
-            "command": "bash ~/.claude/hooks/pnpm-guard.sh",
-            "type": "command"
+            "type": "command",
+            "command": "bash ~/.claude/hooks/pnpm-guard.sh"
           }
-        ],
-        "matcher": "Bash"
+        ]
       }
     ],
     "SessionStart": [
       {
+        "matcher": "*",
         "hooks": [
           {
+            "type": "command",
             "command": "bash '/Users/walid-mos/.claude/hooks/herdr-agent-state.sh' session",
-            "timeout": 10,
-            "type": "command"
+            "timeout": 10
           }
-        ],
-        "matcher": "*"
+        ]
       }
     ],
     "UserPromptSubmit": [
       {
         "hooks": [
           {
-            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"UserPromptSubmit\",\"additionalContext\":\"Rappel : mode terse actif (règles complètes dans TERSE.md) — sauf si /terse a été invoqué dans cette conversation pour le désactiver.\"}}'",
-            "type": "command"
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"UserPromptSubmit\",\"additionalContext\":\"Rappel : mode terse actif (règles complètes dans TERSE.md) — sauf si /terse a été invoqué dans cette conversation pour le désactiver.\"}}'"
           }
         ]
       }
     ]
   },
-  "inputNeededNotifEnabled": true,
-  "model": "claude-opus-4-8",
-  "permissions": {
-    "defaultMode": "auto"
-  },
-  "preferredNotifChannel": "auto",
-  "remoteControlAtStartup": true,
-  "skipWorkflowUsageWarning": true,
-  "statusLine": {
-    "command": "bash ~/.claude/statusline-command.sh",
-    "type": "command"
-  },
-  "theme": "auto",
-  "tui": "fullscreen",
   "worktree": {
     "baseRef": "fresh"
-  }
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "bash ~/.claude/statusline-command.sh"
+  },
+  "enabledPlugins": {
+    "impeccable@impeccable": true
+  },
+  "extraKnownMarketplaces": {
+    "impeccable": {
+      "source": {
+        "source": "github",
+        "repo": "pbakaus/impeccable"
+      }
+    }
+  },
+  "effortLevel": "high",
+  "tui": "fullscreen",
+  "autoMemoryEnabled": false,
+  "skipWorkflowUsageWarning": true,
+  "theme": "auto",
+  "editorMode": "normal",
+  "preferredNotifChannel": "auto",
+  "remoteControlAtStartup": true,
+  "inputNeededNotifEnabled": true,
+  "agentPushNotifEnabled": true
 }

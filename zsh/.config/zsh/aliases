@@ -5,6 +5,9 @@
 alias szsh="source ~/.zshenv && source ~/.zshrc"
 alias getip="ifconfig | grep \"inet \" | grep -v 127.0.0.1"
 
+# Terminal - full clear (Cmd+K equivalent: screen + scrollback)
+alias k="clear && printf $'\\e[3J'"
+
 # Git - unalias OMZ conflicts
 unalias gf 2>/dev/null
 unalias gl 2>/dev/null

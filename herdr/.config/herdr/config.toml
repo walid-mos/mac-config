@@ -14,7 +14,7 @@ surface0 = "#e6e9ef"
 
 [ui]
 show_agent_labels_on_pane_borders = true
-mouse_capture = false
+mouse_capture = true
 accent = "#8839ef" # mauve Latte, aligné sur l'accent du thème pi
 pane_gaps = false # dividers fins partagés au lieu de doubles bordures épaisses
 pane_scrollbars = false # récupère la colonne réservée aux scrollbars
@@ -28,16 +28,27 @@ rows = [
 ]
 
 [keys]
+# Prefix pour les actions rares (resize, copy, detach, help). ctrl+space :
+# ergonomique, zéro conflit shell (ctrl+a écraserait le début-de-ligne readline).
+prefix = "ctrl+space"
+
 # Toggle entre les 2 derniers panes focus (éditeur ↔ agent)
 last_pane = "prefix+space"
 
-# Hiérarchie de navigation : tab = workspaces, [ ] = tabs, hjkl = panes
-next_workspace = "prefix+tab"
-previous_workspace = "prefix+shift+tab"
-next_tab = "prefix+]"
-previous_tab = "prefix+["
-copy_mode = "prefix+shift+c"  # déplacé : prefix+[ appartient aux tabs
-cycle_pane_next = ""          # hjkl + last_pane suffisent
+# Deux couches de chiffres, tout en direct : ctrl = tabs (fréquent, combo le plus
+# fiable), alt = workspaces. ctrl+t / alt+t = nouveau tab / nouveau workspace.
+# Le prefix reste en second dans chaque array : fallback si un chord direct ne
+# passe pas (ctrl+ponctuation dépend de la négo CSI-u ghostty↔herdr).
+switch_tab = ["ctrl+1..9", "prefix+1..9"]
+switch_workspace = ["alt+1..9", "prefix+shift+1..9"]
+new_tab = ["ctrl+t", "prefix+c"]
+next_tab = ["cmd+]", "prefix+]"]
+previous_tab = ["cmd+[", "prefix+["]
+new_workspace = ["alt+t", "prefix+shift+n"]
+next_workspace = ["alt+tab", "prefix+tab"]
+previous_workspace = ["alt+shift+tab", "prefix+shift+tab"]
+copy_mode = "prefix+shift+c"
+cycle_pane_next = ""
 cycle_pane_previous = ""
 
 # Navigate mode (prefix+w) : hjkl = panes (persistant), JK = workspaces
@@ -45,3 +56,33 @@ navigate_workspace_up = "shift+k"
 navigate_workspace_down = "shift+j"
 navigate_pane_up = "k"
 navigate_pane_down = "j"
+
+# Splits directs, muscle memory ghostty (n = pane à droite, v = pane en bas).
+# alt+... passe car ghostty a macos-option-as-alt = left.
+split_vertical = "alt+n"
+split_horizontal = "alt+v"
+close_pane = "alt+x"
+# Resize reste prefix+r (mode). Tabs = ctrl+chiffre, workspaces = alt+chiffre.
+
+# Navigation vim-aware nvim <-> herdr via le plugin aimdevlee/herdr-nvim-nav.
+# Reconstruit le performable de ghostty, que herdr n'a pas : herdr lit un marker
+# de pane, forwarde la frappe au nvim par socket sinon déplace le focus de pane.
+[[keys.command]]
+key = "alt+h"
+type = "plugin_action"
+command = "herdr-nvim-nav.left"
+
+[[keys.command]]
+key = "alt+j"
+type = "plugin_action"
+command = "herdr-nvim-nav.down"
+
+[[keys.command]]
+key = "alt+k"
+type = "plugin_action"
+command = "herdr-nvim-nav.up"
+
+[[keys.command]]
+key = "alt+l"
+type = "plugin_action"
+command = "herdr-nvim-nav.right"

@@ -20,11 +20,9 @@ end, { desc = "Previous error" })
 vim.keymap.set("n", "<leader>sh", "<cmd>vsplit<CR>", { desc = "Split right" })
 vim.keymap.set("n", "<leader>sv", "<cmd>split<CR>", { desc = "Split below" })
 
--- Split navigation (Alt+hjkl) — shared with Ghostty's performable:goto_split
-vim.keymap.set("n", "<A-h>", "<C-w>h", { desc = "Go to left split" })
-vim.keymap.set("n", "<A-j>", "<C-w>j", { desc = "Go to lower split" })
-vim.keymap.set("n", "<A-k>", "<C-w>k", { desc = "Go to upper split" })
-vim.keymap.set("n", "<A-l>", "<C-w>l", { desc = "Go to right split" })
+-- Split navigation is owned by the herdr-nvim-nav plugin (lua/plugins/herdr-nav.lua).
+-- herdr's alt+hjkl trigger forwards a hardcoded ctrl+hjkl into nvim, so the plugin
+-- must bind ctrl+hjkl here — alt would never fire.
 
 -- Toggle dark/light mode (catppuccin reacts to vim.o.background)
 vim.keymap.set("n", "<leader>tb", function()

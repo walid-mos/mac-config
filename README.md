@@ -4,28 +4,12 @@ macOS dotfiles managed with [GNU Stow](https://www.gnu.org/software/stow/) + a M
 
 ## Layout
 
-Each top-level directory is a **Stow package** whose internal tree mirrors `$HOME`:
+**Every top-level directory is a Stow package** whose internal tree mirrors `$HOME` — the package list is derived from the filesystem by the Makefile (`make help` shows it). Only two exceptions, listed in `NONSTOW`: `docs/` (documentation) and `obsidian/` (custom iCloud target, own Make target).
 
-```
-.stow_repository/
-├── Makefile              # stow orchestrator + post-install hooks
-├── cmux/.config/cmux/    # cmux config
-├── colima/.config/colima # colima config (template _templates/)
-├── docker/.docker/       # Docker CLI config
-├── gh/.config/gh/        # GitHub CLI config.yml (hosts.yml = token, ignored)
-├── ghostty/.config/ghostty
-├── git/                  # .gitconfig + .config/git/ignore
-├── homebrew/.config/homebrew # approved tap formulae (trust.json)
-├── languages/.local/     # manually installed binaries (see languages/README.md)
-├── nvim/.config/nvim/    # Neovim config
-├── opencode/.config/opencode
-├── pi/.pi/agent/          # settings.json of the pi CLI agent (auth + sessions ignored)
-├── rclone/.config/rclone/ # rclone.conf (R2 remote via env_auth, no secrets)
-├── rectangle/Library/    # Rectangle config (window manager)
-├── obsidian/Brain/       # Obsidian "Brain" vault config (see below)
-├── starship/.config/     # prompt
-└── zsh/                  # .zshenv, .zshrc, .zprofile, .config/zsh
-```
+Two invariants carry all the knowledge:
+
+- **`NOFOLD`** (Makefile) — packages whose target directory also receives files *written by the tool* (`gh/hosts.yml` token, `pi/auth.json` + sessions, `~/.claude` runtime, `colima/_lima`, `docker/buildx`, `rtk/history.db`, `~/.local/bin` shared with pnpm/fnm, …). Stow is run with `--no-folding` for them: the target stays a real directory outside the repo, only authored files are symlinked, so runtime and secrets can never land in the working tree. This mechanism replaces per-tool `.gitignore` blocks — prevention instead of exclusion.
+- **`.gitignore`** — reduced to genuine secrets (`zsh/.config/zsh/secrets`) and generic noise; runtime paths need no rule because NOFOLD keeps them out of the repo entirely.
 
 **`pi/` package**: `make pi` stows `~/.pi/agent/settings.json`, `make pi-post` installs the CLI (`pnpm add -g @earendil-works/pi-coding-agent`) if missing. Auth happens on first launch (`pi` then `/login`) and lives in `~/.pi/agent/auth.json`, never versioned. pi writes through the symlink when a setting changes via `/settings`: the diff shows up directly in the repo — review before committing.
 
@@ -68,7 +52,7 @@ Hand-curated list of a fresh mac's packages (34 → selection). **Do not regener
 | `make bootstrap`  | Fresh mac from scratch: Xcode CLT + Homebrew + `brew bundle` + `install` |
 | `make brew-bundle`| Installs the `Brewfile` packages (formulae + casks)                   |
 | `make`, `make install` | Stows every package + runs all post-install hooks                |
-| `make <package>`  | Stows a single package (`make nvim`, `make zsh`, …)                   |
+| `make <package>`  | (Re)stows a single package (`make nvim`, `make zsh`, …) — idempotent `-R` |
 | `make restow`     | Rebuilds the symlinks (useful after adding/removing files)            |
 | `make unstow`     | Removes all symlinks                                                  |
 | `make obsidian`   | Stows the `.obsidian` config into the Brain vault (custom iCloud target) |
@@ -78,14 +62,13 @@ Hand-curated list of a fresh mac's packages (34 → selection). **Do not regener
 
 ## Conventions
 
-- **No runtime data committed.** Anything generated at runtime (caches, session data, temp files) is explicitly ignored in `.gitignore`.
+- **No runtime data in the repo.** Packages whose target dir receives tool-written files are in `NOFOLD` — the runtime physically cannot reach the working tree (see Layout).
 - **Secrets.** `zsh/.config/zsh/secrets` is gitignored. Every API key lives in that file or in the macOS keychain.
-- **Stow has no native hooks.** All post-install goes through the Makefile (`<package>-post`).
+- **Stow has no native hooks.** All post-install goes through the Makefile (`<package>-post`, listed in `POSTS`).
 
 ## Adding a new package
 
-1. Create the directory at the repo root, mirroring the target tree from `$HOME`.
-2. Add it to the `PACKAGES` variable in the `Makefile`.
-3. If the tool writes other files into the target directory (token, lock, state), also add the package to `NOFOLD`: without `--no-folding`, Stow folds the whole directory into a symlink and the tool ends up writing its secrets into the repo.
-4. If a post-install step is needed, add a `<package>-post` target and chain it into the `install` target.
-5. `make <package>` then check the symlinks with `ls -la $HOME`.
+1. Create the directory at the repo root, mirroring the target tree from `$HOME` — it is picked up automatically (`PACKAGES` is derived from the filesystem).
+2. If the tool writes other files into the target directory (token, lock, state), add the package to `NOFOLD`: without `--no-folding`, Stow folds the whole directory into a symlink and the tool ends up writing its secrets into the repo.
+3. If a post-install step is needed, add a `<package>-post` target and its name to `POSTS`.
+4. `make <package>` then check the symlinks with `ls -la $HOME`.

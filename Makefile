@@ -8,22 +8,41 @@ SHELL := /usr/bin/env bash
 export PATH := /opt/homebrew/bin:/usr/local/bin:$(PATH)
 
 STOW := stow -t $(HOME)
-PACKAGES := claude cmux colima docker gh ghostty git herdr homebrew languages nvim opencode pi rclone rectangle rp rtk starship zsh
+
+# Chaque dossier à la racine du repo est un package Stow — ajouter un dossier
+# suffit à le rendre stowable. NONSTOW liste les seules exceptions : docs
+# (documentation) et obsidian (cible custom iCloud, stowé par sa propre cible).
+NONSTOW := docs obsidian
+PACKAGES := $(filter-out $(NONSTOW),$(patsubst %/,%,$(wildcard */)))
 
 # Packages dont le dossier cible reçoit aussi des fichiers écrits par l'outil
-# (gh/hosts.yml, homebrew/trust.json.lock, pi/auth.json + models-store.json + sessions, …) :
-# sans --no-folding Stow replierait le dossier entier en symlink et l'outil écrirait
-# ses secrets/runtime dans le repo (puis un unstow les casserait).
-NOFOLD := claude gh git herdr homebrew pi rclone
+# (gh/hosts.yml, pi/auth.json + sessions, claude/projects + cache, colima/_lima,
+# docker/buildx + contexts, rtk/history.db, git/credentials via credential-store
+# XDG, languages/.local/bin partagé avec pnpm/fnm) : sans --no-folding Stow
+# replierait le dossier entier en symlink et l'outil écrirait ses secrets et son
+# runtime dans le repo (puis un unstow les casserait).
+NOFOLD := claude colima docker gh git herdr homebrew languages pi rclone rtk
+
+# Hooks post-install chaînés par `make install` (cible <nom>-post ; rust n'a pas
+# de package Stow, rustup gère ~/.rustup et ~/.cargo lui-même).
+POSTS := claude gh herdr nvim pi rp rtk rust
 
 # Obsidian : le vault vit dans iCloud, seule la config .obsidian est stowée
 # (symlinks relatifs → portables entre machines). Les binaires (thème, plugins,
-# fonts) ne sont pas versionnés : obsidian-post les installe.
+# fonts) ne sont pas versionnés : obsidian-post les installe depuis cette liste
+# unique id=owner/repo — les data dirs des plugins en sont dérivés.
 OBSIDIAN_VAULT_DIR := $(HOME)/Library/Mobile Documents/iCloud~md~obsidian/Documents/Brain
 OBSIDIAN_VAULT := $(OBSIDIAN_VAULT_DIR)/.obsidian
-OBSIDIAN_PLUGIN_DATA := obsidian-style-settings obsidian-hider obsidian-icon-folder settings-search shiki-highlighter folder-notes
+OBSIDIAN_PLUGINS := \
+	obsidian-style-settings=obsidian-community/obsidian-style-settings \
+	obsidian-hider=kepano/obsidian-hider \
+	obsidian-icon-folder=florianwoelki/obsidian-iconize \
+	settings-search=javalent/settings-search \
+	shiki-highlighter=mprojectscode/obsidian-shiki-plugin \
+	folder-notes=LostPaul/obsidian-folder-notes
+OBSIDIAN_PLUGIN_DATA := $(foreach spec,$(OBSIDIAN_PLUGINS),$(firstword $(subst =, ,$(spec))))
 
-.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) claude-post gh-post nvim-post pi-dirs pi-post rp-post rtk-post rust-post obsidian obsidian-save obsidian-post proxy-reset
+.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs obsidian obsidian-save obsidian-post proxy-reset
 
 help:
 	@echo "Targets:"
@@ -32,8 +51,8 @@ help:
 	@echo "  install      Stow every package and run all post-install hooks"
 	@echo "  all          Alias of install"
 	@echo "  unstow       Unstow every package"
-	@echo "  restow       Restow every package (-R)"
-	@echo "  <package>    Stow a single package (e.g. make nvim)"
+	@echo "  restow       Restow every package"
+	@echo "  <package>    (Re)stow a single package (e.g. make nvim)"
 	@echo ""
 	@echo "  obsidian       Stow la config versionnée dans le vault Brain (iCloud)"
 	@echo "  obsidian-save  Ré-adopte (--adopt) les fichiers qu'Obsidian a dé-symlinkés"
@@ -72,18 +91,17 @@ brew-bundle:
 	@echo "→ brew bundle (Brewfile)"
 	@brew bundle --file=Brewfile
 
-install all: $(PACKAGES) claude-post gh-post nvim-post pi-post rp-post rtk-post rust-post obsidian obsidian-post
+install all: $(PACKAGES) $(addsuffix -post,$(POSTS)) obsidian obsidian-post
+
+# -R (restow) est idempotent : premier stow ou réparation de drift, même geste.
+# Seul point d'invocation de stow pour les packages — NOFOLD s'applique ici.
+$(PACKAGES):
+	@$(STOW) -R $(if $(filter $@,$(NOFOLD)),--no-folding) $@
+
+restow: $(PACKAGES)
 
 unstow:
 	@for pkg in $(PACKAGES); do $(STOW) -D $$pkg; done
-
-restow:
-	@for pkg in $(PACKAGES); do \
-		if [[ " $(NOFOLD) " == *" $$pkg "* ]]; then $(STOW) --no-folding -R $$pkg; else $(STOW) -R $$pkg; fi; \
-	done
-
-$(PACKAGES):
-	@if [[ " $(NOFOLD) " == *" $@ "* ]]; then $(STOW) --no-folding $@; else $(STOW) $@; fi
 
 claude-post:
 	@if ! command -v d2 >/dev/null; then \
@@ -99,8 +117,8 @@ claude-post:
 	else echo "claude introuvable — plugin impeccable non installé"; fi
 
 # gh est un formula brew ; sa config est stowée par le package gh (hosts.yml, qui
-# contient le token OAuth, est gitignoré). L'auth `gh auth login` est interactive
-# et ne peut pas être automatisée ici. Rejouable : no-op si gh est déjà présent.
+# contient le token OAuth, reste un fichier réel hors repo grâce à NOFOLD).
+# L'auth `gh auth login` est interactive et ne peut pas être automatisée ici.
 gh-post:
 	@if ! command -v gh >/dev/null; then \
 		if command -v brew >/dev/null; then brew install gh; \
@@ -110,6 +128,24 @@ gh-post:
 		gh auth status >/dev/null 2>&1 && echo "gh prêt et authentifié" \
 			|| echo "gh installé — lance \`gh auth login\` pour t'authentifier (push/PR)"; \
 	else echo "gh non installé — étape ignorée"; fi
+
+# herdr est un binaire brew ; sa config est stowée par le package herdr (NOFOLD).
+# Le plugin herdr-nvim-nav fournit les actions plugin_action bindées en alt+hjkl
+# dans config.toml : sans lui, alt+hjkl n'a aucun effet côté herdr. Le pendant
+# nvim du plugin est géré par lazy (lua/plugins/herdr-nav.lua), installé au 1er
+# lancement de nvim — rien à faire ici pour ce versant.
+herdr-post:
+	@if ! command -v herdr >/dev/null; then \
+		if command -v brew >/dev/null; then brew install herdr; \
+		else echo "herdr introuvable et brew indisponible — installe-le à la main (https://herdr.dev)"; fi; \
+	fi
+	@if command -v herdr >/dev/null; then \
+		herdr plugin list 2>/dev/null | grep -q herdr-nvim-nav \
+			|| herdr plugin install aimdevlee/herdr-nvim-nav --yes >/dev/null 2>&1; \
+		herdr plugin list 2>/dev/null | grep -q herdr-nvim-nav \
+			&& { herdr server reload-config >/dev/null 2>&1 || true; echo "herdr-nvim-nav prêt : alt+hjkl navigue nvim <-> panes herdr"; } \
+			|| echo "herdr-nvim-nav non installé — alt+hjkl inactif côté herdr (vérifie \`herdr plugin install aimdevlee/herdr-nvim-nav\`)"; \
+	else echo "herdr non installé — étape ignorée"; fi
 
 nvim-post:
 	@if ! command -v rg >/dev/null; then \
@@ -153,6 +189,26 @@ rp-post:
 		|| { echo "node not found — install it (fnm install --lts) so 'rp' can serve plan.html"; exit 0; }
 	@echo "rp ready: \`rp <slug>\` will serve plan.html and wait for /submit"
 
+rtk-post:
+	@if ! command -v rtk >/dev/null; then \
+		if command -v brew >/dev/null; then brew install rtk; \
+		else echo "rtk introuvable et brew indisponible — installe rtk à la main (https://github.com/rtk-ai/rtk)"; fi; \
+	fi
+	@command -v rtk >/dev/null && rtk init -g --auto-patch >/dev/null \
+		&& echo "rtk prêt: hook posé dans ~/.claude — redémarre Claude Code pour l'activer" \
+		|| echo "rtk non installé — étape ignorée"
+
+# rustup gère sa propre toolchain (~/.rustup, ~/.cargo) hors Stow ; c'est lui qui
+# pose ~/.cargo/env sourcé par zsh/.zshenv. Installer non-interactif, profil par
+# défaut, toolchain stable. Rejouable : si cargo est déjà là on ne touche à rien.
+rust-post:
+	@if ! command -v cargo >/dev/null && [[ ! -f "$(HOME)/.cargo/env" ]]; then \
+		echo "→ installation de rustup (toolchain stable)"; \
+		curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-toolchain stable; \
+	fi
+	@[[ -f "$(HOME)/.cargo/env" ]] && echo "rust prêt: $$("$(HOME)/.cargo/bin/rustc" --version 2>/dev/null)" \
+		|| echo "rust non installé — étape ignorée"
+
 obsidian:
 	@for id in $(OBSIDIAN_PLUGIN_DATA); do mkdir -p "$(OBSIDIAN_VAULT)/plugins/$$id"; done
 	@stow -d obsidian -t "$(OBSIDIAN_VAULT_DIR)" -R Brain
@@ -167,14 +223,7 @@ obsidian-post:
 	@echo "→ thème AnuPpuccin"
 	@curl -fsSL -o "$(OBSIDIAN_VAULT)/themes/AnuPpuccin/theme.css" https://github.com/AnubisNekhet/AnuPpuccin/releases/latest/download/theme.css
 	@curl -fsSL -o "$(OBSIDIAN_VAULT)/themes/AnuPpuccin/manifest.json" https://github.com/AnubisNekhet/AnuPpuccin/releases/latest/download/manifest.json
-	@for spec in \
-		obsidian-style-settings=obsidian-community/obsidian-style-settings \
-		obsidian-hider=kepano/obsidian-hider \
-		obsidian-icon-folder=florianwoelki/obsidian-iconize \
-		settings-search=javalent/settings-search \
-		shiki-highlighter=mprojectscode/obsidian-shiki-plugin \
-		folder-notes=LostPaul/obsidian-folder-notes \
-	; do \
+	@for spec in $(OBSIDIAN_PLUGINS); do \
 		id=$${spec%%=*}; repo=$${spec#*=}; dir="$(OBSIDIAN_VAULT)/plugins/$$id"; \
 		echo "→ plugin $$id"; mkdir -p "$$dir"; \
 		curl -fsSL -o "$$dir/main.js" "https://github.com/$$repo/releases/latest/download/main.js" || { echo "échec $$id/main.js"; exit 1; }; \
@@ -186,26 +235,6 @@ obsidian-post:
 		brew list --cask font-inter >/dev/null 2>&1 || brew install --cask font-inter; \
 	else echo "brew indisponible — installe les fonts iA Writer Quattro et Inter à la main"; fi
 	@echo "thème + plugins prêts — au premier lancement par machine : Settings → Community plugins → désactiver Restricted mode"
-
-# rustup gère sa propre toolchain (~/.rustup, ~/.cargo) hors Stow ; c'est lui qui
-# pose ~/.cargo/env sourcé par zsh/.zshenv. Installer non-interactif, profil par
-# défaut, toolchain stable. Rejouable : si cargo est déjà là on ne touche à rien.
-rust-post:
-	@if ! command -v cargo >/dev/null && [[ ! -f "$(HOME)/.cargo/env" ]]; then \
-		echo "→ installation de rustup (toolchain stable)"; \
-		curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-toolchain stable; \
-	fi
-	@[[ -f "$(HOME)/.cargo/env" ]] && echo "rust prêt: $$("$(HOME)/.cargo/bin/rustc" --version 2>/dev/null)" \
-		|| echo "rust non installé — étape ignorée"
-
-rtk-post:
-	@if ! command -v rtk >/dev/null; then \
-		if command -v brew >/dev/null; then brew install rtk; \
-		else echo "rtk introuvable et brew indisponible — installe rtk à la main (https://github.com/rtk-ai/rtk)"; fi; \
-	fi
-	@command -v rtk >/dev/null && rtk init -g --auto-patch >/dev/null \
-		&& echo "rtk prêt: hook posé dans ~/.claude — redémarre Claude Code pour l'activer" \
-		|| echo "rtk non installé — étape ignorée"
 
 # Zscaler pose son PAC (127.0.0.1:9000/systemproxy-*.pac) sur tous les services
 # réseau et le laisse en place même arrêté ; macOS coupe alors le relais de

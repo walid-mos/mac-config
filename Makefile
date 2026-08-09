@@ -11,9 +11,10 @@ STOW := stow -t $(HOME)
 PACKAGES := claude cmux colima docker gh ghostty git herdr homebrew languages nvim opencode pi rclone rectangle rp rtk starship zsh
 
 # Packages dont le dossier cible reçoit aussi des fichiers écrits par l'outil
-# (gh/hosts.yml, homebrew/trust.json.lock, …) : sans --no-folding Stow replierait
-# le dossier entier en symlink et l'outil écrirait ses secrets dans le repo.
-NOFOLD := gh git herdr homebrew rclone
+# (gh/hosts.yml, homebrew/trust.json.lock, pi/auth.json + models-store.json + sessions, …) :
+# sans --no-folding Stow replierait le dossier entier en symlink et l'outil écrirait
+# ses secrets/runtime dans le repo (puis un unstow les casserait).
+NOFOLD := gh git herdr homebrew pi rclone
 
 # Obsidian : le vault vit dans iCloud, seule la config .obsidian est stowée
 # (symlinks relatifs → portables entre machines). Les binaires (thème, plugins,
@@ -118,9 +119,11 @@ nvim-post:
 	@command -v rg >/dev/null && echo "ripgrep prêt: telescope live_grep/grep_string opérationnels" \
 		|| echo "ripgrep non installé — telescope live_grep échouera"
 
-# Sans ce dossier, stow replierait ~/.pi/agent en symlink vers le repo et pi y
-# écrirait ses sessions et son auth.json. extensions/skills/themes sont des
-# symlinks vers le repo : les nouveaux fichiers y sont versionnés d'office.
+# pi est dans NOFOLD : stow ne replie jamais ~/.pi/agent, donc auth.json,
+# models-store.json et sessions/ (runtime écrit par pi) restent des fichiers réels
+# hors repo, jamais absorbés ni cassés par un stow/unstow/restow. pi-dirs crée le
+# dossier sessions à l'avance en ceinture-bretelles. extensions/skills/themes sont
+# des symlinks vers le repo : les nouveaux fichiers y sont versionnés d'office.
 pi: | pi-dirs
 
 pi-dirs:

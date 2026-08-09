@@ -12,8 +12,7 @@
   "defaultProjectTrust": "ask",
   "theme": "catppuccin-latte",
   "packages": [
-    "npm:pi-web-access",
-    "git:github.com/EmilioAK/pi-claude-style-scroll"
+    "npm:pi-web-access"
   ],
   "enabledModels": [
     "kimi-coding/k3",

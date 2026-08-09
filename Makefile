@@ -14,7 +14,7 @@ PACKAGES := claude cmux colima docker gh ghostty git herdr homebrew languages nv
 # (gh/hosts.yml, homebrew/trust.json.lock, pi/auth.json + models-store.json + sessions, …) :
 # sans --no-folding Stow replierait le dossier entier en symlink et l'outil écrirait
 # ses secrets/runtime dans le repo (puis un unstow les casserait).
-NOFOLD := gh git herdr homebrew pi rclone
+NOFOLD := claude gh git herdr homebrew pi rclone
 
 # Obsidian : le vault vit dans iCloud, seule la config .obsidian est stowée
 # (symlinks relatifs → portables entre machines). Les binaires (thème, plugins,

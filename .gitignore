@@ -42,6 +42,17 @@ pi/.pi/agent/*
 !pi/.pi/agent/skills/
 !pi/.pi/agent/themes/
 
+# claude: version la config authored (settings, hooks, skills, statusline, memory) ;
+# le reste (backups, cache, file-history, history, plugins, projects, sessions,
+# shell-snapshots, session-env) est du runtime jamais versionné
+claude/.claude/*
+!claude/.claude/CLAUDE.md
+!claude/.claude/TERSE.md
+!claude/.claude/settings.json
+!claude/.claude/statusline-command.sh
+!claude/.claude/hooks/
+!claude/.claude/skills/
+
 # RTK: only version config.toml; ignore any runtime/cache data in the package
 rtk/Library/Application Support/rtk/*
 !rtk/Library/Application Support/rtk/config.toml

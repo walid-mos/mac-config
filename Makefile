@@ -25,7 +25,7 @@ NOFOLD := claude colima docker gh git herdr homebrew languages pi rclone rtk
 
 # Hooks post-install chaînés par `make install` (cible <nom>-post ; rust n'a pas
 # de package Stow, rustup gère ~/.rustup et ~/.cargo lui-même).
-POSTS := claude gh herdr nvim pi rp rtk rust
+POSTS := claude dev-dirs gh herdr nvim pi rp rtk rust
 
 # Obsidian : le vault vit dans iCloud, seule la config .obsidian est stowée
 # (symlinks relatifs → portables entre machines). Les binaires (thème, plugins,
@@ -42,7 +42,7 @@ OBSIDIAN_PLUGINS := \
 	folder-notes=LostPaul/obsidian-folder-notes
 OBSIDIAN_PLUGIN_DATA := $(foreach spec,$(OBSIDIAN_PLUGINS),$(firstword $(subst =, ,$(spec))))
 
-.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs obsidian obsidian-save obsidian-post proxy-reset
+.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs obsidian obsidian-save obsidian-post proxy-reset dev-dirs
 
 help:
 	@echo "Targets:"
@@ -57,6 +57,7 @@ help:
 	@echo "  obsidian       Stow la config versionnée dans le vault Brain (iCloud)"
 	@echo "  obsidian-save  Ré-adopte (--adopt) les fichiers qu'Obsidian a dé-symlinkés"
 	@echo "  obsidian-post  Installe thème AnuPpuccin, plugins communautaires et fonts"
+	@echo "  dev-dirs       Scaffolde ~/Development/{clients,tools,nextnode} (idempotent)"
 	@echo ""
 	@echo "  proxy-reset    Retire le PAC proxy laissé par Zscaler (rétablit le relais Apple)"
 	@echo ""
@@ -217,6 +218,22 @@ obsidian:
 obsidian-save:
 	@stow -d obsidian -t "$(OBSIDIAN_VAULT_DIR)" --adopt -R Brain
 	@echo "fichiers dé-symlinkés par Obsidian ré-adoptés dans le repo — vérifie git diff avant commit"
+
+# Dev directories scaffold — crée ~/Development/{clients,tools,nextnode} si absent.
+# Idempotent : mkdir -p ne fait rien si le dossier existe déjà.
+DEV_DIRS := $(HOME)/Development/clients $(HOME)/Development/tools $(HOME)/Development/nextnode
+
+dev-dirs-post:
+	@for d in $(DEV_DIRS); do \
+		if [ -d "$$d" ]; then \
+			echo "✓ $$d"; \
+		else \
+			mkdir -p "$$d" && echo "→ créé $$d"; \
+		fi; \
+	done
+
+dev-dirs:
+	@$(MAKE) dev-dirs-post
 
 obsidian-post:
 	@mkdir -p "$(OBSIDIAN_VAULT)/themes/AnuPpuccin" "$(OBSIDIAN_VAULT)/plugins"

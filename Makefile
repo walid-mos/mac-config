@@ -11,8 +11,9 @@ STOW := stow -t $(HOME)
 
 # Chaque dossier à la racine du repo est un package Stow — ajouter un dossier
 # suffit à le rendre stowable. NONSTOW liste les seules exceptions : docs
-# (documentation) et obsidian (cible custom iCloud, stowé par sa propre cible).
-NONSTOW := docs obsidian
+# (documentation), obsidian (cible custom iCloud, stowé par sa propre cible)
+# et scripts (outillage git interne, rien à déployer dans $HOME).
+NONSTOW := docs obsidian scripts
 PACKAGES := $(filter-out $(NONSTOW),$(patsubst %/,%,$(wildcard */)))
 
 # Packages dont le dossier cible reçoit aussi des fichiers écrits par l'outil
@@ -42,7 +43,7 @@ OBSIDIAN_PLUGINS := \
 	folder-notes=LostPaul/obsidian-folder-notes
 OBSIDIAN_PLUGIN_DATA := $(foreach spec,$(OBSIDIAN_PLUGINS),$(firstword $(subst =, ,$(spec))))
 
-.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs obsidian obsidian-save obsidian-post proxy-reset dev-dirs
+.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs obsidian obsidian-save obsidian-post proxy-reset dev-dirs git-filters
 
 help:
 	@echo "Targets:"
@@ -58,6 +59,7 @@ help:
 	@echo "  obsidian-save  Ré-adopte (--adopt) les fichiers qu'Obsidian a dé-symlinkés"
 	@echo "  obsidian-post  Installe thème AnuPpuccin, plugins communautaires et fonts"
 	@echo "  dev-dirs       Scaffolde ~/Development/{clients,tools,nextnode} (idempotent)"
+	@echo "  git-filters    Configure les clean filters git (.gitattributes) dans .git/config"
 	@echo ""
 	@echo "  proxy-reset    Retire le PAC proxy laissé par Zscaler (rétablit le relais Apple)"
 	@echo ""
@@ -92,7 +94,7 @@ brew-bundle:
 	@echo "→ brew bundle (Brewfile)"
 	@brew bundle --file=Brewfile
 
-install all: $(PACKAGES) $(addsuffix -post,$(POSTS)) obsidian obsidian-post
+install all: git-filters $(PACKAGES) $(addsuffix -post,$(POSTS)) obsidian obsidian-post
 
 # -R (restow) est idempotent : premier stow ou réparation de drift, même geste.
 # Seul point d'invocation de stow pour les packages — NOFOLD s'applique ici.
@@ -234,6 +236,16 @@ dev-dirs-post:
 
 dev-dirs:
 	@$(MAKE) dev-dirs-post
+
+# Filtres clean git (cf. .gitattributes) : ils vivent dans .git/config, donc non
+# versionnés — cette cible les (re)pose après chaque clone. Idempotente.
+# Le script filtre est référencé en chemin absolu : git l'exécute quel que soit
+# le cwd de la commande (status, diff, add...).
+git-filters:
+	@git config filter.pi-settings.clean "$(CURDIR)/scripts/git-filter-pi-settings-clean.sh"
+	@git config filter.claude-settings.clean "$(CURDIR)/scripts/git-filter-claude-settings-clean.sh"
+	@chmod +x scripts/git-filter-pi-settings-clean.sh scripts/git-filter-claude-settings-clean.sh
+	@echo "filtres pi-settings + claude-settings actifs — les settings.json ne bougent que sur vrais changements (jq requis)"
 
 obsidian-post:
 	@mkdir -p "$(OBSIDIAN_VAULT)/themes/AnuPpuccin" "$(OBSIDIAN_VAULT)/plugins"

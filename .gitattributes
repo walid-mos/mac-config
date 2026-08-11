@@ -1,0 +1,11 @@
+# Filtres de normalisation — les scripts référencés sont configurés dans
+# .git/config par `make git-filters` (à rejouer après chaque clone).
+
+# settings.json est réécrit par pi à la volée (modèle actif, changelog vu) :
+# le filtre clean normalise ces clés pour que git ne bouge que sur les vrais
+# changements de config. Valeurs canoniques : scripts/git-filter-pi-settings-clean.sh
+pi/.pi/agent/settings.json filter=pi-settings
+
+# settings.json est réécrit par Claude Code à la volée (modèle actif via
+# /model) : même mécanisme. Valeur canonique : scripts/git-filter-claude-settings-clean.sh
+claude/.claude/settings.json filter=claude-settings

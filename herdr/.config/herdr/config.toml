@@ -20,6 +20,7 @@ pane_gaps = false # dividers fins partagés au lieu de doubles bordures épaisse
 pane_scrollbars = false # récupère la colonne réservée aux scrollbars
 hide_tab_bar_when_single_tab = true
 
+agent_panel_sort = "spaces"
 [ui.sidebar.agents]
 row_gap = 1 # respiration entre les entrées d'agents
 rows = [

@@ -6,7 +6,6 @@
   "permissions": {
     "defaultMode": "auto"
   },
-  "model": "claude-fable-5[1m]",
   "disableClaudeAiConnectors": true,
   "hooks": {
     "PreToolUse": [

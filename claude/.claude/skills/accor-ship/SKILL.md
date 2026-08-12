@@ -1,16 +1,16 @@
 ---
-name: ship-accor
+name: accor-ship
 user-invocable: true
 description: >-
   Développer une feature du produit Menu Compliance (front @astore/menu-compliance
   + API @astore/api) dans le monorepo accor product-data-apps, en stack de PR :
   récupération fidèle des assets visuels du prototype, code optimisé à
   l'intégration, commits atomiques, simplify par maillon puis global. Trigger on
-  /ship-accor, ou quand l'utilisateur décrit une feature Menu Compliance à livrer
+  /accor-ship, ou quand l'utilisateur décrit une feature Menu Compliance à livrer
   dans ce repo.
 ---
 
-# ship-accor
+# accor-ship
 
 Livrer une feature de **Menu Compliance** dans le monorepo accor
 `product-data-apps`, en **stack de PR lisibles**. C'est `/stack` avec le contexte
@@ -19,7 +19,7 @@ sont acquis — l'utilisateur ne fournit que **la feature** (et un ticket au bes
 
 ## Arguments
 
-`/ship-accor <description de la feature> [référence ou contenu du ticket] [options]`
+`/accor-ship <description de la feature> [référence ou contenu du ticket] [options]`
 
 - `<description>` (requis) — la feature à livrer. Seule source de vérité avec le
   ticket éventuel.
@@ -60,6 +60,27 @@ C'est un prototype produit par un LLM : **rendu visuel exactement ce qu'on veut*
    L'intégrer dans notre stack (React + TS + conventions `@nextnode-solutions/*`),
    propre, testable, SOLID. Les skills `react`, `typescript`, `coding`, `nextnode-*`
    ne sont pas optionnels.
+
+### Limite d'autorité du prototype — visuel/front SEULEMENT
+
+L'autorité du proto s'arrête à **ce qui s'affiche** : pixels, layout, libellés,
+états, comportements d'écran. Tout le reste du proto est vibecodé et **n'a aucune
+autorité** : back, API, hooks, stores, et **surtout modèle de données / base**.
+
+- **INTERDIT** de dériver du proto un schéma DB, des colonnes, un modèle de données,
+  des valeurs par défaut persistées, une règle métier ou une décision produit lue
+  dans son code (`src/lib/*`, commentaires de débriefs, fixtures, localStorage).
+  Le proto montre *ce que l'écran affiche*, jamais *comment on le stocke*.
+- Sources de vérité côté back : **le ticket/la spec**, l'architecture du repo
+  (`AGENTS.md`), et l'existant en base. Le modèle de données se conçoit depuis le
+  besoin, pas depuis les types du proto.
+- Toute décision métier qui n'apparaît que dans le code du proto (structure d'un
+  barème, valeurs, cas limites, vocabulaire persisté) est une **hypothèse à faire
+  valider par l'utilisateur en Phase 1** — via `AskUserQuestion` — avant d'être
+  gravée en schéma DB ou en contrat API. La citer avec sa source ; ne jamais la
+  présenter comme acquise.
+- Ce qui reste légitime à lire dans le proto pour le back : les libellés affichés
+  et la forme des écrans, pour dimensionner les DTO *après* validation du modèle.
 
 Récupérer le proto : `git clone` du repo en scratchpad ou lecture via `gh`/WebFetch
 pour inventorier assets et markup ; ouvrir l'URL déployée dans Chrome comme
@@ -131,10 +152,18 @@ en plus :
   vers le bas du stack si besoin (`gh stack rebase`), re-tester.
 - **Submit** : `gh stack submit` seulement après les deux passes `/simplify`.
   Pas d'auto-merge.
+- **Descriptions de PR** : chaque PR du stack suit **strictement**
+  `.github/PULL_REQUEST_TEMPLATE.md` du repo (sections Ticket — ou justification
+  de son absence dans le Summary —, Summary, Scope coché, Changes, How was this
+  tested?, Checklist). Jamais de structure libre. Vérifier chaque corps contre le
+  template avant de considérer le submit fini ; `gh stack submit` ne le fait pas
+  tout seul — repasser en `gh pr edit --body-file` si besoin.
 
 ## Definition of done
 
 - La feature est livrée en entier, ou le reste est listé comme bloqué avec sa raison.
+- Aucun schéma DB, contrat API ou décision métier n'est dérivé du code du proto ;
+  toute hypothèse métier issue du proto a été validée par l'utilisateur en Phase 1.
 - Rendu du front **copie 1:1 du prototype déployé**
   (`https://drinks-menu-compliance-vite.vercel.app/`), assets récupérés, comparé
   côte à côte dans Chrome ; code réécrit propre — jamais le code du proto copié.
@@ -144,3 +173,4 @@ en plus :
 - `pnpm test`, `pnpm lint`, `pnpm typecheck` verts sur tout le stack — sortie réelle.
 - `/simplify` a tourné **par maillon puis en global**, correctifs commités et testés.
 - Stack de PR soumis depuis `develop` (`gh stack submit`), sauf `--stop-before-pr`.
+- Chaque description de PR est conforme à `.github/PULL_REQUEST_TEMPLATE.md`.

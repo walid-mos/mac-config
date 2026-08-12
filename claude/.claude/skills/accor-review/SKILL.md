@@ -1,9 +1,9 @@
 ---
-name: review-accor
-description: Format a raw PR review comment to the accor CODE_REVIEW_CHARTER and post it inline. Use on /review-accor, or when the user gives a file/line + a raw comment and wants it turned into a proper review comment on a GitHub PR in this repo.
+name: accor-review
+description: Format a raw PR review comment to the accor CODE_REVIEW_CHARTER and post it inline. Use on /accor-review, or when the user gives a file/line + a raw comment and wants it turned into a proper review comment on a GitHub PR in this repo.
 ---
 
-# review-accor
+# accor-review
 
 Turn a raw remark into a charter-compliant PR review comment, then post it inline.
 Self-contained: everything from `.github/CODE_REVIEW_CHARTER.md` that matters for

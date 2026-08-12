@@ -84,6 +84,8 @@ simplify global → submit`.
 
 ## 5. Skills liés
 
-- `/ship-accor` — livrer une feature Menu Compliance en stack de PR (périmètre + proto figés).
-- `/review-accor` — review dédiée Accor.
+- `/accor-ship` — livrer une feature Menu Compliance en stack de PR (périmètre + proto figés).
+- `/accor-review` — review dédiée Accor.
+- `/accor-wording` — audit du drift de wording contre le proto.
+- `/accor-teams-pr` — message Teams d'annonce des PR à review.
 - `/stack`, `/swarm`, `/simplify` — orchestration et nettoyage génériques.

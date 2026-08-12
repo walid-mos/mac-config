@@ -19,5 +19,7 @@ command -v jq >/dev/null || { cat; exit 0; }
 jq -j '
   .defaultProvider = "openrouter"
   | .defaultModel = "deepseek/deepseek-v4-flash"
+  | .defaultThinkingLevel = "high"
+  | .hideThinkingBlock = false
   | del(.lastChangelogVersion)
 '

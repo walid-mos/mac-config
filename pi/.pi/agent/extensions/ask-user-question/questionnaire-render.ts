@@ -175,7 +175,7 @@ function renderOtherRow(
 		return;
 	}
 	const rowPrefix = `${prefix}${theme.fg(color, rowLabel)}`;
-	const contentWidth = Math.max(1, width - visibleWidth(prefix));
+	const contentWidth = Math.max(1, width - visibleWidth(rowPrefix));
 	const editorLines = editor
 		.render(contentWidth)
 		.slice(1, -1) // strip the editor's horizontal border lines

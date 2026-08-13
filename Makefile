@@ -161,12 +161,12 @@ nvim-post:
 # pi est dans NOFOLD : stow ne replie jamais ~/.pi/agent, donc auth.json,
 # models-store.json et sessions/ (runtime écrit par pi) restent des fichiers réels
 # hors repo, jamais absorbés ni cassés par un stow/unstow/restow. pi-dirs crée le
-# dossier sessions à l'avance en ceinture-bretelles. extensions/skills/themes sont
-# des symlinks vers le repo : les nouveaux fichiers y sont versionnés d'office.
+# dossier sessions à l'avance en ceinture-bretelles. extensions/skills/themes/agents
+# sont des symlinks vers le repo : les nouveaux fichiers y sont versionnés d'office.
 pi: | pi-dirs
 
 pi-dirs:
-	@mkdir -p "$(HOME)/.pi/agent/sessions"
+	@mkdir -p "$(HOME)/.pi/agent/sessions" "$(HOME)/.pi/agent/agents"
 
 # pnpm installé par brew est un script `#!/usr/bin/env node` et node arrive via
 # fnm, pas via brew : sur un mac neuf on installe le LTS puis on lance pnpm au
@@ -184,8 +184,10 @@ pi-post:
 			fnm exec --using lts-latest -- pnpm add -g @earendil-works/pi-coding-agent; \
 		else echo "node et fnm introuvables — installe node puis relance make pi-post"; fi; \
 	fi
-	@command -v pi >/dev/null && echo "pi prêt — \`pi\` puis /login pour l'auth" \
-		|| echo "pi non installé — étape ignorée"
+	@if command -v pi >/dev/null; then \
+		pi install npm:pi-web-access >/dev/null; \
+		echo "pi prêt — packages web-access — \`pi\` puis /login pour l'auth"; \
+	else echo "pi non installé — étape ignorée"; fi
 
 rp-post:
 	@command -v node >/dev/null || command -v fnm >/dev/null \

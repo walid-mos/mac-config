@@ -3,11 +3,19 @@ local function on_attach(ev)
 		vim.keymap.set(mode, lhs, rhs, { buffer = ev.buf, desc = desc })
 	end
 
-	map("n", "<leader>cd", vim.lsp.buf.definition, "Go to definition")
+	local telescope = require("telescope.builtin")
+
+	map("n", "gd", telescope.lsp_definitions, "Go to definition")
+	map("n", "gD", vim.lsp.buf.declaration, "Go to declaration")
+	map("n", "gr", telescope.lsp_references, "References")
+	map("n", "gI", telescope.lsp_implementations, "Go to implementation")
+	map("n", "gy", telescope.lsp_type_definitions, "Go to type definition")
+
+	map("n", "<leader>cd", telescope.lsp_definitions, "Go to definition")
 	map("n", "<leader>cD", vim.lsp.buf.declaration, "Go to declaration")
-	map("n", "<leader>cr", vim.lsp.buf.references, "Find references")
-	map("n", "<leader>ci", vim.lsp.buf.implementation, "Go to implementation")
-	map("n", "<leader>ct", vim.lsp.buf.type_definition, "Go to type definition")
+	map("n", "<leader>cr", telescope.lsp_references, "Find references")
+	map("n", "<leader>ci", telescope.lsp_implementations, "Go to implementation")
+	map("n", "<leader>ct", telescope.lsp_type_definitions, "Go to type definition")
 	map("n", "<leader>ca", vim.lsp.buf.code_action, "Code actions")
 	map("n", "<leader>cn", vim.lsp.buf.rename, "Rename symbol")
 	-- Format via conform.nvim, pas le LSP
@@ -38,7 +46,7 @@ return {
 		"williamboman/mason-lspconfig.nvim",
 		dependencies = { "williamboman/mason.nvim" },
 		opts = {
-			ensure_installed = { "lua_ls" },
+			ensure_installed = { "lua_ls", "vtsls", "pyright", "clangd", "marksman" },
 		},
 	},
 

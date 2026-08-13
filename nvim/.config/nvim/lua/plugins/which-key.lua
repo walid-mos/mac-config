@@ -16,6 +16,7 @@ return {
 			{ "<leader>x", group = "Diagnostics" },
 			{ "<leader>k", desc = "Open completion" },
 			{ "<leader>s", group = "[S]plit" },
+			{ "<leader>r", group = "[R]eplace" },
 		},
 
 		win = {

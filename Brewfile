@@ -18,6 +18,9 @@ brew "ripgrep"
 # Agents & LLM
 brew "herdr"
 brew "rtk"
+# Notifs macOS cliquables pour herdr (delivery = "system") : sans lui herdr
+# retombe sur osascript et le clic ouvre Script Editor au lieu de Ghostty.
+brew "terminal-notifier"
 
 # Conteneurs
 brew "colima"

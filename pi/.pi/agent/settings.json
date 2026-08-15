@@ -18,7 +18,8 @@
     "kimi-coding/k3",
     "kimi-coding/k3-256k",
     "openrouter/deepseek/deepseek-v4-flash",
-    "openrouter/x-ai/grok-4.5"
+    "xai/grok-4.6",
+    "xai/grok-build-0.1"
   ],
   "hideThinkingBlock": false
 }

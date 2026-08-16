@@ -82,6 +82,18 @@ function finiteNumber(value: unknown): number | undefined {
 	const n = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
 	return Number.isFinite(n) ? n : undefined;
 }
+
+/** Unwrap JSON `{val: n}` or plain number. */
+function valOf(x: unknown): number | undefined {
+	if (typeof x === "number") return finiteNumber(x);
+	if (isRecord(x) && "val" in x) return finiteNumber(x.val);
+	return finiteNumber(x);
+}
+
+/** Type guard: JSON object (not array, not null). */
+function isRecord(x: unknown): x is Record<string, unknown> {
+	return typeof x === "object" && x !== null && !Array.isArray(x);
+}
 function fgHex(hex: string, s: string): string {
 	const [r, g, b] = rgb(hex);
 	return `\x1b[38;2;${r};${g};${b}m${s}\x1b[39m`;
@@ -215,7 +227,15 @@ type OpenRouterQuota = {
 	balance: number; // account credits remaining (total_credits - total_usage)
 	weekly?: { remaining: number; limit: number }; // per-key weekly spend cap, if set
 };
-type QuotaCache = { kimi?: KimiQuota; openrouter?: OpenRouterQuota; error?: boolean };
+type XaiQuota = {
+	tier?: string;
+	// Legacy GrokBuildBillingConfig fields (deprecated, old accounts only)
+	monthly?: { used: number; limit: number; reset: string };
+	// Primary pool gauge — creditUsagePercent over a weekly OR monthly period
+	pool?: { usedPercent: number; reset: string; label: "hebdo" | "mois" };
+	prepaidBalance?: number;
+};
+type QuotaCache = { kimi?: KimiQuota; openrouter?: OpenRouterQuota; xai?: XaiQuota; error?: boolean };
 
 function readToken(provider: string): string | undefined {
 	try {
@@ -226,10 +246,23 @@ function readToken(provider: string): string | undefined {
 	}
 }
 
-async function fetchJson(url: string, token: string): Promise<any | undefined> {
+async function fetchJson(url: string, token: string): Promise<unknown | undefined> {
 	try {
 		const res = await fetch(url, {
 			headers: { Authorization: `Bearer ${token}` },
+			signal: AbortSignal.timeout(8000),
+		});
+		if (!res.ok) return undefined;
+		return await res.json();
+	} catch {
+		return undefined;
+	}
+}
+
+async function fetchJsonWithHeaders(url: string, headers: Record<string, string>): Promise<unknown | undefined> {
+	try {
+		const res = await fetch(url, {
+			headers,
 			signal: AbortSignal.timeout(8000),
 		});
 		if (!res.ok) return undefined;
@@ -258,7 +291,8 @@ async function pollQuotas(): Promise<QuotaCache> {
 
 	const kimiToken = readToken("kimi-coding");
 	if (kimiToken) {
-		const data = await fetchJson("https://api.kimi.com/coding/v1/usages", kimiToken);
+		const kimiRes = await fetchJson("https://api.kimi.com/coding/v1/usages", kimiToken);
+		const data = isRecord(kimiRes) ? kimiRes : undefined;
 		const limits: unknown[] = Array.isArray(data?.limits) ? data.limits : [];
 		const fiveHourRaw = limits.find((l: unknown) => {
 			const w = (l as { window?: { duration?: number; timeUnit?: string } })?.window;
@@ -293,17 +327,99 @@ async function pollQuotas(): Promise<QuotaCache> {
 	if (orToken) {
 		const creditsData = await fetchJson("https://openrouter.ai/api/v1/credits", orToken);
 		const keyData = await fetchJson("https://openrouter.ai/api/v1/auth/key", orToken);
-		const c = creditsData?.data;
-		if (c && typeof c.total_credits === "number") {
-			const quota: OpenRouterQuota = {
-				balance: Math.max(0, c.total_credits - (c.total_usage ?? 0)),
-			};
-			const k = keyData?.data;
-			if (k && typeof k.limit === "number" && typeof k.limit_remaining === "number") {
-				quota.weekly = { remaining: k.limit_remaining, limit: k.limit };
+		const cd = isRecord(creditsData) ? creditsData : undefined;
+		const kd = isRecord(keyData) ? keyData : undefined;
+		const c = isRecord(cd?.data) ? cd?.data : undefined;
+		const k = isRecord(kd?.data) ? kd?.data : undefined;
+		if (c) {
+			const total = c.total_credits;
+			const usage = c.total_usage;
+			if (typeof total === "number") {
+				const quota: OpenRouterQuota = {
+					balance: Math.max(0, total - (typeof usage === "number" ? usage : 0)),
+				};
+				if (k) {
+					const limit = k.limit;
+					const limitRemaining = k.limit_remaining;
+					if (typeof limit === "number" && typeof limitRemaining === "number") {
+						quota.weekly = { remaining: limitRemaining, limit };
+					}
+				}
+				cache.openrouter = quota;
 			}
-			cache.openrouter = quota;
 		}
+	}
+
+	// xAI (Grok/X subscription) — cli-chat-proxy billing endpoints
+	const xaiToken = readToken("xai");
+	if (xaiToken) {
+		const xaiHeaders = {
+			Authorization: `Bearer ${xaiToken}`,
+			"x-xai-token-auth": "xai-grok-cli",
+			Accept: "application/json",
+		};
+		const [billingData, creditsData, settingsData] = await Promise.all([
+			fetchJsonWithHeaders("https://cli-chat-proxy.grok.com/v1/billing", xaiHeaders),
+			fetchJsonWithHeaders(
+				"https://cli-chat-proxy.grok.com/v1/billing?format=credits",
+				xaiHeaders,
+			),
+			fetchJsonWithHeaders("https://cli-chat-proxy.grok.com/v1/settings", xaiHeaders),
+		]);
+
+		const q: XaiQuota = {};
+
+		// Tier
+		const s = isRecord(settingsData) ? settingsData : undefined;
+		const tier = s?.subscription_tier_display;
+		if (typeof tier === "string" && tier.length > 0) q.tier = tier;
+
+		// Monthly billing
+		const bd = isRecord(billingData) ? billingData : undefined;
+		const bCfg = isRecord(bd?.config) ? bd?.config : undefined;
+		const mLimit = valOf(bCfg?.monthlyLimit);
+		const mUsed = valOf(bCfg?.used);
+		const mReset = typeof bCfg?.billingPeriodEnd === "string" ? bCfg.billingPeriodEnd : "";
+		if (mLimit !== undefined && mUsed !== undefined) {
+			q.monthly = { used: mUsed, limit: mLimit, reset: mReset };
+		}
+
+		// Primary pool — creditUsagePercent is the gauge grok.com Settings → Usage
+		// shows; period is weekly or monthly (official billing.rs supports both).
+		const cd = isRecord(creditsData) ? creditsData : undefined;
+		const cCfg = isRecord(cd?.config) ? cd?.config : undefined;
+		const periodObj = cCfg?.currentPeriod;
+		const periodType = isRecord(periodObj) ? periodObj.type : undefined;
+		if (periodType === "USAGE_PERIOD_TYPE_WEEKLY" || periodType === "USAGE_PERIOD_TYPE_MONTHLY") {
+			const wReset =
+				typeof cCfg?.billingPeriodEnd === "string"
+					? cCfg.billingPeriodEnd
+					: isRecord(periodObj) && typeof periodObj.end === "string"
+						? periodObj.end
+						: "";
+			// Primary: creditUsagePercent; fallback: onDemandUsed / onDemandCap.
+			// A parseable period with neither value means zero usage (CodexBar).
+			let usedPercent = finiteNumber(cCfg?.creditUsagePercent);
+			if (usedPercent === undefined) {
+				const wCap = valOf(cCfg?.onDemandCap);
+				const wUsed = valOf(cCfg?.onDemandUsed);
+				usedPercent =
+					wCap !== undefined && wCap > 0 && wUsed !== undefined
+						? Math.min(100, Math.max(0, (wUsed / wCap) * 100))
+						: 0;
+			} else {
+				usedPercent = Math.min(100, Math.max(0, usedPercent));
+			}
+			q.pool = {
+				usedPercent,
+				reset: wReset,
+				label: periodType === "USAGE_PERIOD_TYPE_MONTHLY" ? "mois" : "hebdo",
+			};
+			const pb = valOf(cCfg?.prepaidBalance);
+			if (pb !== undefined && pb > 0) q.prepaidBalance = pb;
+		}
+
+		cache.xai = q;
 	}
 
 	return cache;
@@ -582,10 +698,11 @@ export default function (pi: ExtensionAPI) {
 					const gitPart = gitLine(gitCache);
 					const dim = (s: string) => fgHex(LATTE.subtext0, s);
 					const provider = (ctx.model?.provider ?? "").toLowerCase();
-					// Show the active provider's quota; fall back to both if unmatched
-					const showKimi = provider.includes("kimi") || (!provider.includes("openrouter") && !provider);
+					// Show the active provider's quota; fall back to everyone if unmatched
+					const showXai = provider.includes("xai");
+					const showKimi = provider.includes("kimi");
 					const showOr = provider.includes("openrouter");
-					const showAll = !showKimi && !showOr;
+					const showAll = !showXai && !showKimi && !showOr;
 
 					const quotaParts: string[] = [];
 
@@ -616,6 +733,37 @@ export default function (pi: ExtensionAPI) {
 						if (orq.weekly) {
 							part +=
 								`   ${dim("hebdo")} ${quotaGauge(orq.weekly.remaining, orq.weekly.limit)}`;
+						}
+						quotaParts.push(part);
+					}
+
+					if (quotaCache.xai && (showXai || showAll)) {
+						const x = quotaCache.xai;
+						let part = `${dim("xai")}`;
+						if (x.tier) part += ` ${fgHex(LATTE.mauve, x.tier)}`;
+						// Legacy monthly cap — only when the primary pool isn't already monthly
+						if (x.monthly && x.monthly.limit > 0 && x.pool?.label !== "mois") {
+							const remaining = x.monthly.limit - x.monthly.used;
+							part += `   ${dim("mois")} ${quotaGauge(remaining, x.monthly.limit)}`;
+							if (x.monthly.reset) {
+								part += ` ${dim(`${ICONS.reset} ${fmtReset(x.monthly.reset)}`)}`;
+							}
+						}
+						if (x.pool && Number.isFinite(x.pool.usedPercent)) {
+							// kimi-style: show the remaining share of the usage pool
+							const remaining = 100 - x.pool.usedPercent;
+							part += `   ${dim(x.pool.label)} ${quotaGauge(remaining, 100)}`;
+							if (x.pool.reset) {
+								part += ` ${dim(`${ICONS.reset} ${fmtReset(x.pool.reset)}`)}`;
+							}
+						}
+						if (x.prepaidBalance && x.prepaidBalance > 0) {
+							const col = balanceColor(x.prepaidBalance);
+							part += `   ${fgHex(col, "◉")} ${fgHex(col, `$${x.prepaidBalance.toFixed(2)}`)} ${dim("crédits")}`;
+						}
+						// Always show at least the tier name so the provider is recognised
+						if (part === `${dim("xai")}`) {
+							part = `${dim("xai")} ${fgHex(LATTE.subtext0, "—")}`;
 						}
 						quotaParts.push(part);
 					}

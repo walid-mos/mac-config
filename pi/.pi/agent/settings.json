@@ -12,7 +12,8 @@
   "defaultProjectTrust": "ask",
   "theme": "catppuccin-latte",
   "packages": [
-    "npm:pi-web-access"
+    "npm:pi-web-access",
+    "npm:@plannotator/pi-extension"
   ],
   "enabledModels": [
     "kimi-coding/k3",

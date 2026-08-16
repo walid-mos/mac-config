@@ -5,11 +5,11 @@ description: >-
   configs (oxlint, oxfmt, TypeScript, tsdown, Vitest, commitlint,
   semantic-release, Tailwind). Load when @nextnode-solutions/standards is in
   package.json or when configuring tooling in a NextNode project.
-user-invocable: true
-synced-at: 7185a94
 ---
 
 # @nextnode-solutions/standards
+
+**Source**: @nextnode/core @ 7185a94 (resync 2026-08-16)
 
 Centralized development standards for all NextNode projects. This is a **config-only** package - no runtime code, no build step. It exports configuration files that projects extend.
 

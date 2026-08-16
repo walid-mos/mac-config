@@ -5,11 +5,11 @@ description: >-
   @nextnode-solutions/logger appears in package.json, when the user imports
   `createLogger` or `Logger` from it, or when configuring logging in a
   NextNode project.
-user-invocable: true
-synced-at: 7185a94
 ---
 
 # @nextnode-solutions/logger
+
+**Source**: @nextnode/core @ 7185a94 (resync 2026-08-16)
 
 Zero-dependency TypeScript logging library for NextNode projects: scope-based organization, environment-aware formatting, pluggable transports, runtime detection (Node.js, browser, webworker).
 

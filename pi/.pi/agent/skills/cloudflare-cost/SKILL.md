@@ -1,6 +1,5 @@
 ---
 name: cloudflare-cost
-user-invocable: true
 description: >-
   Cost-safety judgment for any Cloudflare Workers project — the pitfalls that
   silently inflate the bill and the mandated practice for each. MUST be loaded
@@ -9,7 +8,7 @@ description: >-
   Cloudflare (Workers or Pages) target, @cloudflare/* or wrangler in
   package.json, or code using Workers, Pages Functions, KV, R2, D1, Durable
   Objects, Queues, Workers AI, Vectorize, Hyperdrive, or the Cache API. Also
-  load on /cloudflare-cost or when the user asks about Cloudflare billing,
+  load when the user mentions the `cloudflare-cost` skill or when the user asks about Cloudflare billing,
   Workers cost, or "why is my Cloudflare bill high".
 ---
 

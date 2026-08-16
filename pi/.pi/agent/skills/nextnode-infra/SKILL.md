@@ -6,11 +6,11 @@ description: >-
   conventions. Load when the user asks to audit a NextNode project, when
   working in a repo of the GitHub `NextNodeSolutions` org, or when any
   @nextnode-solutions/* package appears in package.json.
-user-invocable: true
-synced-at: 7185a94
 ---
 
 # NextNode Core Monorepo
+
+**Source**: @nextnode/core @ 7185a94 (resync 2026-08-16)
 
 `@nextnode/core` - pnpm workspaces + Turborepo, ESM only, Node >=24.
 
@@ -70,25 +70,25 @@ For every `@nextnode-solutions/*` dep in `package.json`, compare the **installed
 **How to resolve**: `pnpm update <pkg>` (or `pnpm update @nextnode-solutions/*` for all).
 
 #### Standards / Testing / Commits / Publishing
-For the detailed setup of `@nextnode-solutions/standards` (oxlint, oxfmt incl. import sorting, TypeScript, vitest, commitlint, lint-staged, semantic-release configs and their required scripts), see `/nextnode-standards` "Complete project setup checklist". Audit ALL items from that checklist as part of compliance.
+For the detailed setup of `@nextnode-solutions/standards` (oxlint, oxfmt incl. import sorting, TypeScript, vitest, commitlint, lint-staged, semantic-release configs and their required scripts), see the skill `nextnode-standards` "Complete project setup checklist". Audit ALL items from that checklist as part of compliance.
 
 #### CI/CD and Backing services
 
-For the full CI/CD and backing-services checklist (nextnode.toml structure, Dockerfile/compose rules, SITE_URL, secrets vs build_args, cross-service URLs, upstream images, volumes, R2, Postgres), load `cicd-checklist.md` on demand. The audit item names below are the top-level pass/fail gates; consult `cicd-checklist.md` for the detail rules before proposing any fix.
+For the full CI/CD and backing-services checklist (nextnode.toml structure, Dockerfile/compose rules, SITE_URL, secrets vs build_args, cross-service URLs, upstream images, volumes, R2, Postgres), load [cicd-checklist.md](cicd-checklist.md) on demand. The audit item names below are the top-level pass/fail gates; consult [cicd-checklist.md](cicd-checklist.md) for the detail rules before proposing any fix.
 
-- [ ] `nextnode.toml` `[project]` section — see `cicd-checklist.md`
-- [ ] Correct reusable GitHub workflow — see `cicd-checklist.md`
-- [ ] `Dockerfile` / `$PORT` (for `type=app`; the caller ships **no** `docker-compose.yml`) — see `cicd-checklist.md`
-- [ ] `SITE_URL` — see `cicd-checklist.md`
-- [ ] Secrets: global pool in `[deploy].secrets` + per-service least-privilege `secrets` — see `/nextnode-deploy` rules 25–26
-- [ ] `build_args` vs `secrets` — see `cicd-checklist.md`
-- [ ] Cross-service URLs — see `cicd-checklist.md`
-- [ ] R2/Postgres backing services — see `cicd-checklist.md`
+- [ ] `nextnode.toml` `[project]` section — see [cicd-checklist.md](cicd-checklist.md)
+- [ ] Correct reusable GitHub workflow — see [cicd-checklist.md](cicd-checklist.md)
+- [ ] `Dockerfile` / `$PORT` (for `type=app`; the caller ships **no** `docker-compose.yml`) — see [cicd-checklist.md](cicd-checklist.md)
+- [ ] `SITE_URL` — see [cicd-checklist.md](cicd-checklist.md)
+- [ ] Secrets: global pool in `[deploy].secrets` + per-service least-privilege `secrets` — see the skill `nextnode-deploy` rules 25–26
+- [ ] `build_args` vs `secrets` — see [cicd-checklist.md](cicd-checklist.md)
+- [ ] Cross-service URLs — see [cicd-checklist.md](cicd-checklist.md)
+- [ ] R2/Postgres backing services — see [cicd-checklist.md](cicd-checklist.md)
 
 #### Logger (if used)
 - [ ] `@nextnode-solutions/logger` imported (not `console.log`)
 - [ ] Logger injected via constructor/parameter (not global import in business logic)
-- [ ] Tests use the testing utilities from `logger/testing` — see `/nextnode-logger` for the full API (`createSpyLogger`, `createNoopLogger`, `createMockLogger`)
+- [ ] Tests use the testing utilities from `logger/testing` — see the skill `nextnode-logger` for the full API (`createSpyLogger`, `createNoopLogger`, `createMockLogger`)
 
 #### Date handling (if used)
 - [ ] No date lib (`date-fns`, `luxon`, `dayjs`, `moment`) in deps — see Rule 4 (flag to user before touching app code)
@@ -98,10 +98,10 @@ For the full CI/CD and backing-services checklist (nextnode.toml structure, Dock
 
 | Skill | What it covers |
 |-------|----------------|
-| `/nextnode-standards` | oxlint, oxfmt, TypeScript, Vitest, commitlint, lint-staged, semantic-release |
-| `/nextnode-logger` | Logger API, transports, testing utilities |
-| `/nextnode-deploy` | nextnode.toml, CI pipeline, deployment, GitHub org (secrets/`nextnode-ci` app → its `github-org.md`) |
-| `/nextnode-design` | Brand colors, typography, logos, UI conventions |
+| `nextnode-standards` | oxlint, oxfmt, TypeScript, Vitest, commitlint, lint-staged, semantic-release |
+| `nextnode-logger` | Logger API, transports, testing utilities |
+| `nextnode-deploy` | nextnode.toml, CI pipeline, deployment, GitHub org (secrets/`nextnode-ci` app → its `github-org.md`) |
+| `nextnode-design` | Brand colors, typography, logos, UI conventions |
 
 ### MANDATORY dispatch
 
@@ -109,10 +109,10 @@ For the full CI/CD and backing-services checklist (nextnode.toml structure, Dock
 
 | Gap category | Load before fixing |
 |---|---|
-| Standards / Testing / Commits / Publishing | `/nextnode-standards` |
-| CI/CD / deploy / Dockerfile / nextnode.toml | `/nextnode-deploy` |
-| Logger usage or testing utilities | `/nextnode-logger` |
-| Brand colors / typography / logos | `/nextnode-design` |
+| Standards / Testing / Commits / Publishing | `nextnode-standards` |
+| CI/CD / deploy / Dockerfile / nextnode.toml | `nextnode-deploy` |
+| Logger usage or testing utilities | `nextnode-logger` |
+| Brand colors / typography / logos | `nextnode-design` |
 
 ## FORBIDDEN (audit agent)
 

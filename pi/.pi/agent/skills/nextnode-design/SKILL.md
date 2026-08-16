@@ -4,11 +4,11 @@ description: >-
   NextNode Solutions design system and brand guidelines (colors, typography,
   logos, UI conventions). Load when building UI or placing brand assets in any
   NextNode front-end project.
-user-invocable: true
-synced-at: 7185a94
 ---
 
 # NextNode Design System
+
+**Source**: @nextnode/core @ 7185a94 (resync 2026-08-16)
 
 Brand guidelines and visual identity for NextNode Solutions projects. The live source of truth is `nextnode-landing/src/styles/global.css`; the Brand Guidelines v2.0 (December 2024) doc is stale on token names. **If `global.css` is unreachable, fail hard** — refuse to emit colors/tokens rather than guessing or copying stale hex.
 

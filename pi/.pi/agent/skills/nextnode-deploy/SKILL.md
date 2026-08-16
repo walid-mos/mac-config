@@ -6,11 +6,11 @@ description: >-
   Workers deploys. Load when a repo has nextnode.toml,
   @nextnode-solutions/infrastructure in package.json, or the user mentions
   NextNode deploys.
-user-invocable: true
-synced-at: 7185a94
 ---
 
 # @nextnode-solutions/infrastructure
+
+**Source**: @nextnode/core @ 7185a94 (resync 2026-08-16)
 
 Config-driven CI/CD CLI for NextNode projects. Reads `nextnode.toml`, runs quality gates, deploys to Cloudflare Pages, Hetzner VPS, or Cloudflare Workers, parses publish results, and enforces prod gates.
 

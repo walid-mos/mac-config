@@ -3,9 +3,8 @@ name: ssh-nextnode
 description: >-
   SSH into a NextNode VPS (deploy user + nextnode-ci key) via Tailscale. Reads
   nextnode.toml to resolve the target hostname. Use when the user runs
-  `/ssh-nextnode`, asks to "ssh into the VPS", "connect to the production
+  `ssh-nextnode`, asks to "ssh into the VPS", "connect to the production
   server", or wants a remote shell on a NextNode Hetzner host.
-user-invocable: true
 ---
 
 # SSH NextNode
@@ -18,9 +17,8 @@ Connect to a NextNode VPS via SSH with the mandatory credentials.
 |-----------|-----------|
 | User `root` or any other user | User `deploy` always |
 | Default SSH key or any identity file other than `nextnode-ci` | `-i ~/.ssh/nextnode-ci` always |
-| Opening an interactive SSH session directly (Claude cannot hold a TTY) | Suggest interactive sessions with the `!` prefix so the user runs them |
+| Opening an interactive SSH session directly (an agent cannot hold an interactive TTY) | Give the user the interactive command to run themselves |
 | Guessing the hostname when `nextnode.toml` is absent | Stop and ask the user which project to target |
-| Running Bash SSH/network commands inside the sandbox | ALL Bash commands MUST use `dangerouslyDisableSandbox: true` |
 
 **Base command:** `ssh -i ~/.ssh/nextnode-ci deploy@<host>`
 
@@ -30,10 +28,10 @@ Connect to a NextNode VPS via SSH with the mandatory credentials.
 - `command` (optional): Remote command to execute. If omitted, suggest the interactive connection command.
 
 Examples:
-- `/ssh-nextnode` - Resolve VPS from current project and show connection command
-- `/ssh-nextnode docker ps` - Run `docker ps` on the current project's VPS
-- `/ssh-nextnode myapp` - Resolve VPS for `myapp` project
-- `/ssh-nextnode myapp docker logs -f backend` - Run command on myapp's VPS
+- ``ssh-nextnode`` - Resolve VPS from current project and show connection command
+- ``ssh-nextnode` docker ps` - Run `docker ps` on the current project's VPS
+- ``ssh-nextnode` myapp` - Resolve VPS for `myapp` project
+- ``ssh-nextnode` myapp docker logs -f backend` - Run command on myapp's VPS
 
 ## Instructions
 
@@ -55,9 +53,9 @@ The resolved hostname is directly usable as a Tailscale host (e.g. `ssh deploy@n
   ```bash
   ssh -i ~/.ssh/nextnode-ci deploy@<tailscale-hostname> '<command>'
   ```
-- If **no command** was provided, suggest the interactive session with the `!` prefix:
+- If **no command** was provided, print the interactive connection command for the user to run in their own terminal:
   ```
-  ! ssh -i ~/.ssh/nextnode-ci deploy@<tailscale-hostname>
+  ssh -i ~/.ssh/nextnode-ci deploy@<tailscale-hostname>
   ```
 
 ## Troubleshooting

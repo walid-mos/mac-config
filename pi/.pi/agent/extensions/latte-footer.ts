@@ -336,14 +336,14 @@ async function pollQuotas(): Promise<QuotaCache> {
 			const usage = c.total_usage;
 			if (typeof total === "number") {
 				const quota: OpenRouterQuota = {
-					balance: Math.max(0, total - (typeof usage === "number" ? usage : 0)),
+		balance: Math.max(0, total - (typeof usage === "number" ? usage : 0)),
 				};
 				if (k) {
-					const limit = k.limit;
-					const limitRemaining = k.limit_remaining;
-					if (typeof limit === "number" && typeof limitRemaining === "number") {
-						quota.weekly = { remaining: limitRemaining, limit };
-					}
+		const limit = k.limit;
+		const limitRemaining = k.limit_remaining;
+		if (typeof limit === "number" && typeof limitRemaining === "number") {
+			quota.weekly = { remaining: limitRemaining, limit };
+		}
 				}
 				cache.openrouter = quota;
 			}
@@ -393,10 +393,10 @@ async function pollQuotas(): Promise<QuotaCache> {
 		if (periodType === "USAGE_PERIOD_TYPE_WEEKLY" || periodType === "USAGE_PERIOD_TYPE_MONTHLY") {
 			const wReset =
 				typeof cCfg?.billingPeriodEnd === "string"
-					? cCfg.billingPeriodEnd
-					: isRecord(periodObj) && typeof periodObj.end === "string"
-						? periodObj.end
-						: "";
+		? cCfg.billingPeriodEnd
+		: isRecord(periodObj) && typeof periodObj.end === "string"
+			? periodObj.end
+			: "";
 			// Primary: creditUsagePercent; fallback: onDemandUsed / onDemandCap.
 			// A parseable period with neither value means zero usage (CodexBar).
 			let usedPercent = finiteNumber(cCfg?.creditUsagePercent);
@@ -404,9 +404,9 @@ async function pollQuotas(): Promise<QuotaCache> {
 				const wCap = valOf(cCfg?.onDemandCap);
 				const wUsed = valOf(cCfg?.onDemandUsed);
 				usedPercent =
-					wCap !== undefined && wCap > 0 && wUsed !== undefined
-						? Math.min(100, Math.max(0, (wUsed / wCap) * 100))
-						: 0;
+		wCap !== undefined && wCap > 0 && wUsed !== undefined
+			? Math.min(100, Math.max(0, (wUsed / wCap) * 100))
+			: 0;
 			} else {
 				usedPercent = Math.min(100, Math.max(0, usedPercent));
 			}
@@ -459,8 +459,8 @@ async function fetchGitStatus(cwd: string): Promise<GitStatus | null> {
 			if (line.startsWith("# branch.ab")) {
 				const m = line.match(/\+(\d+)\s+-(\d+)/);
 				if (m) {
-					status.ahead = Number(m[1]);
-					status.behind = Number(m[2]);
+		status.ahead = Number(m[1]);
+		status.behind = Number(m[2]);
 				}
 				continue;
 			}
@@ -542,6 +542,20 @@ function gitBar(s: GitStatus): string {
 	return frame(bar);
 }
 
+function readSafely<T>(read: () => T, fallback: T): T {
+	try {
+		return read();
+	} catch {
+		return fallback;
+	}
+}
+
+function clampFooterLines(lines: string[], width: number): string[] {
+	return lines.map((line) =>
+		visibleWidth(line) <= width ? line : truncateToWidth(line, width),
+	);
+}
+
 /** Left side of line 2: ascii-style git summary with proportional bar + counters. */
 function gitLine(s: GitStatus | null): string {
 	const dim = (t: string) => fgHex(LATTE.subtext0, t);
@@ -619,170 +633,177 @@ export default function (pi: ExtensionAPI) {
 
 			return {
 				dispose() {
-					unsubBranch();
-					footerInstalled = false;
-					requestRender = undefined;
+		unsubBranch();
+		footerInstalled = false;
+		requestRender = undefined;
 				},
 				invalidate() {},
 				render(width: number): string[] {
-					// ── Line 1, left: model+thinking · path+branch ──
-					const model = ctx.model?.id || "no-model";
-					let thinking = "off";
-					try {
-						thinking = ctx.thinkingLevel ?? "off";
-					} catch {}
-					const modelGroup = powerline([
-						{ bg: LATTE.mauve, label: model, icon: ICONS.model },
-						{
-							bg: THINKING_COLORS[thinking] ?? LATTE.overlay1,
-							label: thinking,
-							icon: ICONS.thinking,
-						},
-					]);
-
-					const cwd = shortPath(ctx.cwd ?? process.cwd());
-					const branch = footerData.getGitBranch();
-					const pathSegs: Segment[] = [
-						{ bg: LATTE.teal, label: cwd, icon: ICONS.folder },
-					];
-					if (branch) pathSegs.push({ bg: LATTE.sapphire, label: branch, icon: ICONS.branch });
-					const pathGroup = powerline(pathSegs);
-
-					const left = `${modelGroup} ${pathGroup}`;
-
-					// ── Line 1, right: statuses · context bar + exact tokens · tokens · cost ──
-					let input = 0,
-						output = 0,
-						cost = 0;
-					for (const e of ctx.sessionManager.getBranch()) {
-						if (e.type === "message" && e.message.role === "assistant") {
-							const m = e.message as AssistantMessage;
-							input += m.usage.input;
-							output += m.usage.output;
-							cost += m.usage.cost.total;
-						}
-					}
-
-					let ctxPart = "";
-					const usage = ctx.getContextUsage?.();
-					if (usage?.percent != null) {
-						const pct = Math.round(usage.percent);
-						const filled = Math.round((usage.percent / 100) * BAR_WIDTH);
-						const barColor =
-							usage.percent < 50 ? LATTE.green : usage.percent < 80 ? LATTE.peach : LATTE.red;
-						const bar =
-							fgHex(barColor, BAR_FULL.repeat(filled)) +
-							fgHex(LATTE.surface1, BAR_EMPTY.repeat(BAR_WIDTH - filled));
-						const exact =
-							usage.tokens != null
-								? ` ${fgHex(LATTE.overlay1, `${fmtTokens(usage.tokens)}/${fmtTokens(usage.contextWindow)}`)}`
-								: "";
-						ctxPart = `${fgHex(LATTE.overlay1, ICONS.context)} ${bar} ${fgHex(barColor, `${pct}%`)}${exact}`;
-					}
-
-					const tokPart = theme.fg(
-						"dim",
-						`↑${fmtTokens(input)} ↓${fmtTokens(output)}  $${cost.toFixed(3)}`,
-					);
-
-					const statuses = [...footerData.getExtensionStatuses().values()].filter(Boolean);
-					const statusPart = statuses.join("  ");
-
-					const right = [statusPart, ctxPart, tokPart].filter(Boolean).join("  ");
-
-					const pad = " ".repeat(Math.max(1, width - visibleWidth(left) - visibleWidth(right)));
-					const line1 = truncateToWidth(left + pad + right, width);
-
-					// ── Line 2: git summary (left) · provider quota (right) ──
-					const lines = [line1];
-					const gitPart = gitLine(gitCache);
-					const dim = (s: string) => fgHex(LATTE.subtext0, s);
-					const provider = (ctx.model?.provider ?? "").toLowerCase();
-					// Show the active provider's quota; fall back to everyone if unmatched
-					const showXai = provider.includes("xai");
-					const showKimi = provider.includes("kimi");
-					const showOr = provider.includes("openrouter");
-					const showAll = !showXai && !showKimi && !showOr;
-
-					const quotaParts: string[] = [];
-
-					if (quotaCache.kimi && (showKimi || showAll)) {
-						const { fiveHour, weekly } = quotaCache.kimi;
-						let part =
-							`${dim("kimi 5h")} ${quotaGauge(fiveHour.remaining, fiveHour.limit)}`;
-						if (fiveHour.reset) {
-							part += ` ${dim(`${ICONS.reset} ${fmtReset(fiveHour.reset)}`)}`;
-						}
-						// limit 0 = unknown / absent weekly — skip rather than emit junk
-						if (Number.isFinite(weekly.limit) && weekly.limit > 0) {
-							part +=
-								`   ${dim("sem")} ${quotaGauge(weekly.remaining, weekly.limit)}`;
-							if (weekly.reset) {
-								part += ` ${dim(`${ICONS.reset} ${fmtReset(weekly.reset)}`)}`;
-							}
-						}
-						quotaParts.push(part);
-					}
-
-					if (quotaCache.openrouter && (showOr || showAll)) {
-						const orq = quotaCache.openrouter;
-						const col = balanceColor(orq.balance);
-						let part =
-							`${dim("openrouter")} ${fgHex(col, "◉")} ${fgHex(col, `$${orq.balance.toFixed(2)}`)}` +
-							` ${dim("crédits")}`;
-						if (orq.weekly) {
-							part +=
-								`   ${dim("hebdo")} ${quotaGauge(orq.weekly.remaining, orq.weekly.limit)}`;
-						}
-						quotaParts.push(part);
-					}
-
-					if (quotaCache.xai && (showXai || showAll)) {
-						const x = quotaCache.xai;
-						let part = `${dim("xai")}`;
-						if (x.tier) part += ` ${fgHex(LATTE.mauve, x.tier)}`;
-						// Legacy monthly cap — only when the primary pool isn't already monthly
-						if (x.monthly && x.monthly.limit > 0 && x.pool?.label !== "mois") {
-							const remaining = x.monthly.limit - x.monthly.used;
-							part += `   ${dim("mois")} ${quotaGauge(remaining, x.monthly.limit)}`;
-							if (x.monthly.reset) {
-								part += ` ${dim(`${ICONS.reset} ${fmtReset(x.monthly.reset)}`)}`;
-							}
-						}
-						if (x.pool && Number.isFinite(x.pool.usedPercent)) {
-							// kimi-style: show the remaining share of the usage pool
-							const remaining = 100 - x.pool.usedPercent;
-							part += `   ${dim(x.pool.label)} ${quotaGauge(remaining, 100)}`;
-							if (x.pool.reset) {
-								part += ` ${dim(`${ICONS.reset} ${fmtReset(x.pool.reset)}`)}`;
-							}
-						}
-						if (x.prepaidBalance && x.prepaidBalance > 0) {
-							const col = balanceColor(x.prepaidBalance);
-							part += `   ${fgHex(col, "◉")} ${fgHex(col, `$${x.prepaidBalance.toFixed(2)}`)} ${dim("crédits")}`;
-						}
-						// Always show at least the tier name so the provider is recognised
-						if (part === `${dim("xai")}`) {
-							part = `${dim("xai")} ${fgHex(LATTE.subtext0, "—")}`;
-						}
-						quotaParts.push(part);
-					}
-
-					{
-						const quotaContent =
-							quotaParts.length > 0
-								? `${fgHex(LATTE.overlay1, ICONS.quota)} ${quotaParts.join(dim("   ·   "))}`
-								: "";
-						const pad2 = " ".repeat(
-							Math.max(1, width - visibleWidth(gitPart) - visibleWidth(quotaContent)),
-						);
-						lines.push(truncateToWidth(gitPart + pad2 + quotaContent, width));
-					}
-
-					return lines;
+		try {
+			return clampFooterLines(renderFooter(width, ctx, theme, footerData), width);
+		} catch {
+			return [""];
+		}
 				},
 			};
 		});
+	}
+
+	function renderFooter(
+		width: number,
+		ctx: ExtensionContext,
+		theme: Theme,
+		footerData: ReadonlyFooterDataProvider,
+	): string[] {
+		// ── Line 1, left: model+thinking · path+branch ──
+		const model = readSafely(() => ctx.model?.id, undefined) || "no-model";
+		const thinking = readSafely(() => ctx.thinkingLevel, "off") ?? "off";
+		const modelGroup = powerline([
+			{ bg: LATTE.mauve, label: model, icon: ICONS.model },
+			{
+				bg: THINKING_COLORS[thinking] ?? LATTE.overlay1,
+				label: thinking,
+				icon: ICONS.thinking,
+			},
+		]);
+
+		const cwd = shortPath(readSafely(() => ctx.cwd, undefined) ?? process.cwd());
+		const branch = footerData.getGitBranch();
+		const pathSegs: Segment[] = [{ bg: LATTE.teal, label: cwd, icon: ICONS.folder }];
+		if (branch) pathSegs.push({ bg: LATTE.sapphire, label: branch, icon: ICONS.branch });
+		const pathGroup = powerline(pathSegs);
+
+		const left = `${modelGroup} ${pathGroup}`;
+
+		// ── Line 1, right: statuses · context bar + exact tokens · tokens · cost ──
+		let input = 0,
+			output = 0,
+			cost = 0;
+		const branchEntries = readSafely(() => ctx.sessionManager.getBranch(), []);
+		for (const e of branchEntries) {
+			if (e.type === "message" && e.message.role === "assistant") {
+				const m = e.message as AssistantMessage;
+				input += m.usage.input;
+				output += m.usage.output;
+				cost += m.usage.cost.total;
+			}
+		}
+
+		let ctxPart = "";
+		const usage = readSafely(() => ctx.getContextUsage?.(), undefined);
+		if (usage?.percent != null) {
+			const pct = Math.round(usage.percent);
+			const filled = Math.round((usage.percent / 100) * BAR_WIDTH);
+			const barColor =
+				usage.percent < 50 ? LATTE.green : usage.percent < 80 ? LATTE.peach : LATTE.red;
+			const bar =
+				fgHex(barColor, BAR_FULL.repeat(filled)) +
+				fgHex(LATTE.surface1, BAR_EMPTY.repeat(BAR_WIDTH - filled));
+			const exact =
+				usage.tokens != null
+					? ` ${fgHex(LATTE.overlay1, `${fmtTokens(usage.tokens)}/${fmtTokens(usage.contextWindow)}`)}`
+					: "";
+			ctxPart = `${fgHex(LATTE.overlay1, ICONS.context)} ${bar} ${fgHex(barColor, `${pct}%`)}${exact}`;
+		}
+
+		const tokPart = theme.fg(
+			"dim",
+			`↑${fmtTokens(input)} ↓${fmtTokens(output)}  $${cost.toFixed(3)}`,
+		);
+
+		const statuses = [...footerData.getExtensionStatuses().values()].filter(Boolean);
+		const statusPart = statuses.join("  ");
+
+		const right = [statusPart, ctxPart, tokPart].filter(Boolean).join("  ");
+
+		const pad = " ".repeat(Math.max(1, width - visibleWidth(left) - visibleWidth(right)));
+		const line1 = truncateToWidth(left + pad + right, width);
+
+		// ── Line 2: git summary (left) · provider quota (right) ──
+		const lines = [line1];
+		const gitPart = gitLine(gitCache);
+		const dim = (s: string) => fgHex(LATTE.subtext0, s);
+		const provider = (readSafely(() => ctx.model?.provider, undefined) ?? "").toLowerCase();
+		// Show the active provider's quota; fall back to everyone if unmatched
+		const showXai = provider.includes("xai");
+		const showKimi = provider.includes("kimi");
+		const showOr = provider.includes("openrouter");
+		const showAll = !showXai && !showKimi && !showOr;
+
+		const quotaParts: string[] = [];
+
+		if (quotaCache.kimi && (showKimi || showAll)) {
+			const { fiveHour, weekly } = quotaCache.kimi;
+			let part =
+				`${dim("kimi 5h")} ${quotaGauge(fiveHour.remaining, fiveHour.limit)}`;
+			if (fiveHour.reset) {
+				part += ` ${dim(`${ICONS.reset} ${fmtReset(fiveHour.reset)}`)}`;
+			}
+			// limit 0 = unknown / absent weekly — skip rather than emit junk
+			if (Number.isFinite(weekly.limit) && weekly.limit > 0) {
+				part += `   ${dim("sem")} ${quotaGauge(weekly.remaining, weekly.limit)}`;
+				if (weekly.reset) {
+					part += ` ${dim(`${ICONS.reset} ${fmtReset(weekly.reset)}`)}`;
+				}
+			}
+			quotaParts.push(part);
+		}
+
+		if (quotaCache.openrouter && (showOr || showAll)) {
+			const orq = quotaCache.openrouter;
+			const col = balanceColor(orq.balance);
+			let part =
+				`${dim("openrouter")} ${fgHex(col, "◉")} ${fgHex(col, `$${orq.balance.toFixed(2)}`)}` +
+				` ${dim("crédits")}`;
+			if (orq.weekly) {
+				part += `   ${dim("hebdo")} ${quotaGauge(orq.weekly.remaining, orq.weekly.limit)}`;
+			}
+			quotaParts.push(part);
+		}
+
+		if (quotaCache.xai && (showXai || showAll)) {
+			const x = quotaCache.xai;
+			let part = `${dim("xai")}`;
+			if (x.tier) part += ` ${fgHex(LATTE.mauve, x.tier)}`;
+			// Legacy monthly cap — only when the primary pool isn't already monthly
+			if (x.monthly && x.monthly.limit > 0 && x.pool?.label !== "mois") {
+				const remaining = x.monthly.limit - x.monthly.used;
+				part += `   ${dim("mois")} ${quotaGauge(remaining, x.monthly.limit)}`;
+				if (x.monthly.reset) {
+					part += ` ${dim(`${ICONS.reset} ${fmtReset(x.monthly.reset)}`)}`;
+				}
+			}
+			if (x.pool && Number.isFinite(x.pool.usedPercent)) {
+				// kimi-style: show the remaining share of the usage pool
+				const remaining = 100 - x.pool.usedPercent;
+				part += `   ${dim(x.pool.label)} ${quotaGauge(remaining, 100)}`;
+				if (x.pool.reset) {
+					part += ` ${dim(`${ICONS.reset} ${fmtReset(x.pool.reset)}`)}`;
+				}
+			}
+			if (x.prepaidBalance && x.prepaidBalance > 0) {
+				const col = balanceColor(x.prepaidBalance);
+				part += `   ${fgHex(col, "◉")} ${fgHex(col, `$${x.prepaidBalance.toFixed(2)}`)} ${dim("crédits")}`;
+			}
+			// Always show at least the tier name so the provider is recognised
+			if (part === `${dim("xai")}`) {
+				part = `${dim("xai")} ${fgHex(LATTE.subtext0, "—")}`;
+			}
+			quotaParts.push(part);
+		}
+
+		{
+			const quotaContent =
+				quotaParts.length > 0
+					? `${fgHex(LATTE.overlay1, ICONS.quota)} ${quotaParts.join(dim("   ·   "))}`
+					: "";
+			const pad2 = " ".repeat(
+				Math.max(1, width - visibleWidth(gitPart) - visibleWidth(quotaContent)),
+			);
+			lines.push(truncateToWidth(gitPart + pad2 + quotaContent, width));
+		}
+
+		return lines;
 	}
 
 	pi.on("session_start", async (_event, ctx) => {

@@ -26,7 +26,7 @@ NOFOLD := claude colima docker gh git herdr homebrew languages pi rclone rtk
 
 # Hooks post-install chaînés par `make install` (cible <nom>-post ; rust n'a pas
 # de package Stow, rustup gère ~/.rustup et ~/.cargo lui-même).
-POSTS := claude dev-dirs gh herdr nvim pi rp rtk rust
+POSTS := claude dev-dirs gh herdr nvim pi plannotator rp rtk rust
 
 # Obsidian : le vault vit dans iCloud, seule la config .obsidian est stowée
 # (symlinks relatifs → portables entre machines). Les binaires (thème, plugins,
@@ -62,6 +62,7 @@ help:
 	@echo "  git-filters    Configure les clean filters git (.gitattributes) dans .git/config"
 	@echo ""
 	@echo "  proxy-reset    Retire le PAC proxy laissé par Zscaler (rétablit le relais Apple)"
+	@echo "  plannotator-post  Installe le binaire, le plugin Claude Code et l'extension Pi"
 	@echo ""
 	@echo "Packages: $(PACKAGES)"
 
@@ -171,6 +172,13 @@ pi-dirs:
 # pnpm installé par brew est un script `#!/usr/bin/env node` et node arrive via
 # fnm, pas via brew : sur un mac neuf on installe le LTS puis on lance pnpm au
 # travers de `fnm exec`. FNM_DIR/PNPM_HOME reprennent zsh/.config/zsh/conf.d.
+#
+# pnpm 11 ignore les flags CLI --config.strict-dep-builds=false quand la commande
+# utilise --prefix (c'est le cas des installs npm de pi : `pi install`/`pi update`
+# passent toujours --prefix ~/.pi/agent/npm). Sans allowBuilds dans le workspace,
+# l'install échoue en ERR_PNPM_IGNORED_BUILDS sur les build scripts non approuvés
+# (node-pty, module natif du webtui via @plannotator/pi-extension). Le fichier est
+# donc écrit AVANT les pi install — sinon le premier install casse d'emblée.
 pi-post: export FNM_DIR := $(HOME)/.local/share/fnm
 pi-post: export PNPM_HOME := $(HOME)/.local/share/pnpm
 pi-post: export PATH := $(HOME)/.local/share/pnpm/bin:$(HOME)/.local/share/pnpm:$(PATH)
@@ -184,8 +192,24 @@ pi-post:
 			fnm exec --using lts-latest -- pnpm add -g @earendil-works/pi-coding-agent; \
 		else echo "node et fnm introuvables — installe node puis relance make pi-post"; fi; \
 	fi
+	@mkdir -p "$(HOME)/.pi/agent/npm"
+	@if ! grep -q '^  node-pty: true' "$(HOME)/.pi/agent/npm/pnpm-workspace.yaml" 2>/dev/null; then \
+		if grep -q '^allowBuilds:' "$(HOME)/.pi/agent/npm/pnpm-workspace.yaml" 2>/dev/null; then \
+			printf '  node-pty: true\n' >> "$(HOME)/.pi/agent/npm/pnpm-workspace.yaml"; \
+		else \
+			printf 'allowBuilds:\n  node-pty: true\n' > "$(HOME)/.pi/agent/npm/pnpm-workspace.yaml"; \
+		fi; \
+		echo "→ pnpm-workspace.yaml: build node-pty approuvé (pnpm 11 + --prefix ignore le flag strict-dep-builds)"; \
+	fi
 	@if command -v pi >/dev/null; then \
-		pi install npm:pi-web-access >/dev/null; \
+		if [ ! -x "$(PNPM_HOME)/bin/pnpm" ]; then \
+			pnpm11=$$(find "$(FNM_DIR)/node-versions" -path "*/installation/bin/pnpm" \( -type f -o -type l \) 2>/dev/null | sort -V | tail -1); \
+			if [ -n "$$pnpm11" ]; then \
+				ln -sf "$$pnpm11" "$(PNPM_HOME)/bin/pnpm"; \
+				echo "→ pnpm v11 symlinké dans PNPM_HOME/bin (store cohérent)"; \
+			fi; \
+		fi; \
+		pi install npm:pi-web-access >/dev/null 2>&1 || true; \
 		echo "pi prêt — packages web-access — \`pi\` puis /login pour l'auth"; \
 	else echo "pi non installé — étape ignorée"; fi
 
@@ -193,6 +217,36 @@ rp-post:
 	@command -v node >/dev/null || command -v fnm >/dev/null \
 		|| { echo "node not found — install it (fnm install --lts) so 'rp' can serve plan.html"; exit 0; }
 	@echo "rp ready: \`rp <slug>\` will serve plan.html and wait for /submit"
+
+# plannotator : binaire CLI (~/.local/bin) + skills Claude Code (~/.claude/skills)
+# posés par l'installateur officiel (idempotent), plugin Claude Code marketplace
+# (hook ExitPlanMode) et extension Pi npm. Le binaire et les skills ne sont pas
+# versionnés : c'est cette cible qui les (re)pose après chaque clone.
+# Les exports FNM_DIR/PNPM_HOME/PATH sont repris de pi-post : pi install appelle
+# pnpm, qui doit résoudre depuis le symlink pnpm v11 posé par pi-post dans
+# PNPM_HOME/bin (store v11 cohérent), pas depuis le pnpm brew v10 (store v10 —
+# mismatch ERR_PNPM_UNEXPECTED_STORE).
+plannotator-post: export FNM_DIR := $(HOME)/.local/share/fnm
+plannotator-post: export PNPM_HOME := $(HOME)/.local/share/pnpm
+plannotator-post: export PATH := $(HOME)/.local/share/pnpm/bin:$(HOME)/.local/share/pnpm:$(PATH)
+plannotator-post:
+	@if ! command -v plannotator >/dev/null; then \
+		echo "→ installation de plannotator (binaire + skills + hooks)"; \
+		curl -fsSL https://plannotator.ai/install.sh | bash; \
+	else \
+		echo "plannotator déjà présent: $$(plannotator --version | head -1)"; \
+	fi
+	@if command -v claude >/dev/null; then \
+		if claude plugin list 2>/dev/null | grep -q 'plannotator@plannotator'; then \
+			echo "plugin claude plannotator déjà installé"; \
+		else \
+			claude plugin marketplace add backnotprop/plannotator >/dev/null 2>&1 || true; \
+			claude plugin install plannotator@plannotator && echo "plugin claude plannotator installé"; \
+		fi; \
+	else echo "claude introuvable — plugin plannotator non installé"; fi
+	@if command -v pi >/dev/null; then \
+		pi install npm:@plannotator/pi-extension >/dev/null 2>&1 && echo "extension pi plannotator à jour"; \
+	else echo "pi introuvable — extension plannotator non installée"; fi
 
 rtk-post:
 	@if ! command -v rtk >/dev/null; then \

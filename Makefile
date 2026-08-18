@@ -21,12 +21,13 @@ PACKAGES := $(filter-out $(NONSTOW),$(patsubst %/,%,$(wildcard */)))
 # docker/buildx + contexts, rtk/history.db, git/credentials via credential-store
 # XDG, languages/.local/bin partagé avec pnpm/fnm) : sans --no-folding Stow
 # replierait le dossier entier en symlink et l'outil écrirait ses secrets et son
-# runtime dans le repo (puis un unstow les casserait).
-NOFOLD := claude colima docker gh git herdr homebrew languages pi rclone rtk
+# runtime dans le repo (puis un unstow les casserait). hermes écrit ses sessions,
+# sa mémoire et ~/.hermes/.env (secrets) hors repo, comme pi.
+NOFOLD := claude colima docker gh git herdr hermes homebrew languages pi rclone rtk
 
 # Hooks post-install chaînés par `make install` (cible <nom>-post ; rust n'a pas
 # de package Stow, rustup gère ~/.rustup et ~/.cargo lui-même).
-POSTS := claude dev-dirs gh herdr nvim pi plannotator rp rtk rust
+POSTS := claude dev-dirs gh herdr hermes nvim pi plannotator rp rtk rust
 
 # Obsidian : le vault vit dans iCloud, seule la config .obsidian est stowée
 # (symlinks relatifs → portables entre machines). Les binaires (thème, plugins,
@@ -43,7 +44,7 @@ OBSIDIAN_PLUGINS := \
 	folder-notes=LostPaul/obsidian-folder-notes
 OBSIDIAN_PLUGIN_DATA := $(foreach spec,$(OBSIDIAN_PLUGINS),$(firstword $(subst =, ,$(spec))))
 
-.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs obsidian obsidian-save obsidian-post proxy-reset dev-dirs git-filters
+.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs hermes-dirs obsidian obsidian-save obsidian-post proxy-reset dev-dirs git-filters
 
 help:
 	@echo "Targets:"
@@ -150,6 +151,36 @@ herdr-post:
 			&& { herdr server reload-config >/dev/null 2>&1 || true; echo "herdr-nvim-nav prêt : alt+hjkl navigue nvim <-> panes herdr"; } \
 			|| echo "herdr-nvim-nav non installé — alt+hjkl inactif côté herdr (vérifie \`herdr plugin install aimdevlee/herdr-nvim-nav\`)"; \
 	else echo "herdr non installé — étape ignorée"; fi
+
+# hermes est dans NOFOLD : stow ne replie jamais ~/.hermes, donc sessions/,
+# memory/ et .env (secrets) restent des fichiers réels hors repo. hermes-dirs
+# crée les dossiers runtime avant stow. La config (config.yaml, AGENTS.md,
+# skills/) est versionnée dans hermes/.hermes/. Les deux installs sont brew :
+# formula hermes-agent (CLI) + cask hermes-desktop (Hermes.app).
+hermes: | hermes-dirs
+
+hermes-dirs:
+	@mkdir -p "$(HOME)/.hermes/sessions" "$(HOME)/.hermes/memory"
+
+hermes-post:
+	@if ! command -v hermes >/dev/null; then \
+		if command -v brew >/dev/null; then \
+			echo "→ installation de hermes-agent (CLI)"; \
+			brew install hermes-agent; \
+		else echo "hermes introuvable et brew indisponible — installe-le à la main (https://hermes-agent.nousresearch.com)"; fi; \
+	fi
+	@if [[ ! -d "/Applications/Hermes.app" ]]; then \
+		if command -v brew >/dev/null; then \
+			echo "→ installation de hermes-desktop (Hermes.app)"; \
+			brew install --cask hermes-desktop; \
+		fi; \
+	fi
+	@if command -v hermes >/dev/null; then \
+		launchctl setenv PATH "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" || true; \
+		launchctl setenv HERMES_DESKTOP_HERMES "/opt/homebrew/bin/hermes" || true; \
+		echo "hermes prêt — GUI: launchctl env posé (persisté par zsh/.zprofile à chaque login)"; \
+		echo "  \`hermes model\` pour le provider LLM, \`hermes desktop\` pour lancer l'app"; \
+	else echo "hermes non installé — étape ignorée"; fi
 
 nvim-post:
 	@if ! command -v rg >/dev/null; then \

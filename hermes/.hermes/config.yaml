@@ -1,0 +1,7 @@
+# ~/.hermes/config.yaml — versionné dans mac-config (hermes/.hermes/config.yaml).
+# Éditer via le CLI : `hermes config set <cle> <valeur>` écrit à travers le symlink
+# stow → la modif est commitable. Un fichier vide/cassé fait retomber hermes sur
+# ses défauts en silence : préférer le CLI à l'édition YAML à la main.
+#
+# Secrets (API keys) → ~/.hermes/.env (jamais versionné, fichier réel hors repo).
+# Identité de l'agent → ~/.hermes/SOUL.md (optionnel).

@@ -2,12 +2,12 @@
 name: accor-ship
 user-invocable: true
 description: >-
-    Développer une feature du produit Menu Compliance (front @astore/menu-compliance
-    + API @astore/api) dans le monorepo accor product-data-apps, en stack de PR :
-    récupération fidèle des assets visuels du prototype, code optimisé à
-    l'intégration, commits atomiques, local execution par maillon puis global. Trigger on
-    /accor-ship, ou quand l'utilisateur décrit une feature Menu Compliance à livrer
-    dans ce repo.
+  Développer une feature du produit Menu Compliance (front @astore/menu-compliance
+  + API @astore/api) dans le monorepo accor product-data-apps, en stack de PR :
+  récupération fidèle des assets visuels du prototype, code optimisé à
+  l'intégration, commits atomiques, simplify par maillon puis global. Trigger on
+  /accor-ship, ou quand l'utilisateur décrit une feature Menu Compliance à livrer
+  dans ce repo.
 ---
 
 # accor-ship
@@ -31,11 +31,11 @@ sont acquis — l'utilisateur ne fournit que **la feature** (et un ticket au bes
 
 ## Périmètre — figé, non négociable
 
-| Touche                                                                                                | Ne touche pas                                          |
-| ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| `apps/menu-compliance` (front, `@astore/menu-compliance`)                                             | `apps/product-benchmark` — jamais, sous aucun prétexte |
-| `apps/api` (back, `@astore/api`) — pour l'API dont la feature a besoin                                | `apps/portail` sauf demande explicite                  |
-| `packages/ui`, `packages/oxlint-config` si un changement partagé l'exige et reste couplé à la feature |                                                        |
+| Touche | Ne touche pas |
+|--------|---------------|
+| `apps/menu-compliance` (front, `@astore/menu-compliance`) | `apps/product-benchmark` — jamais, sous aucun prétexte |
+| `apps/api` (back, `@astore/api`) — pour l'API dont la feature a besoin | `apps/portail` sauf demande explicite |
+| `packages/ui`, `packages/oxlint-config` si un changement partagé l'exige et reste couplé à la feature | |
 
 Toute modification hors de ce périmètre se signale et se justifie avant de committer.
 
@@ -53,8 +53,8 @@ En cas de doute sur un rendu, l'URL déployée tranche — pas le code, pas le g
 C'est un prototype produit par un LLM : **rendu visuel exactement ce qu'on veut**,
 **code de très mauvaise qualité**. Deux règles opposées :
 
-1. **Fidélité visuelle totale (1:1).** Récupérer _obligatoirement tous les assets
-   visuels_ — images, icônes, SVG, polices, tokens de couleur, espacements,
+1. **Fidélité visuelle totale (1:1).** Récupérer *obligatoirement tous les assets
+   visuels* — images, icônes, SVG, polices, tokens de couleur, espacements,
    structure de layout. Le rendu final doit être indiscernable du prototype déployé.
 2. **Code réécrit, pas copié.** Ne jamais recopier le code du prototype tel quel.
    L'intégrer dans notre stack (React + TS + conventions `@nextnode-solutions/*`),
@@ -70,7 +70,7 @@ autorité** : back, API, hooks, stores, et **surtout modèle de données / base*
 - **INTERDIT** de dériver du proto un schéma DB, des colonnes, un modèle de données,
   des valeurs par défaut persistées, une règle métier ou une décision produit lue
   dans son code (`src/lib/*`, commentaires de débriefs, fixtures, localStorage).
-  Le proto montre _ce que l'écran affiche_, jamais _comment on le stocke_.
+  Le proto montre *ce que l'écran affiche*, jamais *comment on le stocke*.
 - Sources de vérité côté back : **le ticket/la spec**, l'architecture du repo
   (`AGENTS.md`), et l'existant en base. Le modèle de données se conçoit depuis le
   besoin, pas depuis les types du proto.
@@ -80,7 +80,7 @@ autorité** : back, API, hooks, stores, et **surtout modèle de données / base*
   gravée en schéma DB ou en contrat API. La citer avec sa source ; ne jamais la
   présenter comme acquise.
 - Ce qui reste légitime à lire dans le proto pour le back : les libellés affichés
-  et la forme des écrans, pour dimensionner les DTO _après_ validation du modèle.
+  et la forme des écrans, pour dimensionner les DTO *après* validation du modèle.
 
 Récupérer le proto : `git clone` du repo en scratchpad ou lecture via `gh`/WebFetch
 pour inventorier assets et markup ; ouvrir l'URL déployée dans Chrome comme
@@ -146,6 +146,13 @@ en plus :
   et vérifier que le rendu est une **copie 1:1** (côte à côte) plus une console
   propre. Le moindre écart visuel = maillon non fini. Ne pas déclarer un maillon
   front fini sans cette comparaison.
+- **`/simplify` par maillon** : skill `simplify` sur le diff du maillon seul
+  (`/simplify maillon`), avant de passer au suivant. Ré-commiter, re-tester vert.
+- **`/simplify` global** : skill `simplify` sur le diff complet du stack
+  (`/simplify global`), avant `submit`. Propager vers le bas du stack si besoin
+  (`gh stack rebase`), re-tester.
+- **Submit** : `gh stack submit` seulement après les deux passes `/simplify`.
+  Pas d'auto-merge.
 - **Descriptions de PR** : chaque PR du stack suit **strictement**
   `.github/PULL_REQUEST_TEMPLATE.md` du repo (sections Ticket — ou justification
   de son absence dans le Summary —, Summary, Scope coché, Changes, How was this
@@ -165,5 +172,6 @@ en plus :
 - Découpé en maillons sous budget, chacun compilant et testant vert seul, plusieurs
   commits atomiques par maillon.
 - `pnpm test`, `pnpm lint`, `pnpm typecheck` verts sur tout le stack — sortie réelle.
+- `/simplify` a tourné **par maillon puis en global**, correctifs commités et testés.
 - Stack de PR soumis depuis `develop` (`gh stack submit`), sauf `--stop-before-pr`.
 - Chaque description de PR est conforme à `.github/PULL_REQUEST_TEMPLATE.md`.

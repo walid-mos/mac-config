@@ -3,8 +3,9 @@ name: stack
 description: >-
   Découper un travail de dev décrit librement en un stack de pull requests
   propres : features ordonnées, chacune sur une branche empilée, commits
-  atomiques, tests verts, puis submit du stack. Trigger on /stack, "découpe ça
-  en PR", "empile les PR", "développe cette feature en stack".
+  atomiques, tests verts, /simplify par maillon puis global, puis submit du
+  stack. Pour le dev hors Plane et tout ce qui passe par /goal. Trigger on
+  /stack, "découpe ça en PR", "empile les PR", "développe cette feature en stack".
 ---
 
 # Stack
@@ -60,7 +61,10 @@ estimé) et commandes de test détectées. Avec `--dry-run`, s'arrêter ici.
      seul commit géant.
    - Tester pour de vrai : suite de tests + lint + typecheck verts avant
      d'avancer. Rouge = on corrige.
+   - **`/simplify maillon`** — reuse / qualité / efficacité / altitude sur le
+     diff du maillon seul. Ré-commiter, re-tester vert.
    - Maillon suivant : `gh stack add <slug-NN-maillon>`.
+4. **`/simplify global`** sur le diff complet du stack, avant tout submit.
 
 Le stack reste **local** — aucune branche ni PR n'est poussée. Le push est
 manuel (`git push` ou `gh stack push`), quand le développeur est prêt.

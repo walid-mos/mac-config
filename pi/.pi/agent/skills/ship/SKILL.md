@@ -2,11 +2,11 @@
 name: ship
 user-invocable: true
 description: >-
-    Execute a whole Plane epic autonomously: worktree from the base branch, every
-    child ticket implemented and tested with atomic commits, sliced into a stack
-    of readable PRs, then simplified via /local execution and submitted. Trigger on /ship,
-    "réalise l'épique X", "implémente toutes les tâches de MINA-1", "lance la
-    feature".
+  Execute a whole Plane epic autonomously: worktree from the base branch, every
+  child ticket implemented and tested with atomic commits, sliced into a stack
+  of readable PRs, then simplified via /simplify and submitted. Trigger on /ship,
+  "réalise l'épique X", "implémente toutes les tâches de MINA-1", "lance la
+  feature".
 ---
 
 # Ship
@@ -40,6 +40,21 @@ lisibles, empilées comme des commits.
 
 ## FORBIDDEN / MANDATORY
 
+| FORBIDDEN | MANDATORY |
+|-----------|-----------|
+| Demander une clarification au milieu de l'épique | Tout ce qui manque se décide en Phase 1, avant le premier commit |
+| Une PR fourre-tout de toute l'épique | Un stack de maillons, chacun ≤ `--max-files` / `--max-lines`, reviewable seul |
+| Un commit fourre-tout par ticket | Plusieurs commits atomiques, chacun compilable et testable seul |
+| Couper un maillon au milieu d'un état incohérent | Un maillon compile, teste vert et se relit seul avant de passer au suivant |
+| Isoler un ticket trivial dans sa propre PR | Fusionner les tickets adjacents fortement couplés tant que le budget tient |
+| Laisser un ticket géant dans un seul maillon | Le re-découper en plusieurs maillons par couche |
+| Passer un ticket en Done sans que sa branche soit poussée | Push de la branche d'abord, transition Plane ensuite |
+| Marquer une tâche faite avec des tests rouges ou non lancés | Lancer les tests réellement et coller la sortie en cas d'échec |
+| Réduire le périmètre en silence | Livrer le reste en entier et dire explicitement ce qui est bloqué et pourquoi |
+| Inventer le contenu d'un ticket de mémoire | `plane_get_workitem` sur chacun, description lue avant d'écrire du code |
+| Travailler directement sur `main` | Worktree ou branche dédiée depuis `--base` |
+| `gh stack submit` avant `/simplify` global | Ordre imposé : dev → simplify par maillon → simplify global → submit |
+
 ## Phase 1 — Orient & découper
 
 En parallèle :
@@ -65,9 +80,9 @@ Construire l'**ordre d'exécution** : tri topologique des tickets. Un ticket dé
 topologique (un maillon ne dépend que de ceux d'en dessous). Règles :
 
 1. **Défaut** : 1 ticket = 1 maillon.
-2. **Fusion** : des tickets adjacents peuvent partager un maillon _seulement si_
+2. **Fusion** : des tickets adjacents peuvent partager un maillon *seulement si*
    ils sont fortement couplés — l'un est intestable ou vide de sens sans l'autre
-   (ex. `schéma DB` + `config Drizzle`) — _et_ que leur diff cumulé estimé reste
+   (ex. `schéma DB` + `config Drizzle`) — *et* que leur diff cumulé estimé reste
    sous `--max-files` / `--max-lines`. Un ticket trivial (poignée de lignes) se
    fusionne par défaut avec son voisin couplé plutôt que d'avoir une PR solitaire.
 3. **Split** : un ticket dont le diff estimé dépasse le budget est éclaté en
@@ -126,6 +141,9 @@ nouvelle branche au-dessus) et y poursuivre. Le signaler dans le rapport.
 
 Quand tous les tickets du maillon sont faits :
 
+- **`/simplify` du maillon** — skill `simplify` sur le diff du maillon seul
+  (`/simplify maillon`) : réutilisation, qualité, efficacité, altitude.
+  Ré-commiter les correctifs, re-tester vert.
 - **Maillon suivant** — `gh stack add <slug-NN-maillon>` crée la branche du
   maillon suivant au-dessus et la checkout. Recommencer la boucle.
 
@@ -138,6 +156,13 @@ blocage local.
 
 Dans cet ordre, sans en sauter :
 
+1. **`/simplify` global** — skill `simplify` sur le diff complet du stack
+   (`/simplify global`) : duplication et altitude qui n'apparaissent qu'en
+   voyant l'ensemble. Si un correctif touche un maillon du bas, propager vers
+   le haut avec `gh stack rebase`, puis re-tester. Sûr : aucune PR n'est
+   encore ouverte.
+2. **Vérification finale** — suite complète verte sur tout le stack, et
+   re-passage Chrome sur les parcours si `/simplify` a touché du code UI.
 3. **Submit** — `gh stack submit --auto --open` : pousse toutes les branches,
    crée toutes les PR d'un coup, prêtes à review, chaînées sur GitHub. Titres et
    descriptions par maillon citent les tickets Plane couverts. Sauf
@@ -159,6 +184,7 @@ Ne rien annoncer comme fini tant que tout ceci n'est pas vrai :
 - Tests, lint et typecheck passent sur tout le stack — sortie réelle, pas une
   supposition.
 - Les parcours web ont été vus dans Chrome.
+- `/simplify` a tourné par maillon **et** en global, correctifs commités et testés.
 - Le stack de PR est soumis (`gh stack submit`), sauf `--stop-before-pr`.
 
 ## Rapport final

@@ -84,7 +84,46 @@ simplify global → submit`.
   chaque clé dans `fr.json` **et** `en.json`.
 - Pas d'`as` (sauf `as const`) ; valider/narrower à la place.
 
-## 5. Skills liés
+## 5. Lecture Jira / Confluence via API REST
+
+Un profil `authFetch` nommé `accor` est configuré dans `~/.config/pi/web-search.json`.
+Il utilise les cookies de la session Chrome pour t'authentifier sur
+`accor-eprocurement-support.atlassian.net`.
+
+**Ne JAMAIS fetcher une page Jira/Confluence en HTML** — ce sont des SPA dont le
+contenu utile est chargé dynamiquement en JS. Toujours utiliser l'API REST.
+
+### Lire un ticket Jira
+
+```
+URL exemple : https://accor-eprocurement-support.atlassian.net/browse/DA-176
+API        : GET /rest/api/3/issue/{TICKET_KEY}
+```
+
+Extraire la clé du ticket (ex: `DA-176`) depuis l'URL et l'injecter dans l'endpoint REST :
+
+```
+fetch_content(auth: "accor", url: "https://accor-eprocurement-support.atlassian.net/rest/api/3/issue/DA-176")
+```
+
+### Lire une page Confluence
+
+```
+URL exemple : https://accor-eprocurement-support.atlassian.net/wiki/spaces/MID/pages/2043871247/...
+API        : GET /wiki/api/v2/pages/{PAGE_ID}?body-format=atlas_doc_format
+```
+
+Extraire le `PAGE_ID` (entier) depuis l'URL Confluence (segment après `/pages/`).
+
+```
+fetch_content(auth: "accor", url: "https://accor-eprocurement-support.atlassian.net/wiki/api/v2/pages/2043871247?body-format=atlas_doc_format")
+```
+
+Le format `atlas_doc_format` renvoie du JSON ADF structuré. Si le fetch est tronqué
+(limite 30k caractères), utiliser `get_search_content` avec le `responseId` et `offset`
+pour récupérer la suite.
+
+## 6. Skills liés
 
 - `/accor-ship` — livrer une feature Menu Compliance en stack de PR (périmètre + proto figés).
 - `/accor-review` — review dédiée Accor.

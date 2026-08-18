@@ -23,6 +23,7 @@ import type {
 	ExtensionContext,
 	SessionEntry,
 } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
 
 const ENTRY_TYPE = "goal-state";
 const MAX_CONDITION_CHARS = 4000;
@@ -76,6 +77,29 @@ export default function goalExtension(pi: ExtensionAPI): void {
 		},
 		handler: async (args, ctx) => {
 			handleCommand(args.trim(), ctx);
+		},
+	});
+
+	pi.registerTool({
+		name: "goal_set",
+		label: "Goal Set",
+		description: "Set (or replace) the active /goal condition so the extension auto-continues across turns. Call at the start of /ship, /stack, /accor-ship to engage the auto-continue loop.",
+		promptSnippet: "Set a goal condition for auto-continue across turns",
+		promptGuidelines: [
+			"Use goal_set at the start of /ship, /stack, /accor-ship to engage the auto-continue loop; the condition must be provable from command outputs, not declarations.",
+		],
+		parameters: Type.Object({
+			condition: Type.String({ minLength: 1, maxLength: MAX_CONDITION_CHARS, description: "Verifiable condition for the auto-continue loop" }),
+		}),
+		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+			const next = createGoal(params.condition);
+			persist(ctx, next);
+			active = next;
+			renderChrome(ctx, next);
+			ctx.ui.notify(`Goal set: ${next.condition}`, "info");
+			return {
+				content: [{ type: "text", text: `Goal set: ${params.condition}` }],
+			};
 		},
 	});
 

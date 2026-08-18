@@ -2,12 +2,12 @@
 name: accor-ship
 user-invocable: true
 description: >-
-  Développer une feature du produit Menu Compliance (front @astore/menu-compliance
-  + API @astore/api) dans le monorepo accor product-data-apps, en stack de PR :
-  récupération fidèle des assets visuels du prototype, code optimisé à
-  l'intégration, commits atomiques, simplify par maillon puis global. Trigger on
-  /accor-ship, ou quand l'utilisateur décrit une feature Menu Compliance à livrer
-  dans ce repo.
+    Développer une feature du produit Menu Compliance (front @astore/menu-compliance
+    + API @astore/api) dans le monorepo accor product-data-apps, en stack de PR :
+    chaque maillon implémenté via local execution (front/code en parallèle avec 1:1 proto
+    fidélité), simplify par maillon puis global, sous le /goal auto-continue loop.
+    Trigger on /accor-ship, ou quand l'utilisateur décrit une feature Menu
+    Compliance à livrer dans ce repo.
 ---
 
 # accor-ship
@@ -31,11 +31,11 @@ sont acquis — l'utilisateur ne fournit que **la feature** (et un ticket au bes
 
 ## Périmètre — figé, non négociable
 
-| Touche | Ne touche pas |
-|--------|---------------|
-| `apps/menu-compliance` (front, `@astore/menu-compliance`) | `apps/product-benchmark` — jamais, sous aucun prétexte |
-| `apps/api` (back, `@astore/api`) — pour l'API dont la feature a besoin | `apps/portail` sauf demande explicite |
-| `packages/ui`, `packages/oxlint-config` si un changement partagé l'exige et reste couplé à la feature | |
+| Touche                                                                                                | Ne touche pas                                          |
+| ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `apps/menu-compliance` (front, `@astore/menu-compliance`)                                             | `apps/product-benchmark` — jamais, sous aucun prétexte |
+| `apps/api` (back, `@astore/api`) — pour l'API dont la feature a besoin                                | `apps/portail` sauf demande explicite                  |
+| `packages/ui`, `packages/oxlint-config` si un changement partagé l'exige et reste couplé à la feature |                                                        |
 
 Toute modification hors de ce périmètre se signale et se justifie avant de committer.
 
@@ -53,8 +53,8 @@ En cas de doute sur un rendu, l'URL déployée tranche — pas le code, pas le g
 C'est un prototype produit par un LLM : **rendu visuel exactement ce qu'on veut**,
 **code de très mauvaise qualité**. Deux règles opposées :
 
-1. **Fidélité visuelle totale (1:1).** Récupérer *obligatoirement tous les assets
-   visuels* — images, icônes, SVG, polices, tokens de couleur, espacements,
+1. **Fidélité visuelle totale (1:1).** Récupérer _obligatoirement tous les assets
+   visuels_ — images, icônes, SVG, polices, tokens de couleur, espacements,
    structure de layout. Le rendu final doit être indiscernable du prototype déployé.
 2. **Code réécrit, pas copié.** Ne jamais recopier le code du prototype tel quel.
    L'intégrer dans notre stack (React + TS + conventions `@nextnode-solutions/*`),
@@ -70,7 +70,7 @@ autorité** : back, API, hooks, stores, et **surtout modèle de données / base*
 - **INTERDIT** de dériver du proto un schéma DB, des colonnes, un modèle de données,
   des valeurs par défaut persistées, une règle métier ou une décision produit lue
   dans son code (`src/lib/*`, commentaires de débriefs, fixtures, localStorage).
-  Le proto montre *ce que l'écran affiche*, jamais *comment on le stocke*.
+  Le proto montre _ce que l'écran affiche_, jamais _comment on le stocke_.
 - Sources de vérité côté back : **le ticket/la spec**, l'architecture du repo
   (`AGENTS.md`), et l'existant en base. Le modèle de données se conçoit depuis le
   besoin, pas depuis les types du proto.
@@ -80,7 +80,7 @@ autorité** : back, API, hooks, stores, et **surtout modèle de données / base*
   gravée en schéma DB ou en contrat API. La citer avec sa source ; ne jamais la
   présenter comme acquise.
 - Ce qui reste légitime à lire dans le proto pour le back : les libellés affichés
-  et la forme des écrans, pour dimensionner les DTO *après* validation du modèle.
+  et la forme des écrans, pour dimensionner les DTO _après_ validation du modèle.
 
 Récupérer le proto : `git clone` du repo en scratchpad ou lecture via `gh`/WebFetch
 pour inventorier assets et markup ; ouvrir l'URL déployée dans Chrome comme
@@ -129,6 +129,21 @@ Un correctif/refactor s'applique sur **le maillon qui a introduit le fichier**,
 jamais sur un maillon aval. Avant de committer dans un stack :
 `git log --all --source -- <fichier>` pour trouver la branche d'origine, committer
 **là**, puis restack l'aval. Ne jamais poser un commit API sur la PR de la vue.
+
+## Objectif — engager le loop /goal
+
+Appeler `goal_set` avec la condition accor :
+
+```
+goal_set({ condition: "Feature Menu Compliance livrée : stack soumis depuis develop,
+  tous les tickets Done (ou bloqués listés), tests/lint/typecheck verts,
+  /simplify par maillon et global effectués, rendu front 1:1 du proto
+  (drinks-menu-compliance-vite.vercel.app), apps/product-benchmark intact,
+  descriptions de PR conformes à .github/PULL_REQUEST_TEMPLATE.md. Stop after 30 turns." })
+```
+
+L'extension `/goal` auto-continue de tour en tour. Règles : **prove don't
+declare**, un step vérifiable par tour, aucune question en cours de route.
 
 ## Exécution — déléguer à `/ship`
 

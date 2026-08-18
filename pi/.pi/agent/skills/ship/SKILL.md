@@ -2,11 +2,12 @@
 name: ship
 user-invocable: true
 description: >-
-  Execute a whole Plane epic autonomously: worktree from the base branch, every
-  child ticket implemented and tested with atomic commits, sliced into a stack
-  of readable PRs, then simplified via /simplify and submitted. Trigger on /ship,
-  "réalise l'épique X", "implémente toutes les tâches de MINA-1", "lance la
-  feature".
+    Execute a whole Plane epic autonomously: worktree from the base branch, every
+    child ticket implemented and tested with atomic commits, sliced into a stack
+    of readable PRs, each maillon implemented via local execution (parallel front/code),
+    simplified via /simplify, and submitted — under the /goal auto-continue loop.
+    Trigger on /ship, "réalise l'épique X", "implémente toutes les tâches de MINA-1",
+    "lance la feature".
 ---
 
 # Ship
@@ -16,6 +17,30 @@ asking the user anything between the first ticket and the submit.
 
 `/backlog` writes the tickets. `/ship` executes them et les découpe en PR
 lisibles, empilées comme des commits.
+
+## Objectif — engager le loop /goal
+
+Avant toute implémentation, appeler `goal_set` avec une condition vérifiable
+depuis les sorties de commandes du transcript (jamais une déclaration) :
+
+```
+goal_set({ condition: "Épique <EPIC> livrée : stack soumis (gh stack view --short
+  affiche N branches), tous les tickets Done dans Plane (ou bloqués listés avec
+  leur raison), tests/lint/typecheck verts sur tout le stack (sorties dans le
+  transcript), /simplify par maillon et global effectués. Stop after 30 turns." })
+```
+
+L'extension `/goal` auto-continue alors de tour en tour jusqu'à `met` /
+`impossible` / `stuck`. Règles du loop (skill `goal`) :
+
+- **Prove, don't declare** — l'évaluateur ne voit que le transcript : chaque
+  condition doit être prouvée par une sortie de commande réelle, pas affirmée.
+- **Un step vérifiable par tour** — préférer le résultat d'une commande à un
+  paragraphe.
+- **Aucune question en cours de route** — tout se tranche en Phase 1.
+- `--stop-before-pr` → la condition devient « stack construit localement, simplify
+  global fait, sans submit » (le push reste hors du loop).
+- Ajuster « Stop after N turns » à la taille de l'épique (25 par défaut).
 
 ## Arguments
 
@@ -40,20 +65,20 @@ lisibles, empilées comme des commits.
 
 ## FORBIDDEN / MANDATORY
 
-| FORBIDDEN | MANDATORY |
-|-----------|-----------|
-| Demander une clarification au milieu de l'épique | Tout ce qui manque se décide en Phase 1, avant le premier commit |
-| Une PR fourre-tout de toute l'épique | Un stack de maillons, chacun ≤ `--max-files` / `--max-lines`, reviewable seul |
-| Un commit fourre-tout par ticket | Plusieurs commits atomiques, chacun compilable et testable seul |
-| Couper un maillon au milieu d'un état incohérent | Un maillon compile, teste vert et se relit seul avant de passer au suivant |
-| Isoler un ticket trivial dans sa propre PR | Fusionner les tickets adjacents fortement couplés tant que le budget tient |
-| Laisser un ticket géant dans un seul maillon | Le re-découper en plusieurs maillons par couche |
-| Passer un ticket en Done sans que sa branche soit poussée | Push de la branche d'abord, transition Plane ensuite |
-| Marquer une tâche faite avec des tests rouges ou non lancés | Lancer les tests réellement et coller la sortie en cas d'échec |
-| Réduire le périmètre en silence | Livrer le reste en entier et dire explicitement ce qui est bloqué et pourquoi |
-| Inventer le contenu d'un ticket de mémoire | `plane_get_workitem` sur chacun, description lue avant d'écrire du code |
-| Travailler directement sur `main` | Worktree ou branche dédiée depuis `--base` |
-| `gh stack submit` avant `/simplify` global | Ordre imposé : dev → simplify par maillon → simplify global → submit |
+| FORBIDDEN                                                   | MANDATORY                                                                     |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Demander une clarification au milieu de l'épique            | Tout ce qui manque se décide en Phase 1, avant le premier commit              |
+| Une PR fourre-tout de toute l'épique                        | Un stack de maillons, chacun ≤ `--max-files` / `--max-lines`, reviewable seul |
+| Un commit fourre-tout par ticket                            | Plusieurs commits atomiques, chacun compilable et testable seul               |
+| Couper un maillon au milieu d'un état incohérent            | Un maillon compile, teste vert et se relit seul avant de passer au suivant    |
+| Isoler un ticket trivial dans sa propre PR                  | Fusionner les tickets adjacents fortement couplés tant que le budget tient    |
+| Laisser un ticket géant dans un seul maillon                | Le re-découper en plusieurs maillons par couche                               |
+| Passer un ticket en Done sans que sa branche soit poussée   | Push de la branche d'abord, transition Plane ensuite                          |
+| Marquer une tâche faite avec des tests rouges ou non lancés | Lancer les tests réellement et coller la sortie en cas d'échec                |
+| Réduire le périmètre en silence                             | Livrer le reste en entier et dire explicitement ce qui est bloqué et pourquoi |
+| Inventer le contenu d'un ticket de mémoire                  | `plane_get_workitem` sur chacun, description lue avant d'écrire du code       |
+| Travailler directement sur `main`                           | Worktree ou branche dédiée depuis `--base`                                    |
+| `gh stack submit` avant `/simplify` global                  | Ordre imposé : dev → simplify par maillon → simplify global → submit          |
 
 ## Phase 1 — Orient & découper
 
@@ -80,9 +105,9 @@ Construire l'**ordre d'exécution** : tri topologique des tickets. Un ticket dé
 topologique (un maillon ne dépend que de ceux d'en dessous). Règles :
 
 1. **Défaut** : 1 ticket = 1 maillon.
-2. **Fusion** : des tickets adjacents peuvent partager un maillon *seulement si*
+2. **Fusion** : des tickets adjacents peuvent partager un maillon _seulement si_
    ils sont fortement couplés — l'un est intestable ou vide de sens sans l'autre
-   (ex. `schéma DB` + `config Drizzle`) — *et* que leur diff cumulé estimé reste
+   (ex. `schéma DB` + `config Drizzle`) — _et_ que leur diff cumulé estimé reste
    sous `--max-files` / `--max-lines`. Un ticket trivial (poignée de lignes) se
    fusionne par défaut avec son voisin couplé plutôt que d'avoir une PR solitaire.
 3. **Split** : un ticket dont le diff estimé dépasse le budget est éclaté en
@@ -110,30 +135,22 @@ bas). En `--no-stack`, une simple branche `feat/<epic-slug>` suffit.
 Nommage des branches de maillon : `<epic-slug>-NN-<slug-maillon>` (NN à deux
 chiffres, du bas vers le haut).
 
-## Phase 3 — Boucle par maillon
+## Phase 3 — Boucle par maillon (exécution locale par maillon)
 
 Pour chaque maillon, dans l'ordre du stack :
 
-Pour chaque ticket du maillon, dans l'ordre :
-
-1. **In Progress** — `plane_update_workitem(identifier=<id>, stateId=<In Progress uuid>)`
-   avant la première ligne de code.
-2. **Implémenter** — TDD quand le ticket a un critère d'acceptation vérifiable :
-   test rouge, code, vert, refactor. Le code respecte SOLID et reste testable :
-   dépendances injectées, pas de singleton caché, pas de couche qui en connaît
-   trois autres.
-3. **Committer en atomique** — un commit par unité cohérente (schéma, puis
-   validation, puis câblage, puis tests), message conventional commit, sur la
-   branche du maillon courant. Jamais un seul commit géant.
-4. **Tester pour de vrai** — suite de tests + lint + typecheck du projet. Rouge
-   = le ticket n'avance pas, on corrige.
-5. **Vérifier dans Chrome** — dès que le ticket produit ou modifie une surface
-   web : lancer l'app (npm/pnpm dev), naviguer le parcours du ticket, vérifier
-   le rendu et la console. Ticket purement back/infra dispensé — le dire.
-6. **Push** — pousser la branche du maillon (`gh stack push` ou `git push`). Le
+1. **In Progress** — passer tous les tickets du maillon en
+   `plane_update_workitem(identifier=<id>, stateId=<In Progress uuid>)`, avant l’implémentation.
+2. **Tester pour de vrai** — suite de tests + lint + typecheck du projet après
+   application. Rouge = le maillon n'avance pas, on corrige en fix direct (pas
+   une nouvelle boucle).
+3. **Vérifier dans Chrome** — dès que le maillon produit ou modifie une surface
+   web : lancer l'app (npm/pnpm dev), naviguer le parcours du maillon, vérifier
+   le rendu et la console. Maillon purement back/infra dispensé — le dire.
+4. **Push** — pousser la branche du maillon (`gh stack push` ou `git push`). Le
    push crée seulement la branche distante, **pas** la PR (submit en Phase 4).
-7. **Done** — `plane_update_workitem(identifier=<id>, stateId=<Done uuid>)`,
-   seulement après le push.
+5. **Done** — `plane_update_workitem(identifier=<id>, stateId=<Done uuid>)` pour
+   chaque ticket du maillon, seulement après le push.
 
 Si le diff réel d'un maillon dépasse largement le budget en cours de route :
 couper un maillon supplémentaire (`gh stack add <slug-NN-maillon>` ouvre une

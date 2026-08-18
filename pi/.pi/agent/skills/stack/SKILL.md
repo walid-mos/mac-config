@@ -1,11 +1,11 @@
 ---
 name: stack
 description: >-
-  Découper un travail de dev décrit librement en un stack de pull requests
-  propres : features ordonnées, chacune sur une branche empilée, commits
-  atomiques, tests verts, /simplify par maillon puis global, puis submit du
-  stack. Pour le dev hors Plane et tout ce qui passe par /goal. Trigger on
-  /stack, "découpe ça en PR", "empile les PR", "développe cette feature en stack".
+    Découper un travail de dev décrit librement en un stack de pull requests
+    propres : features ordonnées, chacune sur une branche empilée, commits
+    atomiques, tests verts, /simplify par maillon puis global, puis submit du
+    stack. Pour le dev hors Plane et tout ce qui passe par /goal. Trigger on
+    /stack, "découpe ça en PR", "empile les PR", "développe cette feature en stack".
 ---
 
 # Stack
@@ -35,7 +35,7 @@ ceux d'en dessous).
 
 1. **Défaut** : une feature cohérente = un maillon.
 2. **Fusion** : ce qui est fortement couplé (l'un est intestable sans l'autre,
-   ex. schéma DB + config) partage un maillon *tant que* le diff cumulé estimé
+   ex. schéma DB + config) partage un maillon _tant que_ le diff cumulé estimé
    reste sous le budget.
 3. **Split** : une feature dont le diff estimé dépasse le budget se coupe en
    plusieurs maillons par couches (schéma → validation → câblage → UI), chacun
@@ -48,6 +48,22 @@ Jamais de coupe au milieu d'un état rouge.
 Sortir un plan court : liste des maillons (nom de branche, contenu, budget
 estimé) et commandes de test détectées. Avec `--dry-run`, s'arrêter ici.
 
+## Objectif — engager le loop /goal
+
+Avant l'exécution, appeler `goal_set` avec une condition vérifiable depuis les
+sorties de commandes du transcript :
+
+```
+goal_set({ condition: "Stack construit localement : gh stack view --short
+  affiche N maillons, tests/lint/typecheck verts, /simplify par maillon et global
+  effectués. Pas de push (manuel). Stop after 25 turns." })
+```
+
+L'extension `/goal` auto-continue de tour en tour jusqu'à `met` / `impossible` /
+`stuck`. Règles : **prove don't declare**, un step vérifiable par tour, aucune
+question en cours de route. La condition exclut délibérément le push (manuel
+dans `/stack`).
+
 ## Exécution
 
 1. **Orient** — relire la description ; repérer dans le repo les commandes de
@@ -56,15 +72,7 @@ estimé) et commandes de test détectées. Avec `--dry-run`, s'arrêter ici.
 2. **Worktree & init** — `git fetch`, worktree depuis `--base` à jour.
    `gh stack init --base <base> <slug-01-maillon>`. Nommage des maillons :
    `<slug>-NN-<slug-maillon>` (NN à deux chiffres, du bas vers le haut).
-3. **Par maillon**, dans l'ordre :
-   - Implémenter, en **commits atomiques** (conventional commit) — jamais un
-     seul commit géant.
-   - Tester pour de vrai : suite de tests + lint + typecheck verts avant
-     d'avancer. Rouge = on corrige.
-   - **`/simplify maillon`** — reuse / qualité / efficacité / altitude sur le
-     diff du maillon seul. Ré-commiter, re-tester vert.
-   - Maillon suivant : `gh stack add <slug-NN-maillon>`.
-4. **`/simplify global`** sur le diff complet du stack, avant tout submit.
+3. **`/simplify global`** sur le diff complet du stack, avant tout submit.
 
 Le stack reste **local** — aucune branche ni PR n'est poussée. Le push est
 manuel (`git push` ou `gh stack push`), quand le développeur est prêt.

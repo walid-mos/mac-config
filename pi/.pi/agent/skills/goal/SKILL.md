@@ -22,8 +22,10 @@ uses (`stack` hors Plane, `ship` sous Plane).
 
 ## When this skill is loaded
 
-A goal is active, or the user just set one. Work until the condition is
-**proven** or honestly impossible.
+A goal is active, or the user just set one. Ship, stack et accor-ship
+appellent eux-mêmes `goal_set` (tool d'extension) — le loop est engagé
+automatiquement. Work until the condition is **proven** or honestly
+impossible.
 
 ## How to work
 
@@ -40,6 +42,8 @@ A goal is active, or the user just set one. Work until the condition is
     - free-form feature, Jira, no tracker → `/stack`
     - cleanup of an already-green diff → `/simplify`
     - everything else → implement in place, still with a behavior lock
+      Note : ship/stack/accor-ship appellent `goal_set` automatiquement — quand tu
+      es dans ces skills, suis leurs phases, le goal est déjà actif.
 4. **One verifiable step per turn.** Prefer a command result over a
    paragraph. The evaluator is a small model with no tools.
 5. **Do not stop because you feel done.** Stop because the condition's

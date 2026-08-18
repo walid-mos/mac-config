@@ -20,6 +20,8 @@ brew "herdr"
 brew "rtk"
 brew "hermes-agent"
 cask "hermes-desktop"
+brew "mlx-lm"    # MLX framework (Apple Silicon)
+brew "pipx"      # Python app isolation
 # Notifs macOS cliquables pour herdr (delivery = "system") : sans lui herdr
 # retombe sur osascript et le clic ouvre Script Editor au lieu de Ghostty.
 brew "terminal-notifier"

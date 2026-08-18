@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+# Start/stop the local Gemma MLX server with Hermes.app.
+# Driven by launchd (com.stow.hermes-gemma). Install via `make hermes-gemma`.
+set -u
+
+MODEL="${HERMES_GEMMA_MODEL:-mlx-community/gemma-4-12B-it-4bit}"
+PORT="${HERMES_GEMMA_PORT:-8080}"
+HOST="${HERMES_GEMMA_HOST:-127.0.0.1}"
+PIDFILE="${HERMES_GEMMA_PIDFILE:-$HOME/.hermes/gemma.pid}"
+LOG="${HERMES_GEMMA_LOG:-$HOME/.hermes/logs/gemma.log}"
+POLL="${HERMES_GEMMA_POLL:-2}"
+
+export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:/usr/sbin:/usr/bin:/bin"
+
+log() { printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"; }
+
+hermes_running() {
+	pgrep -f '/Hermes.app/Contents/MacOS/Hermes' >/dev/null 2>&1
+}
+
+server_up() {
+	curl -sf -m 1 "http://${HOST}:${PORT}/v1/models" >/dev/null 2>&1
+}
+
+listener_pid() {
+	lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t 2>/dev/null | head -1
+}
+
+server_pid() {
+	local listen
+	listen=$(listener_pid || true)
+	if [[ -n "${listen:-}" ]]; then
+		printf '%s\n' "$listen"
+		return 0
+	fi
+	if [[ -f "$PIDFILE" ]]; then
+		local pid
+		pid=$(cat "$PIDFILE" 2>/dev/null || true)
+		if [[ -n "${pid:-}" ]] && kill -0 "$pid" 2>/dev/null; then
+			printf '%s\n' "$pid"
+			return 0
+		fi
+	fi
+	return 1
+}
+
+start_server() {
+	if server_up; then
+		local pid
+		pid=$(server_pid || true)
+		if [[ -n "${pid:-}" ]]; then
+			printf '%s\n' "$pid" >"$PIDFILE"
+			log "déjà prêt pid=${pid} :${PORT}"
+		fi
+		return 0
+	fi
+	if ! command -v mlx_vlm.server >/dev/null; then
+		log "mlx_vlm.server introuvable (pipx install mlx-vlm)"
+		return 1
+	fi
+	mkdir -p "$(dirname "$LOG")" "$(dirname "$PIDFILE")"
+	log "démarrage mlx_vlm.server :${PORT} (${MODEL})"
+	nohup mlx_vlm.server --model "$MODEL" --port "$PORT" --host "$HOST" --log-level INFO >>"$LOG" 2>&1 &
+	printf '%s\n' "$!" >"$PIDFILE"
+}
+
+stop_server() {
+	local pid
+	pid=$(server_pid || true)
+	if [[ -z "${pid:-}" ]]; then
+		rm -f "$PIDFILE"
+		return 0
+	fi
+	log "arrêt mlx_vlm.server pid=${pid}"
+	kill "$pid" 2>/dev/null || true
+	local i
+	for i in 1 2 3 4 5; do
+		kill -0 "$pid" 2>/dev/null || break
+		sleep 1
+	done
+	kill -9 "$pid" 2>/dev/null || true
+	rm -f "$PIDFILE"
+}
+
+mkdir -p "$(dirname "$LOG")" "$(dirname "$PIDFILE")"
+
+while true; do
+	if hermes_running; then
+		start_server || sleep 10
+		while hermes_running; do
+			sleep "$POLL"
+		done
+		stop_server
+	else
+		sleep "$POLL"
+	fi
+done

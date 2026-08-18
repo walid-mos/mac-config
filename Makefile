@@ -44,7 +44,7 @@ OBSIDIAN_PLUGINS := \
 	folder-notes=LostPaul/obsidian-folder-notes
 OBSIDIAN_PLUGIN_DATA := $(foreach spec,$(OBSIDIAN_PLUGINS),$(firstword $(subst =, ,$(spec))))
 
-.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs hermes-dirs obsidian obsidian-save obsidian-post proxy-reset dev-dirs git-filters
+.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs hermes-dirs hermes-gemma obsidian obsidian-save obsidian-post proxy-reset dev-dirs git-filters
 
 help:
 	@echo "Targets:"
@@ -64,6 +64,7 @@ help:
 	@echo ""
 	@echo "  proxy-reset    Retire le PAC proxy laissé par Zscaler (rétablit le relais Apple)"
 	@echo "  plannotator-post  Installe le binaire, le plugin Claude Code et l'extension Pi"
+	@echo "  hermes-gemma   Installe le superviseur Gemma (démarre/arrête avec Hermes.app)"
 	@echo ""
 	@echo "Packages: $(PACKAGES)"
 
@@ -179,8 +180,49 @@ hermes-post:
 		launchctl setenv PATH "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" || true; \
 		launchctl setenv HERMES_DESKTOP_HERMES "/opt/homebrew/bin/hermes" || true; \
 		echo "hermes prêt — GUI: launchctl env posé (persisté par zsh/.zprofile à chaque login)"; \
-		echo "  \`hermes model\` pour le provider LLM, \`hermes desktop\` pour lancer l'app"; \
+		echo "  \`hermes model\` pour le provider LLM"; \
 	else echo "hermes non installé — étape ignorée"; fi
+	@$(MAKE) hermes-gemma
+
+# Backend local Gemma 4 12B via MLX (multimodal). Hermes est un client HTTP :
+# il ne lance pas l'inférence. Un LaunchAgent supervise mlx_vlm.server et le
+# démarre/arrête avec Hermes.app (évite 7 Go de RAM résidents hors session).
+# Rejouable : pose le binaire pipx, écrit le plist, (re)charge launchd.
+hermes-gemma:
+	@if ! command -v mlx_vlm.server >/dev/null; then \
+		if command -v pipx >/dev/null; then \
+			echo "→ installation de mlx-vlm via pipx"; \
+			pipx install mlx-vlm; \
+			pipx inject mlx-vlm jinja2; \
+		else echo "pipx introuvable — installe-le via brew"; exit 1; fi; \
+	fi
+	@test -x "$(HOME)/.hermes/bin/hermes-gemma-supervise" \
+		|| { echo "superviseur absent — lance \`make hermes\` d'abord"; exit 1; }
+	@mkdir -p "$(HOME)/Library/LaunchAgents" "$(HOME)/.hermes/logs"
+	@umask 077; printf '%s\n' \
+		'<?xml version="1.0" encoding="UTF-8"?>' \
+		'<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' \
+		'<plist version="1.0"><dict>' \
+		'<key>Label</key><string>com.stow.hermes-gemma</string>' \
+		'<key>ProgramArguments</key><array>' \
+		'<string>$(HOME)/.hermes/bin/hermes-gemma-supervise</string>' \
+		'</array>' \
+		'<key>RunAtLoad</key><true/>' \
+		'<key>KeepAlive</key><true/>' \
+		'<key>ThrottleInterval</key><integer>5</integer>' \
+		'<key>StandardOutPath</key><string>$(HOME)/.hermes/logs/gemma-supervise.log</string>' \
+		'<key>StandardErrorPath</key><string>$(HOME)/.hermes/logs/gemma-supervise.log</string>' \
+		'<key>EnvironmentVariables</key><dict>' \
+		'<key>HOME</key><string>$(HOME)</string>' \
+		'<key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:$(HOME)/.local/bin:/usr/sbin:/usr/bin:/bin</string>' \
+		'</dict></dict></plist>' \
+		> "$(HOME)/Library/LaunchAgents/com.stow.hermes-gemma.plist"
+	@uid=$$(id -u); \
+		launchctl bootout "gui/$$uid/com.stow.hermes-gemma" >/dev/null 2>&1 || true; \
+		launchctl bootstrap "gui/$$uid" "$(HOME)/Library/LaunchAgents/com.stow.hermes-gemma.plist"; \
+		launchctl enable "gui/$$uid/com.stow.hermes-gemma"; \
+		launchctl kickstart -k "gui/$$uid/com.stow.hermes-gemma"
+	@echo "superviseur Gemma chargé — démarre/arrête avec Hermes.app (:8080)"
 
 nvim-post:
 	@if ! command -v rg >/dev/null; then \

@@ -1,12 +1,12 @@
 ---
 name: accor-teams-pr
-description: Rédige le message Teams d'annonce de PR à review, à partir des seuls numéros de PR (« fais le message teams pour la 132 et la 133 »). Récupère titre, description et diff via gh, détecte les stacks, et sort le texte prêt à coller dans Teams. Trigger on /accor-teams-pr, « message teams pour les PR », « annonce ces PR », « préviens l'équipe des PR à review ».
+description: Rédige le message Teams d'annonce de PR à review, à partir des seuls numéros de PR (« fais le message teams pour la 132 et la 133 »). Récupère titre, description et diff via gh, détecte les stacks, et copie le message en HTML riche dans le presse-papiers (vraies puces Teams au Cmd+V). Trigger on /accor-teams-pr, « message teams pour les PR », « annonce ces PR », « préviens l'équipe des PR à review ».
 ---
 
 # accor-teams-pr
 
-Entrée : un ou plusieurs numéros de PR. Sortie : un bloc de texte à coller tel quel
-dans Teams, dans le format exact que l'utilisateur poste depuis toujours.
+Entrée : un ou plusieurs numéros de PR. Sortie : le message copié dans le
+presse-papiers en HTML riche — Cmd+V dans Teams donne de vraies puces.
 
 ## 1. Collecte
 
@@ -40,20 +40,23 @@ n'ont pas de lien de base entre elles, même postées ensemble.
 ```
 <url brute>
 PR 1/2
-<ligne de contenu>
-<ligne de contenu>
+- <ligne de contenu>
+- <ligne de contenu>
 
 <url brute>
 PR 2/2
-<ligne de contenu>
+- <ligne de contenu>
 ```
 
 Règles dures :
 
-- **URL brute seule sur sa première ligne.** Teams auto-linkifie ; le markdown
-  `[texte](url)` n'est pas rendu dans la zone de composition et casserait le lien.
-- Aucun markdown : pas de `#`, pas de `-`/`*`, pas de gras, pas de tableau, pas de
-  backticks. Uniquement des lignes de texte nu.
+- **URL brute seule sur sa première ligne.** Le script en fait un lien HTML.
+  Jamais de markdown `[texte](url)`.
+- Chaque ligne de contenu commence par `- ` (tiret + espace). C'est le marqueur
+  que le script transforme en `<li>` — pas une puce Teams à coller telle quelle.
+- Pas de `#`, pas de `*`, pas de gras, pas de tableau, pas de backticks, pas de
+  `•`.
+- `PR x/y` sans puce, entre l'URL et la liste.
 - Ligne vide entre deux PR, jamais à l'intérieur d'une PR.
 - Ne pas répéter l'URL en fin de bloc, ne pas ajouter d'en-tête ni de formule
   d'appel (« Salut à tous », « merci d'avance ») : l'utilisateur les ajoute lui-même
@@ -84,6 +87,22 @@ sert seulement à faire cliquer.
 
 ## 5. Sortie
 
-Rendre le bloc dans une fence de code (pour que la copie soit propre), puis une
-seule ligne de note **hors** du bloc si et seulement si elle est actionnable —
-typiquement l'ordre de review d'un stack. Rien d'autre.
+Teams n'applique le markdown (`- item`) **que pendant la frappe**. Un collage
+de `- item` ou de `• item` reste du texte brut. Le seul collage qui produit de
+vraies puces, c'est du HTML riche dans le presse-papiers.
+
+1. Construire le bloc au format de la section 3.
+2. Le passer au script :
+
+```bash
+printf '%s\n' "<bloc>" | ./scripts/copy-to-teams.sh
+```
+
+(`./scripts` est relatif au dossier du skill.)
+
+3. Afficher un aperçu du bloc dans une fence de code (relecture seulement —
+   **ne pas** demander à l'utilisateur de le copier).
+4. Une ligne hors fence : « déjà dans le presse-papiers — Cmd+V dans Teams ».
+   Plus une note d'ordre de review si c'est un stack. Rien d'autre.
+
+Si le script échoue : le dire, ne pas inventer un fallback markdown.

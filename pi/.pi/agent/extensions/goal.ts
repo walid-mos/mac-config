@@ -21,6 +21,7 @@ import type {
 	ExtensionAPI,
 	ExtensionCommandContext,
 	ExtensionContext,
+	ExtensionUIContext,
 	SessionEntry,
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
@@ -30,6 +31,7 @@ const MAX_CONDITION_CHARS = 4000;
 const DEFAULT_MAX_TURNS = 25;
 const STUCK_NO_TOOL_TURNS = 2;
 const TRANSCRIPT_CHAR_BUDGET = 6000;
+const CHROME_TICK_MS = 1_000;
 
 const PREFERRED_EVALUATOR_IDS = ["deepseek-v4-flash", "grok-build", "k3"] as const;
 
@@ -43,6 +45,8 @@ type GoalState = {
 	condition: string;
 	startedAt: string;
 	turnsEvaluated: number;
+	/** In-memory display counter (LLM rounds). Optional on restored entries. */
+	turnsStarted?: number;
 	noToolTurns: number;
 	maxTurns: number;
 	lastVerdict: GoalVerdict | null;
@@ -63,6 +67,8 @@ const EVALUATOR_SYSTEM = [
 let active: GoalState | null = null;
 let evaluating = false;
 let api: ExtensionAPI | null = null;
+let chromeUi: ExtensionUIContext | null = null;
+let chromeClock: ReturnType<typeof setInterval> | null = null;
 
 export default function goalExtension(pi: ExtensionAPI): void {
 	api = pi;
@@ -92,7 +98,7 @@ export default function goalExtension(pi: ExtensionAPI): void {
 			condition: Type.String({ minLength: 1, maxLength: MAX_CONDITION_CHARS, description: "Verifiable condition for the auto-continue loop" }),
 		}),
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-			const next = createGoal(params.condition);
+			const next = createGoal(params.condition, !ctx.isIdle());
 			persist(ctx, next);
 			active = next;
 			renderChrome(ctx, next);
@@ -105,6 +111,16 @@ export default function goalExtension(pi: ExtensionAPI): void {
 
 	pi.on("session_start", async (_event, ctx) => {
 		active = restoreActiveGoal(ctx.sessionManager.getEntries());
+		renderChrome(ctx, active);
+	});
+
+	pi.on("session_shutdown", async () => {
+		stopChromeClock();
+	});
+
+	pi.on("turn_start", async (_event, ctx) => {
+		if (!active || active.status !== "active") return;
+		active = { ...active, turnsStarted: displayTurns(active) + 1 };
 		renderChrome(ctx, active);
 	});
 
@@ -138,7 +154,7 @@ function handleCommand(args: string, ctx: ExtensionCommandContext): void {
 		return;
 	}
 
-	const next = createGoal(args);
+	const next = createGoal(args, !ctx.isIdle());
 	persist(ctx, next);
 	active = next;
 	renderChrome(ctx, next);
@@ -149,11 +165,12 @@ function handleCommand(args: string, ctx: ExtensionCommandContext): void {
 	host.sendUserMessage(kickoffPrompt(next), { expandPromptTemplates: true });
 }
 
-function createGoal(condition: string): GoalState {
+function createGoal(condition: string, alreadyInTurn: boolean): GoalState {
 	return {
 		condition,
 		startedAt: new Date().toISOString(),
 		turnsEvaluated: 0,
+		turnsStarted: alreadyInTurn ? 1 : 0,
 		noToolTurns: 0,
 		maxTurns: parseMaxTurns(condition),
 		lastVerdict: null,
@@ -346,10 +363,8 @@ function restoreActiveGoal(entries: readonly SessionEntry[]): GoalState | null {
 	if (!found || found.status !== "active") return null;
 	return {
 		...found,
-		turnsEvaluated: 0,
+		turnsStarted: found.turnsStarted || found.turnsEvaluated,
 		noToolTurns: 0,
-		lastVerdict: null,
-		lastReason: "",
 	};
 }
 
@@ -360,20 +375,57 @@ function persist(ctx: ExtensionCommandContext | ExtensionContext, state: GoalSta
 	host.appendEntry(ENTRY_TYPE, state);
 }
 
-function renderChrome(ctx: ExtensionCommandContext | ExtensionContext, state: GoalState | null): void {
-	if (!state || state.status !== "active") {
-		ctx.ui.setStatus("goal", undefined);
-		ctx.ui.setWidget("goal", undefined);
-		return;
-	}
-	const elapsed = formatElapsed(state.startedAt);
-	const line = `◎ /goal active · ${elapsed} · ${state.turnsEvaluated} turns`;
-	ctx.ui.setStatus("goal", line);
-	ctx.ui.setWidget("goal", [
+function displayTurns(state: GoalState): number {
+	return state.turnsStarted || state.turnsEvaluated;
+}
+
+function chromeLine(state: GoalState): string {
+	return `◎ /goal active · ${formatElapsed(state.startedAt)} · ${displayTurns(state)} turns`;
+}
+
+function stopChromeClock(): void {
+	if (!chromeClock) return;
+	clearInterval(chromeClock);
+	chromeClock = null;
+}
+
+function startChromeClock(): void {
+	if (chromeClock) return;
+	chromeClock = setInterval(() => {
+		if (!active || active.status !== "active" || !chromeUi) {
+			stopChromeClock();
+			return;
+		}
+		try {
+			paintChrome(chromeUi, active);
+		} catch {
+			stopChromeClock();
+			chromeUi = null;
+		}
+	}, CHROME_TICK_MS);
+	chromeClock.unref?.();
+}
+
+function paintChrome(ui: ExtensionUIContext, state: GoalState): void {
+	const line = chromeLine(state);
+	ui.setWidget("goal", [
 		line,
 		truncate(state.condition, 80),
 		state.lastReason ? `last: ${truncate(state.lastReason, 80)}` : "waiting for first evaluation",
 	]);
+}
+
+function renderChrome(ctx: ExtensionCommandContext | ExtensionContext, state: GoalState | null): void {
+	ctx.ui.setStatus("goal", undefined);
+	if (!state || state.status !== "active") {
+		stopChromeClock();
+		ctx.ui.setWidget("goal", undefined);
+		chromeUi = null;
+		return;
+	}
+	chromeUi = ctx.ui;
+	paintChrome(ctx.ui, state);
+	startChromeClock();
 }
 
 function formatStatus(state: GoalState | null): string {
@@ -382,7 +434,7 @@ function formatStatus(state: GoalState | null): string {
 	const reason = state.lastReason ? `\nLast: ${state.lastReason}` : "";
 	return [
 		`Goal (${state.status}): ${state.condition}`,
-		`Running ${elapsed}, ${state.turnsEvaluated} turns evaluated, cap ${state.maxTurns}`,
+		`Running ${elapsed}, ${displayTurns(state)} turns, ${state.turnsEvaluated} evaluated, cap ${state.maxTurns}`,
 		reason,
 	]
 		.filter(Boolean)
@@ -412,7 +464,9 @@ function continuePrompt(state: GoalState): string {
 function formatElapsed(startedAt: string): string {
 	const start = Date.parse(startedAt);
 	if (!Number.isFinite(start)) return "?";
-	const minutes = Math.max(0, Math.round((Date.now() - start) / 60000));
+	const seconds = Math.max(0, Math.floor((Date.now() - start) / 1000));
+	if (seconds < 60) return `${seconds}s`;
+	const minutes = Math.floor(seconds / 60);
 	if (minutes < 60) return `${minutes}m`;
 	const hours = Math.floor(minutes / 60);
 	return `${hours}h${minutes % 60}m`;

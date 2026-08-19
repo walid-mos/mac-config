@@ -10,7 +10,7 @@ __pycache__/
 node_modules/
 .pnpm-store/
 
-# Le runtime des outils (gh/hosts.yml, pi/auth.json + sessions, claude/projects,
+# Le runtime des outils (gh/hosts.yml, pi/auth.json + sessions,
 # colima/_lima, docker/buildx, rtk/history.db, …) n'apparaît jamais ici : les
 # packages concernés sont dans NOFOLD (Makefile) — leur dossier cible est un vrai
 # dossier hors repo, l'outil ne peut pas écrire dans le working tree.

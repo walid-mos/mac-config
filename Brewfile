@@ -53,8 +53,6 @@ cask "visual-studio-code"
 cask "google-chrome"
 cask "obsidian"
 cask "iina"
-cask "claude"
-cask "claude-code"
 cask "kitlangton-hex"
 
 # Fonts (vault Obsidian — obsidian-post les vérifie aussi)

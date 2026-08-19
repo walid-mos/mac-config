@@ -8,7 +8,7 @@ macOS dotfiles managed with [GNU Stow](https://www.gnu.org/software/stow/) + a M
 
 Two invariants carry all the knowledge:
 
-- **`NOFOLD`** (Makefile) — packages whose target directory also receives files *written by the tool* (`gh/hosts.yml` token, `pi/auth.json` + sessions, `~/.claude` runtime, `colima/_lima`, `docker/buildx`, `rtk/history.db`, `~/.local/bin` shared with pnpm/fnm, …). Stow is run with `--no-folding` for them: the target stays a real directory outside the repo, only authored files are symlinked, so runtime and secrets can never land in the working tree. This mechanism replaces per-tool `.gitignore` blocks — prevention instead of exclusion.
+- **`NOFOLD`** (Makefile) — packages whose target directory also receives files *written by the tool* (`gh/hosts.yml` token, `pi/auth.json` + sessions, `colima/_lima`, `docker/buildx`, `rtk/history.db`, `~/.local/bin` shared with pnpm/fnm, …). Stow is run with `--no-folding` for them: the target stays a real directory outside the repo, only authored files are symlinked, so runtime and secrets can never land in the working tree. This mechanism replaces per-tool `.gitignore` blocks — prevention instead of exclusion.
 - **`.gitignore`** — reduced to genuine secrets (`zsh/.config/zsh/secrets`) and generic noise; runtime paths need no rule because NOFOLD keeps them out of the repo entirely.
 
 **`pi/` package**: `make pi` stows `~/.pi/agent/settings.json`, `make pi-post` installs the CLI (`pnpm add -g @earendil-works/pi-coding-agent`) if missing. Auth happens on first launch (`pi` then `/login`) and lives in `~/.pi/agent/auth.json`, never versioned. pi writes through the symlink when a setting changes via `/settings`: the diff shows up directly in the repo — review before committing.
@@ -42,7 +42,7 @@ The target is replayable: each step detects what is already in place. Both brew 
 
 ### The `Brewfile`
 
-Hand-curated list of a fresh mac's packages (34 → selection). **Do not regenerate via `brew bundle dump`**: the dump reinjects transitive dependencies and deliberately excluded personal apps. Adding/removing a package = edit the `Brewfile` directly, then `make brew-bundle`. Post-hooks cover the non-brew parts (pi via `pnpm`, impeccable plugin, rtk init, Obsidian assets).
+Hand-curated list of a fresh mac's packages (34 → selection). **Do not regenerate via `brew bundle dump`**: the dump reinjects transitive dependencies and deliberately excluded personal apps. Adding/removing a package = edit the `Brewfile` directly, then `make brew-bundle`. Post-hooks cover the non-brew parts (pi via `pnpm`, rtk init, Obsidian assets).
 
 
 ## Makefile targets

@@ -259,7 +259,7 @@ wt_new() {
     fi
 }
 
-# Spawn a worktree + a cmux workspace running claude in it
+# Spawn a worktree + a cmux workspace running pi in it
 wt_spawn() {
     local branch_name=""
 
@@ -300,7 +300,7 @@ wt_spawn() {
     # worktree stays clean. `clear` + `( ... & )` keep the cmux pane tidy
     # (no neofetch leftover, no job-control notifications).
     local pnpm_log="/tmp/wt-spawn-${normalized_project}-${normalized_branch}-pnpm.log"
-    local cmd="clear; ( _wt_spawn_init ${(q)pnpm_log} ${(q)workspace_name} & ) ; claude"
+    local cmd="clear; ( _wt_spawn_init ${(q)pnpm_log} ${(q)workspace_name} & ) ; pi"
 
     echo "🚀 Spawning cmux workspace: $workspace_name"
     cmux new-workspace --name "$workspace_name" --cwd "$worktree_path" --command "$cmd"
@@ -776,7 +776,7 @@ wt_help() {
     echo ""
     echo "COMMANDS:"
     echo "    new <branch> [-y]       Create new worktree for branch"
-    echo "    spawn <branch>          Create worktree + cmux workspace + claude (and pnpm i in bg if pnpm-lock.yaml)"
+    echo "    spawn <branch>          Create worktree + cmux workspace + pi (and pnpm i in bg if pnpm-lock.yaml)"
     echo "    switch [branch]         Switch to existing worktree (interactive without args)"
     echo "    list                    List all worktrees for current project"
     echo "    status                  Show git status for all worktrees"
@@ -790,7 +790,7 @@ wt_help() {
     echo "EXAMPLES:"
     echo "    wt new feature-auth              Create worktree for branch 'feature-auth'"
     echo "    wt new feature-auth -y           Create worktree, auto-confirm (for scripts/CI)"
-    echo "    wt spawn feature-auth            Create worktree + cmux workspace running claude"
+    echo "    wt spawn feature-auth            Create worktree + cmux workspace running pi"
     echo "    wt switch                        Interactive worktree selection"
     echo "    wt switch feature-auth           Direct switch (already non-interactive)"
     echo "    wt list                          List all worktrees"

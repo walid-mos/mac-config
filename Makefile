@@ -11,23 +11,23 @@ STOW := stow -t $(HOME)
 
 # Chaque dossier à la racine du repo est un package Stow — ajouter un dossier
 # suffit à le rendre stowable. NONSTOW liste les seules exceptions : docs
-# (documentation), obsidian (cible custom iCloud, stowé par sa propre cible)
-# et scripts (outillage git interne, rien à déployer dans $HOME).
-NONSTOW := docs obsidian scripts
+# (documentation), obsidian (cible custom iCloud, stowé par sa propre cible),
+# scripts (outillage git interne) et claude (package conservé, non déployé).
+NONSTOW := docs obsidian scripts claude
 PACKAGES := $(filter-out $(NONSTOW),$(patsubst %/,%,$(wildcard */)))
 
 # Packages dont le dossier cible reçoit aussi des fichiers écrits par l'outil
-# (gh/hosts.yml, pi/auth.json + sessions, claude/projects + cache, colima/_lima,
-# docker/buildx + contexts, rtk/history.db, git/credentials via credential-store
-# XDG, languages/.local/bin partagé avec pnpm/fnm) : sans --no-folding Stow
+# (gh/hosts.yml, pi/auth.json + sessions, colima/_lima, docker/buildx +
+# contexts, rtk/history.db, git/credentials via credential-store XDG,
+# languages/.local/bin partagé avec pnpm/fnm) : sans --no-folding Stow
 # replierait le dossier entier en symlink et l'outil écrirait ses secrets et son
 # runtime dans le repo (puis un unstow les casserait). hermes écrit ses sessions,
 # sa mémoire et ~/.hermes/.env (secrets) hors repo, comme pi.
-NOFOLD := claude colima docker gh git herdr hermes homebrew languages pi rclone rtk
+NOFOLD := colima docker gh git herdr hermes homebrew languages pi rclone rtk
 
 # Hooks post-install chaînés par `make install` (cible <nom>-post ; rust n'a pas
 # de package Stow, rustup gère ~/.rustup et ~/.cargo lui-même).
-POSTS := claude dev-dirs gh herdr hermes nvim pi plannotator rp rtk rust
+POSTS := dev-dirs gh herdr hermes nvim pi plannotator rp rtk rust
 
 # Obsidian : le vault vit dans iCloud, seule la config .obsidian est stowée
 # (symlinks relatifs → portables entre machines). Les binaires (thème, plugins,
@@ -63,7 +63,7 @@ help:
 	@echo "  git-filters    Configure les clean filters git (.gitattributes) dans .git/config"
 	@echo ""
 	@echo "  proxy-reset    Retire le PAC proxy laissé par Zscaler (rétablit le relais Apple)"
-	@echo "  plannotator-post  Installe le binaire, le plugin Claude Code et l'extension Pi"
+	@echo "  plannotator-post  Installe le binaire et l'extension Pi"
 	@echo "  hermes-gemma   Installe le superviseur Gemma (démarre/arrête avec Hermes.app)"
 	@echo ""
 	@echo "Packages: $(PACKAGES)"
@@ -291,10 +291,9 @@ rp-post:
 		|| { echo "node not found — install it (fnm install --lts) so 'rp' can serve plan.html"; exit 0; }
 	@echo "rp ready: \`rp <slug>\` will serve plan.html and wait for /submit"
 
-# plannotator : binaire CLI (~/.local/bin) + skills Claude Code (~/.claude/skills)
-# posés par l'installateur officiel (idempotent), plugin Claude Code marketplace
-# (hook ExitPlanMode) et extension Pi npm. Le binaire et les skills ne sont pas
-# versionnés : c'est cette cible qui les (re)pose après chaque clone.
+# plannotator : binaire CLI (~/.local/bin) posé par l'installateur officiel
+# (idempotent) + extension Pi npm. Le binaire n'est pas versionné : c'est
+# cette cible qui le (re)pose après chaque clone.
 # Les exports FNM_DIR/PNPM_HOME/PATH sont repris de pi-post : pi install appelle
 # pnpm, qui doit résoudre depuis le symlink pnpm v11 posé par pi-post dans
 # PNPM_HOME/bin (store v11 cohérent), pas depuis le pnpm brew v10 (store v10 —
@@ -304,19 +303,11 @@ plannotator-post: export PNPM_HOME := $(HOME)/.local/share/pnpm
 plannotator-post: export PATH := $(HOME)/.local/share/pnpm/bin:$(HOME)/.local/share/pnpm:$(PATH)
 plannotator-post:
 	@if ! command -v plannotator >/dev/null; then \
-		echo "→ installation de plannotator (binaire + skills + hooks)"; \
+		echo "→ installation de plannotator (binaire)"; \
 		curl -fsSL https://plannotator.ai/install.sh | bash; \
 	else \
 		echo "plannotator déjà présent: $$(plannotator --version | head -1)"; \
 	fi
-	@if command -v claude >/dev/null; then \
-		if claude plugin list 2>/dev/null | grep -q 'plannotator@plannotator'; then \
-			echo "plugin claude plannotator déjà installé"; \
-		else \
-			claude plugin marketplace add backnotprop/plannotator >/dev/null 2>&1 || true; \
-			claude plugin install plannotator@plannotator && echo "plugin claude plannotator installé"; \
-		fi; \
-	else echo "claude introuvable — plugin plannotator non installé"; fi
 	@if command -v pi >/dev/null; then \
 		pi install npm:@plannotator/pi-extension >/dev/null 2>&1 && echo "extension pi plannotator à jour"; \
 	else echo "pi introuvable — extension plannotator non installée"; fi
@@ -327,7 +318,7 @@ rtk-post:
 		else echo "rtk introuvable et brew indisponible — installe rtk à la main (https://github.com/rtk-ai/rtk)"; fi; \
 	fi
 	@command -v rtk >/dev/null && rtk init -g --auto-patch >/dev/null \
-		&& echo "rtk prêt: hook posé dans ~/.claude — redémarre Claude Code pour l'activer" \
+		&& echo "rtk prêt" \
 		|| echo "rtk non installé — étape ignorée"
 
 # rustup gère sa propre toolchain (~/.rustup, ~/.cargo) hors Stow ; c'est lui qui

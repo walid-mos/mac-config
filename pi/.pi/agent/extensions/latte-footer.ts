@@ -2,7 +2,7 @@
  * Latte Footer — powerline-style footer matching Catppuccin Latte.
  *
  * Line 1: [󰚩 model  thinking]  [ path   branch] ···· context bar + exact tokens · tokens · cost
- * Line 2: provider quotas (kimi-coding 5h/weekly, openrouter credits) with reset times
+ * Line 2: git status + PR #n · provider quotas (kimi-coding 5h/weekly, openrouter credits)
  *
  * Toggle with /latte-footer. Icons are configurable below (Nerd Font).
  * Quotas are polled every 5 min using the OAuth tokens from ~/.pi/agent/auth.json.
@@ -15,7 +15,7 @@ import type {
 	ReadonlyFooterDataProvider,
 	Theme,
 } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth, visibleWidth, type TUI } from "@earendil-works/pi-tui";
+import { hyperlink, truncateToWidth, visibleWidth, type TUI } from "@earendil-works/pi-tui";
 import { homedir } from "node:os";
 import { readFileSync } from "node:fs";
 import { execFile } from "node:child_process";
@@ -57,6 +57,7 @@ const BAR_FULL = "█";
 const BAR_EMPTY = "░";
 const QUOTA_POLL_MS = 5 * 60 * 1000;
 const GIT_POLL_MS = 4000;
+const PR_POLL_MS = 30_000;
 const AUTH_PATH = `${homedir()}/.pi/agent/auth.json`;
 
 const THINKING_COLORS: Record<string, string> = {
@@ -574,6 +575,49 @@ function gitLine(s: GitStatus | null): string {
 	return `${dim("git")} ${gitBar(s)} ${counters.join(dim("·") + " ")}`;
 }
 
+// ── Current GitHub PR ───────────────────────────────────────────────
+type GitPr = { number: number; url: string };
+
+function isGitPr(value: unknown): value is GitPr {
+	if (!isRecord(value)) return false;
+	const number = value.number;
+	const url = value.url;
+	return (
+		typeof number === "number" &&
+		Number.isInteger(number) &&
+		number > 0 &&
+		typeof url === "string" &&
+		url.startsWith("https://")
+	);
+}
+
+/** Resolve the PR attached to the current branch via `gh`. Null if none / not GitHub. */
+async function fetchCurrentPr(cwd: string): Promise<GitPr | null> {
+	try {
+		const { stdout } = await execFileAsync("gh", ["pr", "view", "--json", "number,url"], {
+			cwd,
+			timeout: 8000,
+		});
+		const parsed: unknown = JSON.parse(stdout);
+		return isGitPr(parsed) ? parsed : null;
+	} catch {
+		return null;
+	}
+}
+
+/** Clickable `PR #n` (OSC 8). Empty when no PR is cached. */
+function prLink(pr: GitPr | null): string {
+	if (!pr) return "";
+	return hyperlink(fgHex(LATTE.blue, `PR #${pr.number}`), pr.url);
+}
+
+function gitWithPr(status: GitStatus | null, pr: GitPr | null): string {
+	const git = gitLine(status);
+	const link = prLink(pr);
+	if (!link) return git;
+	return `${git} ${fgHex(LATTE.subtext0, "·")} ${link}`;
+}
+
 export default function (pi: ExtensionAPI) {
 	let enabled = true;
 	let requestRender: (() => void) | undefined;
@@ -582,6 +626,9 @@ export default function (pi: ExtensionAPI) {
 	let gitCache: GitStatus | null = null;
 	let gitTimer: ReturnType<typeof setInterval> | undefined;
 	let gitCwd: string | undefined;
+	let prCache: GitPr | null = null;
+	let prTimer: ReturnType<typeof setInterval> | undefined;
+	let prGeneration = 0;
 	let footerInstalled = false;
 
 	async function refreshQuotas() {
@@ -614,10 +661,35 @@ export default function (pi: ExtensionAPI) {
 		gitTimer.unref?.();
 	}
 
+	async function refreshPr(cwd: string): Promise<void> {
+		const generation = ++prGeneration;
+		const pr = await fetchCurrentPr(cwd);
+		if (generation !== prGeneration) return;
+		if (prCache?.number === pr?.number && prCache?.url === pr?.url) return;
+		prCache = pr;
+		requestRender?.();
+	}
+
+	function startPrPolling(cwd: string): void {
+		refreshPr(cwd);
+		if (prTimer) return;
+		prTimer = setInterval(() => {
+			if (gitCwd) refreshPr(gitCwd);
+		}, PR_POLL_MS);
+		prTimer.unref?.();
+	}
+
+	function refreshPrForBranchChange(): void {
+		prCache = null;
+		requestRender?.();
+		if (gitCwd) refreshPr(gitCwd);
+	}
+
 	function setup(ctx: ExtensionContext) {
 		if (!enabled) return;
 		startPolling();
 		startGitPolling(ctx.cwd ?? process.cwd());
+		startPrPolling(ctx.cwd ?? process.cwd());
 
 		// Only install the footer component once — re-setFooter on every
 		// session_start / toggle stacks ghost rows with the split-footer renderer.
@@ -629,7 +701,10 @@ export default function (pi: ExtensionAPI) {
 
 		ctx.ui.setFooter((tui: TUI, theme: Theme, footerData: ReadonlyFooterDataProvider) => {
 			requestRender = () => tui.requestRender();
-			const unsubBranch = footerData.onBranchChange(() => tui.requestRender());
+			const unsubBranch = footerData.onBranchChange(() => {
+				tui.requestRender();
+				refreshPrForBranchChange();
+			});
 
 			return {
 				dispose() {
@@ -721,7 +796,7 @@ export default function (pi: ExtensionAPI) {
 
 		// ── Line 2: git summary (left) · provider quota (right) ──
 		const lines = [line1];
-		const gitPart = gitLine(gitCache);
+		const gitPart = gitWithPr(gitCache, prCache);
 		const dim = (s: string) => fgHex(LATTE.subtext0, s);
 		const provider = (readSafely(() => ctx.model?.provider, undefined) ?? "").toLowerCase();
 		// Show the active provider's quota; fall back to everyone if unmatched

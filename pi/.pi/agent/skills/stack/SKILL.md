@@ -1,9 +1,11 @@
 ---
 name: stack
+user-invocable: true
 description: >-
     Découper un travail de dev décrit librement en un stack de pull requests
     propres : features ordonnées, chacune sur une branche empilée, commits
-    atomiques, tests verts, /simplify par maillon puis global, puis submit du
+    atomiques, tests verts, /visual-check par maillon UI, /simplify par maillon
+    puis global, puis submit du
     stack. Pour le dev hors Plane et tout ce qui passe par /goal. Trigger on
     /stack, "découpe ça en PR", "empile les PR", "développe cette feature en stack".
 ---
@@ -55,8 +57,10 @@ sorties de commandes du transcript :
 
 ```
 goal_set({ condition: "Stack construit localement : gh stack view --short
-  affiche N maillons, tests/lint/typecheck verts, /simplify par maillon et global
-  effectués. Pas de push (manuel). Stop after 25 turns." })
+  affiche N maillons, tests/lint/typecheck verts, /visual-check par maillon UI
+  (screenshots + console + parcours d'acceptation dans le transcript),
+  /simplify par maillon et global effectués. Pas de push (manuel).
+  Stop after 25 turns." })
 ```
 
 L'extension `/goal` auto-continue de tour en tour jusqu'à `met` / `impossible` /

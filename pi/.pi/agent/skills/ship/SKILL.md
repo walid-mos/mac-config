@@ -5,7 +5,8 @@ description: >-
     Execute a whole Plane epic autonomously: worktree from the base branch, every
     child ticket implemented and tested with atomic commits, sliced into a stack
     of readable PRs, each maillon implemented via local execution (parallel front/code),
-    simplified via /simplify, and submitted — under the /goal auto-continue loop.
+    visually and functionally verified via /visual-check, simplified via
+    /simplify, and submitted — under the /goal auto-continue loop.
     Trigger on /ship, "réalise l'épique X", "implémente toutes les tâches de MINA-1",
     "lance la feature".
 ---
@@ -27,7 +28,9 @@ depuis les sorties de commandes du transcript (jamais une déclaration) :
 goal_set({ condition: "Épique <EPIC> livrée : stack soumis (gh stack view --short
   affiche N branches), tous les tickets Done dans Plane (ou bloqués listés avec
   leur raison), tests/lint/typecheck verts sur tout le stack (sorties dans le
-  transcript), /simplify par maillon et global effectués. Stop after 30 turns." })
+  transcript), /visual-check par maillon UI (screenshots + console + parcours
+  d'acceptation dans le transcript), /simplify par maillon et global effectués.
+  Stop after 30 turns." })
 ```
 
 L'extension `/goal` auto-continue alors de tour en tour jusqu'à `met` /
@@ -52,8 +55,8 @@ L'extension `/goal` auto-continue alors de tour en tour jusqu'à `met` /
 - `--base <branch>` — branche de départ du worktree et trunk du stack. Défaut :
   `main`.
 - `--no-worktree` — travailler dans le repo courant (branche dédiée quand même).
-- `--no-chrome` — sauter la vérification navigateur (sinon obligatoire dès
-  qu'un ticket touche une surface web).
+- `--no-chrome` — sauter `/visual-check` (sinon obligatoire dès qu'un ticket
+  touche une surface web).
 - `--only <IDS>` — restreindre à une liste de tickets, séparés par des virgules.
 - `--max-files <N>` — plafond mou de fichiers par maillon de PR. Défaut : `20`.
 - `--max-lines <N>` — plafond mou de lignes changées par maillon. Défaut : `1000`.
@@ -95,7 +98,9 @@ En parallèle :
   `--no-stack` et le dire.
 
 Charger les skills que le stack impose (`typescript`, `react`, `coding`,
-`nextnode-*`, `tdd`…) — ils ne sont pas optionnels.
+`nextnode-*`) — ils ne sont pas optionnels. Dès qu'un maillon touche
+une surface web : charger aussi `visual-check` (source de vérité du check
+navigateur — ne pas réécrire son workflow ici).
 
 Construire l'**ordre d'exécution** : tri topologique des tickets. Un ticket déjà
 `Done` est sauté (le dire). Un cycle de blocage → signaler et ordonner à la main.
@@ -119,8 +124,9 @@ préférable à un maillon qui ne compile pas. Ne jamais couper au milieu d'un �
 rouge.
 
 Sortir un plan court : liste des maillons (nom de branche, tickets inclus,
-budget fichiers/lignes estimé), commandes de test détectées, surfaces web à
-vérifier via Chrome. Avec `--dry-run`, s'arrêter ici.
+budget fichiers/lignes estimé), commandes de test détectées, surfaces web et
+parcours d'acceptation à vérifier via `/visual-check`. Avec `--dry-run`,
+s'arrêter ici.
 
 ## Phase 2 — Worktree & init du stack
 
@@ -144,9 +150,16 @@ Pour chaque maillon, dans l'ordre du stack :
 2. **Tester pour de vrai** — suite de tests + lint + typecheck du projet après
    application. Rouge = le maillon n'avance pas, on corrige en fix direct (pas
    une nouvelle boucle).
-3. **Vérifier dans Chrome** — dès que le maillon produit ou modifie une surface
-   web : lancer l'app (npm/pnpm dev), naviguer le parcours du maillon, vérifier
-   le rendu et la console. Maillon purement back/infra dispensé — le dire.
+3. **`/visual-check` + parcours fonctionnel** — dès que le maillon produit ou
+   modifie une surface web (sauf `--no-chrome`) :
+    - Charger le skill `visual-check` et l'exécuter sur les **pages du maillon**
+      (paths du ticket / proto, pas un crawl de tout le site).
+    - En plus du rendu : exercer le **parcours d'acceptation** du ticket avec
+      `frontend_act` (click, type, submit…) et `frontend_eval` pour les critères
+      exacts (texte, état, compteurs). Console clean exigée.
+    - Anomalie visuelle, console error, ou parcours cassé = maillon non fini.
+      Corriger en fix direct, re-check, puis seulement push.
+      Maillon purement back/infra dispensé — le dire.
 4. **Push** — pousser la branche du maillon (`gh stack push` ou `git push`). Le
    push crée seulement la branche distante, **pas** la PR (submit en Phase 4).
 5. **Done** — `plane_update_workitem(identifier=<id>, stateId=<Done uuid>)` pour
@@ -158,9 +171,6 @@ nouvelle branche au-dessus) et y poursuivre. Le signaler dans le rapport.
 
 Quand tous les tickets du maillon sont faits :
 
-- **`/simplify` du maillon** — skill `simplify` sur le diff du maillon seul
-  (`/simplify maillon`) : réutilisation, qualité, efficacité, altitude.
-  Ré-commiter les correctifs, re-tester vert.
 - **Maillon suivant** — `gh stack add <slug-NN-maillon>` crée la branche du
   maillon suivant au-dessus et la checkout. Recommencer la boucle.
 
@@ -173,18 +183,18 @@ blocage local.
 
 Dans cet ordre, sans en sauter :
 
-1. **`/simplify` global** — skill `simplify` sur le diff complet du stack
-   (`/simplify global`) : duplication et altitude qui n'apparaissent qu'en
-   voyant l'ensemble. Si un correctif touche un maillon du bas, propager vers
-   le haut avec `gh stack rebase`, puis re-tester. Sûr : aucune PR n'est
+1. **`/simplify` global** — skill `simplify` sous son contrat
+   (`/simplify global`). Si un correctif touche un maillon du bas, propager
+   vers le haut avec `gh stack rebase`, puis re-tester. Sûr : aucune PR n'est
    encore ouverte.
 2. **Vérification finale** — suite complète verte sur tout le stack, et
-   re-passage Chrome sur les parcours si `/simplify` a touché du code UI.
+   re-`/visual-check` des parcours si `/simplify` a touché du code UI.
 3. **Submit** — `gh stack submit --auto --open` : pousse toutes les branches,
    crée toutes les PR d'un coup, prêtes à review, chaînées sur GitHub. Titres et
    descriptions par maillon citent les tickets Plane couverts. Sauf
    `--stop-before-pr`, qui s'arrête après l'étape 2 et rend la main avec le stack
-   local prêt. En `--no-stack` : `/pr` sur la branche unique au lieu de `submit`.
+   local prêt. En `--no-stack` : charger le skill `pr` sur la branche unique
+   au lieu de `submit`.
 
 Ship **n'auto-merge pas**. Le merge du stack reste une porte humaine explicite :
 `gh stack merge` (ou `gh stack merge --yes`) une fois les PR revues.
@@ -200,7 +210,9 @@ Ne rien annoncer comme fini tant que tout ceci n'est pas vrai :
   justifié et signalé), compilant et testant vert seul.
 - Tests, lint et typecheck passent sur tout le stack — sortie réelle, pas une
   supposition.
-- Les parcours web ont été vus dans Chrome.
+- Les parcours web ont un `/visual-check` dans le transcript (screenshots vus,
+  console, parcours d'acceptation exercé) — ou maillon back/infra explicitement
+  dispensé, ou `--no-chrome`.
 - `/simplify` a tourné par maillon **et** en global, correctifs commités et testés.
 - Le stack de PR est soumis (`gh stack submit`), sauf `--stop-before-pr`.
 
@@ -208,5 +220,5 @@ Ne rien annoncer comme fini tant que tout ceci n'est pas vrai :
 
 Le stack (`gh stack view --short`), puis une ligne par maillon : nom, tickets
 inclus (identifiant + état), nombre de commits, budget fichiers/lignes réel, URL
-de la PR. Ce qui a été vérifié dans Chrome, et ce qui reste ouvert ou bloqué.
+de la PR. Ce qui a été vérifié via `/visual-check`, et ce qui reste ouvert ou bloqué.
 Rappeler la commande de merge (`gh stack merge`). Pas de récap du code écrit.

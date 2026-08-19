@@ -83,8 +83,8 @@ autorité** : back, API, hooks, stores, et **surtout modèle de données / base*
   et la forme des écrans, pour dimensionner les DTO _après_ validation du modèle.
 
 Récupérer le proto : `git clone` du repo en scratchpad ou lecture via `gh`/WebFetch
-pour inventorier assets et markup ; ouvrir l'URL déployée dans Chrome comme
-référence visuelle de contrôle. Ne pas ajouter le proto comme dépendance ni le
+pour inventorier assets et markup ; ouvrir l'URL déployée via `/visual-check`
+comme référence visuelle de contrôle. Ne pas ajouter le proto comme dépendance ni le
 laisser traîner dans le repo.
 
 ## Repo — commandes détectées
@@ -137,8 +137,9 @@ Appeler `goal_set` avec la condition accor :
 ```
 goal_set({ condition: "Feature Menu Compliance livrée : stack soumis depuis develop,
   tous les tickets Done (ou bloqués listés), tests/lint/typecheck verts,
-  /simplify par maillon et global effectués, rendu front 1:1 du proto
-  (drinks-menu-compliance-vite.vercel.app), apps/product-benchmark intact,
+  /simplify par maillon et global effectués, /visual-check 1:1 vs proto
+  (screenshots dans le transcript, drinks-menu-compliance-vite.vercel.app),
+  apps/product-benchmark intact,
   descriptions de PR conformes à .github/PULL_REQUEST_TEMPLATE.md. Stop after 30 turns." })
 ```
 
@@ -155,17 +156,17 @@ en plus :
 - **Découpe** : la couche « assets + intégration visuelle » et la couche « API »
   forment des maillons distincts quand le budget l'impose ; les regrouper seulement
   si fortement couplés.
-- **Chrome obligatoire** : dès qu'un maillon touche le front, lancer
-  `pnpm dev:compliance`, ouvrir en parallèle le prototype déployé
-  (`https://drinks-menu-compliance-vite.vercel.app/`), naviguer le même parcours
-  et vérifier que le rendu est une **copie 1:1** (côte à côte) plus une console
-  propre. Le moindre écart visuel = maillon non fini. Ne pas déclarer un maillon
-  front fini sans cette comparaison.
-- **`/simplify` par maillon** : skill `simplify` sur le diff du maillon seul
-  (`/simplify maillon`), avant de passer au suivant. Ré-commiter, re-tester vert.
-- **`/simplify` global** : skill `simplify` sur le diff complet du stack
-  (`/simplify global`), avant `submit`. Propager vers le bas du stack si besoin
-  (`gh stack rebase`), re-tester.
+- **`/visual-check` obligatoire** (sauf `--no-chrome`) : dès qu'un maillon
+  touche le front, charger le skill `visual-check`. Lancer `pnpm dev:compliance`,
+  ouvrir en parallèle le prototype déployé
+  (`https://drinks-menu-compliance-vite.vercel.app/`) et l'app locale, naviguer
+  le même parcours (`frontend_act`) et vérifier que le rendu est une **copie 1:1**
+  (screenshots côte à côte) plus une console propre. Le moindre écart visuel =
+  maillon non fini. Ne pas déclarer un maillon front fini sans cette comparaison.
+- **`/simplify` par maillon** : charger le skill `simplify` sous **son** contrat
+  (`/simplify maillon`), avant le maillon suivant.
+- **`/simplify` global** : skill `simplify` sous son contrat (`/simplify global`),
+  avant `submit`. Propager (`gh stack rebase`) si un correctif touche le bas.
 - **Submit** : `gh stack submit` seulement après les deux passes `/simplify`.
   Pas d'auto-merge.
 - **Descriptions de PR** : chaque PR du stack suit **strictement**
@@ -173,7 +174,9 @@ en plus :
   de son absence dans le Summary —, Summary, Scope coché, Changes, How was this
   tested?, Checklist). Jamais de structure libre. Vérifier chaque corps contre le
   template avant de considérer le submit fini ; `gh stack submit` ne le fait pas
-  tout seul — repasser en `gh pr edit --body-file` si besoin.
+  tout seul — repasser en `gh pr edit --body-file` si besoin. Même contrainte
+  en `--no-stack` : le skill `pr` ne connaît pas le template Accor — réécrire
+  le body avant de considérer le submit fini.
 
 ## Definition of done
 
@@ -182,7 +185,8 @@ en plus :
   toute hypothèse métier issue du proto a été validée par l'utilisateur en Phase 1.
 - Rendu du front **copie 1:1 du prototype déployé**
   (`https://drinks-menu-compliance-vite.vercel.app/`), assets récupérés, comparé
-  côte à côte dans Chrome ; code réécrit propre — jamais le code du proto copié.
+  côte à côte via `/visual-check` (screenshots dans le transcript) ; code réécrit
+  propre — jamais le code du proto copié.
 - `apps/product-benchmark` intact.
 - Découpé en maillons sous budget, chacun compilant et testant vert seul, plusieurs
   commits atomiques par maillon.

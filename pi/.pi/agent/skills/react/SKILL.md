@@ -68,7 +68,7 @@ A truly tiny, private sub-component used by exactly one component may co-locate 
 
 - Duplicated JSX --> extract a component; duplicated stateful logic --> a custom hook. Rule of three: the third copy MUST be extracted; don't abstract on the first.
 - Aim much flatter than the linted depth-8: past ~3-4 levels, extract a child component. Fragments over wrapper `<div>`s.
-- Test behaviour, not internals: RTL queries by role/text, fire events, assert visible output. Never assert internal state, hook call order, or blind snapshots. Drive with `tdd`.
+- Test behaviour, not internals: RTL queries by role/text, fire events, assert visible output. Never assert internal state, hook call order, or blind snapshots. Write the failing test first, then the code.
 - `useMemo`/`useCallback`/`React.memo` only for measured hot paths or to stabilize a dependency - never a default.
 
 ## State management

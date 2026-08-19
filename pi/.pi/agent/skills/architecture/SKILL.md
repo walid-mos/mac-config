@@ -23,11 +23,9 @@ This skill is the _launchable workflow_. The doctrine and vocabulary live in [`.
 - Load `../coding/architecture.md` (doctrine + vocabulary).
 - Read the project's domain language and decisions so suggestions match the codebase: `CLAUDE.md`, `CONTEXT.md` / `ARCHITECTURE.md` if present, and any ADRs under `docs/adr/`. **Do not re-litigate decisions already recorded in an ADR.**
 
-### 2. Explore (delegate breadth)
+### 2. Explore
 
-Delegate mapping to `searcher` (AGENTS.md gather, async). Never spawn an unnamed agent. If you need a `workflowScript`, it must name `agent: "searcher"`, use `timeoutMs: 1800000`, never `$`, never collapse:
-
-Have it note where you feel friction — don't follow rigid heuristics:
+Map where you feel friction — don't follow rigid heuristics:
 
 - Where does understanding one concept require bouncing between many small modules?
 - Where are modules **shallow** (ARCH 0 signals)?

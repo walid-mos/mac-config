@@ -42,9 +42,9 @@ teste seul. Impératif, expliquer le _pourquoi_ quand il n'est pas évident.
 **Base & flux** : brancher depuis `develop` à jour ; ouvrir la PR **contre `develop`**
 (intégration → déploie l'env _dev_ ; `main` = _prod_, promotions uniquement).
 
-**Stacks** : via `gh stack` ; un maillon = une branche + une PR, ≤ ~20 fichiers / ~1000
-lignes ; jamais couper sur un état qui ne compile pas ; ordre `dev → simplify maillon →
-simplify global → submit`.
+**Stacks** : via `gh stack`. Découpe : contrat Stack
+([slicing.md](../stack/references/slicing.md)) — pas de seuils ni d'algorithme
+ici. Ordre livré : `dev → simplify maillon → simplify global → submit`.
 
 > ⚠️ **Renommer une branche sur GitHub FERME ses PR** (le head ref est immuable, l'ancien
 > nom disparaît → GitHub ferme la PR). Corollaire : **nommer correctement dès la création**.

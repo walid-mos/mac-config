@@ -153,9 +153,15 @@ ci-dessus injectées. Invoquer le skill `ship` et suivre ses phases, en respecta
 en plus :
 
 - **Base** : `develop` par défaut (`--base develop`).
-- **Découpe** : la couche « assets + intégration visuelle » et la couche « API »
-  forment des maillons distincts quand le budget l'impose ; les regrouper seulement
-  si fortement couplés.
+- **Nommage des branches** : override explicite de `/ship` et `/stack`. Chaque
+  maillon respecte la nomenclature Accor `<type>/<TICKET?>-<kebab-desc>`, avec
+  une description unique mais **sans** index `-01-` / `-02-`. Le lien entre
+  maillons vit dans `gh stack`, jamais dans le nom de branche.
+- **Découpe** : contrat Stack
+  ([slicing.md](../stack/references/slicing.md)). Contraintes Accor à lui
+  passer : périmètre Menu Compliance, proto 1:1 (front only), pas de schéma
+  dérivé du proto, clean arch API, nomenclature de branche Accor sans index de
+  stack. Pas de règle de découpe locale ni de seuils.
 - **`/visual-check` obligatoire** (sauf `--no-chrome`) : dès qu'un maillon
   touche le front, charger le skill `visual-check`. Lancer `pnpm dev:compliance`,
   ouvrir en parallèle le prototype déployé
@@ -188,8 +194,8 @@ en plus :
   côte à côte via `/visual-check` (screenshots dans le transcript) ; code réécrit
   propre — jamais le code du proto copié.
 - `apps/product-benchmark` intact.
-- Découpé en maillons sous budget, chacun compilant et testant vert seul, plusieurs
-  commits atomiques par maillon.
+- Découpé selon le contrat Stack, chaque maillon compilant et testant vert seul,
+  plusieurs commits atomiques par maillon.
 - `pnpm test`, `pnpm lint`, `pnpm typecheck` verts sur tout le stack — sortie réelle.
 - `/simplify` a tourné **par maillon puis en global**, correctifs commités et testés.
 - Stack de PR soumis depuis `develop` (`gh stack submit`), sauf `--stop-before-pr`.

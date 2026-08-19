@@ -17,10 +17,13 @@
     "npm:pi-frontend-check"
   ],
   "enabledModels": [
+    "openai-codex/gpt-5.6-sol",
+    "xai/grok-4.6",
+    "openai-codex/gpt-5.6-terra",
     "kimi-coding/k3",
     "openrouter/deepseek/deepseek-v4-flash",
-    "openrouter/deepseek/deepseek-v4-pro",
-    "xai/grok-4.6"
+    "openai-codex/gpt-5.6-luna",
+    "openrouter/deepseek/deepseek-v4-pro"
   ],
   "hideThinkingBlock": false
 }

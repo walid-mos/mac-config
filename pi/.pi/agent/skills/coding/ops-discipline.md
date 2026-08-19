@@ -13,10 +13,6 @@ Most of an AI coding bill pays for context that never gets used; reading
   `offset`/`limit`. Never default to whole files.
 - **One file at a time, on demand.** Never pre-load files "in case they're
   related"; open the next file only when the current one points to it.
-- **Delegate breadth to `searcher`.** "Where is X defined / which files
-  reference Y" across the repo goes to the `searcher` agent (async,
-  aliases `scout` / `explorer` / `files`). It returns a digest — the main
-  loop stays small.
 - **Don't re-read after editing.** `edit`/`write` are tracked and error on
   failure; re-reading to "verify" is pure waste.
 

@@ -16,8 +16,8 @@ description: >-
 Take one Plane epic from Backlog to an open **stack of pull requests**, without
 asking the user anything between the first ticket and the submit.
 
-`/backlog` writes the tickets. `/ship` executes them et les découpe en PR
-lisibles, empilées comme des commits.
+`/backlog` writes the tickets. `/ship` les ordonne, les passe au contrat
+de découpe Stack, et les exécute en PR lisibles empilées comme des commits.
 
 ## Objectif — engager le loop /goal
 
@@ -58,8 +58,8 @@ L'extension `/goal` auto-continue alors de tour en tour jusqu'à `met` /
 - `--no-chrome` — sauter `/visual-check` (sinon obligatoire dès qu'un ticket
   touche une surface web).
 - `--only <IDS>` — restreindre à une liste de tickets, séparés par des virgules.
-- `--max-files <N>` — plafond mou de fichiers par maillon de PR. Défaut : `20`.
-- `--max-lines <N>` — plafond mou de lignes changées par maillon. Défaut : `1000`.
+- `--max-files <N>` / `--max-lines <N>` — transmis au contrat Stack
+  ([slicing.md](../stack/references/slicing.md)). Pas de défauts propres.
 - `--no-stack` — désactiver le stacking : une seule branche, une seule PR en fin
   (comportement historique). Fallback aussi si l'extension `gh stack` manque.
 - `--stop-before-pr` — construire le stack local mais ne pas `submit`.
@@ -71,11 +71,9 @@ L'extension `/goal` auto-continue alors de tour en tour jusqu'à `met` /
 | FORBIDDEN                                                   | MANDATORY                                                                     |
 | ----------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | Demander une clarification au milieu de l'épique            | Tout ce qui manque se décide en Phase 1, avant le premier commit              |
-| Une PR fourre-tout de toute l'épique                        | Un stack de maillons, chacun ≤ `--max-files` / `--max-lines`, reviewable seul |
+| Une PR fourre-tout de toute l'épique                        | Stack de maillons selon [slicing.md](../stack/references/slicing.md)          |
 | Un commit fourre-tout par ticket                            | Plusieurs commits atomiques, chacun compilable et testable seul               |
 | Couper un maillon au milieu d'un état incohérent            | Un maillon compile, teste vert et se relit seul avant de passer au suivant    |
-| Isoler un ticket trivial dans sa propre PR                  | Fusionner les tickets adjacents fortement couplés tant que le budget tient    |
-| Laisser un ticket géant dans un seul maillon                | Le re-découper en plusieurs maillons par couche                               |
 | Passer un ticket en Done sans que sa branche soit poussée   | Push de la branche d'abord, transition Plane ensuite                          |
 | Marquer une tâche faite avec des tests rouges ou non lancés | Lancer les tests réellement et coller la sortie en cas d'échec                |
 | Réduire le périmètre en silence                             | Livrer le reste en entier et dire explicitement ce qui est bloqué et pourquoi |
@@ -105,23 +103,11 @@ navigateur — ne pas réécrire son workflow ici).
 Construire l'**ordre d'exécution** : tri topologique des tickets. Un ticket déjà
 `Done` est sauté (le dire). Un cycle de blocage → signaler et ordonner à la main.
 
-**Découper le stack** — regrouper les tickets ordonnés en une liste ordonnée de
-**maillons** (une branche + une PR chacun). L'ordre des maillons = l'ordre
-topologique (un maillon ne dépend que de ceux d'en dessous). Règles :
-
-1. **Défaut** : 1 ticket = 1 maillon.
-2. **Fusion** : des tickets adjacents peuvent partager un maillon _seulement si_
-   ils sont fortement couplés — l'un est intestable ou vide de sens sans l'autre
-   (ex. `schéma DB` + `config Drizzle`) — _et_ que leur diff cumulé estimé reste
-   sous `--max-files` / `--max-lines`. Un ticket trivial (poignée de lignes) se
-   fusionne par défaut avec son voisin couplé plutôt que d'avoir une PR solitaire.
-3. **Split** : un ticket dont le diff estimé dépasse le budget est éclaté en
-   plusieurs maillons empilés, par couche (schéma → validation → câblage →
-   tests / UI), chacun compilable seul.
-
-Le budget est mou : dépasser un peu pour ne pas couper une unité atomique est
-préférable à un maillon qui ne compile pas. Ne jamais couper au milieu d'un état
-rouge.
+**Découper le stack** — passer les tickets ordonnés, leurs faits (description,
+couplage, edges, surfaces, acceptation) et les flags `--max-files` /
+`--max-lines` au contrat [slicing.md](../stack/references/slicing.md).
+Ship n'a pas d'algorithme de découpe propre : pas de « 1 ticket = 1
+maillon », pas de fusion/split locaux.
 
 Sortir un plan court : liste des maillons (nom de branche, tickets inclus,
 budget fichiers/lignes estimé), commandes de test détectées, surfaces web et
@@ -165,9 +151,9 @@ Pour chaque maillon, dans l'ordre du stack :
 5. **Done** — `plane_update_workitem(identifier=<id>, stateId=<Done uuid>)` pour
    chaque ticket du maillon, seulement après le push.
 
-Si le diff réel d'un maillon dépasse largement le budget en cours de route :
-couper un maillon supplémentaire (`gh stack add <slug-NN-maillon>` ouvre une
-nouvelle branche au-dessus) et y poursuivre. Le signaler dans le rapport.
+Si un split en cours de route s'impose : ré-appliquer le contrat Stack,
+`gh stack add <slug-NN-maillon>` (nouvelle branche au-dessus), y poursuivre.
+Le signaler dans le rapport.
 
 Quand tous les tickets du maillon sont faits :
 
@@ -206,8 +192,8 @@ Ne rien annoncer comme fini tant que tout ceci n'est pas vrai :
 - Chaque ticket de l'épique est `Done` dans Plane, ou explicitement listé comme
   bloqué avec sa raison.
 - Chaque ticket a plusieurs commits atomiques.
-- Le travail est découpé en maillons, chacun sous le budget (ou dépassement
-  justifié et signalé), compilant et testant vert seul.
+- Le travail est découpé selon le contrat Stack, chaque maillon compilant et
+  testant vert seul (dépassement de budget justifié et signalé si besoin).
 - Tests, lint et typecheck passent sur tout le stack — sortie réelle, pas une
   supposition.
 - Les parcours web ont un `/visual-check` dans le transcript (screenshots vus,

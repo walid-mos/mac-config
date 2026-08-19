@@ -6,8 +6,9 @@
  * /goal clear        clear (aliases: stop, off, reset, none, cancel)
  *
  * After each settled turn a small independent model judges the condition
- * against the transcript. not_yet → auto-continue. met / impossible /
- * stuck → clear and return control.
+ * against the transcript. Valid not_yet → auto-continue. met / impossible /
+ * stuck → stop (stuck stays terminal). Evaluator absence or invalid reply
+ * → pause without auto-continuing.
  */
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type {
@@ -30,7 +31,10 @@ const ENTRY_TYPE = "goal-state";
 const MAX_CONDITION_CHARS = 4000;
 const DEFAULT_MAX_TURNS = 25;
 const STUCK_NO_TOOL_TURNS = 2;
-const TRANSCRIPT_CHAR_BUDGET = 6000;
+const TRANSCRIPT_CHAR_BUDGET = 20_000;
+const TOOL_RESULT_CHAR_BUDGET = 4_000;
+const MAX_PROOF_ITEMS = 32;
+const MAX_PROOF_ITEM_CHARS = 300;
 const CHROME_TICK_MS = 1_000;
 
 const PREFERRED_EVALUATOR_IDS = ["deepseek-v4-flash", "grok-build", "k3"] as const;
@@ -39,7 +43,29 @@ const CLEAR_ALIASES = new Set(["clear", "stop", "off", "reset", "none", "cancel"
 
 type GoalVerdict = "not_yet" | "met" | "impossible" | "stuck";
 
+type EvaluatorVerdict = Exclude<GoalVerdict, "stuck">;
+
 type GoalStatus = "active" | "met" | "impossible" | "cleared" | "stuck";
+
+type ParsedEvaluatorReply =
+	| {
+			ok: true;
+			verdict: EvaluatorVerdict;
+			reason: string;
+			proofs: string[];
+			invalidatedProofs: string[];
+	  }
+	| { ok: false; reason: string };
+
+type GoalTurnCounters = {
+	turnsEvaluated: number;
+	noToolTurns: number;
+};
+
+type GoalLoopDecision =
+	| { action: "continue"; reason: string; proofs: string[] }
+	| { action: "pause"; reason: string }
+	| { action: "stop"; verdict: Exclude<GoalVerdict, "not_yet">; reason: string; proofs?: string[] };
 
 type GoalState = {
 	condition: string;
@@ -51,17 +77,20 @@ type GoalState = {
 	maxTurns: number;
 	lastVerdict: GoalVerdict | null;
 	lastReason: string;
+	/** Cumulative command/read-back facts retained when older transcript evidence is clipped. */
+	proofs?: string[];
 	status: GoalStatus;
 };
 
 const EVALUATOR_SYSTEM = [
 	"You evaluate whether a coding-agent session has met a user-stated goal.",
-	"You have no tools. Judge only the transcript excerpt.",
-	"Return ONLY JSON: {\"verdict\":\"met\"|\"not_yet\"|\"impossible\",\"reason\":\"...\"}",
-	"met: the stated check is evidenced in the excerpt (command output, grep empty, etc.).",
-	"not_yet: work remains or the proof is missing.",
+	"You have no tools. Judge the retained proof ledger plus the recent transcript excerpt.",
+	"Ledger entries are command/read-back facts verified in earlier transcript windows.",
+	"Return ONLY JSON: {\"verdict\":\"met\"|\"not_yet\"|\"impossible\",\"reason\":\"...\",\"proofs\":[\"new concise verified fact\"],\"invalidatedProofs\":[\"exact prior entry contradicted by newer evidence\"]}.",
+	"met: every part of the condition is evidenced by the cumulative proofs or recent command/read-back output.",
+	"not_yet: work remains or proof for any required part is missing.",
 	"impossible: the condition cannot be satisfied (missing access, contradiction, unfixable red lock).",
-	"A claim without command/read-back evidence is not_yet, never met.",
+	"A claim without command/read-back evidence is not_yet, never met and never a proof entry.",
 ].join(" ");
 
 let active: GoalState | null = null;
@@ -175,6 +204,7 @@ function createGoal(condition: string, alreadyInTurn: boolean): GoalState {
 		maxTurns: parseMaxTurns(condition),
 		lastVerdict: null,
 		lastReason: "",
+		proofs: [],
 		status: "active",
 	};
 }
@@ -201,65 +231,107 @@ async function evaluateAndContinue(ctx: ExtensionContext): Promise<void> {
 
 	const excerpt = collectTranscriptExcerpt(ctx.sessionManager.getBranch());
 	const usedTools = excerpt.toolCallCount > 0;
-	const noToolTurns = usedTools ? 0 : current.noToolTurns + 1;
-	const turnsEvaluated = current.turnsEvaluated + 1;
-
-	let verdict: GoalVerdict = "not_yet";
-	let reason = "";
-
-	if (turnsEvaluated >= current.maxTurns) {
-		verdict = "stuck";
-		reason = `Turn cap reached (${current.maxTurns}).`;
-	} else if (noToolTurns >= STUCK_NO_TOOL_TURNS) {
-		verdict = "stuck";
-		reason = `No tool use for ${noToolTurns} turns — loop stopped, goal still set.`;
-	} else {
-		const judged = await judgeCondition(ctx, current.condition, excerpt.text);
-		verdict = judged.verdict;
-		reason = judged.reason;
-	}
-
-	const next: GoalState = {
-		...current,
-		turnsEvaluated,
-		noToolTurns,
-		lastVerdict: verdict,
-		lastReason: reason,
-		status: verdict === "not_yet" ? "active" : verdict,
+	const counters: GoalTurnCounters = {
+		turnsEvaluated: current.turnsEvaluated + 1,
+		noToolTurns: usedTools ? 0 : current.noToolTurns + 1,
 	};
+	const decision = await decideGoalLoop(ctx, current, excerpt.text, counters);
+	const next = nextGoalState(current, counters, decision);
 	persist(ctx, next);
 	active = next;
 	renderChrome(ctx, next);
+	enactGoalDecision(ctx, next, decision);
+}
 
+async function decideGoalLoop(
+	ctx: ExtensionContext,
+	current: GoalState,
+	transcript: string,
+	counters: GoalTurnCounters,
+): Promise<GoalLoopDecision> {
+	if (counters.turnsEvaluated >= current.maxTurns) {
+		return { action: "stop", verdict: "stuck", reason: `Turn cap reached (${current.maxTurns}).` };
+	}
+	if (counters.noToolTurns >= STUCK_NO_TOOL_TURNS) {
+		return {
+			action: "stop",
+			verdict: "stuck",
+			reason: `No tool use for ${counters.noToolTurns} turns — loop stopped, goal still set.`,
+		};
+	}
+
+	const judged = await judgeCondition(ctx, current.condition, transcript, current.proofs ?? []);
+	if (!judged.ok) return { action: "pause", reason: judged.reason };
+	const proofs = updateProofLedger(current.proofs ?? [], judged.proofs, judged.invalidatedProofs);
+	if (judged.verdict === "met" && proofs.length === 0) {
+		return { action: "pause", reason: "Evaluator returned met without verified proofs." };
+	}
+	if (judged.verdict === "not_yet") {
+		return { action: "continue", reason: judged.reason, proofs };
+	}
+	return { action: "stop", verdict: judged.verdict, reason: judged.reason, proofs };
+}
+
+function nextGoalState(
+	current: GoalState,
+	counters: GoalTurnCounters,
+	decision: GoalLoopDecision,
+): GoalState {
+	if (decision.action === "pause") {
+		return { ...current, ...counters, lastReason: decision.reason };
+	}
+	if (decision.action === "continue") {
+		return {
+			...current,
+			...counters,
+			lastVerdict: "not_yet",
+			lastReason: decision.reason,
+			proofs: decision.proofs,
+			status: "active",
+		};
+	}
+	return {
+		...current,
+		...counters,
+		lastVerdict: decision.verdict,
+		lastReason: decision.reason,
+		proofs: decision.proofs ?? current.proofs,
+		status: decision.verdict,
+	};
+}
+
+function enactGoalDecision(
+	ctx: ExtensionContext,
+	next: GoalState,
+	decision: GoalLoopDecision,
+): void {
 	const host = api;
 	if (!host) return;
 
-	if (verdict === "not_yet") {
-		ctx.ui.notify(`◎ goal not yet: ${reason}`, "info");
+	if (decision.action === "continue") {
+		ctx.ui.notify(`◎ goal not yet: ${decision.reason}`, "info");
 		host.sendUserMessage(continuePrompt(next), { deliverAs: "followUp" });
 		return;
 	}
-
-	if (verdict === "stuck" && noToolTurns >= STUCK_NO_TOOL_TURNS) {
-		next.status = "active";
-		active = next;
-		persist(ctx, next);
-		renderChrome(ctx, next);
-		ctx.ui.notify(`Goal paused: ${reason}`, "warning");
+	if (decision.action === "pause") {
+		ctx.ui.notify(`Goal paused: ${decision.reason}`, "warning");
 		return;
 	}
-
-	ctx.ui.notify(`Goal ${verdict}: ${reason}`, verdict === "met" ? "info" : "warning");
+	ctx.ui.notify(
+		`Goal ${decision.verdict}: ${decision.reason}`,
+		decision.verdict === "met" ? "info" : "warning",
+	);
 }
 
 async function judgeCondition(
 	ctx: ExtensionContext,
 	condition: string,
 	transcript: string,
-): Promise<{ verdict: GoalVerdict; reason: string }> {
+	proofs: readonly string[],
+): Promise<ParsedEvaluatorReply> {
 	const model = pickEvaluatorModel(ctx);
 	if (!model) {
-		return { verdict: "not_yet", reason: "No evaluator model; continuing." };
+		return { ok: false, reason: "No evaluator model." };
 	}
 
 	try {
@@ -268,7 +340,11 @@ async function judgeCondition(
 			messages: [
 				{
 					role: "user",
-					content: `Condition:\n${condition}\n\nTranscript excerpt:\n${transcript}`,
+					content: [
+						`Condition:\n${condition}`,
+						`Retained proof ledger:\n${formatProofLedger(proofs)}`,
+						`Recent transcript excerpt:\n${transcript}`,
+					].join("\n\n"),
 					timestamp: Date.now(),
 				},
 			],
@@ -276,7 +352,7 @@ async function judgeCondition(
 		return parseEvaluatorReply(reply);
 	} catch (error: unknown) {
 		const message = error instanceof Error ? error.message : "evaluator failed";
-		return { verdict: "not_yet", reason: `${message}; continuing.` };
+		return { ok: false, reason: message };
 	}
 }
 
@@ -294,29 +370,83 @@ function pickEvaluatorModel(ctx: ExtensionContext): Model | undefined {
 	return other ?? ctx.model ?? available[0];
 }
 
-function parseEvaluatorReply(reply: AssistantMessage): { verdict: GoalVerdict; reason: string } {
-	const text = assistantText(reply);
+function parseEvaluatorReply(reply: AssistantMessage): ParsedEvaluatorReply {
+	return parseEvaluatorText(assistantText(reply));
+}
+
+export function parseEvaluatorText(text: string): ParsedEvaluatorReply {
+	const jsonText = extractJsonObject(text);
+	if (!jsonText) {
+		return { ok: false, reason: "Evaluator returned no JSON." };
+	}
+	const parsed = parseJsonValue(jsonText);
+	if (!parsed.ok) {
+		return { ok: false, reason: "Evaluator JSON parse failed." };
+	}
+	return parseEvaluatorPayload(parsed.value);
+}
+
+function extractJsonObject(text: string): string | null {
 	const jsonMatch = text.match(/\{[\s\S]*\}/);
-	if (!jsonMatch) {
-		return { verdict: "not_yet", reason: "Evaluator returned no JSON; continuing." };
-	}
+	return jsonMatch ? jsonMatch[0] : null;
+}
 
-	let parsed: unknown;
+function parseJsonValue(text: string): { ok: true; value: unknown } | { ok: false } {
 	try {
-		parsed = JSON.parse(jsonMatch[0]);
+		return { ok: true, value: JSON.parse(text) };
 	} catch {
-		return { verdict: "not_yet", reason: "Evaluator JSON parse failed; continuing." };
+		return { ok: false };
 	}
-	if (!isRecord(parsed)) {
-		return { verdict: "not_yet", reason: "Evaluator JSON is not an object; continuing." };
-	}
+}
 
-	const verdict = parsed.verdict;
-	const reason = typeof parsed.reason === "string" ? parsed.reason : "";
-	if (verdict === "met" || verdict === "not_yet" || verdict === "impossible") {
-		return { verdict, reason: reason || verdict };
+function parseEvaluatorPayload(value: unknown): ParsedEvaluatorReply {
+	if (!isRecord(value)) {
+		return { ok: false, reason: "Evaluator JSON is not an object." };
 	}
-	return { verdict: "not_yet", reason: reason || "Unknown evaluator verdict; continuing." };
+	const reason = typeof value.reason === "string" ? value.reason : "";
+	if (!isEvaluatorVerdict(value.verdict)) {
+		return { ok: false, reason: reason || "Unknown evaluator verdict." };
+	}
+	if (!isStringArray(value.proofs) || !isStringArray(value.invalidatedProofs)) {
+		return { ok: false, reason: "Evaluator proof updates are missing or invalid." };
+	}
+	return {
+		ok: true,
+		verdict: value.verdict,
+		reason: reason || value.verdict,
+		proofs: normalizeProofs(value.proofs),
+		invalidatedProofs: normalizeProofs(value.invalidatedProofs),
+	};
+}
+
+function normalizeProofs(proofs: readonly string[]): string[] {
+	const unique: string[] = [];
+	for (const proof of proofs) {
+		const normalized = truncate(proof.replace(/\s+/g, " ").trim(), MAX_PROOF_ITEM_CHARS);
+		if (!normalized) continue;
+		const previous = unique.indexOf(normalized);
+		if (previous >= 0) unique.splice(previous, 1);
+		unique.push(normalized);
+	}
+	return unique.slice(-MAX_PROOF_ITEMS);
+}
+
+export function updateProofLedger(
+	current: readonly string[],
+	added: readonly string[],
+	invalidated: readonly string[],
+): string[] {
+	const removed = new Set(normalizeProofs(invalidated));
+	return normalizeProofs([...current.filter((proof) => !removed.has(proof)), ...added]);
+}
+
+function formatProofLedger(proofs: readonly string[]): string {
+	if (proofs.length === 0) return "(empty)";
+	return proofs.map((proof) => `- ${proof}`).join("\n");
+}
+
+function isEvaluatorVerdict(value: unknown): value is EvaluatorVerdict {
+	return value === "met" || value === "not_yet" || value === "impossible";
 }
 
 function collectTranscriptExcerpt(branch: readonly SessionEntry[]): {
@@ -338,17 +468,14 @@ function collectTranscriptExcerpt(branch: readonly SessionEntry[]): {
 			const text = textParts(message.content)
 				.map((part) => part.text)
 				.join("\n");
-			if (text) chunks.push(`TOOL ${message.toolName}:\n${text.slice(0, 800)}`);
+			if (text) chunks.push(`TOOL ${message.toolName}:\n${clipTail(text, TOOL_RESULT_CHAR_BUDGET)}`);
 		} else if (isUserMessage(message)) {
 			const text = userText(message.content);
 			if (text && !text.startsWith("Goal ")) chunks.push(`USER:\n${text.slice(0, 400)}`);
 		}
 	}
 
-	let text = chunks.join("\n\n");
-	if (text.length > TRANSCRIPT_CHAR_BUDGET) {
-		text = text.slice(text.length - TRANSCRIPT_CHAR_BUDGET);
-	}
+	const text = clipTail(chunks.join("\n\n"), TRANSCRIPT_CHAR_BUDGET);
 	return { text, toolCallCount };
 }
 
@@ -365,6 +492,7 @@ function restoreActiveGoal(entries: readonly SessionEntry[]): GoalState | null {
 		...found,
 		turnsStarted: found.turnsStarted || found.turnsEvaluated,
 		noToolTurns: 0,
+		proofs: isStringArray(found.proofs) ? normalizeProofs(found.proofs) : [],
 	};
 }
 
@@ -477,6 +605,11 @@ function truncate(value: string, max: number): string {
 	return `${value.slice(0, max - 1)}…`;
 }
 
+function clipTail(value: string, max: number): string {
+	if (value.length <= max) return value;
+	return value.slice(value.length - max);
+}
+
 function assistantText(message: AssistantMessage): string {
 	return message.content
 		.filter((part): part is TextContent => part.type === "text")
@@ -520,6 +653,10 @@ function isGoalState(value: unknown): value is GoalState {
 		typeof value.maxTurns === "number" &&
 		typeof value.status === "string"
 	);
+}
+
+function isStringArray(value: unknown): value is string[] {
+	return Array.isArray(value) && value.every((item) => typeof item === "string");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

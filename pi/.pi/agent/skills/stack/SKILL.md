@@ -24,28 +24,15 @@ une PR fourre-tout en fin de course.
   critères d'acceptation). Source de vérité.
 - `--base <branch>` — branche de départ. Défaut : `main`.
 - `--no-worktree` — travailler dans le repo courant (branche dédiée quand même).
-- `--max-files <N>` — plafond mou de fichiers par maillon. Défaut : `20`.
-- `--max-lines <N>` — plafond mou de lignes changées par maillon. Défaut : `1000`.
+- `--max-files <N>` / `--max-lines <N>` — plafonds mous. Défaut et règles : [slicing.md](references/slicing.md).
 - `--no-stack` — une seule branche, une seule PR. Fallback si `gh stack` manque.
 - `--dry-run` — produire le plan (dont le découpage) et s'arrêter.
 
 ## Découpage
 
-Transformer le périmètre en une liste ordonnée de **maillons** (une branche +
-une PR chacun), du plus fondamental au plus haut (un maillon ne dépend que de
-ceux d'en dessous).
-
-1. **Défaut** : une feature cohérente = un maillon.
-2. **Fusion** : ce qui est fortement couplé (l'un est intestable sans l'autre,
-   ex. schéma DB + config) partage un maillon _tant que_ le diff cumulé estimé
-   reste sous le budget.
-3. **Split** : une feature dont le diff estimé dépasse le budget se coupe en
-   plusieurs maillons par couches (schéma → validation → câblage → UI), chacun
-   compilable seul.
-
-Un maillon doit se relire et se tester seul. Budget mou : dépasser un peu pour
-ne pas couper une unité atomique vaut mieux qu'un maillon qui ne compile pas.
-Jamais de coupe au milieu d'un état rouge.
+Charger et appliquer [references/slicing.md](references/slicing.md) — seule
+source de vérité. Transformer le périmètre en une liste ordonnée de
+**maillons** selon ce contrat (jamais un algorithme local).
 
 Sortir un plan court : liste des maillons (nom de branche, contenu, budget
 estimé) et commandes de test détectées. Avec `--dry-run`, s'arrêter ici.
@@ -89,8 +76,8 @@ manuel (`git push` ou `gh stack push`), quand le développeur est prêt.
 - Ne jamais travailler directement sur `main`.
 - Si une feature se révèle infaisable : implémenter tout ce qui l'est, livrer le
   reste, et dire explicitement ce qui bloque et pourquoi.
-- Si le diff réel dépasse largement le budget en cours de route : couper un
-  maillon supplémentaire (`gh stack add`) et le signaler.
+- Si un split en cours de route s'impose : ré-appliquer
+  [slicing.md](references/slicing.md), `gh stack add`, et le signaler.
 
 ## Rapport final
 

@@ -2,7 +2,7 @@
  * Latte Footer — powerline-style footer matching Catppuccin Latte.
  *
  * Line 1: [󰚩 model  thinking]  [ path   branch] ···· context bar + exact tokens · tokens · cost
- * Line 2: git status + PR #n · provider quotas (kimi-coding 5h/weekly, openrouter credits)
+ * Line 2: git status + PR #n · provider quotas (openai-codex 5h/weekly, kimi, openrouter, xai)
  *
  * Toggle with /latte-footer. Icons are configurable below (Nerd Font).
  * Quotas are polled every 5 min using the OAuth tokens from ~/.pi/agent/auth.json.
@@ -20,6 +20,7 @@ import { homedir } from "node:os";
 import { readFileSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { Buffer } from "node:buffer";
 
 const execFileAsync = promisify(execFile);
 
@@ -236,15 +237,43 @@ type XaiQuota = {
 	pool?: { usedPercent: number; reset: string; label: "hebdo" | "mois" };
 	prepaidBalance?: number;
 };
-type QuotaCache = { kimi?: KimiQuota; openrouter?: OpenRouterQuota; xai?: XaiQuota; error?: boolean };
+type UsageWindow = {
+	usedPercent: number;
+	reset: string;
+	label: string;
+};
+type OpenAIQuota = {
+	plan?: string;
+	windows: UsageWindow[];
+	credits?: number;
+	resets?: number;
+};
+type QuotaCache = {
+	kimi?: KimiQuota;
+	openrouter?: OpenRouterQuota;
+	xai?: XaiQuota;
+	openai?: OpenAIQuota;
+	error?: boolean;
+};
 
-function readToken(provider: string): string | undefined {
+function readAuthRecord(provider: string): Record<string, unknown> | undefined {
 	try {
-		const auth = JSON.parse(readFileSync(AUTH_PATH, "utf8"));
-		return auth[provider]?.access;
+		const parsed: unknown = JSON.parse(readFileSync(AUTH_PATH, "utf8"));
+		if (!isRecord(parsed)) return undefined;
+		const entry = parsed[provider];
+		return isRecord(entry) ? entry : undefined;
 	} catch {
 		return undefined;
 	}
+}
+
+function readAuthField(provider: string, field: string): string | undefined {
+	const value = readAuthRecord(provider)?.[field];
+	return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function readToken(provider: string): string | undefined {
+	return readAuthField(provider, "access");
 }
 
 async function fetchJson(url: string, token: string): Promise<unknown | undefined> {
@@ -271,6 +300,90 @@ async function fetchJsonWithHeaders(url: string, headers: Record<string, string>
 	} catch {
 		return undefined;
 	}
+}
+
+const OPENAI_PLAN_LABELS: Record<string, string> = {
+	guest: "guest",
+	free: "free",
+	go: "go",
+	plus: "plus",
+	pro: "pro",
+	prolite: "pro lite",
+	free_workspace: "workspace",
+	team: "team",
+	business: "business",
+	enterprise: "enterprise",
+	edu: "edu",
+	education: "edu",
+	quorum: "quorum",
+	k12: "k12",
+	unknown: "unknown",
+};
+
+function openaiPlanLabel(planType: unknown): string | undefined {
+	if (typeof planType !== "string" || planType.length === 0) return undefined;
+	return OPENAI_PLAN_LABELS[planType] ?? planType;
+}
+
+function usageWindowLabel(limitWindowSeconds: number): string {
+	if (limitWindowSeconds >= 6 * 24 * 3600) return "sem";
+	if (limitWindowSeconds >= 4.5 * 3600) return "5h";
+	if (limitWindowSeconds >= 45 * 60) return `${Math.round(limitWindowSeconds / 3600)}h`;
+	return `${Math.max(1, Math.round(limitWindowSeconds / 60))}min`;
+}
+
+function chatgptAccountIdFromToken(token: string): string | undefined {
+	const payload = token.split(".")[1];
+	if (!payload) return undefined;
+	try {
+		const padded = payload.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(payload.length / 4) * 4, "=");
+		const parsed: unknown = JSON.parse(Buffer.from(padded, "base64").toString("utf8"));
+		if (!isRecord(parsed)) return undefined;
+		const oauth = parsed["https://api.openai.com/auth"];
+		if (!isRecord(oauth)) return undefined;
+		const id = oauth.chatgpt_account_id;
+		return typeof id === "string" && id.length > 0 ? id : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+function parseUsageWindow(raw: unknown): UsageWindow | undefined {
+	if (!isRecord(raw)) return undefined;
+	const usedPercent = finiteNumber(raw.used_percent);
+	const windowSeconds = finiteNumber(raw.limit_window_seconds);
+	if (usedPercent === undefined || windowSeconds === undefined || windowSeconds <= 0) return undefined;
+	const resetAt = finiteNumber(raw.reset_at);
+	const reset =
+		resetAt === undefined ? "" : new Date(resetAt * 1000).toISOString();
+	return {
+		usedPercent: Math.min(100, Math.max(0, usedPercent)),
+		reset,
+		label: usageWindowLabel(windowSeconds),
+	};
+}
+
+function parseOpenAIUsage(raw: unknown): OpenAIQuota | undefined {
+	if (!isRecord(raw)) return undefined;
+	const rateLimit = isRecord(raw.rate_limit) ? raw.rate_limit : undefined;
+	const windows = [rateLimit?.primary_window, rateLimit?.secondary_window].flatMap((window) => {
+		const parsed = parseUsageWindow(window);
+		return parsed ? [parsed] : [];
+	});
+	const creditsRaw = isRecord(raw.credits) ? raw.credits : undefined;
+	const credits =
+		creditsRaw?.has_credits === true ? finiteNumber(creditsRaw.balance) : undefined;
+	const resetsRaw = isRecord(raw.rate_limit_reset_credits) ? raw.rate_limit_reset_credits : undefined;
+	const resets = finiteNumber(resetsRaw?.available_count);
+	const plan = openaiPlanLabel(raw.plan_type);
+	if (!plan && windows.length === 0 && credits === undefined && (resets === undefined || resets <= 0)) {
+		return undefined;
+	}
+	const quota: OpenAIQuota = { windows };
+	if (plan) quota.plan = plan;
+	if (credits !== undefined && credits > 0) quota.credits = credits;
+	if (resets !== undefined && resets > 0) quota.resets = resets;
+	return quota;
 }
 
 function parseKimiWindow(detail: unknown, resetFallback?: unknown): KimiQuota["fiveHour"] | undefined {
@@ -421,6 +534,23 @@ async function pollQuotas(): Promise<QuotaCache> {
 		}
 
 		cache.xai = q;
+	}
+
+	// OpenAI Codex (ChatGPT subscription) — WHAM usage windows
+	const openaiToken = readToken("openai-codex");
+	if (openaiToken) {
+		const accountId =
+			readAuthField("openai-codex", "accountId") ?? chatgptAccountIdFromToken(openaiToken);
+		if (accountId) {
+			const usage = await fetchJsonWithHeaders("https://chatgpt.com/backend-api/wham/usage", {
+				Authorization: `Bearer ${openaiToken}`,
+				"ChatGPT-Account-ID": accountId,
+				originator: "codex_cli_rs",
+				Accept: "application/json",
+			});
+			const quota = parseOpenAIUsage(usage);
+			if (quota) cache.openai = quota;
+		}
 	}
 
 	return cache;
@@ -609,6 +739,28 @@ async function fetchCurrentPr(cwd: string): Promise<GitPr | null> {
 function prLink(pr: GitPr | null): string {
 	if (!pr) return "";
 	return hyperlink(fgHex(LATTE.blue, `PR #${pr.number}`), pr.url);
+}
+
+function usageWindowPart(window: UsageWindow, dim: (s: string) => string): string {
+	const remaining = 100 - window.usedPercent;
+	const reset = window.reset ? ` ${dim(`${ICONS.reset} ${fmtReset(window.reset)}`)}` : "";
+	return `${dim(window.label)} ${quotaGauge(remaining, 100)}${reset}`;
+}
+
+function openaiQuotaPart(quota: OpenAIQuota, dim: (s: string) => string): string {
+	const head = quota.plan
+		? `${dim("openai")} ${fgHex(LATTE.mauve, quota.plan)}`
+		: dim("openai");
+	const extras = quota.windows.map((window) => usageWindowPart(window, dim));
+	if (quota.credits !== undefined) {
+		const col = balanceColor(quota.credits);
+		extras.push(`${fgHex(col, "◉")} ${fgHex(col, `$${quota.credits.toFixed(2)}`)} ${dim("crédits")}`);
+	}
+	if (quota.resets !== undefined) {
+		extras.push(dim(`${quota.resets} reset${quota.resets > 1 ? "s" : ""}`));
+	}
+	if (extras.length === 0) return `${head} ${fgHex(LATTE.subtext0, "—")}`;
+	return `${head}   ${extras.join("   ")}`;
 }
 
 function gitWithPr(status: GitStatus | null, pr: GitPr | null): string {
@@ -803,7 +955,8 @@ export default function (pi: ExtensionAPI) {
 		const showXai = provider.includes("xai");
 		const showKimi = provider.includes("kimi");
 		const showOr = provider.includes("openrouter");
-		const showAll = !showXai && !showKimi && !showOr;
+		const showOpenai = provider.includes("openai");
+		const showAll = !showXai && !showKimi && !showOr && !showOpenai;
 
 		const quotaParts: string[] = [];
 
@@ -834,6 +987,10 @@ export default function (pi: ExtensionAPI) {
 				part += `   ${dim("hebdo")} ${quotaGauge(orq.weekly.remaining, orq.weekly.limit)}`;
 			}
 			quotaParts.push(part);
+		}
+
+		if (quotaCache.openai && (showOpenai || showAll)) {
+			quotaParts.push(openaiQuotaPart(quotaCache.openai, dim));
 		}
 
 		if (quotaCache.xai && (showXai || showAll)) {

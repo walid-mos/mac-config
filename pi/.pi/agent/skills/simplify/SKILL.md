@@ -16,8 +16,16 @@ Cleanup of a **diff that already works**, before review. Not bug hunting.
 
 ## Execution contract
 
-Foreground, live card, **30 min**. Never lower `timeoutMs`. Never use
-`$` in the script (no shell). Children: `acceptance: false`.
+Prefer async plus a barrier wait. Do not mandate foreground or a live card.
+
+Never lower `timeoutMs`. Never use `$` in the script (no shell).
+Children: `acceptance: false` and a bounded read-only `turnBudget`.
+Never put a tight turn/tool/usage budget on an `implementer`.
+
+Every child sets `outputMode: "file-only"` and a distinct `output` path.
+The parent consumes `structuredOutput`, `artifactPaths`, and those output
+paths. Never paste full transcripts, tool traces, or diffs into the parent
+or into a later child task.
 
 ## Arguments
 
@@ -59,11 +67,12 @@ that are here.
    before any agent sees them: `**/migrations/meta/*_snapshot.json`,
    lockfiles, generated clients, license dumps. Empty after that → stop.
 4. Build `FILES` (explicit, sorted) and `RANGE` (`<base>...HEAD` or the
-   equivalent). Children never re-derive the partition.
+   equivalent). Children never re-derive the partition. They inspect
+   `git diff RANGE -- FILES` themselves.
 
-Pass each child the **full source diff** (generated already stripped)
-plus `RANGE` + `FILES`. Same contract as Claude's bundled `/simplify`:
-complete context, then they grep the wider repo.
+Pass each child `RANGE` + `FILES` + the angle contract. Never paste
+the source diff. Same contract as Claude's bundled `/simplify` for
+research depth: they grep the wider repo, especially reuse.
 
 Wait for every child. Dedup by `file|line` or the same mechanism.
 
@@ -82,7 +91,72 @@ looks messy.
 
 Apply only verified `cleanup`:
 
-- All `trivial`/`local` in ≤ 3 files → you may apply.
+- All `trivial`/`local` in ≤ 3 files → apply them yourself.
+- Any `cross-file`, or more than 3 files, or anything that is not a
+  simple accepted cleanup → a **fresh** `implementer` (code) and/or
+  `implementer-front` (UI). Never fork the parent session.
+
+```js
+const WRITER_SCHEMA = {
+	type: 'object',
+	additionalProperties: false,
+	required: ['changedFiles', 'validation', 'conflicts', 'risks'],
+	properties: {
+		changedFiles: { type: 'array', items: { type: 'string' } },
+		validation: {
+			type: 'object',
+			additionalProperties: false,
+			required: ['ok', 'command'],
+			properties: {
+				ok: { type: 'boolean' },
+				command: { type: 'string' },
+				summary: { type: 'string' },
+			},
+		},
+		conflicts: { type: 'array', items: { type: 'string' } },
+		risks: { type: 'array', items: { type: 'string' } },
+	},
+}
+const RANGE = '<base>...HEAD'
+const FILES = ['path/a.ts']
+const SKILLS = ['coding']
+const FINDINGS = [
+	{
+		file: 'path/a.ts',
+		line: 1,
+		summary: '<verified cleanup>',
+		cost: 'local',
+		class: 'cleanup',
+	},
+]
+const GATE = '<same behavior-lock command as Phase 0>'
+const apply = await runs.run('simplify-apply', {
+	agent: 'implementer',
+	context: 'fresh',
+	worktree: false,
+	gate: GATE,
+	skill: SKILLS,
+	outputSchema: WRITER_SCHEMA,
+	output: 'simplify/apply.json',
+	outputMode: 'file-only',
+	task: [
+		'Apply only these verified simplify cleanups. No other edits.',
+		'RANGE: ' + RANGE,
+		'Files (edit ONLY these):',
+		...FILES.map(f => '- ' + f),
+		'Findings:',
+		JSON.stringify(FINDINGS),
+		'Inspect Git yourself. Do not expect a pasted diff.',
+		'Validate with: ' + GATE,
+	].join('\n'),
+})
+return {
+	key: apply.key,
+	ok: !!(apply && !apply.error),
+	artifacts: apply && apply.artifactPaths,
+	structured: apply && apply.structuredOutput,
+}
+```
 
 Re-run the behavior lock. Red → revert the offending fix, move it to
 follow-up. Never leave the tree red.
@@ -95,10 +169,22 @@ unstaged and say so.
 
 `.filter` on `runs.all` — children die. `stats.failed` goes in the report.
 
-If the parent workflow itself times out: completed `structuredOutput` is
-still on the child runs — read it (`children.list` / run artifacts),
-then retry only the missing angles. Collapsing to an inline pass is a
-skill violation, not a fallback.
+On a dead angle: **do not self-review**. In this order:
+
+3. If a structured artifact already exists, consume it — do not redo
+   the research.
+4. Restart the **exact same named agent/model** only when the run is
+   not resumable **and** no usable artifact exists.
+
+Never substitute another model. Never lower `timeoutMs` on the retry.
+
+If the parent workflow itself times out: completed `structuredOutput`
+and output files are still on the child runs — read them
+(`children.list` / run artifacts), then retry only the missing angles.
+Collapsing to an inline pass is a skill violation, not a fallback.
+
+Preserve any handoff whose `patch.changed === true` after a crash.
+Never `worktree.discard` preserved work before an apply/reject decision.
 
 ## Output
 

@@ -7,6 +7,7 @@ description: >-
   with real blocking edges. Trigger on /backlog, "transforme ça en tickets",
   "fais-moi les épiques", "mets ça dans Plane", "spec cette feature",
   "découpe cette feature en tickets", "construis le backlog".
+  Lookup seul ("c'est quoi MINA-12") : plane_* tools, pas ce skill.
 ---
 
 # Backlog

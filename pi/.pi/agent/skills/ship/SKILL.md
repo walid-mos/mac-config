@@ -8,7 +8,7 @@ description: >-
     visually and functionally verified via /visual-check, simplified via
     /simplify, and submitted — under the /goal auto-continue loop.
     Trigger on /ship, "réalise l'épique X", "implémente toutes les tâches de MINA-1",
-    "lance la feature".
+    "lance la feature". Lookup seul ("c'est quoi le ticket X") : plane_* tools, pas /ship.
 ---
 
 # Ship

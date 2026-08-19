@@ -1,8 +1,6 @@
-# HTML deliverables
+# Deliverables
 
-Tous les livrables de ce skill sont idéalement des documents HTML construits
-avec le skill `html`. `html` n'est pas encore importé dans pi, donc pour le
-moment les livrables sont en Markdown.
+Tous les livrables de ce skill sont des documents Markdown.
 
 ## Gate 2 — `round-<n>.md`
 

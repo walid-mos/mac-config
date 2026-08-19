@@ -25,6 +25,10 @@ This skill is the _launchable workflow_. The doctrine and vocabulary live in [`.
 
 ### 2. Explore (delegate breadth)
 
+Delegate mapping to `searcher` (AGENTS.md gather, async). Never spawn an unnamed agent. If you need a `workflowScript`, it must name `agent: "searcher"`, use `timeoutMs: 1800000`, never `$`, never collapse:
+
+Have it note where you feel friction — don't follow rigid heuristics:
+
 - Where does understanding one concept require bouncing between many small modules?
 - Where are modules **shallow** (ARCH 0 signals)?
 - Where were pure functions extracted only for testability, but the real bugs hide in how they're _called_ (no locality)?
@@ -48,7 +52,7 @@ If a candidate contradicts an ADR, surface it ONLY when the friction is real eno
 
 ### 4. Present + choose
 
-Default to an **inline** ranked summary ending with a single **Top recommendation**. For a shareable artifact, consider saving it under the project's `docs/` notes. Then ask: **"Which of these would you like to explore?"**
+Default to an **inline** ranked summary ending with a single **Top recommendation**. For a shareable artifact, consider saving it under the project's `docs/` notes. Then ask which candidate to explore via `ask_user_question` — never a free-text question.
 
 ### 5. Grill the chosen one
 
@@ -59,5 +63,4 @@ When the user picks a candidate, walk the design tree in conversation - constrai
 
 ## Boundaries
 
-- This skill **finds and shapes** architecture; it does not mass-rewrite code. Once a refactor is agreed, implement it under the normal coding doctrine (`coding`, language skill, `react`).
-- One refactor at a time, behind green tests - drive the change with the `tdd` skill.
+- This skill **finds and shapes** architecture; it does not mass-rewrite code. Once a refactor is agreed, implement it under the normal coding doctrine (`coding`, language skill, `react`), behind green tests. One refactor at a time.

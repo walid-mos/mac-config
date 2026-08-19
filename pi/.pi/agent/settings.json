@@ -13,16 +13,14 @@
   "theme": "catppuccin-latte",
   "packages": [
     "npm:pi-web-access",
-    "npm:@plannotator/pi-extension"
+    "npm:@plannotator/pi-extension",
+    "npm:pi-frontend-check"
   ],
   "enabledModels": [
     "kimi-coding/k3",
-    "kimi-coding/k3-256k",
     "openrouter/deepseek/deepseek-v4-flash",
     "openrouter/deepseek/deepseek-v4-pro",
-    "xai/grok-4.6",
-    "xai/grok-build-0.1",
-    "openrouter/openai/gpt-5.6-sol"
+    "xai/grok-4.6"
   ],
   "hideThinkingBlock": false
 }

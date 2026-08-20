@@ -251,9 +251,11 @@ pi-dirs:
 # pnpm 11 ignore les flags CLI --config.strict-dep-builds=false quand la commande
 # utilise --prefix (c'est le cas des installs npm de pi : `pi install`/`pi update`
 # passent toujours --prefix ~/.pi/agent/npm). Sans allowBuilds dans le workspace,
-# l'install échoue en ERR_PNPM_IGNORED_BUILDS sur les build scripts non approuvés
-# (node-pty, module natif du webtui via @plannotator/pi-extension). Le fichier est
-# donc écrit AVANT les pi install — sinon le premier install casse d'emblée.
+# l'install échoue en ERR_PNPM_IGNORED_BUILDS sur les build scripts sans décision
+# explicite. node-pty est le module natif du webtui via @plannotator/pi-extension ;
+# les scripts de @google/genai et protobufjs ne sont pas nécessaires ici. Le fichier
+# est donc écrit de façon déterministe AVANT les pi install/update : toute nouvelle
+# dépendance avec un build échouera explicitement jusqu'à examen de cette politique.
 pi-post: export FNM_DIR := $(HOME)/.local/share/fnm
 pi-post: export PNPM_HOME := $(HOME)/.local/share/pnpm
 pi-post: export PATH := $(HOME)/.local/share/pnpm/bin:$(HOME)/.local/share/pnpm:$(PATH)
@@ -268,14 +270,14 @@ pi-post:
 		else echo "node et fnm introuvables — installe node puis relance make pi-post"; fi; \
 	fi
 	@mkdir -p "$(HOME)/.pi/agent/npm"
-	@if ! grep -q '^  node-pty: true' "$(HOME)/.pi/agent/npm/pnpm-workspace.yaml" 2>/dev/null; then \
-		if grep -q '^allowBuilds:' "$(HOME)/.pi/agent/npm/pnpm-workspace.yaml" 2>/dev/null; then \
-			printf '  node-pty: true\n' >> "$(HOME)/.pi/agent/npm/pnpm-workspace.yaml"; \
-		else \
-			printf 'allowBuilds:\n  node-pty: true\n' > "$(HOME)/.pi/agent/npm/pnpm-workspace.yaml"; \
-		fi; \
-		echo "→ pnpm-workspace.yaml: build node-pty approuvé (pnpm 11 + --prefix ignore le flag strict-dep-builds)"; \
-	fi
+	@printf '%s\n' \
+		'# Build-script policy for Pi npm extensions (pnpm 11).' \
+		'allowBuilds:' \
+		"  '@google/genai': false" \
+		'  node-pty: true' \
+		'  protobufjs: false' \
+		> "$(HOME)/.pi/agent/npm/pnpm-workspace.yaml"
+	@echo "→ pnpm-workspace.yaml: node-pty approuvé ; builds @google/genai/protobufjs refusés"
 	@if command -v pi >/dev/null; then \
 		if [ ! -x "$(PNPM_HOME)/bin/pnpm" ]; then \
 			pnpm11=$$(find "$(FNM_DIR)/node-versions" -path "*/installation/bin/pnpm" \( -type f -o -type l \) 2>/dev/null | sort -V | tail -1); \

@@ -1,4 +1,5 @@
 {
   "app.thinking.toggle": "ctrl+`",
-  "app.tools.expand": "ctrl+shift+`"
+  "app.tools.expand": "ctrl+shift+`",
+  "app.suspend": []
 }

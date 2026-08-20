@@ -38,7 +38,13 @@ function sendRequestAttempt(request: unknown, timeoutMs: number): Promise<boolea
 
     const socket = net.createConnection(socketEndpoint!);
     socket.on("error", () => finish(false));
-    socket.on("connect", () => socket.write(`${JSON.stringify(request)}\n`));
+    socket.on("connect", () => {
+      try {
+        socket.write(`${JSON.stringify(request)}\n`);
+      } catch {
+        finish(false);
+      }
+    });
     socket.on("data", () => finish(true));
     socket.on("end", () => finish(false));
     timeout = setTimeout(() => finish(false), timeoutMs);
@@ -47,10 +53,14 @@ function sendRequestAttempt(request: unknown, timeoutMs: number): Promise<boolea
 }
 
 async function sendRequest(request: unknown): Promise<void> {
-  if (await sendRequestAttempt(request, 500)) {
-    return;
+  try {
+    if (await sendRequestAttempt(request, 500)) {
+      return;
+    }
+    await sendRequestAttempt(request, 1500);
+  } catch {
+    // Herdr reporting is best-effort and must never reject into Pi lifecycle hooks.
   }
-  await sendRequestAttempt(request, 1500);
 }
 
 type AgentState = "working" | "blocked" | "idle";

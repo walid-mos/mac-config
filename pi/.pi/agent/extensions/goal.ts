@@ -26,6 +26,15 @@ import type {
 	SessionEntry,
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+function pickPreferredModel<T extends { id: string }>(
+    available: readonly T[], preferredIds: readonly string[],
+): T | undefined {
+    for (const needle of preferredIds) {
+        const hit = available.find(model => model.id.includes(needle));
+        if (hit) return hit;
+    }
+    return undefined;
+}
 
 const ENTRY_TYPE = "goal-state";
 const MAX_CONDITION_CHARS = 4000;
@@ -149,7 +158,22 @@ export default function goalExtension(pi: ExtensionAPI): void {
 
 	pi.on("turn_start", async (_event, ctx) => {
 		if (!active || active.status !== "active") return;
+		if (isTurnCapReached(displayTurns(active), active.maxTurns)) {
+			const stopped: GoalState = {
+				...active,
+				lastVerdict: "stuck",
+				lastReason: `Turn cap reached (${active.maxTurns}).`,
+				status: "stuck",
+			};
+			persist(ctx, stopped);
+			active = stopped;
+			renderChrome(ctx, stopped);
+			ctx.ui.notify(`Goal stuck: ${stopped.lastReason}`, "warning");
+			ctx.abort();
+			return;
+		}
 		active = { ...active, turnsStarted: displayTurns(active) + 1 };
+		persist(ctx, active);
 		renderChrome(ctx, active);
 	});
 
@@ -217,6 +241,10 @@ function parseMaxTurns(condition: string): number {
 	return Math.min(parsed, 100);
 }
 
+export function isTurnCapReached(turnsStarted: number, maxTurns: number): boolean {
+	return turnsStarted >= maxTurns;
+}
+
 function clearGoal(ctx: ExtensionCommandContext | ExtensionContext, status: GoalStatus): void {
 	if (!active) return;
 	const closed: GoalState = { ...active, status };
@@ -249,7 +277,7 @@ async function decideGoalLoop(
 	transcript: string,
 	counters: GoalTurnCounters,
 ): Promise<GoalLoopDecision> {
-	if (counters.turnsEvaluated >= current.maxTurns) {
+	if (isTurnCapReached(displayTurns(current), current.maxTurns)) {
 		return { action: "stop", verdict: "stuck", reason: `Turn cap reached (${current.maxTurns}).` };
 	}
 	if (counters.noToolTurns >= STUCK_NO_TOOL_TURNS) {
@@ -335,6 +363,7 @@ async function judgeCondition(
 	}
 
 	try {
+		// complete() takes ApiStreamOptions; SimpleStreamOptions.reasoning is only on completeSimple, which ModelRegistry does not expose.
 		const reply = await ctx.modelRegistry.complete(model, {
 			systemPrompt: EVALUATOR_SYSTEM,
 			messages: [
@@ -360,10 +389,15 @@ function pickEvaluatorModel(ctx: ExtensionContext): Model | undefined {
 	const available = ctx.modelRegistry.getAvailable();
 	if (available.length === 0) return ctx.model;
 
-	for (const needle of PREFERRED_EVALUATOR_IDS) {
-		const hit = available.find((model) => model.id.includes(needle));
-		if (hit) return hit;
-	}
+	const loaded = loadOrchestrationConfig(defaultOrchestrationPath());
+	const fromDashboard = resolveEvaluatorModel(
+		available,
+		selectedGoalEvaluatorKey(loaded.ok ? loaded.value : undefined),
+	);
+	if (fromDashboard) return fromDashboard;
+
+	const preferred = pickPreferredModel(available, PREFERRED_EVALUATOR_IDS);
+	if (preferred) return preferred;
 
 	const currentId = ctx.model?.id;
 	const other = available.find((model) => model.id !== currentId);
@@ -584,7 +618,7 @@ function continuePrompt(state: GoalState): string {
 	return [
 		`Goal toujours actif: ${state.condition}`,
 		`Dernier verdict: not_yet — ${state.lastReason}`,
-		`Tours: ${state.turnsEvaluated}/${state.maxTurns}.`,
+		`Tours: ${displayTurns(state)}/${state.maxTurns}.`,
 		"Continue. Ne demande rien. Prouve la condition par une sortie de commande.",
 	].join("\n");
 }
@@ -636,7 +670,12 @@ function isAssistantMessage(value: AgentMessage): value is AssistantMessage {
 }
 
 function isToolResultMessage(value: AgentMessage): value is ToolResultMessage {
-	return isRecord(value) && value.role === "toolResult" && typeof value.toolName === "string";
+	return (
+		isRecord(value) &&
+		value.role === "toolResult" &&
+		typeof value.toolName === "string" &&
+		Array.isArray(value.content)
+	);
 }
 
 function isUserMessage(value: AgentMessage): value is UserMessage {

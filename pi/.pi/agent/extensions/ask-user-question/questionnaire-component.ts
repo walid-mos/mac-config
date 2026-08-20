@@ -70,9 +70,11 @@ export function runQuestionnaire<TUi>(
 		const state = new QuestionnaireState(questions, editorPort);
 
 		let cachedLines: string[] | undefined;
+		let cachedWidth: number | undefined;
 
 		function refresh(): void {
 			cachedLines = undefined;
+			cachedWidth = undefined;
 			tui.requestRender();
 		}
 
@@ -209,13 +211,15 @@ export function runQuestionnaire<TUi>(
 
 		return {
 			render(width: number): string[] {
-				if (!cachedLines) {
+				if (!cachedLines || cachedWidth !== width) {
 					cachedLines = renderQuestionnaire(state, questions, editor, theme, width);
+					cachedWidth = width;
 				}
 				return cachedLines;
 			},
 			invalidate: () => {
 				cachedLines = undefined;
+				cachedWidth = undefined;
 			},
 			handleInput,
 		};

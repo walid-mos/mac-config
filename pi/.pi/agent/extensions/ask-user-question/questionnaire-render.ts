@@ -3,7 +3,7 @@
  * No TUI handle, no mutation — the component owns caching and re-renders.
  */
 
-import { visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
+import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import type { Editor } from "@earendil-works/pi-tui";
 import { ANSWER_PREVIEW_MAX_LENGTH, type Answer, type Question, UI_TEXT } from "./questionnaire-model";
 import type { QuestionnaireState } from "./questionnaire-state";
@@ -44,7 +44,10 @@ export function renderQuestionnaire(
 ): string[] {
 	const lines: string[] = [];
 	const renderWidth = Math.max(1, width);
-	const sink: LineSink = (line) => lines.push(line);
+	// A custom component must never return a line wider than the current terminal.
+	// Keep this final boundary even when an embedded Editor changes its padding.
+	const sink: LineSink = (line) =>
+		lines.push(visibleWidth(line) <= renderWidth ? line : truncateToWidth(line, renderWidth));
 
 	lines.push(theme.fg("accent", "─".repeat(renderWidth)));
 	if (state.isMulti) renderTabBar(state, questions, theme, renderWidth, sink);

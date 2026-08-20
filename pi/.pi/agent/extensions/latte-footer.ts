@@ -781,60 +781,88 @@ export default function (pi: ExtensionAPI) {
 	let prCache: GitPr | null = null;
 	let prTimer: ReturnType<typeof setInterval> | undefined;
 	let prGeneration = 0;
+	let lifecycleGeneration = 0;
 	let footerInstalled = false;
 
-	async function refreshQuotas() {
-		quotaCache = await pollQuotas();
-		requestRender?.();
+	function requestRenderSafely(): void {
+		try {
+			requestRender?.();
+		} catch {
+			requestRender = undefined;
+		}
+	}
+
+	async function refreshQuotas(): Promise<void> {
+		const generation = lifecycleGeneration;
+		try {
+			const quotas = await pollQuotas();
+			if (generation !== lifecycleGeneration) return;
+			quotaCache = quotas;
+			requestRenderSafely();
+		} catch {
+			// Quota APIs are decorative; a provider/network failure must never escape a timer.
+		}
 	}
 
 	function startPolling() {
 		if (pollTimer) return;
-		refreshQuotas();
-		pollTimer = setInterval(refreshQuotas, QUOTA_POLL_MS);
+		void refreshQuotas();
+		pollTimer = setInterval(() => void refreshQuotas(), QUOTA_POLL_MS);
 		pollTimer.unref?.();
 	}
 
-	async function refreshGit(cwd: string) {
-		gitCache = await fetchGitStatus(cwd);
-		requestRender?.();
+	async function refreshGit(cwd: string): Promise<void> {
+		const generation = lifecycleGeneration;
+		try {
+			const status = await fetchGitStatus(cwd);
+			if (generation !== lifecycleGeneration) return;
+			gitCache = status;
+			requestRenderSafely();
+		} catch {
+			// Git status is decorative; never reject from an interval callback.
+		}
 	}
 
 	function startGitPolling(cwd: string) {
 		gitCwd = cwd;
 		if (gitTimer) {
-			refreshGit(cwd);
+			void refreshGit(cwd);
 			return;
 		}
-		refreshGit(cwd);
+		void refreshGit(cwd);
 		gitTimer = setInterval(() => {
-			if (gitCwd) refreshGit(gitCwd);
+			if (gitCwd) void refreshGit(gitCwd);
 		}, GIT_POLL_MS);
 		gitTimer.unref?.();
 	}
 
 	async function refreshPr(cwd: string): Promise<void> {
 		const generation = ++prGeneration;
-		const pr = await fetchCurrentPr(cwd);
-		if (generation !== prGeneration) return;
-		if (prCache?.number === pr?.number && prCache?.url === pr?.url) return;
-		prCache = pr;
-		requestRender?.();
+		const lifecycle = lifecycleGeneration;
+		try {
+			const pr = await fetchCurrentPr(cwd);
+			if (generation !== prGeneration || lifecycle !== lifecycleGeneration) return;
+			if (prCache?.number === pr?.number && prCache?.url === pr?.url) return;
+			prCache = pr;
+			requestRenderSafely();
+		} catch {
+			// GitHub status is decorative; never reject from an interval callback.
+		}
 	}
 
 	function startPrPolling(cwd: string): void {
-		refreshPr(cwd);
+		void refreshPr(cwd);
 		if (prTimer) return;
 		prTimer = setInterval(() => {
-			if (gitCwd) refreshPr(gitCwd);
+			if (gitCwd) void refreshPr(gitCwd);
 		}, PR_POLL_MS);
 		prTimer.unref?.();
 	}
 
 	function refreshPrForBranchChange(): void {
 		prCache = null;
-		requestRender?.();
-		if (gitCwd) refreshPr(gitCwd);
+		requestRenderSafely();
+		if (gitCwd) void refreshPr(gitCwd);
 	}
 
 	function setup(ctx: ExtensionContext) {
@@ -846,7 +874,7 @@ export default function (pi: ExtensionAPI) {
 		// Only install the footer component once — re-setFooter on every
 		// session_start / toggle stacks ghost rows with the split-footer renderer.
 		if (footerInstalled) {
-			requestRender?.();
+			requestRenderSafely();
 			return;
 		}
 		footerInstalled = true;
@@ -910,9 +938,9 @@ export default function (pi: ExtensionAPI) {
 		for (const e of branchEntries) {
 			if (e.type === "message" && e.message.role === "assistant") {
 				const m = e.message as AssistantMessage;
-				input += m.usage.input;
-				output += m.usage.output;
-				cost += m.usage.cost.total;
+				input += finiteNumber(m.usage?.input) ?? 0;
+				output += finiteNumber(m.usage?.output) ?? 0;
+				cost += finiteNumber(m.usage?.cost?.total) ?? 0;
 			}
 		}
 
@@ -1041,12 +1069,25 @@ export default function (pi: ExtensionAPI) {
 	pi.on("session_start", async (_event, ctx) => {
 		setup(ctx);
 	});
+	pi.on("session_shutdown", async () => {
+		lifecycleGeneration += 1;
+		prGeneration += 1;
+		if (pollTimer) clearInterval(pollTimer);
+		if (gitTimer) clearInterval(gitTimer);
+		if (prTimer) clearInterval(prTimer);
+		pollTimer = undefined;
+		gitTimer = undefined;
+		prTimer = undefined;
+		gitCwd = undefined;
+		requestRender = undefined;
+		footerInstalled = false;
+	});
 
 	// Refresh stats after each turn
-	pi.on("turn_end", async () => requestRender?.());
-	pi.on("agent_end", async () => requestRender?.());
-	pi.on("thinking_level_select", async () => requestRender?.());
-	pi.on("model_select", async () => requestRender?.());
+	pi.on("turn_end", async () => requestRenderSafely());
+	pi.on("agent_end", async () => requestRenderSafely());
+	pi.on("thinking_level_select", async () => requestRenderSafely());
+	pi.on("model_select", async () => requestRenderSafely());
 
 	pi.registerCommand("latte-footer", {
 		description: "Toggle the Catppuccin Latte powerline footer",

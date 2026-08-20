@@ -11,10 +11,6 @@ description: >-
 
 # Goal
 
-The `/goal` **extension** owns the loop (set / status / clear, evaluate
-after each settled turn, auto-continue). This skill owns **how you work**
-while a goal is active.
-
 Claude's `/goal` is a session-scoped stop-hook: a small model judges the
 condition after every turn and either continues or clears. Ours does the
 same via the extension, plus the delivery rules this workspace already

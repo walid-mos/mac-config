@@ -21,10 +21,7 @@ read it.
 
 ---
 
-## OPS 2 - Model pins stay on the agent
-
-Never pass `model` per-run unless the user explicitly asked. Agent
-frontmatter pins are the contract.
+## OPS 2 - Model selection stays at the role level
 
 ---
 

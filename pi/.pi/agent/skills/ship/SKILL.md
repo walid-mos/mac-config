@@ -16,9 +16,6 @@ description: >-
 Take one Plane epic from Backlog to an open **stack of pull requests**, without
 asking the user anything between the first ticket and the submit.
 
-`/backlog` writes the tickets. `/ship` les ordonne, les passe au contrat
-de découpe Stack, et les exécute en PR lisibles empilées comme des commits.
-
 ## Objectif — engager le loop /goal
 
 Avant toute implémentation, appeler `goal_set` avec une condition vérifiable

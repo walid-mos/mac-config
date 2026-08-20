@@ -11,6 +11,7 @@
   "enableInstallTelemetry": false,
   "defaultProjectTrust": "ask",
   "theme": "catppuccin-latte",
+  "tuiMode": "fullscreen",
   "packages": [
     "npm:pi-web-access",
     "npm:@plannotator/pi-extension",

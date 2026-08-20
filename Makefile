@@ -44,7 +44,7 @@ OBSIDIAN_PLUGINS := \
 	folder-notes=LostPaul/obsidian-folder-notes
 OBSIDIAN_PLUGIN_DATA := $(foreach spec,$(OBSIDIAN_PLUGINS),$(firstword $(subst =, ,$(spec))))
 
-.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs hermes-dirs hermes-gemma obsidian obsidian-save obsidian-post proxy-reset dev-dirs git-filters
+.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs pi-update pi-smoke hermes-dirs hermes-gemma obsidian obsidian-save obsidian-post proxy-reset dev-dirs git-filters
 
 help:
 	@echo "Targets:"
@@ -64,6 +64,8 @@ help:
 	@echo ""
 	@echo "  proxy-reset    Retire le PAC proxy laissé par Zscaler (rétablit le relais Apple)"
 	@echo "  plannotator-post  Installe le binaire et l'extension Pi"
+	@echo "  pi-update      Met à jour Pi et tous ses packages"
+	@echo "  pi-smoke       Stress-test le démarrage Pi avec saisie immédiate"
 	@echo "  hermes-gemma   Installe le superviseur Gemma (démarre/arrête avec Hermes.app)"
 	@echo ""
 	@echo "Packages: $(PACKAGES)"
@@ -283,8 +285,14 @@ pi-post:
 			fi; \
 		fi; \
 		pi install npm:pi-web-access >/dev/null 2>&1 || true; \
-		echo "pi prêt — packages web-access — \`pi\` puis /login pour l'auth"; \
+		pi update --all; \
+		echo "pi prêt et à jour — packages web-access — \`pi\` puis /login pour l'auth"; \
 	else echo "pi non installé — étape ignorée"; fi
+
+pi-update: pi-post
+
+pi-smoke: pi
+	@python3 scripts/test-pi-startup.py
 
 rp-post:
 	@command -v node >/dev/null || command -v fnm >/dev/null \

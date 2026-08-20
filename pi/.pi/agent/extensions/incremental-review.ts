@@ -39,6 +39,11 @@ const PLANNOTATOR_REQUEST_CHANNEL = "plannotator:request";
 const REF_NAME = "_incremental/last-review";
 const SNAPSHOT_MESSAGE = "incremental-review snapshot";
 const DELTA_MESSAGE = "Changes since last review";
+const REVIEW_FIX_COMMIT_INSTRUCTIONS =
+  "\n\nApply every actionable review fix. Before reporting completion, inspect `git status`, " +
+  "group the fixes by independent domain, and create one atomic commit per domain. " +
+  "Stage only the files for that domain; never mix independent domains in a commit. " +
+  "Do not leave review-fix files unstaged or untracked; leave pre-existing unrelated changes untouched.";
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -262,7 +267,7 @@ function forwardReviewFeedback(pi: ExtensionAPI, result: CodeReviewResult): void
       "\n\n> Verify that your changes address each annotation before " +
       "marking the review as resolved.";
   }
-  safeSendMessage(pi, feedback, "forward review feedback");
+  safeSendMessage(pi, feedback + REVIEW_FIX_COMMIT_INSTRUCTIONS, "forward review feedback");
 }
 
 function onReviewDone(

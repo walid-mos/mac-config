@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { parseEvaluatorText, updateProofLedger } from "../extensions/goal.ts";
+import { isTurnCapReached, parseEvaluatorText, updateProofLedger } from "../extensions/goal.ts";
 
 function testCumulativeProofsAreParsed(): void {
 	const result = parseEvaluatorText(
@@ -49,11 +49,18 @@ function testLedgerUpdatesAreCodeEnforced(): void {
 	assert.deepEqual(updated, ["new proof", "keep proof"]);
 }
 
+function testTurnCapUsesStartedModelRounds(): void {
+	assert.equal(isTurnCapReached(29, 30), false);
+	assert.equal(isTurnCapReached(30, 30), true);
+	assert.equal(isTurnCapReached(536, 30), true);
+}
+
 const tests: Array<[string, () => void]> = [
 	["cumulative proofs are parsed", testCumulativeProofsAreParsed],
 	["proofs are required", testProofsAreRequired],
 	["proof ledger is bounded and deduplicated", testProofLedgerIsBoundedAndDeduplicated],
 	["ledger updates are code-enforced", testLedgerUpdatesAreCodeEnforced],
+	["turn cap uses started model rounds", testTurnCapUsesStartedModelRounds],
 ];
 
 for (const [name, test] of tests) {

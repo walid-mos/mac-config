@@ -4,11 +4,11 @@ macOS dotfiles managed with [GNU Stow](https://www.gnu.org/software/stow/) + a M
 
 ## Layout
 
-**Every top-level directory is a Stow package** whose internal tree mirrors `$HOME` — the package list is derived from the filesystem by the Makefile (`make help` shows it). Only two exceptions, listed in `NONSTOW`: `docs/` (documentation) and `obsidian/` (custom iCloud target, own Make target).
+**Every top-level directory is a Stow package** whose internal tree mirrors `$HOME` — the package list is derived from the filesystem by the Makefile (`make help` shows it). Exceptions listed in `NONSTOW`: `docs/` (documentation), `obsidian/` (custom iCloud target, own Make target), `scripts/` (internal git tooling), and `claude/` (kept in-tree, not deployed).
 
 Two invariants carry all the knowledge:
 
-- **`NOFOLD`** (Makefile) — packages whose target directory also receives files *written by the tool* (`gh/hosts.yml` token, `pi/auth.json` + sessions, `colima/_lima`, `docker/buildx`, `rtk/history.db`, `~/.local/bin` shared with pnpm/fnm, …). Stow is run with `--no-folding` for them: the target stays a real directory outside the repo, only authored files are symlinked, so runtime and secrets can never land in the working tree. This mechanism replaces per-tool `.gitignore` blocks — prevention instead of exclusion.
+- **`NOFOLD`** (Makefile) — packages whose target directory also receives files *written by the tool* (`gh/hosts.yml` token, `pi/auth.json` + sessions, `colima/_lima`, `docker/buildx`, `rtk/history.db`, `~/.local/bin` shared with pnpm/fnm, …). Stow is run with `--no-folding` for them: the target stays a **real directory** (never a single symlink to the package). **Only files already present in the package are symlinked.** Files created later in the live directory stay local and never appear in the working tree until they are copied into the package and restowed. This replaces per-tool `.gitignore` blocks — prevention instead of exclusion.
 - **`.gitignore`** — reduced to genuine secrets (`zsh/.config/zsh/secrets`) and generic noise; runtime paths need no rule because NOFOLD keeps them out of the repo entirely.
 
 **`pi/` package**: `make pi` stows `~/.pi/agent/settings.json`, `make pi-post` installs the CLI (`pnpm add -g @earendil-works/pi-coding-agent`) if missing. Auth happens on first launch (`pi` then `/login`) and lives in `~/.pi/agent/auth.json`, never versioned. pi writes through the symlink when a setting changes via `/settings`: the diff shows up directly in the repo — review before committing.
@@ -62,13 +62,13 @@ Hand-curated list of a fresh mac's packages (34 → selection). **Do not regener
 
 ## Conventions
 
-- **No runtime data in the repo.** Packages whose target dir receives tool-written files are in `NOFOLD` — the runtime physically cannot reach the working tree (see Layout).
+- **No runtime data in the repo.** Packages whose target dir receives tool-written files are in `NOFOLD` — the directory stays real, so new local files never fold into the working tree (see Layout).
 - **Secrets.** `zsh/.config/zsh/secrets` is gitignored. Every API key lives in that file or in the macOS keychain.
 - **Stow has no native hooks.** All post-install goes through the Makefile (`<package>-post`, listed in `POSTS`).
 
 ## Adding a new package
 
 1. Create the directory at the repo root, mirroring the target tree from `$HOME` — it is picked up automatically (`PACKAGES` is derived from the filesystem).
-2. If the tool writes other files into the target directory (token, lock, state), add the package to `NOFOLD`: without `--no-folding`, Stow folds the whole directory into a symlink and the tool ends up writing its secrets into the repo.
+2. If the tool writes other files into the target directory (token, lock, state), add the package to `NOFOLD`: without `--no-folding`, Stow folds the whole directory into a symlink and the tool writes into the repo. With `--no-folding`, only files already present in the package are linked; add any new config to the package explicitly, then restow.
 3. If a post-install step is needed, add a `<package>-post` target and its name to `POSTS`.
 4. `make <package>` then check the symlinks with `ls -la $HOME`.

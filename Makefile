@@ -19,10 +19,13 @@ PACKAGES := $(filter-out $(NONSTOW),$(patsubst %/,%,$(wildcard */)))
 # Packages dont le dossier cible reçoit aussi des fichiers écrits par l'outil
 # (gh/hosts.yml, pi/auth.json + sessions, colima/_lima, docker/buildx +
 # contexts, rtk/history.db, git/credentials via credential-store XDG,
-# languages/.local/bin partagé avec pnpm/fnm) : sans --no-folding Stow
-# replierait le dossier entier en symlink et l'outil écrirait ses secrets et son
-# runtime dans le repo (puis un unstow les casserait). hermes écrit ses sessions,
-# sa mémoire et ~/.hermes/.env (secrets) hors repo, comme pi.
+# languages/.local/bin partagé avec pnpm/fnm) : --no-folding garde le dossier
+# cible réel (jamais un symlink unique vers le package). Seuls les fichiers déjà
+# présents dans le package sont liés ; un fichier créé ensuite reste local et
+# n'entre dans le repo que s'il est ajouté explicitement au package puis restow.
+# Sans --no-folding, Stow replierait le dossier entier et l'outil écrirait ses
+# secrets/runtime dans le repo (puis un unstow les casserait). hermes écrit ses
+# sessions, sa mémoire et ~/.hermes/.env (secrets) hors repo, comme pi.
 NOFOLD := colima docker gh git herdr hermes homebrew languages pi rclone rtk
 
 # Hooks post-install chaînés par `make install` (cible <nom>-post ; rust n'a pas
@@ -234,11 +237,11 @@ nvim-post:
 	@command -v rg >/dev/null && echo "ripgrep prêt: telescope live_grep/grep_string opérationnels" \
 		|| echo "ripgrep non installé — telescope live_grep échouera"
 
-# pi est dans NOFOLD : stow ne replie jamais ~/.pi/agent, donc auth.json,
-# models-store.json et sessions/ (runtime écrit par pi) restent des fichiers réels
-# hors repo, jamais absorbés ni cassés par un stow/unstow/restow. pi-dirs crée le
-# dossier sessions à l'avance en ceinture-bretelles. extensions/skills/themes/agents
-# sont des symlinks vers le repo : les nouveaux fichiers y sont versionnés d'office.
+# pi est dans NOFOLD : stow ne replie jamais ~/.pi/agent, donc le dossier reste
+# réel. Seuls les fichiers déjà présents dans le package (settings.json, skills, …) sont des
+# symlinks. auth.json, models-store.json et sessions/ restent locaux hors repo.
+# Un fichier créé dans le live dir n'est pas versionné tant qu'il n'est pas ajouté
+# au package. pi-dirs crée sessions/ à l'avance en ceinture-bretelles.
 pi: | pi-dirs
 
 pi-dirs:

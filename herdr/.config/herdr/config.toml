@@ -21,6 +21,12 @@ pane_scrollbars = false # récupère la colonne réservée aux scrollbars
 hide_tab_bar_when_single_tab = true
 
 agent_panel_sort = "spaces"
+
+# Pi/frontend-check emits screenshots through the Kitty graphics protocol.
+# Herdr must own and repaint those placements instead of only reserving their cells.
+[experimental]
+kitty_graphics = true
+
 [ui.sidebar.agents]
 row_gap = 1 # respiration entre les entrées d'agents
 rows = [

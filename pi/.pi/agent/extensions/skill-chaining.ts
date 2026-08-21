@@ -26,18 +26,16 @@ import type {
 } from "@earendil-works/pi-tui";
 import { fuzzyFilter } from "@earendil-works/pi-tui";
 import { readFileSync } from "node:fs";
+import {
+	applySkillChainingCompletion,
+	isSkillCompletionContext,
+} from "./skill-chaining/apply.ts";
 
 /**
  * Regex that matches a `/skill:` token with optional typed prefix,
  * preceded by whitespace or line-start.
  */
 const SKILL_TOKEN_RE = /(?:^|\s)(\/skill:([a-z0-9-]*))$/;
-
-/**
- * Regex to check whether we are INSIDE a `/skill:` context
- * (for tab-completion gating).
- */
-const SKILL_CONTEXT_RE = /(?:^|\s)\/skill:[a-z0-9-]*$/;
 
 /**
  * Build an autocomplete provider that wraps the built-in provider.
@@ -94,27 +92,15 @@ function createSkillChainingProvider(current: AutocompleteProvider): Autocomplet
 			};
 		},
 
-		applyCompletion(
-			lines: string[],
-			cursorLine: number,
-			cursorCol: number,
-			item: AutocompleteItem,
-			prefix: string,
-		): { lines: string[]; cursorLine: number; cursorCol: number } {
-			const currentLine = lines[cursorLine] ?? "";
-			const before = currentLine.slice(0, cursorCol - prefix.length);
-			const after = currentLine.slice(cursorCol);
-
-			// Insert "/skill:name " (leading slash + trailing space for chaining).
-			const newLine = before + "/" + item.value + " " + after;
-			const newLines = [...lines];
-			newLines[cursorLine] = newLine;
-
-			return {
-				lines: newLines,
+		applyCompletion(lines, cursorLine, cursorCol, item, prefix) {
+			return applySkillChainingCompletion(
+				current.applyCompletion.bind(current),
+				lines,
 				cursorLine,
-				cursorCol: before.length + item.value.length + 2, // +2 for "/" and space
-			};
+				cursorCol,
+				item,
+				prefix,
+			);
 		},
 
 		shouldTriggerFileCompletion(
@@ -127,7 +113,7 @@ function createSkillChainingProvider(current: AutocompleteProvider): Autocomplet
 
 			// Inside a /skill: context, Tab should open the skill menu,
 			// not the file-completion menu.
-			if (textBefore.match(SKILL_CONTEXT_RE)) {
+			if (isSkillCompletionContext(textBefore)) {
 				return false;
 			}
 
@@ -274,7 +260,7 @@ export default function (pi: ExtensionAPI): void {
 				// The built-in already handles start-of-line; we focus on
 				// the mid-line case the built-in misses.
 				if (
-					textBefore.match(SKILL_CONTEXT_RE) &&
+					isSkillCompletionContext(textBefore) &&
 					!editor.isShowingAutocomplete()
 				) {
 					ed.tryTriggerAutocomplete();

@@ -79,9 +79,8 @@ type GoalLoopDecision =
 type GoalState = {
 	condition: string;
 	startedAt: string;
+	/** Completed /goal cycles evaluated after the agent settles. */
 	turnsEvaluated: number;
-	/** In-memory display counter (LLM rounds). Optional on restored entries. */
-	turnsStarted?: number;
 	noToolTurns: number;
 	maxTurns: number;
 	lastVerdict: GoalVerdict | null;
@@ -136,7 +135,7 @@ export default function goalExtension(pi: ExtensionAPI): void {
 			condition: Type.String({ minLength: 1, maxLength: MAX_CONDITION_CHARS, description: "Verifiable condition for the auto-continue loop" }),
 		}),
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-			const next = createGoal(params.condition, !ctx.isIdle());
+			const next = createGoal(params.condition);
 			persist(ctx, next);
 			active = next;
 			renderChrome(ctx, next);
@@ -154,27 +153,6 @@ export default function goalExtension(pi: ExtensionAPI): void {
 
 	pi.on("session_shutdown", async () => {
 		stopChromeClock();
-	});
-
-	pi.on("turn_start", async (_event, ctx) => {
-		if (!active || active.status !== "active") return;
-		if (isTurnCapReached(displayTurns(active), active.maxTurns)) {
-			const stopped: GoalState = {
-				...active,
-				lastVerdict: "stuck",
-				lastReason: `Turn cap reached (${active.maxTurns}).`,
-				status: "stuck",
-			};
-			persist(ctx, stopped);
-			active = stopped;
-			renderChrome(ctx, stopped);
-			ctx.ui.notify(`Goal stuck: ${stopped.lastReason}`, "warning");
-			ctx.abort();
-			return;
-		}
-		active = { ...active, turnsStarted: displayTurns(active) + 1 };
-		persist(ctx, active);
-		renderChrome(ctx, active);
 	});
 
 	pi.on("agent_settled", async (_event, ctx) => {
@@ -207,7 +185,7 @@ function handleCommand(args: string, ctx: ExtensionCommandContext): void {
 		return;
 	}
 
-	const next = createGoal(args, !ctx.isIdle());
+	const next = createGoal(args);
 	persist(ctx, next);
 	active = next;
 	renderChrome(ctx, next);
@@ -218,12 +196,11 @@ function handleCommand(args: string, ctx: ExtensionCommandContext): void {
 	host.sendUserMessage(kickoffPrompt(next), { expandPromptTemplates: true });
 }
 
-function createGoal(condition: string, alreadyInTurn: boolean): GoalState {
+function createGoal(condition: string): GoalState {
 	return {
 		condition,
 		startedAt: new Date().toISOString(),
 		turnsEvaluated: 0,
-		turnsStarted: alreadyInTurn ? 1 : 0,
 		noToolTurns: 0,
 		maxTurns: parseMaxTurns(condition),
 		lastVerdict: null,
@@ -241,8 +218,8 @@ function parseMaxTurns(condition: string): number {
 	return Math.min(parsed, 100);
 }
 
-export function isTurnCapReached(turnsStarted: number, maxTurns: number): boolean {
-	return turnsStarted >= maxTurns;
+export function isTurnCapReached(turnsEvaluated: number, maxTurns: number): boolean {
+	return turnsEvaluated >= maxTurns;
 }
 
 function clearGoal(ctx: ExtensionCommandContext | ExtensionContext, status: GoalStatus): void {
@@ -277,27 +254,40 @@ async function decideGoalLoop(
 	transcript: string,
 	counters: GoalTurnCounters,
 ): Promise<GoalLoopDecision> {
-	if (isTurnCapReached(displayTurns(current), current.maxTurns)) {
-		return { action: "stop", verdict: "stuck", reason: `Turn cap reached (${current.maxTurns}).` };
+	const judged = await judgeCondition(ctx, current.condition, transcript, current.proofs ?? []);
+	return decideEvaluatedGoal(current, counters, judged);
+}
+
+export function decideEvaluatedGoal(
+	current: GoalState,
+	counters: GoalTurnCounters,
+	judged: ParsedEvaluatorReply,
+): GoalLoopDecision {
+	if (!judged.ok) return { action: "pause", reason: judged.reason };
+	const proofs = updateProofLedger(current.proofs ?? [], judged.proofs, judged.invalidatedProofs);
+	if (judged.verdict === "met" && proofs.length === 0) {
+		return { action: "pause", reason: "Evaluator returned met without verified proofs." };
+	}
+	if (judged.verdict !== "not_yet") {
+		return { action: "stop", verdict: judged.verdict, reason: judged.reason, proofs };
+	}
+	if (isTurnCapReached(counters.turnsEvaluated, current.maxTurns)) {
+		return {
+			action: "stop",
+			verdict: "stuck",
+			reason: `Turn cap reached (${current.maxTurns}).`,
+			proofs,
+		};
 	}
 	if (counters.noToolTurns >= STUCK_NO_TOOL_TURNS) {
 		return {
 			action: "stop",
 			verdict: "stuck",
 			reason: `No tool use for ${counters.noToolTurns} turns — loop stopped, goal still set.`,
+			proofs,
 		};
 	}
-
-	const judged = await judgeCondition(ctx, current.condition, transcript, current.proofs ?? []);
-	if (!judged.ok) return { action: "pause", reason: judged.reason };
-	const proofs = updateProofLedger(current.proofs ?? [], judged.proofs, judged.invalidatedProofs);
-	if (judged.verdict === "met" && proofs.length === 0) {
-		return { action: "pause", reason: "Evaluator returned met without verified proofs." };
-	}
-	if (judged.verdict === "not_yet") {
-		return { action: "continue", reason: judged.reason, proofs };
-	}
-	return { action: "stop", verdict: judged.verdict, reason: judged.reason, proofs };
+	return { action: "continue", reason: judged.reason, proofs };
 }
 
 function nextGoalState(
@@ -514,20 +504,44 @@ function collectTranscriptExcerpt(branch: readonly SessionEntry[]): {
 }
 
 function restoreActiveGoal(entries: readonly SessionEntry[]): GoalState | null {
-	let found: GoalState | null = null;
+	let found: unknown = null;
 	for (const entry of entries) {
 		if (entry.type !== "custom" || entry.customType !== ENTRY_TYPE) continue;
-		const data = entry.data;
-		if (!isGoalState(data)) continue;
-		found = data;
+		if (!isGoalState(entry.data)) continue;
+		found = entry.data;
 	}
-	if (!found || found.status !== "active") return null;
+	return restoreGoalState(found);
+}
+
+export function restoreGoalState(value: unknown): GoalState | null {
+	if (!isGoalState(value)) return null;
+	const falseLegacyCap = isFalseLegacyTurnCap(value);
+	if (value.status !== "active" && !falseLegacyCap) return null;
 	return {
-		...found,
-		turnsStarted: found.turnsStarted || found.turnsEvaluated,
+		condition: value.condition,
+		startedAt: value.startedAt,
+		turnsEvaluated: value.turnsEvaluated,
 		noToolTurns: 0,
-		proofs: isStringArray(found.proofs) ? normalizeProofs(found.proofs) : [],
+		maxTurns: value.maxTurns,
+		lastVerdict: falseLegacyCap ? "not_yet" : value.lastVerdict,
+		lastReason: falseLegacyCap
+			? "Restored after correcting legacy turn-cap counting."
+			: value.lastReason,
+		proofs: isStringArray(value.proofs) ? normalizeProofs(value.proofs) : [],
+		status: "active",
 	};
+}
+
+function isFalseLegacyTurnCap(value: unknown): boolean {
+	if (!isRecord(value)) return false;
+	return (
+		value.status === "stuck" &&
+		typeof value.turnsStarted === "number" &&
+		typeof value.turnsEvaluated === "number" &&
+		value.turnsStarted > value.turnsEvaluated &&
+		typeof value.lastReason === "string" &&
+		/^Turn cap reached \(\d+\)\.$/.test(value.lastReason)
+	);
 }
 
 function persist(ctx: ExtensionCommandContext | ExtensionContext, state: GoalState): void {
@@ -537,12 +551,8 @@ function persist(ctx: ExtensionCommandContext | ExtensionContext, state: GoalSta
 	host.appendEntry(ENTRY_TYPE, state);
 }
 
-function displayTurns(state: GoalState): number {
-	return state.turnsStarted || state.turnsEvaluated;
-}
-
 function chromeLine(state: GoalState): string {
-	return `◎ /goal active · ${formatElapsed(state.startedAt)} · ${displayTurns(state)} turns`;
+	return `◎ /goal active · ${formatElapsed(state.startedAt)} · ${state.turnsEvaluated} turns`;
 }
 
 function stopChromeClock(): void {
@@ -596,7 +606,7 @@ function formatStatus(state: GoalState | null): string {
 	const reason = state.lastReason ? `\nLast: ${state.lastReason}` : "";
 	return [
 		`Goal (${state.status}): ${state.condition}`,
-		`Running ${elapsed}, ${displayTurns(state)} turns, ${state.turnsEvaluated} evaluated, cap ${state.maxTurns}`,
+		`Running ${elapsed}, ${state.turnsEvaluated} evaluated turns, cap ${state.maxTurns}`,
 		reason,
 	]
 		.filter(Boolean)
@@ -618,7 +628,7 @@ function continuePrompt(state: GoalState): string {
 	return [
 		`Goal toujours actif: ${state.condition}`,
 		`Dernier verdict: not_yet — ${state.lastReason}`,
-		`Tours: ${displayTurns(state)}/${state.maxTurns}.`,
+		`Tours évalués: ${state.turnsEvaluated}/${state.maxTurns}.`,
 		"Continue. Ne demande rien. Prouve la condition par une sortie de commande.",
 	].join("\n");
 }

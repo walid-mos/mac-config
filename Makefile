@@ -28,9 +28,9 @@ PACKAGES := $(filter-out $(NONSTOW),$(patsubst %/,%,$(wildcard */)))
 # sessions, sa mémoire et ~/.hermes/.env (secrets) hors repo, comme pi.
 NOFOLD := colima docker gh git herdr hermes homebrew languages pi rclone rtk
 
-# Hooks post-install chaînés par `make install` (cible <nom>-post ; rust n'a pas
-# de package Stow, rustup gère ~/.rustup et ~/.cargo lui-même).
-POSTS := dev-dirs gh herdr hermes nvim pi plannotator rp rtk rust
+# Hooks post-install chaînés par `make install` (cible <nom>-post ; rust et crit
+# n'ont pas de package Stow — rustup gère ~/.rustup/~/.cargo, Crit est une formula brew).
+POSTS := crit dev-dirs gh herdr hermes nvim pi rp rtk rust
 
 # Obsidian : le vault vit dans iCloud, seule la config .obsidian est stowée
 # (symlinks relatifs → portables entre machines). Les binaires (thème, plugins,
@@ -66,7 +66,7 @@ help:
 	@echo "  git-filters    Configure les clean filters git (.gitattributes) dans .git/config"
 	@echo ""
 	@echo "  proxy-reset    Retire le PAC proxy laissé par Zscaler (rétablit le relais Apple)"
-	@echo "  plannotator-post  Installe le binaire et l'extension Pi"
+	@echo "  crit-post      Installe Crit et ses skills Pi officiels"
 	@echo "  pi-update      Met à jour Pi et tous ses packages"
 	@echo "  pi-smoke       Stress-test le démarrage Pi avec saisie immédiate"
 	@echo "  hermes-gemma   Installe le superviseur Gemma (démarre/arrête avec Hermes.app)"
@@ -255,7 +255,7 @@ pi-dirs:
 # utilise --prefix (c'est le cas des installs npm de pi : `pi install`/`pi update`
 # passent toujours --prefix ~/.pi/agent/npm). Sans allowBuilds dans le workspace,
 # l'install échoue en ERR_PNPM_IGNORED_BUILDS sur les build scripts sans décision
-# explicite. node-pty est le module natif du webtui via @plannotator/pi-extension ;
+# explicite. node-pty reste approuvé pour les extensions npm qui en dépendent ;
 # les scripts de @google/genai et protobufjs ne sont pas nécessaires ici. Le fichier
 # est donc écrit de façon déterministe AVANT les pi install/update : toute nouvelle
 # dépendance avec un build échouera explicitement jusqu'à examen de cette politique.
@@ -306,26 +306,38 @@ rp-post:
 		|| { echo "node not found — install it (fnm install --lts) so 'rp' can serve plan.html"; exit 0; }
 	@echo "rp ready: \`rp <slug>\` will serve plan.html and wait for /submit"
 
-# plannotator : binaire CLI (~/.local/bin) posé par l'installateur officiel
-# (idempotent) + extension Pi npm. Le binaire n'est pas versionné : c'est
-# cette cible qui le (re)pose après chaque clone.
-# Les exports FNM_DIR/PNPM_HOME/PATH sont repris de pi-post : pi install appelle
-# pnpm, qui doit résoudre depuis le symlink pnpm v11 posé par pi-post dans
-# PNPM_HOME/bin (store v11 cohérent), pas depuis le pnpm brew v10 (store v10 —
-# mismatch ERR_PNPM_UNEXPECTED_STORE).
-plannotator-post: export FNM_DIR := $(HOME)/.local/share/fnm
-plannotator-post: export PNPM_HOME := $(HOME)/.local/share/pnpm
-plannotator-post: export PATH := $(HOME)/.local/share/pnpm/bin:$(HOME)/.local/share/pnpm:$(PATH)
-plannotator-post:
-	@if ! command -v plannotator >/dev/null; then \
-		echo "→ installation de plannotator (binaire)"; \
-		curl -fsSL https://plannotator.ai/install.sh | bash; \
-	else \
-		echo "plannotator déjà présent: $$(plannotator --version | head -1)"; \
+# crit : formula brew (binaire) + skills Pi officiels écrits dans
+# ~/.pi/agent/skills/{crit,crit-cli} par `crit install pi --force`. On lance
+# depuis $HOME pour forcer la destination globale, pas un .pi/skills projet.
+# --force rafraîchit les skills déjà présents. L'échec de `crit install` doit
+# faire échouer la recette (pas d'echo de succès inconditionnel).
+# Nettoyage Plannotator : binaire / état / dep npm orphelins. Un `git reset`
+# + ancienne cible `plannotator-post` peut tout réinstaller.
+crit-post: export FNM_DIR := $(HOME)/.local/share/fnm
+crit-post: export PNPM_HOME := $(HOME)/.local/share/pnpm
+crit-post: export PATH := $(HOME)/.local/share/pnpm/bin:$(HOME)/.local/share/pnpm:$(PATH)
+crit-post:
+	@if ! command -v crit >/dev/null; then \
+		if command -v brew >/dev/null; then \
+			echo "→ installation de crit (brew)"; \
+			brew install crit; \
+		else \
+			echo "crit introuvable et brew indisponible — installation impossible (https://crit.md)" >&2; \
+			exit 1; \
+		fi; \
 	fi
-	@if command -v pi >/dev/null; then \
-		pi install npm:@plannotator/pi-extension >/dev/null 2>&1 && echo "extension pi plannotator à jour"; \
-	else echo "pi introuvable — extension plannotator non installée"; fi
+	@if command -v crit >/dev/null; then \
+		( cd "$(HOME)" && crit install pi --force ) && \
+		echo "crit prêt: $$(crit --version 2>/dev/null | head -1) — skills Pi dans ~/.pi/agent/skills/{crit,crit-cli}"; \
+	else echo "crit non installé — étape ignorée"; fi
+	@if command -v pi >/dev/null && pi list 2>/dev/null | grep -Fq '@plannotator/pi-extension'; then \
+		pi remove npm:@plannotator/pi-extension; \
+	fi
+	@if [ -f "$(HOME)/.pi/agent/npm/package.json" ] && grep -Fq '@plannotator/pi-extension' "$(HOME)/.pi/agent/npm/package.json"; then \
+		( cd "$(HOME)/.pi/agent/npm" && pnpm remove @plannotator/pi-extension ); \
+	fi
+	@rm -f "$(HOME)/.local/bin/plannotator"
+	@rm -rf "$(HOME)/.plannotator"
 
 rtk-post:
 	@if ! command -v rtk >/dev/null; then \

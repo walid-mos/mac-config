@@ -14,7 +14,6 @@
   "tuiMode": "fullscreen",
   "packages": [
     "npm:pi-web-access",
-    "npm:@plannotator/pi-extension",
     "npm:pi-frontend-check"
   ],
   "enabledModels": [

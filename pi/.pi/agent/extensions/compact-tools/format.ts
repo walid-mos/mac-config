@@ -10,9 +10,30 @@ export type CompactToolArgs = {
 };
 
 export const MAX_COMMAND_LENGTH = 80;
+export const MAX_DISPLAY_PATH = 48;
+const PATH_ELLIPSIS = "…";
 
 export function truncate(text: string, max: number): string {
 	return text.length > max ? `${text.slice(0, max - 3)}...` : text;
+}
+
+export function compactPath(path: string, max: number = MAX_DISPLAY_PATH): string {
+	if (path.length <= max) return path;
+	const parts = path.split("/").filter((part) => part.length > 0);
+	const last = parts[parts.length - 1];
+	if (!last) return truncate(path, max);
+	let tail = last;
+	for (let i = parts.length - 2; i >= 0; i--) {
+		const next = `${parts[i]}/${tail}`;
+		const candidate = `${PATH_ELLIPSIS}/${next}`;
+		if (candidate.length > max) break;
+		tail = next;
+	}
+	const compacted = `${PATH_ELLIPSIS}/${tail}`;
+	if (compacted.length <= max) return compacted;
+	const prefix = `${PATH_ELLIPSIS}/`;
+	if (max <= prefix.length) return prefix.slice(0, max);
+	return `${prefix}${last.slice(-(max - prefix.length))}`;
 }
 
 export function joinCollapsed(header: string, meta: string): string {

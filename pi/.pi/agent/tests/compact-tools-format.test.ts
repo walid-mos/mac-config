@@ -2,11 +2,13 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
 	bashHeader,
+	compactPath,
 	editHeader,
 	findHeader,
 	grepHeader,
 	joinCollapsed,
 	lsHeader,
+	MAX_DISPLAY_PATH,
 	readHeader,
 	showCallLine,
 	writeHeader,
@@ -36,6 +38,31 @@ test("call line stays visible only while running or expanded", () => {
 	assert.equal(showCallLine({ expanded: false, isPartial: true }), true);
 	assert.equal(showCallLine({ expanded: true, isPartial: false }), true);
 	assert.equal(showCallLine({ expanded: false, isPartial: false }), false);
+});
+
+test("short paths stay intact", () => {
+	assert.equal(compactPath("compact-tools.ts"), "compact-tools.ts");
+	assert.equal(compactPath("pi/.pi/agent"), "pi/.pi/agent");
+	assert.equal(readHeader({ path: "a.ts" }, compactPath), "read a.ts");
+});
+
+test("long basenames preserve the filename tail", () => {
+	const filename = `${"generated-".repeat(8)}schema.snapshot.ts`;
+	const compacted = compactPath(`/tmp/cache/${filename}`);
+	assert.equal(compacted.length, MAX_DISPLAY_PATH);
+	assert.equal(compacted.startsWith("…/"), true);
+	assert.equal(compacted.endsWith("schema.snapshot.ts"), true);
+});
+
+test("long pnpm paths keep a useful trailing segment", () => {
+	const pnpmPath =
+		"/Users/walid-mos/.stow_repository/pi/.pi/agent/node_modules/.pnpm/@earendil-works+pi-coding-agent@1.2.3/node_modules/@earendil-works/pi-coding-agent/src/core/tools.ts";
+	const compacted = compactPath(pnpmPath);
+	assert.equal(compacted.startsWith("…/"), true);
+	assert.equal(compacted.includes("pi-coding-agent/src/core/tools.ts"), true);
+	assert.equal(compacted.length <= MAX_DISPLAY_PATH, true);
+	assert.equal(readHeader({ path: pnpmPath }, compactPath).startsWith("read …/"), true);
+	assert.equal(readHeader({ path: pnpmPath }, compactPath).length <= MAX_DISPLAY_PATH + "read ".length, true);
 });
 
 test("collapsed output has no blank lines", () => {

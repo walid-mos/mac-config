@@ -38,6 +38,7 @@ import { Text } from "@earendil-works/pi-tui";
 import { homedir } from "os";
 import {
 	bashHeader,
+	compactPath,
 	editHeader,
 	findHeader,
 	grepHeader,
@@ -55,7 +56,8 @@ const DIFF_EXCERPT_LINES = 30;
 
 function shortenPath(path: string): string {
 	const home = homedir();
-	return path.startsWith(home) ? `~${path.slice(home.length)}` : path;
+	const shortened = path.startsWith(home) ? `~${path.slice(home.length)}` : path;
+	return compactPath(shortened);
 }
 
 type ToolResult = {

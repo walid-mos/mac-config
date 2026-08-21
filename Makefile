@@ -47,7 +47,7 @@ OBSIDIAN_PLUGINS := \
 	folder-notes=LostPaul/obsidian-folder-notes
 OBSIDIAN_PLUGIN_DATA := $(foreach spec,$(OBSIDIAN_PLUGINS),$(firstword $(subst =, ,$(spec))))
 
-.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs pi-update pi-smoke hermes-dirs hermes-gemma obsidian obsidian-save obsidian-post proxy-reset dev-dirs git-filters
+.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs pi-update pi-smoke herdr-pi-smoke hermes-dirs hermes-gemma obsidian obsidian-save obsidian-post proxy-reset dev-dirs git-filters
 
 help:
 	@echo "Targets:"
@@ -69,6 +69,7 @@ help:
 	@echo "  crit-post      Installe Crit et ses skills Pi officiels"
 	@echo "  pi-update      Met à jour Pi et tous ses packages"
 	@echo "  pi-smoke       Stress-test le démarrage Pi avec saisie immédiate"
+	@echo "  herdr-pi-smoke Isolated Herdr named-session smoke: 20+ rapid Pi pane starts"
 	@echo "  hermes-gemma   Installe le superviseur Gemma (démarre/arrête avec Hermes.app)"
 	@echo ""
 	@echo "Packages: $(PACKAGES)"
@@ -300,6 +301,9 @@ pi-update: pi-post
 
 pi-smoke: pi
 	@python3 scripts/test-pi-startup.py
+
+herdr-pi-smoke: herdr
+	@python3 scripts/test-herdr-pi-startup.py
 
 rp-post:
 	@command -v node >/dev/null || command -v fnm >/dev/null \

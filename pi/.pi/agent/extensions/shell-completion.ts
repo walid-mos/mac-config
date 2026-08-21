@@ -4,8 +4,10 @@
  * - Popup opens right after typing `!`, stays alive while typing the command.
  * - Command position (first word after `!`, also after `|`, `;`, `&&`, `||`):
  *   completes from your real zsh environment — PATH executables, builtins,
- *   aliases, functions — dumped once per process via `zsh -ic` (sources your
- *   ~/.zshrc). The cache survives /clear and /resume.
+ *   aliases, functions — dumped once per process via a NON-interactive zsh
+ *   that sources ~/.zshrc explicitly. Interactive `zsh -i` would open /dev/tty
+ *   and can tcsetpgrp a foreign pgid (SIGTTIN on the parent). The cache
+ *   survives /clear and /resume.
  * - Argument position: delegates to pi's built-in path completion.
  * - Outside `!` mode: 100% native behavior (slash commands, @files, Tab).
  *
@@ -23,6 +25,7 @@ import {
 	fuzzyFilter,
 } from "@earendil-works/pi-tui";
 import { readdirSync, statSync } from "node:fs";
+import { homedir } from "node:os";
 import { delimiter, join } from "node:path";
 
 const MAX_SUGGESTIONS = 20;
@@ -114,9 +117,18 @@ function scanPathExecutables(): Cache {
 	return cache;
 }
 
+function zshDumpArgv(): string[] {
+	// Keep this helper non-interactive and job control disabled so it cannot
+	// compete with Pi for the pane foreground group. Source the real home rc
+	// explicitly to retain aliases/functions, passing its path as data in $1.
+	const zshrc = join(homedir(), ".zshrc");
+	const script = `unsetopt MONITOR; [[ -f "$1" ]] && source "$1"; unsetopt MONITOR; ${ZSH_DUMP_SCRIPT}`;
+	return ["-f", "-c", script, "shell-completion", zshrc];
+}
+
 async function buildCache(pi: ExtensionAPI, cwd: string, notify: (msg: string) => void): Promise<Cache> {
 	try {
-		const result = await pi.exec("zsh", ["-ic", ZSH_DUMP_SCRIPT], {
+		const result = await pi.exec("zsh", zshDumpArgv(), {
 			cwd,
 			timeout: ZSH_TIMEOUT_MS,
 		});

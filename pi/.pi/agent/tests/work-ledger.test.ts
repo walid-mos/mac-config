@@ -9,12 +9,14 @@ import {
 	WORK_LEDGER_ENTRY_TYPE,
 	collectLedgerHistory,
 	formatLedgerProjection,
+	formatStatus,
 	injectLedgerProjection,
 	isLedgerProjectionMessage,
 	needsProjection,
 	normalizeSnapshot,
 	parseLedgerRecord,
 	restoreLatestSnapshot,
+	shouldShowLedgerWidget,
 	snapshotFromCompactionSummary,
 	type LedgerBranchEntry,
 	type WorkSnapshot,
@@ -226,6 +228,7 @@ test("does not project after a newer agent checkpoint", testNoProjectionAfterNew
 test("parses compact summary into a snapshot", testSnapshotFromCompactionSummary);
 test("falls back when compact summary is empty", testCompactSummaryFallback);
 test("defaults missing origin to checkpoint", testMissingOriginDefaultsToCheckpoint);
+test("shows widget only for active or blocked snapshots", testWidgetHiddenWhenComplete);
 
 function testProjectionNeededForCompactOriginAfterCompaction(): void {
 	assert.equal(needsProjection([{ type: "compaction" }, compactSnapshotRecord()]), true);
@@ -309,4 +312,16 @@ function testMissingOriginDefaultsToCheckpoint(): void {
 	assert.equal(parsed?.kind, "snapshot");
 	if (parsed?.kind !== "snapshot") return;
 	assert.equal(parsed.origin, "checkpoint");
+}
+
+function testWidgetHiddenWhenComplete(): void {
+	assert.equal(shouldShowLedgerWidget(null), false);
+	assert.equal(shouldShowLedgerWidget(sampleSnapshot({ status: "active" })), true);
+	assert.equal(shouldShowLedgerWidget(sampleSnapshot({ status: "blocked" })), true);
+	assert.equal(shouldShowLedgerWidget(sampleSnapshot({ status: "complete" })), false);
+	const restored = restoreLatestSnapshot([snapshotRecord({ status: "complete", phase: "shipped" })]);
+	assert.equal(restored?.status, "complete");
+	assert.equal(shouldShowLedgerWidget(restored), false);
+	assert.equal(formatStatus(restored).startsWith("Work ledger (complete)"), true);
+	assert.equal(collectLedgerHistory([snapshotRecord({ status: "complete" })]).length, 1);
 }

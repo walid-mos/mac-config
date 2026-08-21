@@ -226,8 +226,12 @@ function persist(record: LedgerRecord): void {
 	api?.appendEntry(WORK_LEDGER_ENTRY_TYPE, record);
 }
 
+export function shouldShowLedgerWidget(snapshot: WorkSnapshot | null): boolean {
+	return snapshot !== null && snapshot.status !== "complete";
+}
+
 function renderWidget(ctx: ExtensionCommandContext | ExtensionContext, snapshot: WorkSnapshot | null): void {
-	if (!snapshot) {
+	if (!shouldShowLedgerWidget(snapshot)) {
 		ctx.ui.setWidget("work-ledger", undefined);
 		return;
 	}

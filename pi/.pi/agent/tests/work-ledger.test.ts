@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+	COMPACT_PHASE,
 	MAX_ITEM_CHARS,
 	MAX_LIST_ITEMS,
 	MAX_TEXT_CHARS,
@@ -14,6 +15,7 @@ import {
 	normalizeSnapshot,
 	parseLedgerRecord,
 	restoreLatestSnapshot,
+	snapshotFromCompactionSummary,
 	type LedgerBranchEntry,
 	type WorkSnapshot,
 } from "../extensions/work-ledger.ts";
@@ -39,7 +41,15 @@ function custom(data: unknown): LedgerBranchEntry {
 }
 
 function snapshotRecord(overrides: Partial<WorkSnapshot> = {}): LedgerBranchEntry {
-	return custom({ kind: "snapshot", ...sampleSnapshot(overrides) });
+	return custom({ kind: "snapshot", origin: "checkpoint", ...sampleSnapshot(overrides) });
+}
+
+function compactSnapshotRecord(overrides: Partial<WorkSnapshot> = {}): LedgerBranchEntry {
+	return custom({
+		kind: "snapshot",
+		origin: "compact",
+		...sampleSnapshot({ phase: COMPACT_PHASE, ...overrides }),
+	});
 }
 
 function testRestoreLatestValidSnapshot(): void {
@@ -211,3 +221,92 @@ test("normalizes bounds and drops empty items", testNormalizeBoundsAndEmptyItems
 test("projects bounded text once", testProjectionTextAndDedup);
 test("restore rejects arbitrary persisted data", testRestoreDoesNotCoerceArbitraryData);
 test("inserts projection before latest user prompt and dedups", testProjectionInsertsBeforeLatestUserAndDedups);
+test("projects compact-origin snapshot after compaction", testProjectionNeededForCompactOriginAfterCompaction);
+test("does not project after a newer agent checkpoint", testNoProjectionAfterNewerCheckpointOverCompact);
+test("parses compact summary into a snapshot", testSnapshotFromCompactionSummary);
+test("falls back when compact summary is empty", testCompactSummaryFallback);
+test("defaults missing origin to checkpoint", testMissingOriginDefaultsToCheckpoint);
+
+function testProjectionNeededForCompactOriginAfterCompaction(): void {
+	assert.equal(needsProjection([{ type: "compaction" }, compactSnapshotRecord()]), true);
+	assert.equal(needsProjection([snapshotRecord(), { type: "compaction" }, compactSnapshotRecord()]), true);
+}
+
+function testNoProjectionAfterNewerCheckpointOverCompact(): void {
+	const entries: LedgerBranchEntry[] = [
+		{ type: "compaction" },
+		compactSnapshotRecord(),
+		snapshotRecord({ phase: "next slice" }),
+	];
+	assert.equal(needsProjection(entries), false);
+}
+
+const SAMPLE_COMPACT_SUMMARY = `## Goal
+Ship the work ledger compact hook
+
+## Constraints & Preferences
+- Keep snapshots out of LLM context
+
+## Progress
+### Done
+- [x] parse compact markdown
+### In Progress
+- [ ] wire session_compact
+### Blocked
+- missing tests
+
+## Key Decisions
+- **custom entries**: keep raw state out of context
+
+## Next Steps
+1. restow pi
+
+## Critical Context
+- compact origin must project
+
+<modified-files>
+work-ledger.ts
+</modified-files>
+<read-files>
+compaction.md
+</read-files>
+`;
+
+function testSnapshotFromCompactionSummary(): void {
+	const snapshot = snapshotFromCompactionSummary(SAMPLE_COMPACT_SUMMARY, null);
+	assert.equal(snapshot.goal, "Ship the work ledger compact hook");
+	assert.equal(snapshot.phase, COMPACT_PHASE);
+	assert.equal(snapshot.status, "blocked");
+	assert.deepEqual(snapshot.done, ["parse compact markdown"]);
+	assert.deepEqual(snapshot.inProgress, ["wire session_compact"]);
+	assert.deepEqual(snapshot.blocked, ["missing tests"]);
+	assert.deepEqual(snapshot.decisions, [
+		{ decision: "custom entries", rationale: "keep raw state out of context" },
+	]);
+	assert.deepEqual(snapshot.nextSteps, ["restow pi"]);
+	assert.deepEqual(snapshot.evidence, ["compact origin must project"]);
+	assert.deepEqual(snapshot.artifacts, [
+		{ path: "work-ledger.ts", purpose: "modified" },
+		{ path: "compaction.md", purpose: "read" },
+	]);
+}
+
+function testCompactSummaryFallback(): void {
+	const fallback = sampleSnapshot({ goal: "Keep going", blocked: [] });
+	const snapshot = snapshotFromCompactionSummary("No prior history. Split-turn compaction.", fallback);
+	assert.equal(snapshot.goal, "Keep going");
+	assert.equal(snapshot.phase, COMPACT_PHASE);
+	assert.equal(snapshot.status, "active");
+	assert.deepEqual(snapshot.done, fallback.done);
+	assert.deepEqual(snapshot.nextSteps, fallback.nextSteps);
+	const empty = snapshotFromCompactionSummary("", null);
+	assert.equal(empty.goal, "Continue the current session");
+	assert.equal(empty.phase, COMPACT_PHASE);
+}
+
+function testMissingOriginDefaultsToCheckpoint(): void {
+	const parsed = parseLedgerRecord({ kind: "snapshot", ...sampleSnapshot() });
+	assert.equal(parsed?.kind, "snapshot");
+	if (parsed?.kind !== "snapshot") return;
+	assert.equal(parsed.origin, "checkpoint");
+}

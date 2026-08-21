@@ -2,10 +2,11 @@
  * Phase-checkpoint ledger.
  *
  * `work_checkpoint` records a bounded snapshot at semantic phase boundaries
- * (never every turn). Snapshots persist only as custom session entries, so raw
- * ledger state stays out of LLM context. After native compaction, a transient
- * `context` hook projects the latest non-cleared snapshot when branch order
- * says the checkpoint was compacted away.
+ * (never every turn). `/compact` (and auto-compact) always writes a compact-origin
+ * snapshot from the native summary so the ledger is never missing after compact.
+ * Snapshots persist only as custom session entries, so raw ledger state stays out
+ * of LLM context. A transient `context` hook projects the latest non-cleared
+ * snapshot after compaction until `/clear` or `/work-ledger clear`.
  *
  * /work-ledger [status|history|clear]
  */
@@ -53,9 +54,13 @@ export type WorkSnapshot = {
 	evidence: string[];
 };
 
-export type SnapshotRecord = WorkSnapshot & { kind: "snapshot" };
+export type SnapshotOrigin = "checkpoint" | "compact";
+export type SnapshotRecord = WorkSnapshot & { kind: "snapshot"; origin: SnapshotOrigin };
 export type ClearRecord = { kind: "clear" };
 export type LedgerRecord = SnapshotRecord | ClearRecord;
+
+export const COMPACT_PHASE = "compacted";
+const DEFAULT_COMPACT_GOAL = "Continue the current session";
 
 export type LedgerBranchEntry = {
 	type: string;
@@ -120,7 +125,7 @@ export default function workLedgerExtension(pi: ExtensionAPI): void {
 		parameters: WorkCheckpointParams,
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
 			const snapshot = normalizeSnapshot(params);
-			persist({ kind: "snapshot", ...snapshot });
+			persist({ kind: "snapshot", origin: "checkpoint", ...snapshot });
 			current = snapshot;
 			renderWidget(ctx, snapshot);
 			return {
@@ -169,6 +174,15 @@ export default function workLedgerExtension(pi: ExtensionAPI): void {
 	pi.on("session_tree", async (_event, ctx) => {
 		current = restoreLatestSnapshot(ctx.sessionManager.getBranch());
 		renderWidget(ctx, current);
+	});
+
+	pi.on("session_compact", async (event, ctx) => {
+		const summary = compactSummaryOf(event.compactionEntry);
+		if (summary === undefined) return;
+		const snapshot = snapshotFromCompactionSummary(summary, current);
+		persist({ kind: "snapshot", origin: "compact", ...snapshot });
+		current = snapshot;
+		renderWidget(ctx, snapshot);
 	});
 
 	pi.on("context", (event, ctx) => {
@@ -239,13 +253,61 @@ export function normalizeSnapshot(input: WorkCheckpointInput): WorkSnapshot {
 	};
 }
 
+type ParsedCompact = {
+	goal: string;
+	done: string[];
+	inProgress: string[];
+	blocked: string[];
+	decisions: WorkDecision[];
+	artifacts: WorkArtifact[];
+	nextSteps: string[];
+	evidence: string[];
+};
+
+export function snapshotFromCompactionSummary(
+	summary: string,
+	fallback: WorkSnapshot | null,
+): WorkSnapshot {
+	const parsed = parseCompactMarkdown(summary);
+	const blocked = parsed.blocked.length > 0 ? parsed.blocked : (fallback?.blocked ?? []);
+	return normalizeSnapshot({
+		goal: usableText(parsed.goal) ?? fallback?.goal ?? DEFAULT_COMPACT_GOAL,
+		phase: COMPACT_PHASE,
+		status: blocked.length > 0 ? "blocked" : "active",
+		done: firstNonEmpty(parsed.done, fallback?.done),
+		inProgress: firstNonEmpty(parsed.inProgress, fallback?.inProgress),
+		blocked,
+		decisions: firstNonEmpty(parsed.decisions, fallback?.decisions),
+		artifacts: firstNonEmpty(parsed.artifacts, fallback?.artifacts),
+		nextSteps: firstNonEmpty(parsed.nextSteps, fallback?.nextSteps),
+		evidence: firstNonEmpty(parsed.evidence, fallback?.evidence),
+	});
+}
+
+export function parseCompactMarkdown(summary: string): ParsedCompact {
+	const progress = markdownSection(summary, "##", "Progress");
+	return {
+		goal: firstContentLine(markdownSection(summary, "##", "Goal")),
+		done: markdownBullets(markdownSection(progress, "###", "Done")),
+		inProgress: markdownBullets(markdownSection(progress, "###", "In Progress")),
+		blocked: markdownBullets(markdownSection(progress, "###", "Blocked")),
+		decisions: markdownDecisions(markdownSection(summary, "##", "Key Decisions")),
+		artifacts: [
+			...pathsToArtifacts(xmlTag(summary, "modified-files"), "modified"),
+			...pathsToArtifacts(xmlTag(summary, "read-files"), "read"),
+		],
+		nextSteps: markdownBullets(markdownSection(summary, "##", "Next Steps")),
+		evidence: markdownBullets(markdownSection(summary, "##", "Critical Context")),
+	};
+}
+
 export function parseLedgerRecord(data: unknown): LedgerRecord | null {
 	if (!isRecord(data) || typeof data.kind !== "string") return null;
 	if (data.kind === "clear") return { kind: "clear" };
 	if (data.kind !== "snapshot") return null;
 	const snapshot = parseSnapshot(data);
 	if (!snapshot) return null;
-	return { kind: "snapshot", ...snapshot };
+	return { kind: "snapshot", origin: parseOrigin(data.origin), ...snapshot };
 }
 
 export function restoreLatestSnapshot(entries: readonly LedgerBranchEntry[]): WorkSnapshot | null {
@@ -274,6 +336,7 @@ export function needsProjection(entries: readonly LedgerBranchEntry[]): boolean 
 	let lastSnapshot = -1;
 	let lastClear = -1;
 	let lastCompaction = -1;
+	let latestOrigin: SnapshotOrigin = "checkpoint";
 	for (const [index, entry] of entries.entries()) {
 		if (entry.type === "compaction") {
 			lastCompaction = index;
@@ -282,13 +345,18 @@ export function needsProjection(entries: readonly LedgerBranchEntry[]): boolean 
 		if (!isLedgerCustomEntry(entry)) continue;
 		const record = parseLedgerRecord(entry.data);
 		if (!record) continue;
-		if (record.kind === "clear") lastClear = index;
-		else lastSnapshot = index;
+		if (record.kind === "clear") {
+			lastClear = index;
+			continue;
+		}
+		lastSnapshot = index;
+		latestOrigin = record.origin;
 	}
 	if (lastSnapshot < 0) return false;
 	if (lastClear > lastSnapshot) return false;
 	if (lastCompaction < 0) return false;
-	return lastCompaction > lastSnapshot;
+	if (lastCompaction > lastSnapshot) return true;
+	return latestOrigin === "compact";
 }
 
 export function formatLedgerProjection(snapshot: WorkSnapshot): string {
@@ -453,6 +521,82 @@ function clip(value: string, max: number): string {
 	const trimmed = value.replace(/\s+/g, " ").trim();
 	if (trimmed.length <= max) return trimmed;
 	return trimmed.slice(0, max);
+}
+
+function parseOrigin(value: unknown): SnapshotOrigin {
+	return value === "compact" ? "compact" : "checkpoint";
+}
+
+function compactSummaryOf(entry: unknown): string | undefined {
+	if (!isRecord(entry) || typeof entry.summary !== "string") return undefined;
+	const summary = entry.summary.trim();
+	return summary.length > 0 ? summary : undefined;
+}
+
+function usableText(value: string): string | undefined {
+	const trimmed = value.replace(/\s+/g, " ").trim();
+	if (trimmed.length === 0) return undefined;
+	if (/no prior history/i.test(trimmed)) return undefined;
+	return trimmed;
+}
+
+function firstNonEmpty<T>(primary: readonly T[], fallback: readonly T[] | undefined): T[] {
+	return primary.length > 0 ? [...primary] : [...(fallback ?? [])];
+}
+
+function markdownSection(text: string, mark: "##" | "###", heading: string): string {
+	const re = new RegExp(`^${mark}\\s+${heading}\\s*$`, "im");
+	const match = re.exec(text);
+	if (!match) return "";
+	const rest = text.slice(match.index + match[0].length);
+	const next = new RegExp(`^${mark}\\s+`, "m").exec(rest);
+	return (next ? rest.slice(0, next.index) : rest).trim();
+}
+
+function firstContentLine(text: string): string {
+	for (const raw of text.split("\n")) {
+		const line = raw.replace(/^[-*]\s+/, "").trim();
+		if (line.length === 0 || line.startsWith("#") || line.startsWith("<")) continue;
+		return line;
+	}
+	return "";
+}
+
+function markdownBullets(text: string): string[] {
+	const items: string[] = [];
+	for (const raw of text.split("\n")) {
+		if (!/^\s*(?:[-*]|\d+[.)])\s+/.test(raw)) continue;
+		const item = raw.replace(/^\s*(?:[-*]|\d+[.)])\s+/, "").replace(/^\[[^\]]*\]\s*/, "").trim();
+		if (item.length > 0) items.push(item);
+	}
+	return items;
+}
+
+function markdownDecisions(text: string): WorkDecision[] {
+	const decisions: WorkDecision[] = [];
+	for (const item of markdownBullets(text)) {
+		const bold = /^\*\*(.+?)\*\*\s*:?\s*(.*)$/.exec(item);
+		const decision = (bold ? bold[1] : item.split(/\s*[—:]\s*/)[0])?.trim() ?? "";
+		const rationale =
+			(bold ? bold[2] : item.split(/\s*[—:]\s*/).slice(1).join(": ")).trim() || "compact summary";
+		if (decision.length === 0) continue;
+		decisions.push({ decision, rationale });
+	}
+	return decisions;
+}
+
+function xmlTag(text: string, tag: string): string {
+	const match = new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, "i").exec(text);
+	return match?.[1]?.trim() ?? "";
+}
+
+function pathsToArtifacts(body: string, purpose: string): WorkArtifact[] {
+	const artifacts: WorkArtifact[] = [];
+	for (const raw of body.split("\n")) {
+		const path = raw.trim();
+		if (path.length > 0) artifacts.push({ path, purpose });
+	}
+	return artifacts;
 }
 
 function isWorkStatus(value: unknown): value is WorkStatus {

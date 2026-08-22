@@ -7,23 +7,24 @@ description: >-
     Nomenclature git (branches, commits, titres de PR), périmètre intouchable
     (Terraform, product-benchmark), architecture (Clean Arch côté api, FSD côté
     fronts), modèle d'auth (data mart Snowflake), baseline qualité. À appliquer pour
-    TOUT travail sous clients/accor. Trigger on /accor, ou dès qu'un fichier du
-    monorepo product-data-apps est touché (branche, commit, PR, code).
+    product-data-apps et ses worktrees (noms product-data-apps*), pas pour tout
+    clients/accor. Trigger on /accor, ou dès qu'un fichier du monorepo
+    product-data-apps (ou d'un worktree associé) est touché (branche, commit, PR, code).
 ---
 
 # accor — règles obligatoires du monorepo product-data-apps
 
 Contexte figé du client **Accor**, repo `product-data-apps`. Ces règles ne sont pas
-optionnelles : elles priment sur les habitudes par défaut. Les docs `AGENTS.md` du
-repo (racine, `apps/api/`, `apps/*/`) sont la source de vérité détaillée ; ce skill
-en extrait ce qui casse une review quand on l'ignore.
+optionnelles : elles priment sur les habitudes par défaut. Ce skill est la source
+privée transverse. Les `AGENTS.md` existants des apps/packages (`apps/api/`,
+`apps/*/` …) sont les sources de vérité détaillées locales.
 
 ## 1. Nomenclature git — non négociable
 
 **Branches** : `<type>/<TICKET?>-<kebab-desc>`.
 
 - `<type>` ∈ `feat` `fix` `chore` `docs` `refactor` `test` (le type dominant du diff).
-- `<TICKET>` = l'id Plane quand le travail en a un (`DA-178`) ; **omis** s'il n'y en a pas
+- `<TICKET>` = l'id Jira quand le travail en a un (`DA-178`) ; **omis** s'il n'y en a pas
   (ex. `feat/pre-push-ai-review`).
 - Exemples valides : `feat/DA-178-partners-api`, `refactor/auth-context-identity`,
   `fix/invoice-upload-timeout`.
@@ -68,10 +69,15 @@ ici. Ordre livré : `dev → simplify maillon → simplify global → submit`.
 - **Fronts** (`menu-compliance`, `portail`, `product-benchmark`) : **Feature-Sliced Design**.
   Import strictement vers le bas (`pages → widgets → features → entities → shared`), jamais
   latéral ni montant. Public API par slice (`index.ts`). Détail : `apps/menu-compliance/AGENTS.md`.
+- **Front product-data-apps vs proto** : invariant privé dans
+  `clients/accor/AGENTS.md` (section _product-data-apps — front uniquement_). Ticket =
+  scope ; proto déployé = vérité visuelle/comportementale **dans ce scope** ;
+  inspecter le repo source puis **réimplémenter** (pas copier). Même politique hors
+  `/accor-ship`.
 - **Auth** : SSO authentifie l'**identité seule** (`{sub, email}`) ; `role` + `segment`
   proviennent du **data mart Snowflake**, jamais du JWT ni du client ; la whitelist
   (`whitelisted_emails`) est un **guard 403 manuel** rempli par SQL, **jamais** la source du
-  rôle. Détail : `AGENTS.md` racine.
+  rôle. Détail : `apps/menu-compliance/AGENTS.md` et `apps/api/AGENTS.md`.
 
 ## 4. Qualité
 

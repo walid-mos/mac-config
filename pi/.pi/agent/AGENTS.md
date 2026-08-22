@@ -19,3 +19,11 @@ Tickets / épiques = Plane.so via `plane_*`. Crit = UI de review (plans et diffs
 ## Maintenance du harness
 
 - TOUJOURS charger le skill `harness-tuning` avant de créer/modifier un skill ou l'AGENTS.md.
+
+## Git
+
+- Ne pas pousser systématiquement. Dans tout dépôt Git, TOUJOURS créer des commits atomiques : minimaux et limités à un même domaine.
+
+## Fixtures locales
+
+- Pour couvrir un état de test, créer si nécessaire des fixtures uniquement dans les services locaux, puis les supprimer à la fin sauf demande explicite de l’utilisateur.

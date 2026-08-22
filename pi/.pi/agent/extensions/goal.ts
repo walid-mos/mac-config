@@ -7,11 +7,12 @@
  *
  * After each settled turn a small independent model judges the condition
  * against the transcript. Valid not_yet → auto-continue. met / impossible /
- * stuck → stop (stuck stays terminal). Evaluator absence or invalid reply
- * → pause without auto-continuing.
+ * stuck → stop (stuck stays terminal). Evaluator failure retries once with
+ * a fallback; two invalid replies → pause without auto-continuing.
  */
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type {
+	Api,
 	AssistantMessage,
 	Model,
 	TextContent,
@@ -44,6 +45,9 @@ const TRANSCRIPT_CHAR_BUDGET = 20_000;
 const TOOL_RESULT_CHAR_BUDGET = 4_000;
 const MAX_PROOF_ITEMS = 32;
 const MAX_PROOF_ITEM_CHARS = 300;
+const MAX_EVALUATOR_DIAGNOSTIC_CHARS = 500;
+const MAX_EVALUATOR_MODEL_CHARS = 100;
+const MAX_EVALUATOR_REASON_CHARS = 120;
 const CHROME_TICK_MS = 1_000;
 export const GOAL_WIDGET_PLACEMENT = "aboveEditor" as const;
 
@@ -66,6 +70,11 @@ type ParsedEvaluatorReply =
 			invalidatedProofs: string[];
 	  }
 	| { ok: false; reason: string };
+
+type EvaluatorModelIdentity = {
+	provider: string;
+	id: string;
+};
 
 type GoalTurnCounters = {
 	turnsEvaluated: number;
@@ -242,6 +251,7 @@ async function evaluateAndContinue(ctx: ExtensionContext): Promise<void> {
 		noToolTurns: usedTools ? 0 : current.noToolTurns + 1,
 	};
 	const decision = await decideGoalLoop(ctx, current, excerpt.text, counters);
+	if (active !== current) return;
 	const next = nextGoalState(current, counters, decision);
 	persist(ctx, next);
 	active = next;
@@ -348,55 +358,115 @@ async function judgeCondition(
 	transcript: string,
 	proofs: readonly string[],
 ): Promise<ParsedEvaluatorReply> {
-	const model = pickEvaluatorModel(ctx);
-	if (!model) {
+	const models = pickEvaluatorModels(ctx);
+	if (models.length === 0) {
 		return { ok: false, reason: "No evaluator model." };
 	}
 
-	try {
+	const evaluatorContext = {
+		systemPrompt: EVALUATOR_SYSTEM,
+		messages: [
+			{
+				role: "user" as const,
+				content: [
+					`Condition:\n${condition}`,
+					`Retained proof ledger:\n${formatProofLedger(proofs)}`,
+					`Recent transcript excerpt:\n${transcript}`,
+				].join("\n\n"),
+				timestamp: Date.now(),
+			},
+		],
+	};
+
+	return evaluateWithFallback(models, async (model) => {
 		// complete() takes ApiStreamOptions; SimpleStreamOptions.reasoning is only on completeSimple, which ModelRegistry does not expose.
-		const reply = await ctx.modelRegistry.complete(model, {
-			systemPrompt: EVALUATOR_SYSTEM,
-			messages: [
-				{
-					role: "user",
-					content: [
-						`Condition:\n${condition}`,
-						`Retained proof ledger:\n${formatProofLedger(proofs)}`,
-						`Recent transcript excerpt:\n${transcript}`,
-					].join("\n\n"),
-					timestamp: Date.now(),
-				},
-			],
-		});
+		const reply = await ctx.modelRegistry.complete(model, evaluatorContext);
 		return parseEvaluatorReply(reply);
-	} catch (error: unknown) {
-		const message = error instanceof Error ? error.message : "evaluator failed";
-		return { ok: false, reason: message };
-	}
+	});
 }
 
-function pickEvaluatorModel(ctx: ExtensionContext): Model | undefined {
+function pickEvaluatorModels(ctx: ExtensionContext): Model<Api>[] {
 	const available = ctx.modelRegistry.getAvailable();
-	if (available.length === 0) return ctx.model;
+	const selected = undefined;
+	return selectEvaluatorAttempts(available, selected, ctx.model);
+}
 
-	const loaded = loadOrchestrationConfig(defaultOrchestrationPath());
-	const fromDashboard = resolveEvaluatorModel(
-		available,
-		selectedGoalEvaluatorKey(loaded.ok ? loaded.value : undefined),
-	);
-	if (fromDashboard) return fromDashboard;
+export function selectEvaluatorAttempts<T extends EvaluatorModelIdentity>(
+	available: readonly T[],
+	selected: T | undefined,
+	current: T | undefined,
+): T[] {
+	const candidates = available.length > 0 ? available : current ? [current] : [];
+	const primary =
+		selected ??
+		pickPreferredModel(candidates, PREFERRED_EVALUATOR_IDS) ??
+		candidates.find((model) => !isSameModel(model, current)) ??
+		current ??
+		candidates[0];
+	if (!primary) return [];
 
-	const preferred = pickPreferredModel(available, PREFERRED_EVALUATOR_IDS);
-	if (preferred) return preferred;
+	const alternatives = candidates.filter((model) => !isSameModel(model, primary));
+	const fallback =
+		(current && !isSameModel(current, primary) ? current : undefined) ??
+		pickPreferredModel(alternatives, PREFERRED_EVALUATOR_IDS) ??
+		alternatives[0] ??
+		primary;
+	return [primary, fallback];
+}
 
-	const currentId = ctx.model?.id;
-	const other = available.find((model) => model.id !== currentId);
-	return other ?? ctx.model ?? available[0];
+export async function evaluateWithFallback<T extends EvaluatorModelIdentity>(
+	models: readonly T[],
+	evaluate: (model: T) => Promise<ParsedEvaluatorReply>,
+): Promise<ParsedEvaluatorReply> {
+	const failures: string[] = [];
+	for (const [index, model] of models.slice(0, 2).entries()) {
+		try {
+			const result = await evaluate(model);
+			if (result.ok) return result;
+			failures.push(formatEvaluatorFailure(index, model, result.reason));
+		} catch (error: unknown) {
+			const reason = error instanceof Error ? error.message : "evaluator failed";
+			failures.push(formatEvaluatorFailure(index, model, reason));
+		}
+	}
+	return {
+		ok: false,
+		reason: truncate(
+			`Evaluator attempts failed: ${failures.join("; ") || "no evaluator model"}`,
+			MAX_EVALUATOR_DIAGNOSTIC_CHARS,
+		),
+	};
+}
+
+function formatEvaluatorFailure(
+	index: number,
+	model: EvaluatorModelIdentity,
+	reason: string,
+): string {
+	const identity = normalizeDiagnostic(`${model.provider}/${model.id}`, MAX_EVALUATOR_MODEL_CHARS);
+	return `#${index + 1} ${identity}: ${normalizeDiagnostic(reason, MAX_EVALUATOR_REASON_CHARS)}`;
+}
+
+function normalizeDiagnostic(value: string, max: number): string {
+	return truncate(value.replace(/\s+/g, " ").trim() || "unknown", max);
+}
+
+function isSameModel(
+	left: EvaluatorModelIdentity,
+	right: EvaluatorModelIdentity | undefined,
+): boolean {
+	return right !== undefined && left.provider === right.provider && left.id === right.id;
 }
 
 function parseEvaluatorReply(reply: AssistantMessage): ParsedEvaluatorReply {
-	return parseEvaluatorText(assistantText(reply));
+	const parsed = parseEvaluatorText(assistantText(reply));
+	if (parsed.ok) return parsed;
+	const contentTypes = [...new Set(reply.content.map((part) => part.type))].join(",") || "none";
+	const stopReason = reply.stopReason ?? "unknown";
+	return {
+		ok: false,
+		reason: `${parsed.reason} content=${contentTypes}, stop=${stopReason}`,
+	};
 }
 
 export function parseEvaluatorText(text: string): ParsedEvaluatorReply {

@@ -47,6 +47,20 @@ export default function thinkingWorking(pi: ExtensionAPI): void {
 		rotation.stop();
 	});
 
+	// This tool replaces the editor with a questionnaire and waits for the user.
+	// A rotating “working” indicator is misleading during that pause.
+	pi.on("tool_execution_start", async (event, ctx) => {
+		if (event.toolName !== "ask_user_question") return;
+		bindUi(ctx);
+		rotation.stop();
+	});
+
+	pi.on("tool_execution_end", async (event, ctx) => {
+		if (event.toolName !== "ask_user_question") return;
+		bindUi(ctx);
+		rotation.start();
+	});
+
 	pi.on("session_shutdown", async (_event, ctx) => {
 		bindUi(ctx);
 		rotation.shutdown();

@@ -297,7 +297,7 @@ pi-post:
 	@python3 scripts/pi-patch-tool-execution.py
 	@python3 scripts/pi-patch-assistant-thinking.py
 
-pi-update: pi-post
+pi-update: crit-post pi-post
 
 pi-smoke: pi
 	@python3 scripts/test-pi-startup.py
@@ -321,19 +321,20 @@ crit-post: export FNM_DIR := $(HOME)/.local/share/fnm
 crit-post: export PNPM_HOME := $(HOME)/.local/share/pnpm
 crit-post: export PATH := $(HOME)/.local/share/pnpm/bin:$(HOME)/.local/share/pnpm:$(PATH)
 crit-post:
-	@if ! command -v crit >/dev/null; then \
-		if command -v brew >/dev/null; then \
-			echo "→ installation de crit (brew)"; \
-			brew install crit; \
-		else \
-			echo "crit introuvable et brew indisponible — installation impossible (https://crit.md)" >&2; \
-			exit 1; \
-		fi; \
+	@command -v brew >/dev/null || { \
+		echo "brew indisponible — installation de Crit impossible (https://crit.md)" >&2; \
+		exit 1; \
+	}
+	@if brew list --formula crit >/dev/null 2>&1; then \
+		echo "→ mise à jour de crit (brew)"; \
+		brew upgrade crit; \
+	else \
+		echo "→ installation de crit (brew)"; \
+		brew install crit; \
 	fi
-	@if command -v crit >/dev/null; then \
-		( cd "$(HOME)" && crit install pi --force ) && \
-		echo "crit prêt: $$(crit --version 2>/dev/null | head -1) — skills Pi dans ~/.pi/agent/skills/{crit,crit-cli}"; \
-	else echo "crit non installé — étape ignorée"; fi
+	@( cd "$(HOME)" && crit install pi --force )
+	@python3 scripts/patch-crit-pi-skill.py
+	@echo "crit prêt: $$(crit --version 2>/dev/null | head -1) — skills Pi ajustés dans ~/.pi/agent/skills/{crit,crit-cli}"
 	@if command -v pi >/dev/null && pi list 2>/dev/null | grep -Fq '@plannotator/pi-extension'; then \
 		pi remove npm:@plannotator/pi-extension; \
 	fi

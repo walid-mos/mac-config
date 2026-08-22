@@ -4,15 +4,10 @@ user-invocable: true
 description: >-
     Open a Crit Story (guided/chaptered) review of the current diff, then run
     Crit's persistent multi-round comment loop in the same review session. Use
-    only when the user invokes /crit-guided or explicitly asks for a guided,
-    story, or chaptered Crit review. Generic /crit or unguided review does not
-    count.
+    only when the user invokes /crit-guided, its /cg alias, or explicitly asks
+    for a guided, story, or chaptered Crit review. Generic /crit or unguided
+    review does not count.
 ---
-
-# Guided Crit review
-
-Combine Crit Story Mode with the official Crit review loop **in one session**.
-Do not edit official Crit-generated skills. Do not set Crit `agent_cmd`.
 
 ## Workdir
 
@@ -46,20 +41,20 @@ the same Crit session. Substitute the remembered absolute directory for
 5. Confirm `<dir>/story.json` exists and is non-empty. If it does not, clean the workdir, stop, and report the writer failure. Do not invent JSON.
 6. Ingest with replacement semantics on every invocation, including a resumed branch that already has a Story:
    `crit story <scope-flags> --story-file <dir>/story.json --refresh --no-open`
-
-`--refresh` is not a substitute for guide/prep/writer; it only makes ingestion idempotent when the Crit session already contains a Story.
-
-On ingest rejection or a "diff changed since prep" / drift error: delete
-`<dir>/story.json`, repeat steps 1–6 **once** from a fresh prep. If the
-second attempt fails, clean the workdir, stop, and report Crit's error. Do not invent JSON.
+   `--refresh` is not a substitute for guide/prep/writer; it only makes ingestion idempotent when the Crit session already contains a Story.
+   On ingest rejection or a "diff changed since prep" / drift error: delete
+   `<dir>/story.json`, repeat steps 1–6 **once** from a fresh prep. If the
+   second attempt fails, clean the workdir, stop, and report Crit's error. Do not invent JSON.
 
 ## Open the same session
 
-After a successful ingest, run foreground `crit <scope-flags>`
-(or `crit --session <id>` if ingest printed a session). Block until Finish
-Review. Relay the printed URL.
-
-Then follow official `/crit` steps 3–4 only: read stdout and the stderr
+After a successful ingest, call `crit_review` with `<scope-flags>` split into
+its `arguments` array (or `["--session", "<id>"]` if ingest printed a session).
+Never launch the interactive review through bash. `crit_review` has no timeout,
+forwards cancellation, and returns only after **Finish Review**, with complete
+stdout instructions and stderr status. Relay the printed URL while the review
+is open if available, then follow the returned instructions automatically.
+Follow official `/crit` steps 3–4 only: read stdout and the stderr
 `approved:` status, fix unresolved comments, reply with
 `crit comment --reply-to` (no `--resolve` unless the user asks), and do not read
 the review file early. **Do not execute official step 5 directly**; replace it
@@ -70,9 +65,8 @@ with the refresh-first reconnect sequence below.
 Before reconnecting (`crit --session …` or the command stdout printed):
 
 1. Re-run **Author and ingest a story** so chapters match the current full diff. Crit keeps comments, viewed state, and round diffs.
-2. Tell the user the story was refreshed, then block on the reconnect command.
-
-Stop when `approved: true` or Finish Review has zero unresolved comments.
+2. Tell the user the story was refreshed, then call `crit_review` with the reconnect command's arguments and follow its returned instructions.
+   Stop when `approved: true` or Finish Review has zero unresolved comments.
 
 ## Out of scope
 

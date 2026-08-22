@@ -45,6 +45,7 @@ const TOOL_RESULT_CHAR_BUDGET = 4_000;
 const MAX_PROOF_ITEMS = 32;
 const MAX_PROOF_ITEM_CHARS = 300;
 const CHROME_TICK_MS = 1_000;
+export const GOAL_WIDGET_PLACEMENT = "aboveEditor" as const;
 
 const PREFERRED_EVALUATOR_IDS = ["deepseek-v4-flash", "grok-build", "k3"] as const;
 
@@ -578,7 +579,7 @@ function startChromeClock(): void {
 	chromeClock.unref?.();
 }
 
-function paintChrome(ui: ExtensionUIContext, state: GoalState): void {
+export function paintChrome(ui: ExtensionUIContext, state: GoalState): void {
 	const line = chromeLine(state);
 	ui.setWidget(
 		"goal",
@@ -587,7 +588,7 @@ function paintChrome(ui: ExtensionUIContext, state: GoalState): void {
 			truncate(state.condition, 80),
 			state.lastReason ? `last: ${truncate(state.lastReason, 80)}` : "waiting for first evaluation",
 		],
-		{ placement: "aboveEditor" },
+		{ placement: GOAL_WIDGET_PLACEMENT },
 	);
 }
 

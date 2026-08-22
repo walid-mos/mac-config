@@ -55,6 +55,7 @@ const {
 	snapshotFromCompactionSummary,
 	syncLedgerWidget,
 } = await import("../extensions/work-ledger.ts");
+const { GOAL_WIDGET_PLACEMENT, paintChrome } = await import("../extensions/goal.ts");
 
 type LedgerBranchEntry = {
 	type: string;
@@ -276,6 +277,7 @@ test("hides compact widget after scheduled delay", testCompactWidgetHideAfterDel
 test("keeps checkpoint widget and cancels compact hide", testCheckpointCancelsCompactHide);
 test("clear and scheduler reset cancel compact hide", testClearAndResetCancelCompactHide);
 test("restores compact origin on latest record", testRestoreLatestRecordOrigin);
+test("goal and ledger widgets share one UI with dedicated placements", testGoalAndLedgerWidgetsShareOneUiWithDedicatedPlacements);
 
 function testProjectionNeededForCompactOriginAfterCompaction(): void {
 	assert.equal(needsProjection([{ type: "compaction" }, compactSnapshotRecord()]), true);
@@ -466,4 +468,39 @@ function testClearAndResetCancelCompactHide(): void {
 function testRestoreLatestRecordOrigin(): void {
 	assert.equal(restoreLatestRecord([compactSnapshotRecord()])?.origin, "compact");
 	assert.equal(restoreLatestRecord([compactSnapshotRecord(), snapshotRecord()])?.origin, "checkpoint");
+}
+
+function testGoalAndLedgerWidgetsShareOneUiWithDedicatedPlacements(): void {
+	const widgets = new Map<string, { value: string[] | undefined; placement?: string }>();
+	const setWidget = (
+		id: string,
+		value: string[] | undefined,
+		options?: { placement?: string },
+	): void => {
+		widgets.set(id, { value, placement: options?.placement });
+	};
+	paintChrome(
+		{ setWidget, notify() {}, setStatus() {} },
+		{
+			condition: "tests pass",
+			startedAt: "2026-08-21T00:00:00.000Z",
+			turnsEvaluated: 1,
+			noToolTurns: 0,
+			maxTurns: 3,
+			lastVerdict: "not_yet",
+			lastReason: "working",
+			proofs: [],
+			status: "active",
+		},
+	);
+	syncLedgerWidget(setWidget, sampleSnapshot(), "checkpoint");
+	const goal = widgets.get("goal");
+	const ledger = widgets.get("work-ledger");
+	assert.equal(GOAL_WIDGET_PLACEMENT, "aboveEditor");
+	assert.equal(LEDGER_WIDGET_PLACEMENT, "belowEditor");
+	assert.equal(goal?.placement, GOAL_WIDGET_PLACEMENT);
+	assert.equal(ledger?.placement, LEDGER_WIDGET_PLACEMENT);
+	assert.notEqual(goal?.value, undefined);
+	assert.notEqual(ledger?.value, undefined);
+	assert.notEqual(goal?.placement, ledger?.placement);
 }

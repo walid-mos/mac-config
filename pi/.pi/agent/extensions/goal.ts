@@ -580,11 +580,15 @@ function startChromeClock(): void {
 
 function paintChrome(ui: ExtensionUIContext, state: GoalState): void {
 	const line = chromeLine(state);
-	ui.setWidget("goal", [
-		line,
-		truncate(state.condition, 80),
-		state.lastReason ? `last: ${truncate(state.lastReason, 80)}` : "waiting for first evaluation",
-	]);
+	ui.setWidget(
+		"goal",
+		[
+			line,
+			truncate(state.condition, 80),
+			state.lastReason ? `last: ${truncate(state.lastReason, 80)}` : "waiting for first evaluation",
+		],
+		{ placement: "aboveEditor" },
+	);
 }
 
 function renderChrome(ctx: ExtensionCommandContext | ExtensionContext, state: GoalState | null): void {

@@ -1,12 +1,45 @@
 import assert from "node:assert/strict";
+import { registerHooks } from "node:module";
 import { test } from "node:test";
-import {
+
+const typeboxStub = `data:text/javascript,${encodeURIComponent(
+	[
+		"export const Type = {",
+		"  Object: (properties) => ({ properties }),",
+		"  String: (options) => options,",
+		"  Array: (items, options) => ({ items, ...options }),",
+		"};",
+	].join(""),
+)}`;
+const stringEnumStub = `data:text/javascript,${encodeURIComponent(
+	"export const StringEnum = (values, options) => ({ values, ...options });",
+)}`;
+const emptyStub = `data:text/javascript,${encodeURIComponent("export {};")}`;
+const textStub = `data:text/javascript,${encodeURIComponent(
+	"export class Text { constructor() {} }",
+)}`;
+
+registerHooks({
+	resolve(specifier, context, nextResolve) {
+		if (specifier === "typebox") return { shortCircuit: true, url: typeboxStub };
+		if (specifier === "@earendil-works/pi-ai") return { shortCircuit: true, url: stringEnumStub };
+		if (specifier === "@earendil-works/pi-tui") return { shortCircuit: true, url: textStub };
+		if (specifier === "@earendil-works/pi-agent-core") return { shortCircuit: true, url: emptyStub };
+		if (specifier === "@earendil-works/pi-coding-agent") return { shortCircuit: true, url: emptyStub };
+		return nextResolve(specifier, context);
+	},
+});
+
+const {
 	COMPACT_PHASE,
 	MAX_ITEM_CHARS,
 	MAX_LIST_ITEMS,
 	MAX_TEXT_CHARS,
 	PROJECTION_MARKER,
 	WORK_LEDGER_ENTRY_TYPE,
+	COMPACT_WIDGET_HIDE_MS,
+	LEDGER_WIDGET_PLACEMENT,
+	cancelCompactWidgetHide,
 	collectLedgerHistory,
 	formatLedgerProjection,
 	formatStatus,
@@ -15,12 +48,21 @@ import {
 	needsProjection,
 	normalizeSnapshot,
 	parseLedgerRecord,
+	restoreLatestRecord,
 	restoreLatestSnapshot,
+	setLedgerWidgetScheduler,
 	shouldShowLedgerWidget,
 	snapshotFromCompactionSummary,
-	type LedgerBranchEntry,
-	type WorkSnapshot,
-} from "../extensions/work-ledger.ts";
+	syncLedgerWidget,
+} = await import("../extensions/work-ledger.ts");
+
+type LedgerBranchEntry = {
+	type: string;
+	customType?: string;
+	data?: unknown;
+};
+
+type WorkSnapshot = ReturnType<typeof normalizeSnapshot>;
 
 function sampleSnapshot(overrides: Partial<WorkSnapshot> = {}): WorkSnapshot {
 	return {
@@ -229,6 +271,11 @@ test("parses compact summary into a snapshot", testSnapshotFromCompactionSummary
 test("falls back when compact summary is empty", testCompactSummaryFallback);
 test("defaults missing origin to checkpoint", testMissingOriginDefaultsToCheckpoint);
 test("shows widget only for active or blocked snapshots", testWidgetHiddenWhenComplete);
+test("places ledger widget below the editor", testLedgerWidgetPlacement);
+test("hides compact widget after scheduled delay", testCompactWidgetHideAfterDelay);
+test("keeps checkpoint widget and cancels compact hide", testCheckpointCancelsCompactHide);
+test("clear and scheduler reset cancel compact hide", testClearAndResetCancelCompactHide);
+test("restores compact origin on latest record", testRestoreLatestRecordOrigin);
 
 function testProjectionNeededForCompactOriginAfterCompaction(): void {
 	assert.equal(needsProjection([{ type: "compaction" }, compactSnapshotRecord()]), true);
@@ -324,4 +371,99 @@ function testWidgetHiddenWhenComplete(): void {
 	assert.equal(shouldShowLedgerWidget(restored), false);
 	assert.equal(formatStatus(restored).startsWith("Work ledger (complete)"), true);
 	assert.equal(collectLedgerHistory([snapshotRecord({ status: "complete" })]).length, 1);
+}
+
+type WidgetCall = {
+	id: string;
+	value: string[] | undefined;
+	placement?: string;
+};
+
+function createFakeClock(): {
+	pending: Array<{ callback: () => void; delayMs: number }>;
+	flush: () => void;
+} {
+	const pending: Array<{ callback: () => void; delayMs: number }> = [];
+	setLedgerWidgetScheduler((callback, delayMs) => {
+		const item = { callback, delayMs };
+		pending.push(item);
+		return {
+			cancel: () => {
+				const index = pending.indexOf(item);
+				if (index >= 0) pending.splice(index, 1);
+			},
+		};
+	});
+	return {
+		pending,
+		flush: () => {
+			const due = pending.splice(0, pending.length);
+			for (const item of due) item.callback();
+		},
+	};
+}
+
+function captureWidgets(): { calls: WidgetCall[]; setWidget: typeof syncLedgerWidget extends never ? never : Parameters<typeof syncLedgerWidget>[0] } {
+	const calls: WidgetCall[] = [];
+	return {
+		calls,
+		setWidget: (id, value, options) => {
+			calls.push({ id, value, placement: options?.placement });
+		},
+	};
+}
+
+function testLedgerWidgetPlacement(): void {
+	const clock = createFakeClock();
+	const ui = captureWidgets();
+	syncLedgerWidget(ui.setWidget, sampleSnapshot(), "checkpoint");
+	assert.equal(ui.calls.at(-1)?.placement, LEDGER_WIDGET_PLACEMENT);
+	assert.equal(LEDGER_WIDGET_PLACEMENT, "belowEditor");
+	assert.equal(clock.pending.length, 0);
+	setLedgerWidgetScheduler();
+}
+
+function testCompactWidgetHideAfterDelay(): void {
+	const clock = createFakeClock();
+	const ui = captureWidgets();
+	syncLedgerWidget(ui.setWidget, sampleSnapshot({ phase: COMPACT_PHASE }), "compact");
+	assert.equal(ui.calls.at(-1)?.value?.[0]?.includes("work-ledger"), true);
+	assert.equal(clock.pending.length, 1);
+	assert.equal(clock.pending[0]?.delayMs, COMPACT_WIDGET_HIDE_MS);
+	syncLedgerWidget(ui.setWidget, sampleSnapshot({ phase: COMPACT_PHASE }), "compact");
+	assert.equal(clock.pending.length, 1);
+	clock.flush();
+	assert.equal(ui.calls.at(-1)?.value, undefined);
+	assert.equal(clock.pending.length, 0);
+	setLedgerWidgetScheduler();
+}
+
+function testCheckpointCancelsCompactHide(): void {
+	const clock = createFakeClock();
+	const ui = captureWidgets();
+	syncLedgerWidget(ui.setWidget, sampleSnapshot({ phase: COMPACT_PHASE }), "compact");
+	syncLedgerWidget(ui.setWidget, sampleSnapshot({ phase: "next" }), "checkpoint");
+	assert.equal(clock.pending.length, 0);
+	assert.equal(ui.calls.at(-1)?.value?.[0]?.includes("next"), true);
+	clock.flush();
+	assert.equal(ui.calls.at(-1)?.value?.[0]?.includes("next"), true);
+	setLedgerWidgetScheduler();
+}
+
+function testClearAndResetCancelCompactHide(): void {
+	const clock = createFakeClock();
+	const ui = captureWidgets();
+	syncLedgerWidget(ui.setWidget, sampleSnapshot(), "compact");
+	syncLedgerWidget(ui.setWidget, null, null);
+	assert.equal(clock.pending.length, 0);
+	assert.equal(ui.calls.at(-1)?.value, undefined);
+	syncLedgerWidget(ui.setWidget, sampleSnapshot(), "compact");
+	setLedgerWidgetScheduler();
+	assert.equal(clock.pending.length, 0);
+	cancelCompactWidgetHide();
+}
+
+function testRestoreLatestRecordOrigin(): void {
+	assert.equal(restoreLatestRecord([compactSnapshotRecord()])?.origin, "compact");
+	assert.equal(restoreLatestRecord([compactSnapshotRecord(), snapshotRecord()])?.origin, "checkpoint");
 }

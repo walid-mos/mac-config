@@ -60,7 +60,33 @@ export type ClearRecord = { kind: "clear" };
 export type LedgerRecord = SnapshotRecord | ClearRecord;
 
 export const COMPACT_PHASE = "compacted";
+export const LEDGER_WIDGET_PLACEMENT = "belowEditor" as const;
+export const COMPACT_WIDGET_HIDE_MS = 20_000;
 const DEFAULT_COMPACT_GOAL = "Continue the current session";
+
+export type DelayHandle = {
+	cancel: () => void;
+};
+
+export type ScheduleDelay = (callback: () => void, delayMs: number) => DelayHandle;
+
+const defaultScheduleDelay: ScheduleDelay = (callback, delayMs) => {
+	const timer = setTimeout(callback, delayMs);
+	return { cancel: () => clearTimeout(timer) };
+};
+
+let scheduleDelay: ScheduleDelay = defaultScheduleDelay;
+let compactHideHandle: DelayHandle | null = null;
+
+export function setLedgerWidgetScheduler(next?: ScheduleDelay): void {
+	cancelCompactWidgetHide();
+	scheduleDelay = next ?? defaultScheduleDelay;
+}
+
+export function cancelCompactWidgetHide(): void {
+	compactHideHandle?.cancel();
+	compactHideHandle = null;
+}
 
 export type LedgerBranchEntry = {
 	type: string;
@@ -108,6 +134,7 @@ const COMMANDS = ["status", "history", "clear"] as const;
 
 let api: ExtensionAPI | null = null;
 let current: WorkSnapshot | null = null;
+let currentOrigin: SnapshotOrigin | null = null;
 
 export default function workLedgerExtension(pi: ExtensionAPI): void {
 	api = pi;
@@ -127,7 +154,8 @@ export default function workLedgerExtension(pi: ExtensionAPI): void {
 			const snapshot = normalizeSnapshot(params);
 			persist({ kind: "snapshot", origin: "checkpoint", ...snapshot });
 			current = snapshot;
-			renderWidget(ctx, snapshot);
+			currentOrigin = "checkpoint";
+			renderWidget(ctx, snapshot, "checkpoint");
 			return {
 				content: [{ type: "text", text: `Checkpoint saved: ${snapshot.phase} (${snapshot.status})` }],
 			};
@@ -167,13 +195,15 @@ export default function workLedgerExtension(pi: ExtensionAPI): void {
 	});
 
 	pi.on("session_start", async (_event, ctx) => {
-		current = restoreLatestSnapshot(ctx.sessionManager.getBranch());
-		renderWidget(ctx, current);
+		applyRestoredRecord(ctx, restoreLatestRecord(ctx.sessionManager.getBranch()));
 	});
 
 	pi.on("session_tree", async (_event, ctx) => {
-		current = restoreLatestSnapshot(ctx.sessionManager.getBranch());
-		renderWidget(ctx, current);
+		applyRestoredRecord(ctx, restoreLatestRecord(ctx.sessionManager.getBranch()));
+	});
+
+	pi.on("session_shutdown", async () => {
+		cancelCompactWidgetHide();
 	});
 
 	pi.on("session_compact", async (event, ctx) => {
@@ -182,7 +212,8 @@ export default function workLedgerExtension(pi: ExtensionAPI): void {
 		const snapshot = snapshotFromCompactionSummary(summary, current);
 		persist({ kind: "snapshot", origin: "compact", ...snapshot });
 		current = snapshot;
-		renderWidget(ctx, snapshot);
+		currentOrigin = "compact";
+		renderWidget(ctx, snapshot, "compact");
 	});
 
 	pi.on("context", (event, ctx) => {
@@ -218,7 +249,8 @@ function clearLedger(ctx: ExtensionCommandContext): void {
 	}
 	persist({ kind: "clear" });
 	current = null;
-	renderWidget(ctx, null);
+	currentOrigin = null;
+	renderWidget(ctx, null, null);
 	ctx.ui.notify("Work ledger cleared", "info");
 }
 
@@ -230,16 +262,57 @@ export function shouldShowLedgerWidget(snapshot: WorkSnapshot | null): boolean {
 	return snapshot !== null && snapshot.status !== "complete";
 }
 
-function renderWidget(ctx: ExtensionCommandContext | ExtensionContext, snapshot: WorkSnapshot | null): void {
+function applyRestoredRecord(
+	ctx: ExtensionCommandContext | ExtensionContext,
+	record: SnapshotRecord | null,
+): void {
+	current = record ? normalizeSnapshot(record) : null;
+	currentOrigin = record?.origin ?? null;
+	renderWidget(ctx, current, currentOrigin);
+}
+
+function renderWidget(
+	ctx: ExtensionCommandContext | ExtensionContext,
+	snapshot: WorkSnapshot | null,
+	origin: SnapshotOrigin | null,
+): void {
+	syncLedgerWidget(ctx.ui.setWidget.bind(ctx.ui), snapshot, origin);
+}
+
+export function syncLedgerWidget(
+	setWidget: (id: string, value: string[] | undefined, options?: { placement: "belowEditor" }) => void,
+	snapshot: WorkSnapshot | null,
+	origin: SnapshotOrigin | null,
+): void {
 	if (!shouldShowLedgerWidget(snapshot)) {
-		ctx.ui.setWidget("work-ledger", undefined);
+		cancelCompactWidgetHide();
+		setWidget("work-ledger", undefined);
 		return;
 	}
-	ctx.ui.setWidget("work-ledger", [
-		`work-ledger · ${snapshot.status} · ${clip(snapshot.phase, 40)}`,
-		clip(snapshot.goal, 80),
-		`${snapshot.done.length} done · ${snapshot.inProgress.length} in progress · ${snapshot.blocked.length} blocked`,
-	]);
+	setWidget(
+		"work-ledger",
+		[
+			`work-ledger · ${snapshot.status} · ${clip(snapshot.phase, 40)}`,
+			clip(snapshot.goal, 80),
+			`${snapshot.done.length} done · ${snapshot.inProgress.length} in progress · ${snapshot.blocked.length} blocked`,
+		],
+		{ placement: LEDGER_WIDGET_PLACEMENT },
+	);
+	if (origin === "compact") {
+		scheduleCompactWidgetHide(setWidget);
+		return;
+	}
+	cancelCompactWidgetHide();
+}
+
+function scheduleCompactWidgetHide(
+	setWidget: (id: string, value: string[] | undefined, options?: { placement: "belowEditor" }) => void,
+): void {
+	cancelCompactWidgetHide();
+	compactHideHandle = scheduleDelay(() => {
+		compactHideHandle = null;
+		setWidget("work-ledger", undefined);
+	}, COMPACT_WIDGET_HIDE_MS);
 }
 
 export function normalizeSnapshot(input: WorkCheckpointInput): WorkSnapshot {
@@ -314,15 +387,20 @@ export function parseLedgerRecord(data: unknown): LedgerRecord | null {
 	return { kind: "snapshot", origin: parseOrigin(data.origin), ...snapshot };
 }
 
-export function restoreLatestSnapshot(entries: readonly LedgerBranchEntry[]): WorkSnapshot | null {
-	let found: WorkSnapshot | null = null;
+export function restoreLatestRecord(entries: readonly LedgerBranchEntry[]): SnapshotRecord | null {
+	let found: SnapshotRecord | null = null;
 	for (const entry of entries) {
 		if (!isLedgerCustomEntry(entry)) continue;
 		const record = parseLedgerRecord(entry.data);
 		if (!record) continue;
-		found = record.kind === "clear" ? null : normalizeSnapshot(record);
+		found = record.kind === "clear" ? null : { kind: "snapshot", origin: record.origin, ...normalizeSnapshot(record) };
 	}
 	return found;
+}
+
+export function restoreLatestSnapshot(entries: readonly LedgerBranchEntry[]): WorkSnapshot | null {
+	const record = restoreLatestRecord(entries);
+	return record ? normalizeSnapshot(record) : null;
 }
 
 export function collectLedgerHistory(entries: readonly LedgerBranchEntry[]): WorkSnapshot[] {

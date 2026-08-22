@@ -127,12 +127,29 @@ Lire le **console health** retourné par `frontend_open` :
 
 Si des erreurs sont présentes, les détailler avec `frontend_console`.
 
-### 3. Responsive (pages critiques)
+### 3. Viewport de vérification
+
+**Desktop est le défaut :** capturer et comparer en **1440×1000**, sauf si le
+caller ou l'utilisateur demande explicitement un autre viewport. Ne jamais
+ajouter une vérification mobile/tablette « par défaut ».
+
+Pour une comparaison proto/local, utiliser exactement le même viewport pour
+les deux cibles (par défaut 1440×1000).
+
+Si une revue responsive est explicitement demandée, capturer les viewports
+**séquentiellement** et analyser chaque résultat avant de passer au suivant :
 
 ```
-frontend_screenshot width=375 height=812   # mobile
-frontend_screenshot width=768 height=1024  # tablette
+frontend_screenshot width=1440 height=1000 # desktop
+frontend_screenshot width=768 height=1024  # tablette, si demandée
+frontend_screenshot width=375 height=812   # mobile, si demandée
+frontend_screenshot width=1440 height=1000 # restaurer le contexte desktop si nécessaire
 ```
+
+`frontend_screenshot` pilote un **viewport partagé et persistant** sur l'unique
+page Chromium : ne jamais lancer en parallèle des captures ou toute action qui
+change `width`/`height`. Une course rendrait les captures non fiables ; la
+capture terminée après le dernier redimensionnement peut être au mauvais format.
 
 ### 4. Interactions (si besoin)
 
@@ -150,7 +167,7 @@ Compiler un rapport structuré :
 
 ### Pages OK
 
-- / — clean, rendu correct desktop et mobile
+- / — clean, rendu correct en desktop 1440×1000
 - /pricing — clean
 
 ### Pages avec anomalies
@@ -187,8 +204,10 @@ Compiler un rapport structuré :
 - **Gate ship/stack** : limiter aux pages et au parcours d'acceptation du
   maillon (pas un crawl du site). Exercer le flux avec `frontend_act` /
   `frontend_eval`. Anomalie, console error ou parcours cassé = maillon non fini.
-- **Limiter le scope** : 10 pages max, 3 viewports max par page. Si le projet
-  a plus de pages, demander via `ask_user_question`.
+- **Limiter le scope** : 10 pages max, 3 viewports max par page. Le défaut est
+  un seul viewport desktop 1440×1000 ; les viewports supplémentaires doivent
+  être demandés explicitement. Si le projet a plus de pages, demander via
+  `ask_user_question`.
 
 ## Conseil : config projet (optionnel)
 
@@ -198,10 +217,7 @@ persistants :
 ```json
 {
 	"pages": ["/", "/about", "/pricing", "/dashboard"],
-	"viewports": [
-		{ "width": 375, "height": 812 },
-		{ "width": 1280, "height": 900 }
-	],
+	"viewports": [{ "width": 1440, "height": 1000 }],
 	"buildCommand": "npm run build",
 	"devCommand": "npm run dev",
 	"port": 3000,

@@ -1,4 +1,6 @@
 {
+  "tui.select.up": "k",
+  "tui.select.down": "j",
   "app.thinking.toggle": "ctrl+`",
   "app.tools.expand": "ctrl+shift+`",
   "app.suspend": []

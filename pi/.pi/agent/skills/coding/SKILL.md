@@ -17,6 +17,14 @@ Sub-files, load on demand:
 
 ---
 
+## RULE 0 - Assumptions, Simplicity, and Scope
+
+Before coding, surface material assumptions and tradeoffs; never silently choose between interpretations that would produce meaningfully different behavior.
+
+Implement the minimum requested behavior. Add no speculative feature, abstraction, configurability, or handling for impossible states. Prefer a direct single-use implementation until reuse is demonstrated.
+
+Make surgical changes: every changed line must trace to the request. Do not refactor, reformat, or clean up unrelated existing code; remove only the imports, variables, functions, and branches that your change makes obsolete.
+
 ## RULE 1 - Early Returns (Guard Clauses)
 
 Handle invalid/edge cases FIRST and return immediately; never wrap the function body in an `if`. Errors first, happy path last at natural indentation. Flattening techniques (the linter caps nesting at 2; these are how you get there): early returns, extract inner blocks into named functions, invert conditions, `continue`/`break` to skip early, pipeline operations (map/filter/reduce) instead of nested loops.

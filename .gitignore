@@ -12,5 +12,7 @@ node_modules/
 
 # Le runtime des outils (gh/hosts.yml, pi/auth.json + sessions,
 # colima/_lima, docker/buildx, rtk/history.db, …) n'apparaît jamais ici : les
-# packages concernés sont dans NOFOLD (Makefile) — leur dossier cible est un vrai
-# dossier hors repo, l'outil ne peut pas écrire dans le working tree.
+# packages concernés gardent leurs chemins runtime locaux. Pi conserve
+# ~/.pi/agent réel grâce à ses répertoires runtime préexistants; Stow replie ses
+# descendants versionnés extensions/ et skills/ en symlinks vers le repo, tandis
+# que external/ (dont les skills Crit générés) reste local et n'est jamais suivi.

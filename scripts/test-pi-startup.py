@@ -14,7 +14,16 @@ import time
 from pathlib import Path
 
 CASES = tuple((width, delay) for delay in (0.0, 0.01, 0.05) for width in (60, 78, 120))
-CRASH_MARKERS = (b"uncaughtException", b"exceeds terminal width", b"Maximum call stack")
+FAILURE_MARKERS = (
+    b"uncaughtException",
+    b"exceeds terminal width",
+    b"Maximum call stack",
+    b"Failed to load extension",
+    b"Failed to load skill",
+    b"does not export a valid factory function",
+    b"does not export a valid extension factory",
+    b"[Extension issues]",
+)
 CRASH_LOG = Path.home() / ".pi" / "agent" / "pi-crash.log"
 
 
@@ -89,10 +98,10 @@ def main() -> int:
     failed = False
     for width, delay in CASES:
         status, output = run_case(width, delay)
-        has_crash_marker = any(marker in output for marker in CRASH_MARKERS)
-        case_failed = status != "shutdown:0" or has_crash_marker
+        has_failure_marker = any(marker in output for marker in FAILURE_MARKERS)
+        case_failed = status != "shutdown:0" or has_failure_marker
         failed = failed or case_failed
-        print(f"width={width} delay={delay:.2f} status={status} crash={has_crash_marker}")
+        print(f"width={width} delay={delay:.2f} status={status} failure={has_failure_marker}")
         if case_failed:
             print(output.decode("utf-8", errors="replace")[-2_000:])
 

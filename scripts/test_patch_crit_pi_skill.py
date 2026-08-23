@@ -26,6 +26,13 @@ class PatchCritPiSkillTest(unittest.TestCase):
             self.assertIn("use `crit_review` instead of bash", first)
             self.assertIn("Generated body.", first)
 
+    def test_external_agent_root_resolves_to_its_crit_skill(self) -> None:
+        agent_root = Path("/runtime/.pi/agent/external")
+        self.assertEqual(
+            MODULE.skill_path(agent_root),
+            agent_root / "skills" / "crit" / "SKILL.md",
+        )
+
     def test_unexpected_generated_skill_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             skill = Path(directory) / "SKILL.md"

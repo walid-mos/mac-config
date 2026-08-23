@@ -12,6 +12,9 @@
   "defaultProjectTrust": "ask",
   "theme": "catppuccin-latte",
   "tuiMode": "fullscreen",
+  "skills": [
+    "~/.pi/agent/external/skills"
+  ],
   "packages": [
     "npm:pi-web-access",
     "npm:pi-frontend-check"

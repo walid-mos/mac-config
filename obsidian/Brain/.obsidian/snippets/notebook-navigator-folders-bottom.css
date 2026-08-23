@@ -1,0 +1,15 @@
+/* Keep notes above the folder tree when Notebook Navigator falls back to a vertical split. */
+.nn-split-container.nn-desktop.nn-dual-pane.nn-orientation-vertical .nn-list-pane {
+  order: 1;
+}
+
+.nn-split-container.nn-desktop.nn-dual-pane.nn-orientation-vertical .nn-navigation-pane {
+  order: 2;
+  border-top: 1px solid var(--nn-theme-divider-border-color);
+  border-bottom: 0;
+}
+
+/* The plugin's resizer assumes the folder pane is above the note list. */
+.nn-split-container.nn-desktop.nn-dual-pane.nn-orientation-vertical .nn-resize-handle {
+  display: none;
+}

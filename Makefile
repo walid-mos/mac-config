@@ -44,7 +44,8 @@ OBSIDIAN_PLUGINS := \
 	obsidian-icon-folder=florianwoelki/obsidian-iconize \
 	settings-search=javalent/settings-search \
 	shiki-highlighter=mprojectscode/obsidian-shiki-plugin \
-	folder-notes=LostPaul/obsidian-folder-notes
+	folder-notes=LostPaul/obsidian-folder-notes \
+	notebook-navigator=johansan/notebook-navigator
 OBSIDIAN_PLUGIN_DATA := $(foreach spec,$(OBSIDIAN_PLUGINS),$(firstword $(subst =, ,$(spec))))
 
 .PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs pi-update pi-smoke herdr-pi-smoke hermes-dirs hermes-gemma obsidian obsidian-save obsidian-post proxy-reset dev-dirs git-filters

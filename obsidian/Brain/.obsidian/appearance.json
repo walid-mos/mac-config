@@ -9,6 +9,7 @@
     "typography-rhythm",
     "ui-polish",
     "colored-headings",
-    "canvas-embed"
+    "canvas-embed",
+    "notebook-navigator-folders-bottom"
   ]
 }

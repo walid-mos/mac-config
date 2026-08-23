@@ -90,6 +90,13 @@ export default function activityStripExtension(pi: ExtensionAPI): void {
 		paint();
 	});
 
+	// Reinsert only when the background-task indicator changes: Map insertion order
+	// then keeps this strip immediately below it.
+	subscribe("bg-tasks:widget-changed", () => {
+		if (!widgetRegistered || ui === undefined) return;
+		ui.setWidget(WIDGET_ID, undefined);
+		paint();
+	});
 
 	pi.on("session_shutdown", async (_event, ctx) => {
 		rememberUi(ctx);

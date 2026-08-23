@@ -1,9 +1,11 @@
 model:
   default: stealth/ox-alpha
   provider: nous
-  base_url: 'https://inference-api.nousresearch.com/v1'
+  base_url: https://inference-api.nousresearch.com/v1
 skills:
   disabled: []
+command_allowlist:
+  - delete in root path
 _config_version: 37
 custom_providers:
   - name: Gemma 4

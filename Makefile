@@ -240,44 +240,30 @@ nvim-post:
 		|| echo "ripgrep non installé — telescope live_grep échouera"
 
 # pi-dirs crée les répertoires runtime avant Stow : ~/.pi/agent reste réel car
-# sessions/ et npm/ existent, tandis que les descendants statiques sans conflit
-# (extensions/, skills/, …) sont repliés en symlinks vers le repo. auth.json,
-# models-store.json, npm/, sessions/ et external/ restent ainsi locaux hors repo.
-# La migration unique déplace les skills locaux réels, jamais les symlinks Stow,
-# vers external/skills pour permettre le pliage de skills/ sans écrire dans le
-# working tree.
+# sessions/ et npm/ existent. Les descendants statiques extensions/, skills/,
+# tests/ et themes/ sont supprimés puis recréés par Stow : le repo est leur unique
+# source de vérité. auth.json, models-store.json, npm/, sessions/ et external/
+# restent locaux hors repo.
 pi: | pi-dirs
 	@$(STOW) --no-folding -D pi
-	@for path in extensions skills tests themes; do \
-		directory="$(HOME)/.pi/agent/$$path"; \
-		[ ! -d "$$directory" ] || find "$$directory" -depth -type d -empty -delete; \
-	done
+	@rm -rf \
+		"$(HOME)/.pi/agent/extensions" \
+		"$(HOME)/.pi/agent/skills" \
+		"$(HOME)/.pi/agent/tests" \
+		"$(HOME)/.pi/agent/themes"
 	@$(STOW) -R pi
 	@for path in extensions skills tests themes; do \
 		[ -L "$(HOME)/.pi/agent/$$path" ] || { \
-			echo "migration Pi incomplète: ~/.pi/agent/$$path contient des fichiers non versionnés" >&2; \
+			echo "déploiement Pi incomplet: ~/.pi/agent/$$path n'est pas géré par Stow" >&2; \
 			exit 1; \
 		}; \
 	done
 
 pi-dirs:
-	@agent="$(HOME)/.pi/agent"; skills="$$agent/skills"; \
-		external="$$agent/external/skills"; versioned="$(CURDIR)/pi/.pi/agent/skills"; \
-		mkdir -p "$$agent/sessions" "$$agent/agents" "$$agent/npm" "$$external"; \
-		if [ -d "$$skills" ] && [ ! -L "$$skills" ]; then \
-			rm -f "$$skills/.DS_Store"; \
-			for source in "$$skills"/* "$$skills"/.[!.]* "$$skills"/..?*; do \
-				[ -e "$$source" ] || continue; \
-				skill=$$(basename "$$source"); destination="$$external/$$skill"; \
-				if [ ! -e "$$versioned/$$skill" ] && [ ! -L "$$source" ]; then \
-					if [ -e "$$destination" ] || [ -L "$$destination" ]; then \
-						echo "migration de skill refusée: $$source et $$destination existent" >&2; \
-						exit 1; \
-					fi; \
-					mv "$$source" "$$destination"; \
-				fi; \
-			done; \
-		fi
+	@mkdir -p \
+		"$(HOME)/.pi/agent/sessions" \
+		"$(HOME)/.pi/agent/npm" \
+		"$(HOME)/.pi/agent/external/skills"
 
 # pnpm installé par brew est un script `#!/usr/bin/env node` et node arrive via
 # fnm, pas via brew : sur un mac neuf on installe le LTS puis on lance pnpm au

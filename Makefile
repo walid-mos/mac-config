@@ -25,8 +25,8 @@ PACKAGES := $(filter-out $(NONSTOW),$(patsubst %/,%,$(wildcard */)))
 # n'entre dans le repo que s'il est ajouté explicitement au package puis restow.
 # Sans --no-folding, Stow replierait le dossier entier et l'outil écrirait ses
 # secrets/runtime dans le repo (puis un unstow les casserait). hermes écrit ses
-# sessions, sa mémoire et ~/.hermes/.env (secrets) hors repo, comme pi.
-NOFOLD := colima docker gh git herdr hermes homebrew languages pi rclone rtk
+# sessions, sa mémoire et ~/.hermes/.env (secrets) hors repo.
+NOFOLD := colima docker gh git herdr hermes homebrew languages rclone rtk
 
 # Hooks post-install chaînés par `make install` (cible <nom>-post ; rust et crit
 # n'ont pas de package Stow — rustup gère ~/.rustup/~/.cargo, Crit est une formula brew).
@@ -48,7 +48,7 @@ OBSIDIAN_PLUGINS := \
 	notebook-navigator=johansan/notebook-navigator
 OBSIDIAN_PLUGIN_DATA := $(foreach spec,$(OBSIDIAN_PLUGINS),$(firstword $(subst =, ,$(spec))))
 
-.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs pi-update pi-smoke herdr-pi-smoke hermes-dirs hermes-gemma obsidian obsidian-save obsidian-post proxy-reset dev-dirs git-filters
+.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs pi-update pi-test herdr-pi-smoke hermes-dirs hermes-gemma obsidian obsidian-save obsidian-post proxy-reset dev-dirs git-filters
 
 help:
 	@echo "Targets:"
@@ -69,7 +69,7 @@ help:
 	@echo "  proxy-reset    Retire le PAC proxy laissé par Zscaler (rétablit le relais Apple)"
 	@echo "  crit-post      Installe Crit et ses skills Pi officiels"
 	@echo "  pi-update      Met à jour Pi et tous ses packages"
-	@echo "  pi-smoke       Stress-test le démarrage Pi avec saisie immédiate"
+	@echo "  pi-test        Vérifie Stow puis stress-test le démarrage réel de Pi"
 	@echo "  herdr-pi-smoke Isolated Herdr named-session smoke: 20+ rapid Pi pane starts"
 	@echo "  hermes-gemma   Installe le superviseur Gemma (démarre/arrête avec Hermes.app)"
 	@echo ""
@@ -108,7 +108,7 @@ install all: git-filters $(PACKAGES) $(addsuffix -post,$(POSTS)) obsidian obsidi
 
 # -R (restow) est idempotent : premier stow ou réparation de drift, même geste.
 # Seul point d'invocation de stow pour les packages — NOFOLD s'applique ici.
-$(PACKAGES):
+$(filter-out pi,$(PACKAGES)):
 	@$(STOW) -R $(if $(filter $@,$(NOFOLD)),--no-folding) $@
 
 restow: $(PACKAGES)
@@ -239,15 +239,39 @@ nvim-post:
 	@command -v rg >/dev/null && echo "ripgrep prêt: telescope live_grep/grep_string opérationnels" \
 		|| echo "ripgrep non installé — telescope live_grep échouera"
 
-# pi est dans NOFOLD : stow ne replie jamais ~/.pi/agent, donc le dossier reste
-# réel. Seuls les fichiers déjà présents dans le package (settings.json, skills, …) sont des
-# symlinks. auth.json, models-store.json et sessions/ restent locaux hors repo.
-# Un fichier créé dans le live dir n'est pas versionné tant qu'il n'est pas ajouté
-# au package. pi-dirs crée sessions/ à l'avance en ceinture-bretelles.
+# pi-dirs crée les répertoires runtime avant Stow : ~/.pi/agent reste réel car
+# sessions/ et npm/ existent, tandis que les descendants statiques sans conflit
+# (extensions/, skills/, …) sont repliés en symlinks vers le repo. auth.json,
+# models-store.json, npm/, sessions/ et external/ restent ainsi locaux hors repo.
+# La migration unique déplace les anciens skills Crit réels, jamais les symlinks
+# Stow, pour permettre le pliage de skills/ sans écrire dans le working tree.
 pi: | pi-dirs
+	@$(STOW) --no-folding -D pi
+	@for path in extensions skills tests themes; do \
+		directory="$(HOME)/.pi/agent/$$path"; \
+		[ ! -d "$$directory" ] || find "$$directory" -depth -type d -empty -delete; \
+	done
+	@$(STOW) -R pi
+	@for path in extensions skills tests themes; do \
+		[ -L "$(HOME)/.pi/agent/$$path" ] || { \
+			echo "migration Pi incomplète: ~/.pi/agent/$$path contient des fichiers non versionnés" >&2; \
+			exit 1; \
+		}; \
+	done
 
 pi-dirs:
-	@mkdir -p "$(HOME)/.pi/agent/sessions" "$(HOME)/.pi/agent/agents"
+	@agent="$(HOME)/.pi/agent"; external="$$agent/external/skills"; \
+		mkdir -p "$$agent/sessions" "$$agent/agents" "$$agent/npm" "$$external"; \
+		for skill in crit crit-cli; do \
+			source="$$agent/skills/$$skill"; destination="$$external/$$skill"; \
+			if [ -e "$$source" ] && [ ! -L "$$source" ]; then \
+				[ ! -e "$$destination" ] || { \
+					echo "migration Crit refusée: $$source et $$destination existent" >&2; \
+					exit 1; \
+				}; \
+				mv "$$source" "$$destination"; \
+			fi; \
+		done
 
 # pnpm installé par brew est un script `#!/usr/bin/env node` et node arrive via
 # fnm, pas via brew : sur un mac neuf on installe le LTS puis on lance pnpm au
@@ -300,7 +324,10 @@ pi-post:
 
 pi-update: crit-post pi-post
 
-pi-smoke: pi
+# Gate unique du harness : validation isolée du déploiement Stow et des ressources
+# du repo, puis stress-test de la configuration live. Aucun restow du HOME réel.
+pi-test:
+	@python3 scripts/test-pi-config.py
 	@python3 scripts/test-pi-startup.py
 
 herdr-pi-smoke: herdr
@@ -311,11 +338,10 @@ rp-post:
 		|| { echo "node not found — install it (fnm install --lts) so 'rp' can serve plan.html"; exit 0; }
 	@echo "rp ready: \`rp <slug>\` will serve plan.html and wait for /submit"
 
-# crit : formula brew (binaire) + skills Pi officiels écrits dans
-# ~/.pi/agent/skills/{crit,crit-cli} par `crit install pi --force`. On lance
-# depuis $HOME pour forcer la destination globale, pas un .pi/skills projet.
-# --force rafraîchit les skills déjà présents. L'échec de `crit install` doit
-# faire échouer la recette (pas d'echo de succès inconditionnel).
+# crit : formula brew (binaire) + skills Pi officiels installés dans un HOME
+# temporaire, puis copiés dans ~/.pi/agent/external/skills/{crit,crit-cli}.
+# Cela laisse ~/.pi/agent/skills entièrement géré par Stow. --force rafraîchit
+# les skills; l'échec de l'installation ou de la copie fait échouer la recette.
 # Nettoyage Plannotator : binaire / état / dep npm orphelins. Un `git reset`
 # + ancienne cible `plannotator-post` peut tout réinstaller.
 crit-post: export FNM_DIR := $(HOME)/.local/share/fnm
@@ -333,9 +359,16 @@ crit-post:
 		echo "→ installation de crit (brew)"; \
 		brew install crit; \
 	fi
-	@( cd "$(HOME)" && crit install pi --force )
-	@python3 scripts/patch-crit-pi-skill.py
-	@echo "crit prêt: $$(crit --version 2>/dev/null | head -1) — skills Pi ajustés dans ~/.pi/agent/skills/{crit,crit-cli}"
+	@temporary_home="$$(mktemp -d)"; trap 'rm -rf "$$temporary_home"' EXIT; \
+		HOME="$$temporary_home" crit install pi --force; \
+		external="$(HOME)/.pi/agent/external/skills"; mkdir -p "$$external"; \
+		for skill in crit crit-cli; do \
+			source="$$temporary_home/.pi/agent/skills/$$skill"; \
+			[ -d "$$source" ] || { echo "Crit n'a pas installé le skill $$skill" >&2; exit 1; }; \
+			rm -rf "$$external/$$skill"; cp -R "$$source" "$$external/$$skill"; \
+		done; \
+		PI_CODING_AGENT_DIR="$(HOME)/.pi/agent/external" python3 scripts/patch-crit-pi-skill.py
+	@echo "crit prêt: $$(crit --version 2>/dev/null | head -1) — skills Pi ajustés dans ~/.pi/agent/external/skills/{crit,crit-cli}"
 	@if command -v pi >/dev/null && pi list 2>/dev/null | grep -Fq '@plannotator/pi-extension'; then \
 		pi remove npm:@plannotator/pi-extension; \
 	fi

@@ -1,6 +1,6 @@
 ---
 name: harness-tuning
-description: Create and maintain pi skills and agent instructions (AGENTS.md). MUST be used every time a skill is created or updated, or when AGENTS.md / agent rules are modified — ensures no rule duplication, correct skill structure, and optimal placement of instructions (system prompt vs tool description vs skill vs extension).
+description: Create and maintain Pi skills, extensions, and agent instructions (AGENTS.md). MUST be loaded whenever any of them is created or modified to prevent rule duplication, place behavior correctly, and run the Pi configuration gate.
 ---
 
 # Harness Tuning
@@ -86,6 +86,7 @@ relatifs : [détails](references/REFERENCE.md), ./scripts/run.sh
 
 ## Vérification après modification
 
+- Après toute modification de skill, extension ou `AGENTS.md`, lancer obligatoirement `make pi-test` lorsque la cible est disponible.
 - Extension : `/reload` dans la session courante
 - AGENTS.md, skills : nouvelle session
 - Forcer le chargement d'un skill pour test : `/skill:<nom>`

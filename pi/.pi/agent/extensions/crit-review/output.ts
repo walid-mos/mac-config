@@ -1,4 +1,4 @@
-import type { CritExecutionResult } from "./crit-process.ts";
+import type { CritExecutionResult } from "./process.ts";
 
 export function formatCritProgress(result: CritExecutionResult): string {
 	const output = [result.stdout.trim(), result.stderr.trim()].filter(Boolean).join("\n");

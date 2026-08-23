@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
-import { runCritProcess } from "./crit-process.ts";
-import { formatCritOutput, formatCritProgress } from "./crit-review-output.ts";
+import { formatCritOutput, formatCritProgress } from "./crit-review/output.ts";
+import { runCritProcess } from "./crit-review/process.ts";
 
 export default function critReviewExtension(pi: ExtensionAPI): void {
 	pi.registerTool({

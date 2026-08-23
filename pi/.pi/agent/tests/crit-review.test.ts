@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { runCritProcess } from "../extensions/crit-process.ts";
-import { formatCritOutput, formatCritProgress } from "../extensions/crit-review-output.ts";
+import { formatCritOutput, formatCritProgress } from "../extensions/crit-review/output.ts";
+import { runCritProcess } from "../extensions/crit-review/process.ts";
 
 const output = formatCritOutput({
 	stdout: "apply these comments\nrun crit --session abc",

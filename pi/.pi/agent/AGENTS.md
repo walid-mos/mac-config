@@ -18,7 +18,7 @@ Tickets / épiques = Plane.so via `plane_*`. Crit = UI de review (plans et diffs
 
 ## Maintenance du harness
 
-- TOUJOURS charger le skill `harness-tuning` avant de créer/modifier un skill ou l'AGENTS.md.
+- TOUJOURS charger le skill `harness-tuning` avant de créer/modifier un skill, une extension Pi ou l'AGENTS.md.
 
 ## Git
 

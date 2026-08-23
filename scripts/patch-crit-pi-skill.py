@@ -22,6 +22,10 @@ JSON through stdin.
 """
 
 
+def skill_path(agent_dir: Path) -> Path:
+    return agent_dir / "skills" / "crit" / "SKILL.md"
+
+
 def patch_skill(path: Path) -> None:
     text = path.read_text()
     if START in text or END in text:
@@ -40,7 +44,7 @@ def patch_skill(path: Path) -> None:
 
 def main() -> int:
     agent_dir = Path(os.environ.get("PI_CODING_AGENT_DIR", "~/.pi/agent")).expanduser()
-    skill = agent_dir / "skills" / "crit" / "SKILL.md"
+    skill = skill_path(agent_dir)
     if not skill.is_file():
         print(f"Crit Pi skill not found: {skill}", file=sys.stderr)
         return 1

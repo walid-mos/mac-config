@@ -22,7 +22,10 @@ Tickets / épiques = Plane.so via `plane_*`. Crit = UI de review (plans et diffs
 
 ## Git
 
-- Ne pas pousser systématiquement. Dans tout dépôt Git, TOUJOURS créer des commits atomiques : minimaux et limités à un même domaine.
+- Par défaut, créer une branche dédiée avant le premier commit. Si l’utilisateur demande explicitement de travailler sur la branche principale, y committer directement.
+- Toujours fusionner une branche avec `git merge --no-ff` afin de conserver un merge commit visible. Ne jamais fast-forward une fusion.
+- Ne pas pousser systématiquement.
+- Avant chaque commit, découper le travail en changements minimaux, chacun limité à un seul comportement ou domaine et valide/testable indépendamment. Ne jamais regrouper configuration, migration, refactor et correctifs de compatibilité sans dépendance stricte.
 
 ## Fixtures locales
 

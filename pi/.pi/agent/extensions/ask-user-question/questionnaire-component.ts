@@ -22,10 +22,14 @@ interface CustomComponent {
 	handleInput(data: string): void;
 }
 
+interface SelectionKeybindings {
+	matches(data: string, action: "tui.select.up" | "tui.select.down"): boolean;
+}
+
 type CustomFactory<T> = (
 	tui: RenderHandle,
 	theme: QuestionnairePalette,
-	keybindings: unknown,
+	keybindings: SelectionKeybindings,
 	done: (result: T) => void,
 ) => CustomComponent;
 
@@ -51,7 +55,7 @@ export function runQuestionnaire<TUi>(
 	custom: <T>(factory: CustomFactory<T>) => Promise<T>,
 	questions: Question[],
 ): Promise<AskResult> {
-	return custom<AskResult>((tui, theme, _keybindings, done) => {
+	return custom<AskResult>((tui, theme, keybindings, done) => {
 		const editorTheme: EditorTheme = {
 			borderColor: (s) => theme.fg("accent", s),
 			selectList: {
@@ -148,11 +152,11 @@ export function runQuestionnaire<TUi>(
 		}
 
 		function handleOptionKey(data: string): void {
-			if (matchesKey(data, Key.up)) {
+			if (keybindings.matches(data, "tui.select.up")) {
 				applyEffects(state.moveCursor(-1));
 				return;
 			}
-			if (matchesKey(data, Key.down)) {
+			if (keybindings.matches(data, "tui.select.down")) {
 				applyEffects(state.moveCursor(1));
 				return;
 			}

@@ -257,9 +257,9 @@ function helpText(state: QuestionnaireState): string {
 			? "Type your answer • Enter confirm all • ↑↓ leave the input • Esc back to options"
 			: "Type your answer • Enter submit • ↑↓ leave the input • Esc back to options";
 	} else if (q.multiSelect) {
-		context = "↑↓ move • Space toggle • 1-9 quick toggle • Enter confirm • Esc cancel";
+		context = "j/k or ↑↓ move • Space toggle • 1-9 quick toggle • Enter confirm • Esc cancel";
 	} else {
-		context = "↑↓ navigate • 1-9 quick select • Enter select • Esc cancel";
+		context = "j/k or ↑↓ navigate • 1-9 quick select • Enter select • Esc cancel";
 	}
 	return navigation ? `${navigation} • ${context}` : context;
 }

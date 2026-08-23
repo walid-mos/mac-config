@@ -44,25 +44,41 @@ def validate_runtime_skill_migration(home: Path, make: str) -> None:
     agent = home / ".pi" / "agent"
     legacy_skill = agent / "skills" / "crit" / "SKILL.md"
     external_skill = agent / "external" / "skills" / "crit" / "SKILL.md"
+    local_skill = agent / "skills" / "local-only" / "SKILL.md"
+    external_local_skill = agent / "external" / "skills" / "local-only" / "SKILL.md"
+    hidden_skills = [agent / "skills" / name / "SKILL.md" for name in (".local-only", "..local-only")]
     legacy_skill.parent.mkdir(parents=True)
+    local_skill.parent.mkdir(parents=True)
     legacy_skill.write_text("legacy-crit\n", encoding="utf-8")
+    local_skill.write_text("local-only\n", encoding="utf-8")
+    for hidden_skill in hidden_skills:
+        hidden_skill.parent.mkdir()
+        hidden_skill.write_text(f"{hidden_skill.parent.name}\n", encoding="utf-8")
+    (agent / "skills" / ".DS_Store").write_text("metadata\n", encoding="utf-8")
     command = [make, "--no-print-directory", "pi-dirs", f"HOME={home}"]
     subprocess.run(command, cwd=REPOSITORY_ROOT, check=True)
     subprocess.run(command, cwd=REPOSITORY_ROOT, check=True)
     if legacy_skill.exists() or external_skill.read_text(encoding="utf-8") != "legacy-crit\n":
         raise RuntimeError("pi-dirs did not migrate the legacy Crit skill idempotently")
+    if local_skill.exists() or external_local_skill.read_text(encoding="utf-8") != "local-only\n":
+        raise RuntimeError("pi-dirs did not migrate an unversioned local skill idempotently")
+    if (agent / "skills" / ".DS_Store").exists():
+        raise RuntimeError("pi-dirs did not remove Finder metadata blocking Stow folding")
+    for hidden_skill in hidden_skills:
+        migrated_skill = agent / "external" / "skills" / hidden_skill.parent.name / "SKILL.md"
+        if hidden_skill.exists() or migrated_skill.read_text(encoding="utf-8") != f"{hidden_skill.parent.name}\n":
+            raise RuntimeError(f"pi-dirs did not migrate hidden skill {hidden_skill.parent.name}")
 
     conflicting_legacy = agent / "skills" / "crit-cli" / "SKILL.md"
-    conflicting_external = agent / "external" / "skills" / "crit-cli" / "SKILL.md"
+    conflicting_external = agent / "external" / "skills" / "crit-cli"
     conflicting_legacy.parent.mkdir(parents=True)
-    conflicting_external.parent.mkdir(parents=True)
     conflicting_legacy.write_text("legacy-copy\n", encoding="utf-8")
-    conflicting_external.write_text("external-copy\n", encoding="utf-8")
+    conflicting_external.symlink_to("missing-skill", target_is_directory=True)
     collision = subprocess.run(command, cwd=REPOSITORY_ROOT, capture_output=True, text=True)
     if collision.returncode == 0:
-        raise RuntimeError("pi-dirs must refuse an ambiguous Crit skill migration")
-    if conflicting_legacy.read_text(encoding="utf-8") != "legacy-copy\n" or conflicting_external.read_text(encoding="utf-8") != "external-copy\n":
-        raise RuntimeError("pi-dirs changed files while refusing an ambiguous Crit migration")
+        raise RuntimeError("pi-dirs must refuse an ambiguous local skill migration")
+    if conflicting_legacy.read_text(encoding="utf-8") != "legacy-copy\n" or not conflicting_external.is_symlink() or os.readlink(conflicting_external) != "missing-skill":
+        raise RuntimeError("pi-dirs changed files while refusing a dangling destination symlink")
 
 
 def deploy_pi(home: Path, stow: str, make: str) -> None:
@@ -84,6 +100,9 @@ def deploy_pi(home: Path, stow: str, make: str) -> None:
     )
     if (agent / "extensions").is_symlink():
         raise RuntimeError("legacy --no-folding fixture unexpectedly folded extensions")
+    local_skill = agent / "skills" / "local-deploy" / "SKILL.md"
+    local_skill.parent.mkdir()
+    local_skill.write_text("local-deploy\n", encoding="utf-8")
     command = [make, "--no-print-directory", "pi", f"HOME={home}"]
     subprocess.run(command, cwd=REPOSITORY_ROOT, check=True)
     subprocess.run(command, cwd=REPOSITORY_ROOT, check=True)
@@ -98,6 +117,7 @@ def require_expected_layout(home: Path) -> None:
     linked_runtime_paths = [str(path) for path in runtime_paths if path.is_symlink()]
     expected_versioned_skill = agent / "skills" / "harness-tuning" / "SKILL.md"
     expected_external_skill = external_skills / "pi-config-test" / "SKILL.md"
+    migrated_local_skill = external_skills / "local-deploy" / "SKILL.md"
     settings = json.loads((agent / "settings.json").read_text(encoding="utf-8"))
     preserved_runtime = {
         agent / "auth.json": '{"sentinel":"auth"}\n',
@@ -109,7 +129,7 @@ def require_expected_layout(home: Path) -> None:
         for path, expected in preserved_runtime.items()
         if not path.is_file() or path.read_text(encoding="utf-8") != expected
     ]
-    if missing_links or linked_runtime_paths or changed_runtime or not expected_versioned_skill.is_file() or not expected_external_skill.is_file() or settings.get("skills") != ["~/.pi/agent/external/skills"]:
+    if missing_links or linked_runtime_paths or changed_runtime or not expected_versioned_skill.is_file() or not expected_external_skill.is_file() or not migrated_local_skill.is_file() or settings.get("skills") != ["~/.pi/agent/external/skills"]:
         details = []
         if missing_links:
             details.append(f"static Pi directories must be symlinks: {', '.join(missing_links)}")
@@ -121,6 +141,8 @@ def require_expected_layout(home: Path) -> None:
             details.append(f"versioned skill missing: {expected_versioned_skill}")
         if not expected_external_skill.is_file():
             details.append(f"external skill missing: {expected_external_skill}")
+        if not migrated_local_skill.is_file():
+            details.append(f"migrated local skill missing: {migrated_local_skill}")
         if settings.get("skills") != ["~/.pi/agent/external/skills"]:
             details.append("settings.json must load ~/.pi/agent/external/skills")
         raise RuntimeError("; ".join(details))

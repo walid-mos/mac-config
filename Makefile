@@ -243,8 +243,9 @@ nvim-post:
 # sessions/ et npm/ existent, tandis que les descendants statiques sans conflit
 # (extensions/, skills/, …) sont repliés en symlinks vers le repo. auth.json,
 # models-store.json, npm/, sessions/ et external/ restent ainsi locaux hors repo.
-# La migration unique déplace les anciens skills Crit réels, jamais les symlinks
-# Stow, pour permettre le pliage de skills/ sans écrire dans le working tree.
+# La migration unique déplace les skills locaux réels, jamais les symlinks Stow,
+# vers external/skills pour permettre le pliage de skills/ sans écrire dans le
+# working tree.
 pi: | pi-dirs
 	@$(STOW) --no-folding -D pi
 	@for path in extensions skills tests themes; do \
@@ -260,18 +261,23 @@ pi: | pi-dirs
 	done
 
 pi-dirs:
-	@agent="$(HOME)/.pi/agent"; external="$$agent/external/skills"; \
+	@agent="$(HOME)/.pi/agent"; skills="$$agent/skills"; \
+		external="$$agent/external/skills"; versioned="$(CURDIR)/pi/.pi/agent/skills"; \
 		mkdir -p "$$agent/sessions" "$$agent/agents" "$$agent/npm" "$$external"; \
-		for skill in crit crit-cli; do \
-			source="$$agent/skills/$$skill"; destination="$$external/$$skill"; \
-			if [ -e "$$source" ] && [ ! -L "$$source" ]; then \
-				[ ! -e "$$destination" ] || { \
-					echo "migration Crit refusée: $$source et $$destination existent" >&2; \
-					exit 1; \
-				}; \
-				mv "$$source" "$$destination"; \
-			fi; \
-		done
+		if [ -d "$$skills" ] && [ ! -L "$$skills" ]; then \
+			rm -f "$$skills/.DS_Store"; \
+			for source in "$$skills"/* "$$skills"/.[!.]* "$$skills"/..?*; do \
+				[ -e "$$source" ] || continue; \
+				skill=$$(basename "$$source"); destination="$$external/$$skill"; \
+				if [ ! -e "$$versioned/$$skill" ] && [ ! -L "$$source" ]; then \
+					if [ -e "$$destination" ] || [ -L "$$destination" ]; then \
+						echo "migration de skill refusée: $$source et $$destination existent" >&2; \
+						exit 1; \
+					fi; \
+					mv "$$source" "$$destination"; \
+				fi; \
+			done; \
+		fi
 
 # pnpm installé par brew est un script `#!/usr/bin/env node` et node arrive via
 # fnm, pas via brew : sur un mac neuf on installe le LTS puis on lance pnpm au

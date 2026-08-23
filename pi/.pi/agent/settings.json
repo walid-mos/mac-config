@@ -22,8 +22,7 @@
     "openai-codex/gpt-5.6-terra",
     "kimi-coding/k3",
     "openrouter/deepseek/deepseek-v4-flash",
-    "openai-codex/gpt-5.6-luna",
-    "openrouter/deepseek/deepseek-v4-pro"
+    "openai-codex/gpt-5.6-luna"
   ],
   "hideThinkingBlock": false
 }

@@ -313,6 +313,7 @@ pi-post:
 	else echo "pi non installé — étape ignorée"; fi
 	@python3 scripts/pi-patch-tool-execution.py
 	@python3 scripts/pi-patch-assistant-thinking.py
+	@python3 scripts/pi-patch-prompt-history.py
 
 pi-update: crit-post pi-post
 

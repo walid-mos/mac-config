@@ -27,6 +27,7 @@ import type {
 	SessionEntry,
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { ABOVE_EDITOR_PRIORITY, setOrderedAboveEditorWidget } from "./ui/ordered-widget-stack.ts";
 function pickPreferredModel<T extends { id: string }>(
     available: readonly T[], preferredIds: readonly string[],
 ): T | undefined {
@@ -161,8 +162,10 @@ export default function goalExtension(pi: ExtensionAPI): void {
 		renderChrome(ctx, active);
 	});
 
-	pi.on("session_shutdown", async () => {
+	pi.on("session_shutdown", async (_event, ctx) => {
 		stopChromeClock();
+		setOrderedAboveEditorWidget(ctx.ui, "goal", undefined);
+		chromeUi = null;
 	});
 
 	pi.on("agent_settled", async (_event, ctx) => {
@@ -649,24 +652,26 @@ function startChromeClock(): void {
 	chromeClock.unref?.();
 }
 
+export function goalChromeLines(state: GoalState, width: number): string[] {
+	return [
+		chromeLine(state),
+		truncate(state.condition, 80),
+		state.lastReason ? `last: ${truncate(state.lastReason, 80)}` : "waiting for first evaluation",
+	].map((line) => truncate(line, Math.max(1, width)));
+}
+
 export function paintChrome(ui: ExtensionUIContext, state: GoalState): void {
-	const line = chromeLine(state);
-	ui.setWidget(
-		"goal",
-		[
-			line,
-			truncate(state.condition, 80),
-			state.lastReason ? `last: ${truncate(state.lastReason, 80)}` : "waiting for first evaluation",
-		],
-		{ placement: GOAL_WIDGET_PLACEMENT },
-	);
+	setOrderedAboveEditorWidget(ui, "goal", {
+		priority: ABOVE_EDITOR_PRIORITY.goal,
+		render: (width) => goalChromeLines(state, width),
+	});
 }
 
 function renderChrome(ctx: ExtensionCommandContext | ExtensionContext, state: GoalState | null): void {
 	ctx.ui.setStatus("goal", undefined);
 	if (!state || state.status !== "active") {
 		stopChromeClock();
-		ctx.ui.setWidget("goal", undefined);
+		setOrderedAboveEditorWidget(ctx.ui, "goal", undefined);
 		chromeUi = null;
 		return;
 	}

@@ -15,6 +15,7 @@ const {
 	decideEvaluatedGoal,
 	default: goalExtension,
 	evaluateWithFallback,
+	goalChromeLines,
 	isTurnCapReached,
 	parseEvaluatorText,
 	restoreGoalState,
@@ -479,6 +480,19 @@ function testInflatedStartedTurnsAreIgnoredOnRestore(): void {
 	assert.equal(restoreGoalState({ ...legacyState, turnsStarted: 2 }), null);
 }
 
+function testGoalChromeLinesRespectTerminalWidth(): void {
+	const lines = goalChromeLines(
+		{
+			...activeGoal,
+			condition: "a condition that is much wider than a narrow terminal",
+			lastReason: "a reason that is also much wider than the terminal",
+		},
+		24,
+	);
+	assert.equal(lines.length, 3);
+	assert.equal(lines.every((line) => line.length <= 24), true);
+}
+
 const tests: Array<[string, () => void | Promise<void>]> = [
 	["cumulative proofs are parsed", testCumulativeProofsAreParsed],
 	["proofs are required", testProofsAreRequired],
@@ -498,6 +512,7 @@ const tests: Array<[string, () => void | Promise<void>]> = [
 	["met at cap wins", testMetAtCapWins],
 	["impossible at cap wins", testImpossibleAtCapWins],
 	["inflated started turns are ignored on restore", testInflatedStartedTurnsAreIgnoredOnRestore],
+	["goal chrome lines respect terminal width", testGoalChromeLinesRespectTerminalWidth],
 ];
 
 for (const [name, test] of tests) {

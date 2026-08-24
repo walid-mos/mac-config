@@ -1,5 +1,4 @@
-import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
-import type { TUI } from "@earendil-works/pi-tui";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import {
 	clipToTerminalWidth,
 	countTool,
@@ -11,6 +10,7 @@ import {
 	tickElapsed,
 	type ActivityStripState,
 } from "./activity-strip/state.ts";
+import { ABOVE_EDITOR_PRIORITY, setOrderedAboveEditorWidget } from "./ui/ordered-widget-stack.ts";
 
 const WIDGET_ID = "activity-strip";
 const TICK_MS = 1000;
@@ -24,16 +24,10 @@ export default function activityStripExtension(pi: ExtensionAPI): void {
 	function paint(): void {
 		if (!widgetRegistered || ui === undefined) return;
 		const line = formatActivityLine(state);
-		ui.setWidget(
-			WIDGET_ID,
-			(_tui: TUI, theme: Theme) => ({
-				render(width: number): string[] {
-					return [theme.fg("dim", clipToTerminalWidth(line, width))];
-				},
-				invalidate(): void {},
-			}),
-			{ placement: "aboveEditor" },
-		);
+		setOrderedAboveEditorWidget(ui, WIDGET_ID, {
+			priority: ABOVE_EDITOR_PRIORITY.activity,
+			render: (width, theme) => [theme.fg("dim", clipToTerminalWidth(line, width))],
+		});
 	}
 
 	function stopTick(): void {
@@ -90,20 +84,13 @@ export default function activityStripExtension(pi: ExtensionAPI): void {
 		paint();
 	});
 
-	// Reinsert only when the background-task indicator changes: Map insertion order
-	// then keeps this strip immediately below it.
-	subscribe("bg-tasks:widget-changed", () => {
-		if (!widgetRegistered || ui === undefined) return;
-		ui.setWidget(WIDGET_ID, undefined);
-		paint();
-	});
 
 	pi.on("session_shutdown", async (_event, ctx) => {
 		rememberUi(ctx);
 		stopTick();
 		widgetRegistered = false;
 		state = emptyActivityStrip();
-		ui?.setWidget(WIDGET_ID, undefined);
+		if (ui !== undefined) setOrderedAboveEditorWidget(ui, WIDGET_ID, undefined);
 	});
 }
 

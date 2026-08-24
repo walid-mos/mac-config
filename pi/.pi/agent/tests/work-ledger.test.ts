@@ -471,12 +471,8 @@ function testRestoreLatestRecordOrigin(): void {
 }
 
 function testGoalAndLedgerWidgetsShareOneUiWithDedicatedPlacements(): void {
-	const widgets = new Map<string, { value: string[] | undefined; placement?: string }>();
-	const setWidget = (
-		id: string,
-		value: string[] | undefined,
-		options?: { placement?: string },
-	): void => {
+	const widgets = new Map<string, { value: unknown; placement?: string }>();
+	const setWidget = (id: string, value: unknown, options?: { placement?: string }): void => {
 		widgets.set(id, { value, placement: options?.placement });
 	};
 	paintChrome(
@@ -494,13 +490,13 @@ function testGoalAndLedgerWidgetsShareOneUiWithDedicatedPlacements(): void {
 		},
 	);
 	syncLedgerWidget(setWidget, sampleSnapshot(), "checkpoint");
-	const goal = widgets.get("goal");
+	const goalStack = widgets.get("ordered-above-editor");
 	const ledger = widgets.get("work-ledger");
 	assert.equal(GOAL_WIDGET_PLACEMENT, "aboveEditor");
 	assert.equal(LEDGER_WIDGET_PLACEMENT, "belowEditor");
-	assert.equal(goal?.placement, GOAL_WIDGET_PLACEMENT);
+	assert.equal(goalStack?.placement, GOAL_WIDGET_PLACEMENT);
 	assert.equal(ledger?.placement, LEDGER_WIDGET_PLACEMENT);
-	assert.notEqual(goal?.value, undefined);
+	assert.notEqual(goalStack?.value, undefined);
 	assert.notEqual(ledger?.value, undefined);
-	assert.notEqual(goal?.placement, ledger?.placement);
+	assert.notEqual(goalStack?.placement, ledger?.placement);
 }

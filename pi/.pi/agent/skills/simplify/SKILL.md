@@ -2,201 +2,220 @@
 name: simplify
 user-invocable: true
 description: >-
-    Post-implementation, pre-review cleanup of a behavior-locked diff: reuse,
-    quality, efficiency, altitude. Always fans out four local execution
-    children, verifies cleanups, then applies only behavior-preserving fixes.
-    Trigger on /simplify, "simplifie le diff", "cleanup avant review",
-    "simplify last commit", "simplify les PR 12 et 13". Not for initial
-    implementation or correctness bugs.
+    Post-implementation cleanup of a behavior-locked diff. Maps the repository,
+    searches semantic duplication across layers with four parallel readers,
+    canonicalizes findings, and applies only verified behavior-preserving fixes.
+    Trigger on /simplify, "simplifie le diff", "cleanup avant review", "simplify
+    last commit", or "simplify les PR 12 et 13". Not for initial implementation
+    or correctness bugs.
 ---
 
 # Simplify
 
-Cleanup of a **diff that already works**, before review. Not bug hunting.
+Simplify code that already works. The objective is less duplicated **knowledge**,
+less accidental complexity, and less future drift — not merely fewer lines.
 
-## Execution contract
+- [classification and clarity guards](references/taxonomy.md)
+- [same-knowledge discovery protocol](references/discovery.md)
 
-Prefer async plus a barrier wait. Do not mandate foreground or a live card.
+## 0. Resolve scope and lock behavior
 
-Never lower `timeoutMs`. Never use `$` in the script (no shell).
-Children: `acceptance: false` and a bounded read-only `turnBudget`.
-Never put a tight turn/tool/usage budget on an `implementer`.
+Treat unrecognized free text as `FOCUS`.
 
-Every child sets `outputMode: "file-only"` and a distinct `output` path.
-The parent consumes `structuredOutput`, `artifactPaths`, and those output
-paths. Never paste full transcripts, tool traces, or diffs into the parent
-or into a later child task.
+| Input                       | Scope                                                                                        |
+| --------------------------- | -------------------------------------------------------------------------------------------- |
+| none                        | default base (`develop`, else `main`, else GitHub default) through `HEAD`, plus working tree |
+| `last` / `HEAD`             | `git show HEAD`, plus working tree                                                           |
+| `HEAD~N` / `last N commits` | `HEAD~N...HEAD`, plus working tree                                                           |
+| `#12` / `pr 12`             | PR diff; apply only changes present locally                                                  |
+| several PRs                 | union; apply only changes present locally                                                    |
+| `maillon`                   | stack branch versus parent; `gh stack view`, then fork-point fallback                        |
+| `global` / `stack`          | whole stack versus default base                                                              |
+| path                        | restrict the resolved range to that path                                                     |
 
-## Arguments
+Set explicit `RANGE`, sorted `FILES`, and `FOCUS`. Exclude generated files before
+research: lockfiles, snapshots such as `**/migrations/meta/*_snapshot.json`,
+generated clients, build output, vendored code, and license dumps. Stop if
+`FILES` is empty.
 
-`/simplify [scope…] [focus]`
+Detect commands from the affected package roots and Makefile. Run the cheapest
+test/typecheck/lint command that covers the changed behavior; record exact
+command, result, and coverage as `LOCK`. A red initial lock stops `/simplify`.
+If no meaningful lock exists, discovery may run but structural/cross-file fixes
+remain follow-ups.
 
-**Default (no scope):** current branch vs repo default (`develop` if it
-exists, else `main`, else `gh repo view --json defaultBranchRef`) plus
-the working tree.
+## 1. Build one shared discovery manifest
 
-```bash
-git diff <base>...HEAD
-git diff HEAD
-```
+The parent performs this deterministic prepass once, before model fan-out. Use
+`git diff --unified=0`, `git ls-files`, workspace/package manifests, import
+aliases, public barrels, and repository architecture instructions. Write a
+compact JSON manifest to a local temporary `MANIFEST_PATH`; never paste source
+or the full diff into child prompts.
 
-| Scope                           | Diff                                                                                                                                              |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| (none)                          | `<base>...HEAD` + working tree                                                                                                                    |
-| `last` / `HEAD` / `last commit` | `git show` of `HEAD` only                                                                                                                         |
-| `HEAD~N` / `last N commits`     | `git diff HEAD~N...HEAD`                                                                                                                          |
-| `#12` / `12` / `pr 12`          | `gh pr diff 12`                                                                                                                                   |
-| `#12 #13` / `prs 12,13`         | union of those PR diffs; apply only if this branch contains them                                                                                  |
-| `maillon`                       | this stack branch vs the branch below (`gh stack view`; else `git merge-base --fork-point` of that parent, else the first unique commit's parent) |
-| `global` / `stack`              | whole stack vs its base (`develop` if it exists, else `main`)                                                                                     |
-| a path                          | restrict the chosen range to that path                                                                                                            |
-
-Remaining free text is extra focus, appended to every child task.
-
-Several PRs: one fan-out on the union. Do not check out another branch
-to apply. A named PR not on this branch → follow-up, still clean the ones
-that are here.
-
-## Phase 0 — Behavior lock + file list (you, inline)
-
-1. Detect test/lint/typecheck from `package.json` / `Makefile`.
-2. Run the cheapest lock that covers the changed surface. Record the
-   exact command and that it was green. No lock → one-line verification
-   plan; treat structural fixes as follow-up, not apply.
-3. Resolve the range. Collect the file list. **Drop generated files**
-   before any agent sees them: `**/migrations/meta/*_snapshot.json`,
-   lockfiles, generated clients, license dumps. Empty after that → stop.
-4. Build `FILES` (explicit, sorted) and `RANGE` (`<base>...HEAD` or the
-   equivalent). Children never re-derive the partition. They inspect
-   `git diff RANGE -- FILES` themselves.
-
-Pass each child `RANGE` + `FILES` + the angle contract. Never paste
-the source diff. Same contract as Claude's bundled `/simplify` for
-research depth: they grep the wider repo, especially reuse.
-
-Wait for every child. Dedup by `file|line` or the same mechanism.
-
-## Phase 2 — Verify, then apply
-
-You verify each `cleanup` yourself (read/grep — no more agents unless
-more than 8 cleanups survive):
-
-- Reuse: the named helper exists and the signature matches.
-- Quality: the copies are the same knowledge (AHA), not look-alikes.
-- Efficiency: the I/O is actually independent.
-- Altitude: the deeper mechanism already exists.
-
-Failed verification → `skip`. Do not expand scope because nearby code
-looks messy.
-
-Apply only verified `cleanup`:
-
-- All `trivial`/`local` in ≤ 3 files → apply them yourself.
-- Any `cross-file`, or more than 3 files, or anything that is not a
-  simple accepted cleanup → a **fresh** `implementer` (code) and/or
-  `implementer-front` (UI). Never fork the parent session.
-
-```js
-const WRITER_SCHEMA = {
-	type: 'object',
-	additionalProperties: false,
-	required: ['changedFiles', 'validation', 'conflicts', 'risks'],
-	properties: {
-		changedFiles: { type: 'array', items: { type: 'string' } },
-		validation: {
-			type: 'object',
-			additionalProperties: false,
-			required: ['ok', 'command'],
-			properties: {
-				ok: { type: 'boolean' },
-				command: { type: 'string' },
-				summary: { type: 'string' },
-			},
-		},
-		conflicts: { type: 'array', items: { type: 'string' } },
-		risks: { type: 'array', items: { type: 'string' } },
-	},
-}
-const RANGE = '<base>...HEAD'
-const FILES = ['path/a.ts']
-const SKILLS = ['coding']
-const FINDINGS = [
-	{
-		file: 'path/a.ts',
-		line: 1,
-		summary: '<verified cleanup>',
-		cost: 'local',
-		class: 'cleanup',
-	},
-]
-const GATE = '<same behavior-lock command as Phase 0>'
-const apply = await runs.run('simplify-apply', {
-	agent: 'implementer',
-	context: 'fresh',
-	worktree: false,
-	gate: GATE,
-	skill: SKILLS,
-	outputSchema: WRITER_SCHEMA,
-	output: 'simplify/apply.json',
-	outputMode: 'file-only',
-	task: [
-		'Apply only these verified simplify cleanups. No other edits.',
-		'RANGE: ' + RANGE,
-		'Files (edit ONLY these):',
-		...FILES.map(f => '- ' + f),
-		'Findings:',
-		JSON.stringify(FINDINGS),
-		'Inspect Git yourself. Do not expect a pasted diff.',
-		'Validate with: ' + GATE,
-	].join('\n'),
-})
-return {
-	key: apply.key,
-	ok: !!(apply && !apply.error),
-	artifacts: apply && apply.artifactPaths,
-	structured: apply && apply.structuredOutput,
+```text
+{
+  version, cacheKey, range, focus,
+  files: [{path, package, runtime, changedHunks, changedSymbols}],
+  knowledgeSeeds: [{id, kind, location, identifiers, distinctiveLiterals,
+                    memberOrFieldSet, operations, propertyPaths}],
+  retrievalCandidates: [{seedId, signal, query, file, line, rank}],
+  packageRoots: [{root, runtime, dependencies, publicEntries}],
+  sharedBoundaries: [{owner, runtime, exports, consumerPackages}],
+  excludedGenerated: [{path, reason}],
+  lock: {command, result, coverage},
+  workspace: {head, statusHash, diffHash, manifestHashes}
 }
 ```
 
-Re-run the behavior lock. Red → revert the offending fix, move it to
-follow-up. Never leave the tree red.
+Normalize paths; sort arrays; deduplicate literals; omit generic tokens. A
+knowledge seed or retrieval candidate is a lead, never proof. Include changed
+predicates, mappers, constants/member sets, schemas/DTOs, validation, error
+maps, route/wire values, state derivations, and repeated I/O shapes. Run exact
+identifier/export and distinctive literal/member-set searches once here;
+record their bounded hits in `retrievalCandidates`. Reviewers verify those hits
+and broaden only when their angle leaves a specific seed unresolved.
 
-Commit the cleanups only if the caller already has a commit convention
-in flight (`ship` / `stack` / `accor-ship`). Otherwise leave them
-unstaged and say so.
+`cacheKey = hash(version + range + focus + files + workspace)`, where
+`workspace` includes HEAD, status/diff hashes, and package/alias/architecture
+manifest hashes. Reuse the manifest and completed angle artifacts only when the
+entire fingerprint still matches. Keep cache artifacts outside the repository.
+Record prepass commands, elapsed time, files/hunks/seeds/hits indexed, candidate
+caps reached, and cache hit/miss.
 
-## Failure recovery
+## 2. Four parallel semantic readers
 
-`.filter` on `runs.all` — children die. `stats.failed` goes in the report.
+Search allocation is asymmetric by design: reuse gets the largest budget
+because wider semantic-clone discovery has the highest recall value. The other
+lanes remain independent safeguards. **Do not rerun manifest searches.** Reuse
+owns repository-wide export/clone broadening; quality inspects local/cross-layer
+same-knowledge candidates; efficiency follows only execution/I/O seeds;
+altitude follows only owner/mechanism candidates. A lane broadens a search only
+for an unresolved seed relevant to its angle and logs why. Pass paths and IDs,
+never transcripts or source dumps.
 
-On a dead angle: **do not self-review**. In this order:
+`FINDINGS_SCHEMA` must enforce this compact shape:
 
-3. If a structured artifact already exists, consume it — do not redo
-   the research.
-4. Restart the **exact same named agent/model** only when the run is
-   not resumable **and** no usable artifact exists.
+```text
+{
+  angle,
+  findings: [{
+    id, concept, class: "cleanup"|"follow-up",
+    cost: "trivial"|"local"|"cross-file",
+    confidence: "high"|"medium"|"low",
+    locations: [{file, line, symbol?}],
+    evidence: [{query, fact}],
+    owner: {file?, package?, symbol?, boundaryLegal: true|false},
+    differences: [string]
+  }],
+  coverage: {
+    changedUnits: [{id, checkedStages: [string]}],
+    rootsSearched: [string], queries: [string],
+    gaps: [string], truncated: boolean,
+    rejected: {semanticMismatch, boundaryViolation, weakSignal, clearerLocal}
+  }
+}
+```
 
-Never substitute another model. Never lower `timeoutMs` on the retry.
+Empty findings are valid; empty or vague **coverage is not**. A lane is complete
+only if each changed knowledge seed records the applicable discovery stages, or
+an explicit gap. If a lane truncates, omits files/seeds, or fails, resume that
+same run first. If no resumable run or valid artifact exists, restart the same
+named agent/model with only the uncovered units. Never lower timeout, substitute
+an angle, or silently accept partial coverage.
 
-If the parent workflow itself times out: completed `structuredOutput`
-and output files are still on the child runs — read them
-(`children.list` / run artifacts), then retry only the missing angles.
-Collapsing to an inline pass is a skill violation, not a fallback.
+## 3. Canonicalize before verification
 
-Preserve any handoff whose `patch.changed === true` after a crash.
-Never `worktree.discard` preserved work before an apply/reject decision.
+The parent merges actual structured data, not prose labels:
 
-## Output
+1. Normalize paths, symbols, owners, and location order.
+2. Reject malformed findings, locations outside searched evidence, missing
+   counterpart proof, or illegal boundaries.
+3. Group by `owner symbol`, else by normalized concept plus the union of
+   locations. Never deduplicate by wording alone.
+4. Merge reuse/altitude or quality/reuse reports about the same knowledge;
+   preserve all angles, evidence, differences, and dissent.
+5. Stable key:
+   `class | owner(package,file,symbol) | concept | sorted(locations)`.
+6. Rank existing compatible exports first; then identical knowledge with an
+   existing shared owner; then follow-ups. Literal-only similarity never wins.
 
-- Behavior lock used (command + result)
-- Scope (range, files kept, files dropped as generated)
-- Fixed (one line each)
-- Follow-up / skipped, with why
-- Failed angles, if any, and what you retried
-- Residual risk
+This step must produce counts for raw, malformed/rejected, deduplicated,
+conflicting, and verification candidates. It is the cost gate: do not pay for a
+second model pass over duplicates.
+
+## 4. Verify cross-cut candidates
+
+The parent verifies every surviving cleanup with `read`/`grep` against source.
+For candidates crossing package, frontend/backend, schema/enum, test/production,
+or runtime boundaries, also prove all of the following:
+
+- values, optionality, defaults, aliases, serialization, errors, and lifecycle
+  mean the same thing;
+- both consumers change for the same domain reason;
+- the proposed owner is an **existing legal shared boundary**, runtime-neutral
+  for every consumer, and dependency direction remains valid;
+- tests retain independent assertions and do not import another consumer's
+  implementation merely to look DRY;
+- no behavior adaptation, flag-heavy abstraction, or clarity loss is hidden.
+
+Conflicting evidence requires focused re-reading of only the cited locations,
+not another repository-wide pass. Any unresolved semantic or boundary question
+becomes `follow-up`/`skip`; similarity is retrieval evidence, never proof.
+
+## 5. Apply the smallest verified set
+
+Load `coding` plus the relevant language/UI skills before editing. Start
+`APPLY_FILES` with `FILES`. It may expand only to:
+
+1. an existing smallest legal shared owner chosen during verification; and
+2. the minimum live consumers that must switch to that canonical source.
+
+This permits a real front/back/schema consolidation when two or more live
+consumers already encode one invariant and the repository already has a proper
+shared owner. It does **not** permit creating a speculative `shared/` package,
+rewriting unrelated callers, or bundling nearby cleanup.
+
+Apply one independent cleanup set at a time, favoring deletion and existing
+exports before extraction. Clarity beats line count: no nested ternaries,
+flag-driven mega-helpers, collapsed concerns, removed error handling, or clever
+one-liners. Preserve public contracts unless the canonical source is already
+that contract.
+
+After each set, rerun `LOCK`. If it fails, revert only that set, classify it as
+follow-up, and restore green. If the workspace fingerprint changed since Phase
+1, invalidate the cache and rediscover before applying stale evidence. Leave
+changes unstaged unless the caller's active workflow owns commits.
+
+## Cost and telemetry
+
+Report measured values when available; use `null`, never estimates, otherwise:
+manifest cache hit, prepass time, per-lane elapsed/input/output/cached tokens and
+searches, raw/deduplicated/verified/accepted findings, coverage gaps, retries,
+and cost per accepted cleanup. The optimization order is:
+
+1. deterministic manifest and cache;
+2. compact artifact handoffs;
+3. bounded candidate ranking;
+4. merge before verification;
+5. focused cross-cut reads only for survivors.
+
+Do not suppress a semantic angle merely to save money. Save tokens by sharing
+facts and narrowing evidence, not by lowering recall.
+
+## Failure recovery and output
+
+On timeout, inspect child status/artifacts; preserve completed structured output
+and any `patch.changed === true`; resume only missing/incomplete work. Never
+replace failed research with parent intuition.
+
+Final output: `LOCK` before/after; range/files/generated exclusions; cache key
+and hit; four-angle coverage/gaps/retries; canonicalized findings with angle
+provenance; fixes; follow-ups/skips and reasons; `APPLY_FILES`; telemetry; and
+residual risk.
 
 ## Boundaries
 
-- Does not hunt correctness bugs. That is a review, not simplify.
-- Called from `ship` / `stack` / `accor-ship`: `maillon` first, then
-  `global` on the whole stack, **before** `gh stack submit`.
+- Correctness bugs belong to review, not `/simplify`.
+- Repository architecture redesign belongs to `/architecture`.
+- In `ship` / `stack` / `accor-ship`: run `maillon`, then `global`, before
+  submitting the stack.

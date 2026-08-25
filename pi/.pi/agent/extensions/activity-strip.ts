@@ -26,6 +26,7 @@ export default function activityStripExtension(pi: ExtensionAPI): void {
 		const line = formatActivityLine(state);
 		setOrderedAboveEditorWidget(ui, WIDGET_ID, {
 			priority: ABOVE_EDITOR_PRIORITY.activity,
+			active: state.promptStarted && !state.frozen,
 			render: (width, theme) => [theme.fg("dim", clipToTerminalWidth(line, width))],
 		});
 	}

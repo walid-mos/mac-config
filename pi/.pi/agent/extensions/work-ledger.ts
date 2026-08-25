@@ -20,6 +20,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { Type, type Static } from "typebox";
+import { setOrderedSurfaceWidget } from "./ui/ordered-widget-stack.ts";
 
 export const WORK_LEDGER_ENTRY_TYPE = "work-ledger";
 export const PROJECTION_MARKER = "[work-ledger]";
@@ -202,8 +203,9 @@ export default function workLedgerExtension(pi: ExtensionAPI): void {
 		applyRestoredRecord(ctx, restoreLatestRecord(ctx.sessionManager.getBranch()));
 	});
 
-	pi.on("session_shutdown", async () => {
+	pi.on("session_shutdown", async (_event, ctx) => {
 		cancelCompactWidgetHide();
+		setOrderedSurfaceWidget(ctx.ui, "work-ledger", undefined, "belowEditor");
 	});
 
 	pi.on("session_compact", async (event, ctx) => {
@@ -276,7 +278,27 @@ function renderWidget(
 	snapshot: WorkSnapshot | null,
 	origin: SnapshotOrigin | null,
 ): void {
-	syncLedgerWidget(ctx.ui.setWidget.bind(ctx.ui), snapshot, origin);
+	const setSurfaceWidget = (
+		id: string,
+		value: string[] | undefined,
+		_options?: { placement: "belowEditor" },
+	): void => {
+		if (value === undefined) {
+			setOrderedSurfaceWidget(ctx.ui, id, undefined, "belowEditor");
+			return;
+		}
+		setOrderedSurfaceWidget(
+			ctx.ui,
+			id,
+			{
+				priority: 100,
+				active: snapshot?.status === "active",
+				render: () => value,
+			},
+			"belowEditor",
+		);
+	};
+	syncLedgerWidget(setSurfaceWidget, snapshot, origin);
 }
 
 export function syncLedgerWidget(

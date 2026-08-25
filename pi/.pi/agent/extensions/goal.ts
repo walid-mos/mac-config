@@ -663,6 +663,7 @@ export function goalChromeLines(state: GoalState, width: number): string[] {
 export function paintChrome(ui: ExtensionUIContext, state: GoalState): void {
 	setOrderedAboveEditorWidget(ui, "goal", {
 		priority: ABOVE_EDITOR_PRIORITY.goal,
+		active: state.status === "active",
 		render: (width) => goalChromeLines(state, width),
 	});
 }

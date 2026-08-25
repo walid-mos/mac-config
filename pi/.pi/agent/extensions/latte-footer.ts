@@ -21,6 +21,7 @@ import { readFileSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { Buffer } from "node:buffer";
+import { getSurfaceDensity, subscribeSurfaceChanges } from "./ui/surface.ts";
 
 const execFileAsync = promisify(execFile);
 
@@ -783,6 +784,7 @@ export default function (pi: ExtensionAPI) {
 	let prGeneration = 0;
 	let lifecycleGeneration = 0;
 	let footerInstalled = false;
+	let unsubscribeSurfaceChanges: (() => void) | undefined;
 
 	function requestRenderSafely(): void {
 		try {
@@ -867,6 +869,7 @@ export default function (pi: ExtensionAPI) {
 
 	function setup(ctx: ExtensionContext) {
 		if (!enabled) return;
+		unsubscribeSurfaceChanges ??= subscribeSurfaceChanges(requestRenderSafely);
 		startPolling();
 		startGitPolling(ctx.cwd ?? process.cwd());
 		startPrPolling(ctx.cwd ?? process.cwd());
@@ -1052,7 +1055,7 @@ export default function (pi: ExtensionAPI) {
 			quotaParts.push(part);
 		}
 
-		{
+		if (getSurfaceDensity() === "detailed") {
 			const quotaContent =
 				quotaParts.length > 0
 					? `${fgHex(LATTE.overlay1, ICONS.quota)} ${quotaParts.join(dim("   ·   "))}`
@@ -1081,6 +1084,8 @@ export default function (pi: ExtensionAPI) {
 		gitCwd = undefined;
 		requestRender = undefined;
 		footerInstalled = false;
+		unsubscribeSurfaceChanges?.();
+		unsubscribeSurfaceChanges = undefined;
 	});
 
 	// Refresh stats after each turn

@@ -168,6 +168,11 @@ function renderChatAction(
 	width: number,
 	sink: LineSink,
 ): void {
+	// Keep this affordance visually separate without adding a selectable state.
+	sink("");
+	sink(theme.fg("dim", "─".repeat(width)));
+	sink("");
+
 	const isCursor = state.isChatAction();
 	const prefix = isCursor ? theme.fg("accent", "> ") : "  ";
 	const color = isCursor ? "accent" : "muted";

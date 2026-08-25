@@ -57,6 +57,12 @@ export default function activityStripExtension(pi: ExtensionAPI): void {
 	}
 
 
+	pi.on("session_start", (_event, ctx) => {
+		rememberUi(ctx);
+		registerWidget();
+		paint();
+	});
+
 	pi.on("before_agent_start", (_event, ctx) => {
 		rememberUi(ctx);
 		state = startPrompt(Date.now());

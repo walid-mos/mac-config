@@ -52,12 +52,29 @@ export interface SingleAnswer extends AnswerBase {
 export interface MultiAnswer extends AnswerBase {
 	kind: "multi";
 	labels: string[];
+	/** Stable values of the selected options, in display order. */
+	optionValues: string[];
+	/** The committed free-text selection, when present. */
+	customText?: string;
 }
 
 export type Answer = SingleAnswer | MultiAnswer;
+
+/** Serializable questionnaire state used when returning from a chat pause. */
+export interface QuestionnaireInitialState {
+	answers: Answer[];
+	drafts?: Record<string, string>;
+}
+
+/** The current question and state needed to resume after chatting with the agent. */
+export interface QuestionnaireChatRequest {
+	question: Question;
+	initialState: QuestionnaireInitialState;
+}
 
 export interface AskResult {
 	questions: Question[];
 	answers: Answer[];
 	cancelled: boolean;
+	chat?: QuestionnaireChatRequest;
 }

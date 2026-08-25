@@ -25,7 +25,7 @@
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
-import type { Answer, AskResult, Question } from "./questionnaire-model";
+import type { Answer, AskResult, Question, QuestionnaireInitialState } from "./questionnaire-model";
 import { runQuestionnaire } from "./questionnaire-component";
 import { AskParams, normalizeQuestions } from "./schema";
 
@@ -43,6 +43,31 @@ function formatAnswerLine(qLabel: string, a: Answer): string {
 	if (a.kind === "multi" && a.labels.length > 1) return `${qLabel}: user selected multiple: ${a.labels.join(", ")}`;
 	const prefix = a.kind === "single" && a.index !== undefined ? `${a.index}. ` : "";
 	return `${qLabel}: user selected: ${prefix}${a.label}`;
+}
+
+function questionnaireKey(questions: Question[]): string {
+	return JSON.stringify(
+		questions.map((question) => ({
+			id: question.id,
+			label: question.label,
+			prompt: question.prompt,
+			options: question.options.map((option) => ({
+				value: option.value,
+				label: option.label,
+				description: option.description,
+				recommended: option.recommended,
+			})),
+			allowOther: question.allowOther,
+			multiSelect: question.multiSelect,
+		})),
+	);
+}
+
+function chatFollowUp(question: Question): string {
+	return [
+		`The user wants to chat about the question "${question.label}": ${question.prompt}`,
+		"Discuss it with the user. When they are ready to answer, call ask_user_question again with the same questionnaire to resume their saved responses.",
+	].join("\n");
 }
 
 /** Narrow surface actually read from the raw call args (renderCall runs on
@@ -71,6 +96,8 @@ function isAskResult(details: unknown): details is AskResult {
 }
 
 export default function askUserQuestion(pi: ExtensionAPI) {
+	const pendingResumeStates = new Map<string, QuestionnaireInitialState>();
+
 	pi.registerTool({
 		name: "ask_user_question",
 		label: "Ask User Question",
@@ -88,8 +115,24 @@ export default function askUserQuestion(pi: ExtensionAPI) {
 			}
 
 			const questions: Question[] = normalizeQuestions(params.questions);
-			const result = await runQuestionnaire((factory) => ctx.ui.custom(factory), questions);
+			const key = questionnaireKey(questions);
+			const result = await runQuestionnaire(
+				(factory) => ctx.ui.custom(factory),
+				questions,
+				pendingResumeStates.get(key),
+			);
 
+			if (result.chat) {
+				pendingResumeStates.set(key, result.chat.initialState);
+				await pi.sendUserMessage(chatFollowUp(result.chat.question), { deliverAs: "followUp" });
+				return {
+					content: [{ type: "text", text: "Chat paused" }],
+					details: result,
+					terminate: true,
+				};
+			}
+
+			pendingResumeStates.delete(key);
 			if (result.cancelled) {
 				return {
 					content: [{ type: "text", text: "User cancelled the question" }],
@@ -127,6 +170,9 @@ export default function askUserQuestion(pi: ExtensionAPI) {
 			}
 			if (details.cancelled) {
 				return new Text(theme.fg("warning", "Cancelled"), 0, 0);
+			}
+			if (details.chat) {
+				return new Text(theme.fg("muted", "Chat paused"), 0, 0);
 			}
 			const lines = details.answers.map((a) => {
 				if (a.wasCustom) {

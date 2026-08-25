@@ -104,6 +104,7 @@ function renderContent(
 		sink("");
 		if (state.isOpenEnded(q)) renderOpenEndedEditor(state, editor, theme, width, sink);
 		else renderOptions(state, q, editor, theme, width, sink);
+		renderChatAction(state, theme, width, sink);
 		return;
 	}
 	if (state.isOnSubmitTab()) renderSubmitScreen(state, questions, theme, width, sink);
@@ -161,6 +162,23 @@ function renderOptionRow(
 /** The "Type something." row: focused = the inline editor (keeping the
  * option's "N. [ ]" label as visual prefix so the row keeps the exact same
  * indentation as the others); unfocused = a static row with the typed text. */
+function renderChatAction(
+	state: QuestionnaireState,
+	theme: QuestionnairePalette,
+	width: number,
+	sink: LineSink,
+): void {
+	// Keep this affordance visually separate without adding a selectable state.
+	sink("");
+	sink(theme.fg("dim", "─".repeat(width)));
+	sink("");
+
+	const isCursor = state.isChatAction();
+	const prefix = isCursor ? theme.fg("accent", "> ") : "  ";
+	const color = isCursor ? "accent" : "muted";
+	pushWrappedWithPrefix(sink, prefix, theme.fg(color, "Chat about this (Ctrl+G)"), width);
+}
+
 function renderOtherRow(
 	state: QuestionnaireState,
 	editor: Editor,
@@ -251,15 +269,15 @@ function helpText(state: QuestionnaireState): string {
 	if (!q || state.isOnSubmitTab()) {
 		context = "Enter submit • Esc cancel";
 	} else if (state.isOpenEnded(q)) {
-		context = "Type your answer • Enter submit • Esc cancel";
+		context = "Type your answer • Enter submit • Ctrl+G chat • Esc cancel";
 	} else if (state.editorHasFocus()) {
 		context = q.multiSelect
-			? "Type your answer • Enter confirm all • ↑↓ leave the input • Esc back to options"
-			: "Type your answer • Enter submit • ↑↓ leave the input • Esc back to options";
+			? "Type your answer • Enter confirm all • Ctrl+G chat • ↑↓ leave the input • Esc back to options"
+			: "Type your answer • Enter submit • Ctrl+G chat • ↑↓ leave the input • Esc back to options";
 	} else if (q.multiSelect) {
-		context = "j/k or ↑↓ move • Space toggle • 1-9 quick toggle • Enter confirm • Esc cancel";
+		context = "j/k or ↑↓ move • Space toggle • 1-9 quick toggle • Enter confirm • Ctrl+G chat • Esc cancel";
 	} else {
-		context = "j/k or ↑↓ navigate • 1-9 quick select • Enter select • Esc cancel";
+		context = "j/k or ↑↓ navigate • 1-9 quick select • Enter select/chat • Ctrl+G chat • Esc cancel";
 	}
 	return navigation ? `${navigation} • ${context}` : context;
 }

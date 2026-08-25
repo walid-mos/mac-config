@@ -6,7 +6,7 @@
  */
 
 import { Editor, type EditorTheme, Key, matchesKey } from "@earendil-works/pi-tui";
-import type { AskResult, Question } from "./questionnaire-model";
+import type { AskResult, Question, QuestionnaireInitialState } from "./questionnaire-model";
 import type { QuestionnairePalette } from "./questionnaire-render";
 import { renderQuestionnaire } from "./questionnaire-render";
 import { type EditorPort, type QuestionnaireEffect, QuestionnaireState } from "./questionnaire-state";
@@ -54,6 +54,7 @@ function cursorOnLastRow(state: QuestionnaireState, editor: Editor): boolean {
 export function runQuestionnaire<TUi>(
 	custom: <T>(factory: CustomFactory<T>) => Promise<T>,
 	questions: Question[],
+	initialState?: QuestionnaireInitialState,
 ): Promise<AskResult> {
 	return custom<AskResult>((tui, theme, keybindings, done) => {
 		const editorTheme: EditorTheme = {
@@ -71,7 +72,7 @@ export function runQuestionnaire<TUi>(
 			getText: () => editor.getText(),
 			setText: (text) => editor.setText(text),
 		};
-		const state = new QuestionnaireState(questions, editorPort);
+		const state = new QuestionnaireState(questions, editorPort, initialState);
 
 		let cachedLines: string[] | undefined;
 		let cachedWidth: number | undefined;
@@ -86,10 +87,15 @@ export function runQuestionnaire<TUi>(
 			done({ questions, answers: state.collectedAnswers(), cancelled });
 		}
 
+		function finishChat(): void {
+			const chat = state.chatRequest();
+			if (chat) done({ questions, answers: state.collectedAnswers(), cancelled: false, chat });
+		}
+
 		function applyEffects(effects: QuestionnaireEffect[]): void {
 			for (const effect of effects) {
 				applyEffect(effect);
-				if (effect === "submit" || effect === "cancel") return; // terminal
+				if (effect === "submit" || effect === "cancel" || effect === "chat") return; // terminal
 			}
 		}
 
@@ -112,6 +118,9 @@ export function runQuestionnaire<TUi>(
 					return;
 				case "cancel":
 					finish(true);
+					return;
+				case "chat":
+					finishChat();
 					return;
 			}
 		}
@@ -139,7 +148,7 @@ export function runQuestionnaire<TUi>(
 				applyEffects(state.moveCursor(-1));
 				return;
 			}
-			if (q && !state.isOpenEnded(q) && matchesKey(data, Key.down) && cursorOnLastRow(state, editor)) {
+			if (q && matchesKey(data, Key.down) && cursorOnLastRow(state, editor)) {
 				applyEffects(state.moveCursor(1));
 				return;
 			}
@@ -175,7 +184,12 @@ export function runQuestionnaire<TUi>(
 				return;
 			}
 			if (matchesKey(data, Key.enter)) {
-				applyEffects(q.multiSelect ? state.commitMultiSelection(q) : state.selectOption(state.cursor));
+				const effects = state.isChatAction()
+					? state.requestChat()
+					: q.multiSelect
+						? state.commitMultiSelection(q)
+						: state.selectOption(state.cursor);
+				applyEffects(effects);
 				return;
 			}
 			if (matchesKey(data, Key.escape)) {
@@ -184,6 +198,11 @@ export function runQuestionnaire<TUi>(
 		}
 
 		function handleInput(data: string): void {
+			if (matchesKey(data, Key.ctrl("g"))) {
+				applyEffects(state.requestChat());
+				return;
+			}
+
 			// Editor focused (cursor on "Type something." or open-ended question):
 			// route everything to the always-visible editor, including digits.
 			if (state.editorHasFocus()) {

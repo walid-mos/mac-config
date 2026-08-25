@@ -1,10 +1,10 @@
 /**
- * Latte Footer — powerline-style footer matching Catppuccin Latte.
+ * Footer — powerline-style footer matching Catppuccin Latte.
  *
  * Line 1: [󰚩 model  thinking]  [ path   branch] ···· context bar + exact tokens · tokens · cost
  * Line 2: git status + PR #n · provider quotas (openai-codex 5h/weekly, kimi, openrouter, xai)
  *
- * Toggle with /latte-footer. Icons are configurable below (Nerd Font).
+ * Toggle with /footer. Icons are configurable below (Nerd Font).
  * Quotas are polled every 5 min using the OAuth tokens from ~/.pi/agent/auth.json.
  */
 
@@ -1087,14 +1087,14 @@ export default function (pi: ExtensionAPI) {
 	pi.on("thinking_level_select", async () => requestRenderSafely());
 	pi.on("model_select", async () => requestRenderSafely());
 
-	pi.registerCommand("latte-footer", {
-		description: "Toggle the Catppuccin Latte powerline footer",
+	pi.registerCommand("footer", {
+		description: "Toggle the powerline footer",
 		handler: async (_args, ctx) => {
 			enabled = !enabled;
 			if (enabled) {
 				footerInstalled = false;
 				setup(ctx);
-				ctx.ui.notify("Latte footer enabled", "info");
+				ctx.ui.notify("Footer enabled", "info");
 			} else {
 				ctx.ui.setFooter(undefined);
 				footerInstalled = false;

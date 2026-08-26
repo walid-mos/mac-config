@@ -1,11 +1,8 @@
 /**
- * Footer — powerline-style footer matching Catppuccin Latte.
+ * Footer — powerline footer in Catppuccin Mocha.
  *
- * Line 1: [󰚩 model  thinking]  [ path   branch] ···· context bar + exact tokens · tokens · cost
- * Line 2: git status + PR #n · provider quotas (openai-codex 5h/weekly, kimi, openrouter, xai)
- *
- * Toggle with /footer. Icons are configurable below (Nerd Font).
- * Quotas are polled every 5 min using the OAuth tokens from ~/.pi/agent/auth.json.
+ * Line 1: [󰚩 model  thinking]   path │····· statuses │ context gauge │ arrows │ cost
+ * Line 2:  branch │ slim churn bar + counters + PR #n │····· provider quotas
  */
 
 import type { AssistantMessage } from "@earendil-works/pi-ai";
@@ -25,21 +22,23 @@ import { Buffer } from "node:buffer";
 
 const execFileAsync = promisify(execFile);
 
-// ── Catppuccin Latte palette ──────────────────────────────────────────
-const LATTE = {
-	mauve: "#8839ef",
-	blue: "#1e66f5",
-	sapphire: "#209fb5",
-	teal: "#179299",
-	green: "#40a02b",
-	yellow: "#df8e1d",
-	peach: "#fe640b",
-	red: "#d20f39",
-	base: "#eff1f5", // light pill text
-	text: "#4c4f69", // dark text — readable on pale pastels
-	surface1: "#bcc0cc",
-	subtext0: "#6c6f85",
-	overlay1: "#8c8fa1",
+// ── Catppuccin Mocha palette ──────────────────────────────────────────
+const MOCHA = {
+	mauve: "#cba6f7",
+	lavender: "#b4befe",
+	blue: "#89b4fa",
+	sapphire: "#74c7ec",
+	teal: "#94e2d5",
+	green: "#a6e3a1",
+	yellow: "#f9e2af",
+	peach: "#fab387",
+	red: "#f38ba8",
+	light: "#cdd6f4", // light text on dim fills
+	dark: "#11111b", // crust — dark text on luminous accent fills
+	surface0: "#45475a",
+	surface1: "#585b70",
+	subtext0: "#a6adc8",
+	overlay1: "#7f849c",
 };
 
 // ── Config ────────────────────────────────────────────────────────────
@@ -64,13 +63,13 @@ const PR_POLL_MS = 30_000;
 const AUTH_PATH = `${homedir()}/.pi/agent/auth.json`;
 
 const THINKING_COLORS: Record<string, string> = {
-	off: LATTE.overlay1,
-	minimal: LATTE.subtext0,
-	low: LATTE.sapphire,
-	medium: LATTE.blue,
-	high: LATTE.mauve,
-	xhigh: LATTE.peach,
-	max: LATTE.red,
+	off: MOCHA.overlay1,
+	minimal: MOCHA.subtext0,
+	low: MOCHA.sapphire,
+	medium: MOCHA.blue,
+	high: MOCHA.mauve,
+	xhigh: MOCHA.peach,
+	max: MOCHA.red,
 };
 
 // ── ANSI helpers (24-bit) ─────────────────────────────────────────────
@@ -119,7 +118,7 @@ function rgb(hex: string): [number, number, number] {
 	const r = parseInt(hex.slice(1, 3), 16);
 	const g = parseInt(hex.slice(3, 5), 16);
 	const b = parseInt(hex.slice(5, 7), 16);
-	if (![r, g, b].every((n) => Number.isFinite(n))) return [108, 111, 133]; // LATTE.subtext0 fallback
+	if (![r, g, b].every((n) => Number.isFinite(n))) return [108, 111, 133]; // MOCHA.subtext0 fallback
 	return [r, g, b];
 }
 
@@ -164,13 +163,13 @@ function relativeLuminance(hex: string): number {
 
 /** Pick dark text on pale pastels, light text on saturated fills. */
 function readableOn(bg: string): string {
-	return relativeLuminance(bg) > 0.35 ? LATTE.text : LATTE.base;
+	return relativeLuminance(bg) > 0.35 ? MOCHA.dark : MOCHA.light;
 }
 
 const SEP_THIN = "\u2502"; // │ quiet vertical separator between data groups
 
 function thinSep(): string {
-	return fgHex(LATTE.surface1, SEP_THIN);
+	return fgHex(MOCHA.surface1, SEP_THIN);
 }
 
 /** Compress a shortened path to its head and last two components: ~/…/ui/extensions */
@@ -225,10 +224,10 @@ function shortPath(cwd: string): string {
  * Anchors: 100% green → 60% yellow → 40% peach → 20% red (held below).
  */
 const QUOTA_STOPS: [number, string][] = [
-	[1.0, LATTE.green],
-	[0.6, LATTE.yellow],
-	[0.4, LATTE.peach],
-	[0.2, LATTE.red],
+	[1.0, MOCHA.green],
+	[0.6, MOCHA.yellow],
+	[0.4, MOCHA.peach],
+	[0.2, MOCHA.red],
 ];
 
 function lerpChannel(a: number, b: number, t: number): number {
@@ -236,7 +235,7 @@ function lerpChannel(a: number, b: number, t: number): number {
 }
 
 function quotaColor(remaining: number, limit: number): string {
-	if (!Number.isFinite(remaining) || !Number.isFinite(limit) || limit <= 0) return LATTE.subtext0;
+	if (!Number.isFinite(remaining) || !Number.isFinite(limit) || limit <= 0) return MOCHA.subtext0;
 	const r = Math.max(0, Math.min(1, remaining / limit));
 
 	// Find bracketing stops (stops are sorted high → low)
@@ -262,10 +261,10 @@ function quotaColor(remaining: number, limit: number): string {
 
 /** Color for credit balance (no limit to compare against): thresholds in $. */
 function balanceColor(balance: number): string {
-	if (balance >= 10) return LATTE.green;
-	if (balance >= 5) return LATTE.yellow;
-	if (balance >= 2) return LATTE.peach;
-	return LATTE.red;
+	if (balance >= 10) return MOCHA.green;
+	if (balance >= 5) return MOCHA.yellow;
+	if (balance >= 2) return MOCHA.peach;
+	return MOCHA.red;
 }
 
 /** Circle fraction dial by remaining ratio (visually distinct from context bar). */
@@ -280,7 +279,7 @@ function quotaDial(ratio: number): string {
 /** Dial + colored percentage of remaining quota. */
 function quotaGauge(remaining: number, limit: number): string {
 	if (!Number.isFinite(remaining) || !Number.isFinite(limit) || limit <= 0) {
-		return fgHex(LATTE.subtext0, "—");
+		return fgHex(MOCHA.subtext0, "—");
 	}
 	// At hard zero remaining, still show 0% (not NaN / broken ANSI).
 	const ratio = Math.max(0, Math.min(1, remaining / limit));
@@ -695,62 +694,25 @@ async function fetchGitStatus(cwd: string): Promise<GitStatus | null> {
 	}
 }
 
-const GIT_BAR_WIDTH = 10;
+const GIT_BAR_WIDTH = 6;
 
-/** Block glyph for a 0–1 fill ratio within one cell. "" when empty. */
-function ratioGlyph(ratio: number): string {
-	if (ratio <= 0) return "";
-	if (ratio <= 0.125) return "▁";
-	if (ratio <= 0.25) return "▂";
-	if (ratio <= 0.375) return "▃";
-	if (ratio <= 0.5) return "▄";
-	if (ratio <= 0.625) return "▅";
-	if (ratio <= 0.75) return "▆";
-	if (ratio <= 0.875) return "▇";
-	return "█";
+/** Rounded slim pill filled by working-tree churn, tinted by severity. */
+function gitSlimBar(total: number, color: string): string {
+	const filled = Math.max(1, Math.min(GIT_BAR_WIDTH, Math.round((total / 12) * GIT_BAR_WIDTH)));
+	return (
+		fgHex(color, PILL_LEFT) +
+		fgHex(color, BAR_FULL.repeat(filled)) +
+		fgHex(MOCHA.surface0, BAR_EMPTY.repeat(GIT_BAR_WIDTH - filled)) +
+		fgHex(color, PILL_RIGHT)
+	);
 }
 
-/** Proportional ascii bar of the working tree: each change type gets a colored share. */
-function gitBar(s: GitStatus): string {
-	const frame = (inner: string) =>
-		fgHex(LATTE.subtext0, "▕") + inner + fgHex(LATTE.subtext0, "▏");
-	const cats: { count: number; color: string }[] = [
-		{ count: s.staged, color: LATTE.green },
-		{ count: s.modified, color: LATTE.yellow },
-		{ count: s.deleted, color: LATTE.red },
-		{ count: s.untracked, color: LATTE.overlay1 },
-	];
-	const total = cats.reduce((acc, c) => acc + c.count, 0);
-	if (total === 0) return frame(fgHex(LATTE.surface1, BAR_EMPTY.repeat(GIT_BAR_WIDTH)));
-
-	// Split the width proportionally (largest remainder), keeping a fractional
-	// leftover so the bar always spans the full width via one partial glyph.
-	const exact = cats.map((c) => (c.count / total) * GIT_BAR_WIDTH);
-	const floors = exact.map(Math.floor);
-	let used = floors.reduce((a, b) => a + b, 0);
-	const byRemainder = cats
-		.map((c, i) => ({ i, rem: exact[i]! - floors[i]! }))
-		.filter((r) => cats[r.i]!.count > 0)
-		.sort((a, b) => b.rem - a.rem);
-	for (const r of byRemainder) {
-		if (used >= GIT_BAR_WIDTH) break;
-		floors[r.i]!++;
-		used++;
-	}
-	let bar = "";
-	let partialColor: string | undefined;
-	let partialRatio = 0;
-	for (let i = 0; i < cats.length; i++) {
-		if (cats[i]!.count === 0) continue;
-		bar += fgHex(cats[i]!.color, BAR_FULL.repeat(floors[i]!));
-		const frac = exact[i]! - Math.floor(exact[i]!);
-		if (frac > 0.05) {
-			partialColor = cats[i]!.color;
-			partialRatio = frac;
-		}
-	}
-	if (partialColor) bar += fgHex(partialColor, ratioGlyph(partialRatio));
-	return frame(bar);
+/** Churn severity: deletions > edits > staged work > untracked noise. */
+function churnColor(s: GitStatus): string {
+	if (s.deleted > 0) return MOCHA.red;
+	if (s.modified > 0) return MOCHA.yellow;
+	if (s.staged > 0) return MOCHA.green;
+	return MOCHA.sapphire;
 }
 
 function readSafely<T>(read: () => T, fallback: T): T {
@@ -767,24 +729,43 @@ function clampFooterLines(lines: string[], width: number): string[] {
 	);
 }
 
-/** Left side of line 2: ascii-style git summary with proportional bar + counters. */
-function gitLine(s: GitStatus | null): string {
-	const dim = (t: string) => fgHex(LATTE.subtext0, t);
-	if (s === null) return `${dim("git")} ${dim("—")}`;
+/** Line 2 left: branch │ slim churn bar + counters (+ PR link appended later). */
+function gitLine(s: GitStatus | null, branch?: string): string {
+	const dim = (t: string) => fgHex(MOCHA.subtext0, t);
+	const groups: string[] = [];
+
+	if (branch) {
+		groups.push(
+			`${fgHex(MOCHA.lavender, ICONS.branch)} ${fgHex(MOCHA.lavender, clampText(branch, 28))}`,
+		);
+	}
+
+	if (s === null) {
+		groups.push(dim("no git"));
+		return groups.join(` ${thinSep()} `);
+	}
+
 	const clean =
 		s.staged + s.modified + s.deleted + s.untracked + s.stash + s.ahead + s.behind === 0;
-	if (clean) return `${dim("git")} ${fgHex(LATTE.green, "✓")}${dim(" clean")}`;
-	const counters: string[] = [];
-	if (s.ahead > 0) counters.push(fgHex(LATTE.mauve, `⇡${s.ahead}`));
-	if (s.behind > 0) counters.push(fgHex(LATTE.mauve, `⇣${s.behind}`));
-	if (s.staged > 0) counters.push(fgHex(LATTE.green, `+${s.staged}`));
-	if (s.modified > 0) counters.push(fgHex(LATTE.yellow, `~${s.modified}`));
-	if (s.deleted > 0) counters.push(fgHex(LATTE.red, `-${s.deleted}`));
-	if (s.untracked > 0) counters.push(fgHex(LATTE.overlay1, `?${s.untracked}`));
-	if (s.stash > 0) counters.push(fgHex(LATTE.sapphire, `≡${s.stash}`));
-	return `${dim("git")} ${gitBar(s)} ${counters.join(` ${dim("·")} `)}`;
-}
+	if (clean) {
+		groups.push(`${fgHex(MOCHA.green, "\u2713")}${dim(" clean")}`);
+		return groups.join(` ${thinSep()} `);
+	}
 
+	const counters: string[] = [];
+	if (s.ahead > 0) counters.push(fgHex(MOCHA.mauve, `\u21d1${s.ahead}`));
+	if (s.behind > 0) counters.push(fgHex(MOCHA.mauve, `\u21d3${s.behind}`));
+	if (s.staged > 0) counters.push(fgHex(MOCHA.green, `\u271a${s.staged}`));
+	if (s.modified > 0) counters.push(fgHex(MOCHA.yellow, `~${s.modified}`));
+	if (s.deleted > 0) counters.push(fgHex(MOCHA.red, `-${s.deleted}`));
+	if (s.untracked > 0) counters.push(fgHex(MOCHA.overlay1, `?${s.untracked}`));
+	if (s.stash > 0) counters.push(fgHex(MOCHA.sapphire, `\u2691${s.stash}`));
+
+	groups.push(gitSlimBar(s.staged + s.modified + s.deleted + s.untracked, churnColor(s)));
+	groups.push(counters.join(` ${dim("\u00b7")} `));
+
+	return groups.join(` ${thinSep()} `);
+}
 // ── Current GitHub PR ───────────────────────────────────────────────
 type GitPr = { number: number; url: string };
 
@@ -818,7 +799,7 @@ async function fetchCurrentPr(cwd: string): Promise<GitPr | null> {
 /** Clickable `PR #n` (OSC 8). Empty when no PR is cached. */
 function prLink(pr: GitPr | null): string {
 	if (!pr) return "";
-	return hyperlink(fgHex(LATTE.blue, `PR #${pr.number}`), pr.url);
+	return hyperlink(fgHex(MOCHA.blue, `PR #${pr.number}`), pr.url);
 }
 
 function usageWindowPart(window: UsageWindow, dim: (s: string) => string): string {
@@ -829,7 +810,7 @@ function usageWindowPart(window: UsageWindow, dim: (s: string) => string): strin
 
 function openaiQuotaPart(quota: OpenAIQuota, dim: (s: string) => string): string {
 	const head = quota.plan
-		? `${dim("openai")} ${fgHex(LATTE.mauve, quota.plan)}`
+		? `${dim("openai")} ${fgHex(MOCHA.mauve, quota.plan)}`
 		: dim("openai");
 	const extras = quota.windows.map((window) => usageWindowPart(window, dim));
 	if (quota.credits !== undefined) {
@@ -839,15 +820,13 @@ function openaiQuotaPart(quota: OpenAIQuota, dim: (s: string) => string): string
 	if (quota.resets !== undefined) {
 		extras.push(dim(`${quota.resets} reset${quota.resets > 1 ? "s" : ""}`));
 	}
-	if (extras.length === 0) return `${head} ${fgHex(LATTE.subtext0, "—")}`;
+	if (extras.length === 0) return `${head} ${fgHex(MOCHA.subtext0, "—")}`;
 	return `${head} ${extras.join(` ${thinSep()} `)}`;
 }
 
-function gitWithPr(status: GitStatus | null, pr: GitPr | null): string {
-	const git = gitLine(status);
-	const link = prLink(pr);
-	if (!link) return git;
-	return `${git} ${fgHex(LATTE.subtext0, "·")} ${link}`;
+function gitWithPr(status: GitStatus | null, pr: GitPr | null, branch?: string): string {
+	const groups = [gitLine(status, branch), prLink(pr)].filter(Boolean);
+	return groups.join(` ${thinSep()} `);
 }
 
 // ── Pure footer rendering (no IO — exported for tests) ───────────────
@@ -880,26 +859,26 @@ function justifyLine(left: string, right: string, width: number): string {
 
 /** Quiet flat metadata: colored icon + muted label. */
 function meta(icon: string, iconColor: string, label: string): string {
-	return `${fgHex(iconColor, icon)} ${fgHex(LATTE.subtext0, label)}`;
+	return `${fgHex(iconColor, icon)} ${fgHex(MOCHA.subtext0, label)}`;
 }
 
 function contextGroup(usage: FooterUsage, exactTokens: boolean): string {
 	const pct = Math.round(usage.percent);
 	const filled = Math.round((usage.percent / 100) * BAR_WIDTH);
 	const barColor =
-		usage.percent < 50 ? LATTE.green : usage.percent < 80 ? LATTE.peach : LATTE.red;
+		usage.percent < 50 ? MOCHA.green : usage.percent < 80 ? MOCHA.peach : MOCHA.red;
 	const bar =
 		fgHex(barColor, BAR_FULL.repeat(filled)) +
-		fgHex(LATTE.surface1, BAR_EMPTY.repeat(BAR_WIDTH - filled));
+		fgHex(MOCHA.surface1, BAR_EMPTY.repeat(BAR_WIDTH - filled));
 	const exact =
 		exactTokens && usage.tokens != null && usage.contextWindow != null
-			? ` ${fgHex(LATTE.overlay1, `${fmtTokens(usage.tokens)}/${fmtTokens(usage.contextWindow)}`)}`
+			? ` ${fgHex(MOCHA.overlay1, `${fmtTokens(usage.tokens)}/${fmtTokens(usage.contextWindow)}`)}`
 			: "";
-	return `${fgHex(LATTE.overlay1, ICONS.context)} ${bar} ${fgHex(barColor, `${pct}%`)}${exact}`;
+	return `${fgHex(MOCHA.overlay1, ICONS.context)} ${bar} ${fgHex(barColor, `${pct}%`)}${exact}`;
 }
 
 function providerQuotaParts(quotas: QuotaCache, provider: string | undefined, compact = false): string[] {
-	const dim = (s: string) => fgHex(LATTE.subtext0, s);
+	const dim = (s: string) => fgHex(MOCHA.subtext0, s);
 	const p = (provider ?? "").toLowerCase();
 	const showXai = p.includes("xai");
 	const showKimi = p.includes("kimi");
@@ -941,7 +920,7 @@ function providerQuotaParts(quotas: QuotaCache, provider: string | undefined, co
 	if (quotas.xai && (showXai || showAll)) {
 		const x = quotas.xai;
 		let bits: string[] = [];
-		if (x.tier) bits.push(fgHex(LATTE.mauve, x.tier));
+		if (x.tier) bits.push(fgHex(MOCHA.mauve, x.tier));
 		if (x.monthly && x.monthly.limit > 0 && x.pool?.label !== "mois") {
 			const remaining = x.monthly.limit - x.monthly.used;
 			let m = `${dim("mois")} ${quotaGauge(remaining, x.monthly.limit)}`;
@@ -973,46 +952,36 @@ export function renderFooterLines(input: FooterRenderInput): string[] {
 
 	// ── Line 1 left: hero pill (model + thinking), never degraded ──
 	const modelGroup = powerline([
-		{ bg: LATTE.mauve, label: input.model, icon: ICONS.model },
+		{ bg: MOCHA.mauve, label: input.model, icon: ICONS.model },
 		{
-			bg: THINKING_COLORS[input.thinkingLevel] ?? LATTE.overlay1,
+			bg: THINKING_COLORS[input.thinkingLevel] ?? MOCHA.overlay1,
 			label: input.thinkingLevel,
 			icon: ICONS.thinking,
 		},
 	]);
 
 	const arrowsGroup = fgHex(
-		LATTE.subtext0,
+		MOCHA.subtext0,
 		`\u2191${fmtTokens(input.tokens.input)} \u2193${fmtTokens(input.tokens.output)}`,
 	);
-	const costGroup = fgHex(LATTE.overlay1, `$${input.tokens.cost.toFixed(3)}`);
+	const costGroup = fgHex(MOCHA.overlay1, `$${input.tokens.cost.toFixed(3)}`);
 
-	type Variant = {
-		pathMax: number;
-		branchMax: number;
-		exactTokens: boolean;
-		hideMeta?: boolean;
-		hideArrows?: boolean;
-	};
+	type Variant = { pathMax: number; exactTokens: boolean; hideMeta?: boolean; hideArrows?: boolean };
 	// Progressive degradation: shrink quiet meta first, then drop exact tokens,
 	// then hide the meta block entirely, finally drop the arrow token counts
 	// (the hero pill, context gauge and cost are never dropped).
 	const variants: Variant[] = [
-		{ pathMax: 34, branchMax: 32, exactTokens: true },
-		{ pathMax: 22, branchMax: 20, exactTokens: true },
-		{ pathMax: 18, branchMax: 14, exactTokens: false },
-		{ pathMax: 18, branchMax: 14, exactTokens: false, hideMeta: true },
-		{ pathMax: 18, branchMax: 14, exactTokens: false, hideMeta: true, hideArrows: true },
+		{ pathMax: 34, exactTokens: true },
+		{ pathMax: 22, exactTokens: true },
+		{ pathMax: 18, exactTokens: false },
+		{ pathMax: 18, exactTokens: false, hideMeta: true },
+		{ pathMax: 18, exactTokens: false, hideMeta: true, hideArrows: true },
 	];
 
 	const buildLine1 = (v: Variant): { left: string; right: string } => {
 		let left = modelGroup;
 		if (!v.hideMeta) {
-			const metaBits = [meta(ICONS.folder, LATTE.teal, compactPath(input.cwd, v.pathMax))];
-			if (input.branch) {
-				metaBits.push(meta(ICONS.branch, LATTE.sapphire, clampText(input.branch, v.branchMax)));
-			}
-			left = `${modelGroup}  ${metaBits.join(` ${thinSep()} `)}`;
+			left = `${modelGroup}  ${meta(ICONS.folder, MOCHA.teal, compactPath(input.cwd, v.pathMax))}`;
 		}
 
 		const rightGroups: string[] = [];
@@ -1043,7 +1012,7 @@ export function renderFooterLines(input: FooterRenderInput): string[] {
 	const lines = [line1];
 
 	// ── Line 2 left: git bar + counters (+ PR link) │ right: provider quotas ──
-	const gitPart = gitWithPr(input.git, input.pr);
+	const gitPart = gitWithPr(input.git, input.pr, input.branch);
 	let quotaParts = providerQuotaParts(input.quotas, input.provider);
 	if (visibleWidth(gitPart) + visibleWidth(quotaContent(quotaParts)) + 2 > width) {
 		quotaParts = providerQuotaParts(input.quotas, input.provider, true);
@@ -1056,7 +1025,7 @@ export function renderFooterLines(input: FooterRenderInput): string[] {
 
 function quotaContent(parts: string[]): string {
 	if (parts.length === 0) return "";
-	return `${fgHex(LATTE.overlay1, ICONS.quota)} ${parts.join(` ${thinSep()} `)}`;
+	return `${fgHex(MOCHA.overlay1, ICONS.quota)} ${parts.join(` ${thinSep()} `)}`;
 }
 
 

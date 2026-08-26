@@ -51,11 +51,12 @@ test("keeps the hero pill, context gauge and cost at every width", () => {
 	}
 });
 
-test("shows path and branch with thin separators when there is room", () => {
-	const [line1] = renderFooterLines(sample({ width: 170 })).map((l) => l.replace(STRIP_ANSI, ""));
-	assert.ok(line1?.includes(".stow_repository"), "full path expected on a wide terminal");
-	assert.ok(line1?.includes("feat/unified-surface"));
-	assert.ok(line1?.includes("\u2502"), "thin separator expected");
+test("keeps the full path on line 1 and moves the branch to the git line", () => {
+	const lines = renderFooterLines(sample({ width: 170 })).map((l) => l.replace(STRIP_ANSI, ""));
+	assert.ok(lines[0]?.includes(".stow_repository"), "full path expected on a wide terminal");
+	assert.equal(lines[0]?.includes("feat/unified-surface"), false, "branch must not sit on line 1");
+	assert.ok(lines[1]?.includes("feat/unified-surface"), "branch expected on the git line");
+	assert.ok(lines[0]?.includes("\u2502"), "thin separator expected");
 });
 
 test("degrades by hiding meta before ever leaking raw escape fragments", () => {

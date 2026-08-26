@@ -1,16 +1,10 @@
 import type { ExtensionUIContext, Theme } from "@earendil-works/pi-coding-agent";
 import type { TUI } from "@earendil-works/pi-tui";
-import {
-	getSurfacePreferences,
-	subscribeSurfaceChanges,
-	surfaceRegistry,
-	type SurfacePlacement,
-} from "./surface.ts";
+import { subscribeSurfaceChanges, surfaceRegistry, type SurfacePlacement } from "./surface.ts";
 
 const HOST_WIDGET_IDS: Record<SurfacePlacement, string> = {
 	aboveEditor: "ordered-above-editor",
 	belowEditor: "ordered-below-editor",
-	footer: "ordered-footer",
 };
 
 export const ABOVE_EDITOR_PRIORITY = {
@@ -21,7 +15,6 @@ export const ABOVE_EDITOR_PRIORITY = {
 
 export type OrderedWidgetEntry = {
 	priority: number;
-	active?: boolean;
 	render: (width: number, theme: Theme) => string[];
 };
 
@@ -29,13 +22,13 @@ type MountedHost = {
 	component: OrderedWidgetHost;
 };
 
-type WidgetPlacement = Exclude<SurfacePlacement, "footer">;
+type WidgetPlacement = SurfacePlacement;
 
 const mountedHosts = new Map<WidgetPlacement, MountedHost>();
 const surfaceEntriesByPlacement = new Map<WidgetPlacement, Map<string, () => void>>();
 
 export function orderedWidgetLines(width: number, theme: Theme): string[] {
-	return surfaceRegistry.render("aboveEditor", width, theme, getSurfacePreferences());
+	return surfaceRegistry.render("aboveEditor", width, theme);
 }
 
 class OrderedWidgetHost {
@@ -50,7 +43,7 @@ class OrderedWidgetHost {
 	}
 
 	render(width: number): string[] {
-		return surfaceRegistry.render(this.placement, width, this.theme, getSurfacePreferences());
+		return surfaceRegistry.render(this.placement, width, this.theme);
 	}
 
 	invalidate(): void {}
@@ -90,7 +83,6 @@ export function setOrderedSurfaceWidget(
 		id: key,
 		placement,
 		priority: entry.priority,
-		active: entry.active,
 		render: ({ width, theme }) => (theme === undefined ? [] : entry.render(width, theme)),
 	});
 	handles.set(key, unregister);

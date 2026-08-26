@@ -292,7 +292,6 @@ function renderWidget(
 			id,
 			{
 				priority: 100,
-				active: snapshot?.status === "active",
 				render: () => value,
 			},
 			"belowEditor",

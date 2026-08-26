@@ -11,11 +11,6 @@
   "enableInstallTelemetry": false,
   "defaultProjectTrust": "ask",
   "theme": "catppuccin-latte",
-  "surface": {
-    "version": 1,
-    "mode": "auto",
-    "preset": "default"
-  },
   "tuiMode": "fullscreen",
   "skills": [
     "~/.pi/agent/external/skills"

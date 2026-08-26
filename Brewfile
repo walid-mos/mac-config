@@ -57,6 +57,6 @@ cask "obsidian"
 cask "iina"
 cask "kitlangton-hex"
 
-# Fonts (vault Obsidian — obsidian-post les vérifie aussi)
+# Fonts (vault Obsidian)
 cask "font-ia-writer-quattro"
 cask "font-inter"

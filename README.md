@@ -13,7 +13,7 @@ Two invariants carry all the knowledge:
 
 **`pi/` package**: `make pi` stows `~/.pi/agent/settings.json`, `make pi-post` installs the CLI (`pnpm add -g @earendil-works/pi-coding-agent`) if missing. Auth happens on first launch (`pi` then `/login`) and lives in `~/.pi/agent/auth.json`, never versioned. pi writes through the symlink when a setting changes via `/settings`: the diff shows up directly in the repo — review before committing.
 
-**`obsidian/` package**: the vault stays in iCloud (`~/Library/Mobile Documents/iCloud~md~obsidian/Documents/Brain`); only its `.obsidian` config is stowed — custom target, hence `make obsidian` (relative symlinks, portable across machines). Unversioned binaries (AnuPpuccin theme, community plugins, fonts) are installed by `make obsidian-post`. If Obsidian replaces a symlink with a real file when saving its settings, `make obsidian-save` (`stow --adopt`) re-adopts the file into the repo — review the `git diff` then commit.
+**`obsidian/` package**: the vault stays in iCloud (`~/Library/Mobile Documents/iCloud~md~obsidian/Documents/Brain`); only its `.obsidian` config is stowed — custom target, hence `make obsidian` (relative symlinks, portable across machines). Unversioned binaries (AnuPpuccin theme, community plugins) live as real files in the vault: iCloud syncs them across machines and Obsidian natively re-installs missing plugins on first launch; system fonts come from the Brewfile. If Obsidian replaces a symlink with a real file when saving its settings, `make obsidian-save` (`stow --adopt`) re-adopts the file into the repo — review the `git diff` then commit.
 
 ## Bootstrapping a new machine
 
@@ -57,7 +57,6 @@ Hand-curated list of a fresh mac's packages (34 → selection). **Do not regener
 | `make unstow`     | Removes all symlinks                                                  |
 | `make obsidian`   | Stows the `.obsidian` config into the Brain vault (custom iCloud target) |
 | `make obsidian-save` | `stow --adopt`: re-adopts files Obsidian de-symlinked               |
-| `make obsidian-post` | Installs AnuPpuccin theme, community plugins and fonts             |
 | `make help`       | Shows help                                                            |
 
 ## Conventions

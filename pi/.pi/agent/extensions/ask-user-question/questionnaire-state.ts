@@ -36,6 +36,10 @@ export class QuestionnaireState {
 	private readonly answers = new Map<string, Answer>();
 	private readonly multiSelections = new Map<string, Set<number>>();
 	private readonly drafts = new Map<string, string>();
+	/** Set by submitEditorText: the TUI Editor clears its buffer BEFORE calling
+	 * onSubmit, so the empty buffer seen by the auto-advance's saveDraft must not
+	 * be treated as "the user erased the draft". Consumed once. */
+	private skipNextDraftSave = false;
 
 	constructor(
 		private readonly questions: Question[],
@@ -188,9 +192,13 @@ export class QuestionnaireState {
 		const q = this.currentQuestion();
 		if (!q) return NO_EFFECT;
 		const text = submittedValue.trim();
+		// The Editor already cleared its buffer: the next saveDraft (auto-advance)
+		// would otherwise wipe the draft we are about to record.
+		this.skipNextDraftSave = true;
 
 		if (this.isOpenEnded(q)) {
 			const answer = text || UI_TEXT.noResponse;
+			if (text) this.drafts.set(q.id, text);
 			this.answers.set(q.id, { kind: "single", id: q.id, value: answer, label: answer, wasCustom: true });
 			return ["advance"];
 		}
@@ -353,6 +361,10 @@ export class QuestionnaireState {
 	}
 
 	private saveDraft(questionId: string): void {
+		if (this.skipNextDraftSave) {
+			this.skipNextDraftSave = false;
+			return;
+		}
 		const text = this.typedText();
 		if (text) this.drafts.set(questionId, text);
 		else this.drafts.delete(questionId); // keeps the row static again

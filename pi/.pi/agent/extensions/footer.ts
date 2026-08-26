@@ -759,13 +759,17 @@ function prLink(pr: GitPr | null): string {
 }
 
 
+function usageWindowPart(window: UsageWindow, dim: (s: string) => string): string {
+	const remaining = 100 - window.usedPercent;
+	const reset = window.reset ? ` ${dim(`${ICONS.reset} ${fmtReset(window.reset)}`)}` : "";
+	return `${dim(window.label)} ${quotaGauge(remaining, 100)}${reset}`;
+}
+
 function openaiQuotaPart(quota: OpenAIQuota, dim: (s: string) => string): string {
-	const identity = quota.plan ? `openai\u00b7${quota.plan}` : "openai";
-	const extras = quota.windows.map((window, index) => {
-		const label = index === 0 ? identity : window.label;
-		const reset = window.reset ? ` ${dim(`${ICONS.reset} ${fmtReset(window.reset)}`)}` : "";
-		return `${quotaGauge(100 - window.usedPercent, 100)}${label ? ` ${dim(label)}` : ""}${reset}`;
-	});
+	const head = quota.plan
+		? `${dim("openai")} ${fgHex(LATTE.mauve, quota.plan)}`
+		: dim("openai");
+	const extras = quota.windows.map((window) => usageWindowPart(window, dim));
 	if (quota.credits !== undefined) {
 		const col = balanceColor(quota.credits);
 		extras.push(`${fgHex(col, "◉")} ${fgHex(col, `$${quota.credits.toFixed(2)}`)} ${dim("crédits")}`);
@@ -773,8 +777,8 @@ function openaiQuotaPart(quota: OpenAIQuota, dim: (s: string) => string): string
 	if (quota.resets !== undefined) {
 		extras.push(dim(`${quota.resets} reset${quota.resets > 1 ? "s" : ""}`));
 	}
-	if (extras.length === 0) return `${dim(identity)} ${fgHex(LATTE.subtext0, "—")}`;
-	return extras.join(` ${thinSep()} `);
+	if (extras.length === 0) return `${head} ${fgHex(LATTE.subtext0, "—")}`;
+	return `${head} ${extras.join(` ${thinSep()} `)}`;
 }
 
 function gitWithPr(status: GitStatus | null, pr: GitPr | null, branch?: string): string {
@@ -843,12 +847,12 @@ function providerQuotaParts(quotas: QuotaCache, provider: string | undefined, co
 
 	if (quotas.kimi && (showKimi || showAll)) {
 		const { fiveHour, weekly } = quotas.kimi;
-		let part = `${quotaGauge(fiveHour.remaining, fiveHour.limit)} ${dim("kimi\u00b75h")}`;
+		let part = `${dim("kimi")} ${dim("5h")} ${quotaGauge(fiveHour.remaining, fiveHour.limit)}`;
 		if (!compact && fiveHour.reset) {
 			part += ` ${dim(`${ICONS.reset} ${fmtReset(fiveHour.reset)}`)}`;
 		}
 		if (Number.isFinite(weekly.limit) && weekly.limit > 0) {
-			part += ` ${thinSep()} ${quotaGauge(weekly.remaining, weekly.limit)} ${dim("sem")}`;
+			part += ` ${thinSep()} ${dim("sem")} ${quotaGauge(weekly.remaining, weekly.limit)}`;
 			if (!compact && weekly.reset) {
 				part += ` ${dim(`${ICONS.reset} ${fmtReset(weekly.reset)}`)}`;
 			}
@@ -859,9 +863,9 @@ function providerQuotaParts(quotas: QuotaCache, provider: string | undefined, co
 	if (quotas.openrouter && (showOr || showAll)) {
 		const orq = quotas.openrouter;
 		const col = balanceColor(orq.balance);
-		let part = `${fgHex(col, "\u25c9")} ${fgHex(col, `$${orq.balance.toFixed(2)}`)} ${dim("openrouter")}`;
+		let part = `${dim("openrouter")} ${fgHex(col, "\u25c9")} ${fgHex(col, `$${orq.balance.toFixed(2)}`)}`;
 		if (orq.weekly && !compact) {
-			part += ` ${thinSep()} ${quotaGauge(orq.weekly.remaining, orq.weekly.limit)} ${dim("hebdo")}`;
+			part += ` ${thinSep()} ${dim("hebdo")} ${quotaGauge(orq.weekly.remaining, orq.weekly.limit)}`;
 		}
 		parts.push(part);
 	}
@@ -872,20 +876,11 @@ function providerQuotaParts(quotas: QuotaCache, provider: string | undefined, co
 
 	if (quotas.xai && (showXai || showAll)) {
 		const x = quotas.xai;
-		const identity = x.tier ? `xai\u00b7${x.tier}` : "xai";
-		let identitySpent = false;
-		/** First group carries the provider identity, later groups keep their own label. */
-		const tag = (fallback: string): string => {
-			if (!identitySpent) {
-				identitySpent = true;
-				return identity;
-			}
-			return fallback;
-		};
-		const bits: string[] = [];
+		let bits: string[] = [];
+		if (x.tier) bits.push(fgHex(LATTE.mauve, x.tier));
 		if (x.monthly && x.monthly.limit > 0 && x.pool?.label !== "mois") {
 			const remaining = x.monthly.limit - x.monthly.used;
-			let m = `${quotaGauge(remaining, x.monthly.limit)} ${dim(tag("mois"))}`;
+			let m = `${dim("mois")} ${quotaGauge(remaining, x.monthly.limit)}`;
 			if (x.monthly.reset) {
 				m += ` ${dim(`${ICONS.reset} ${fmtReset(x.monthly.reset)}`)}`;
 			}
@@ -893,7 +888,7 @@ function providerQuotaParts(quotas: QuotaCache, provider: string | undefined, co
 		}
 		if (x.pool && Number.isFinite(x.pool.usedPercent)) {
 			const remaining = 100 - x.pool.usedPercent;
-			let pool = `${quotaGauge(remaining, 100)} ${dim(tag(x.pool.label))}`;
+			let pool = `${dim(x.pool.label)} ${quotaGauge(remaining, 100)}`;
 			if (x.pool.reset) {
 				pool += ` ${dim(`${ICONS.reset} ${fmtReset(x.pool.reset)}`)}`;
 			}
@@ -903,7 +898,7 @@ function providerQuotaParts(quotas: QuotaCache, provider: string | undefined, co
 			const col = balanceColor(x.prepaidBalance);
 			bits.push(`${fgHex(col, "\u25c9")} ${fgHex(col, `$${x.prepaidBalance.toFixed(2)}`)}`);
 		}
-		parts.push(bits.length > 0 ? bits.join(` ${thinSep()} `) : dim(identity));
+		parts.push(bits.length > 0 ? `${dim("xai")} ${bits.join(` ${thinSep()} `)}` : `${dim("xai")} ${dim("\u2014")}`);
 	}
 
 	return parts;

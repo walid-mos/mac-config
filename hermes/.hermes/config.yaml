@@ -108,6 +108,7 @@ skills:
 command_allowlist:
   - execute_code
   - delete in root path
+  - script execution via -e/-c flag
 _config_version: 39
 custom_providers:
   - name: Gemma 4

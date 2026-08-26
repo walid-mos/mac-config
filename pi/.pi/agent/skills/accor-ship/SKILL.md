@@ -147,24 +147,57 @@ jamais sur un maillon aval. Avant de committer dans un stack :
 `git log --all --source -- <fichier>` pour trouver la branche d'origine, committer
 **là**, puis restack l'aval. Ne jamais poser un commit API sur la PR de la vue.
 
-## Objectif — engager le loop /goal
+## Objectif — construire puis engager le loop `/goal`
 
-Appeler `goal_set` avec la condition accor :
+**Ne jamais appeler `goal_set` avec le template générique seul.** Avant de
+l'engager, terminer l'inventaire d'acceptation de Phase 1 : ticket intégral,
+chaque section de spec liée, critères d'acceptation, et chaque surface/état du
+prototype dans le scope. Poser les questions bloquantes à ce moment-là.
+
+Construire ensuite une **matrice d'acceptation numérotée et exhaustive** dans le
+transcript. Une ligne par exigence observable ou métier, y compris les contenus
+informatifs non interactifs (libellés, aperçus, compteurs, valeurs préremplies,
+états disabled/readonly, variantes par segment/rôle). Chaque ligne contient :
+
+- identifiant stable (`AC-01`, `AC-02`…) et source exacte (ticket, section de
+  spec, état/route du proto) ;
+- résultat attendu précis ;
+- surface et variantes concernées ;
+- preuve finale exigée : test automatisé, commande/API, ou parcours + assertion
+  DOM + screenshot local/proto au même viewport.
+
+Tout lien de spec cité par le ticket doit être lu via l'API REST Confluence avec
+`auth: "accor"`. Un lien non lisible est un blocker explicite, jamais une raison
+de l'ignorer. Faire une passe de réconciliation **ticket ↔ spec ↔ prototype** :
+chaque exigence trouvée doit apparaître dans la matrice ; chaque divergence doit
+être résolue selon l'autorité des sources avant le goal.
+
+Appeler alors `goal_set` avec une condition **spécifique à la feature** qui
+énumère les identifiants de la matrice et exige leur preuve individuelle :
 
 ```
-goal_set({ condition: "Feature Menu Compliance livrée : stack soumis depuis develop,
-  tous les tickets Done (ou bloqués listés), tests/lint/typecheck verts,
-  /simplify par maillon et global effectués, /visual-check 1:1 vs proto
-  sur les surfaces/états du ticket, mêmes viewports
-  (screenshots dans le transcript, drinks-menu-compliance-vite.vercel.app),
-  exclusions : features hors ticket, UI/scripts tiers demandés par le PO,
-  switcher d'impersonation local,
-  apps/product-benchmark intact,
-  descriptions de PR conformes à .github/PULL_REQUEST_TEMPLATE.md. Stop after 30 turns." })
+goal_set({ condition: "Feature Menu Compliance <FEATURE> livrée : AC-01…AC-N de
+  la matrice d'acceptation tous prouvés individuellement dans le transcript et
+  aucune ligne omise/non vérifiée ; stack soumis depuis develop ; tickets Done
+  (ou blockers listés) ; tests/lint/typecheck verts ; /simplify par maillon et
+  global ; /visual-check 1:1 local/proto sur chaque surface, état et variante de
+  la matrice aux mêmes viewports, avec assertions DOM pour contenus/états et
+  screenshots ; exclusions explicitement listées ; apps/product-benchmark
+  intact ; descriptions de PR conformes à .github/PULL_REQUEST_TEMPLATE.md.
+  Des tests verts ou un parcours principal vert ne suffisent pas si une AC n'a
+  pas sa preuve. Stop after 30 turns." })
 ```
+
+Adapter `<FEATURE>`, `AC-01…AC-N`, les variantes, les preuves et les exclusions :
+aucun placeholder ne doit rester dans l'appel réel. Si la condition devient trop
+longue, référencer la matrice complète déjà présente dans le transcript plutôt
+que supprimer des exigences.
 
 L'extension `/goal` auto-continue de tour en tour. Règles : **prove don't
-declare**, un step vérifiable par tour, aucune question en cours de route.
+declare**, un step vérifiable par tour, aucune question après l'engagement du
+goal. Le goal ne peut être `met` que si chaque ligne de la matrice possède sa
+preuve ; « tests verts », « UI conforme » ou « ticket livré » ne sont jamais des
+preuves de couverture exhaustives.
 
 ## Exécution — déléguer à `/ship`
 
@@ -179,9 +212,11 @@ en plus :
   maillons vit dans `gh stack`, jamais dans le nom de branche.
 - **Découpe** : contrat Stack
   ([slicing.md](../stack/references/slicing.md)). Contraintes Accor à lui
-  passer : périmètre Menu Compliance, proto 1:1 sur les surfaces/états du ticket
+  passer : périmètre Menu Compliance, **matrice d'acceptation intégrale avec ses
+  AC affectées à au moins un maillon**, proto 1:1 sur les surfaces/états du ticket
   (front only), pas de schéma dérivé du proto, clean arch API, nomenclature de branche Accor sans index de
-  stack. Pas de règle de découpe locale ni de seuils.
+  stack. Après découpe, vérifier qu'aucune AC n'est orpheline ; une AC non affectée
+  bloque l'implémentation. Pas de règle de découpe locale ni de seuils.
 - **`/visual-check` obligatoire** : dès qu'un maillon touche le front, charger
   le skill `visual-check`. Lancer `pnpm dev:compliance`,
   ouvrir en parallèle le prototype déployé
@@ -209,6 +244,13 @@ en plus :
 
 ## Definition of done
 
+- La matrice d'acceptation issue du ticket, de **toutes** ses sections de spec
+  liées et du prototype est complète ; chaque AC est affectée, implémentée et
+  prouvée individuellement. Refaire en fin de travail la réconciliation
+  ticket ↔ spec ↔ prototype ↔ matrice ↔ diff/tests pour détecter toute omission.
+- Aucun critère n'est considéré couvert par simple proximité avec un autre : une
+  barrière métier ne prouve pas l'aperçu informatif associé, et un test de submit
+  ne prouve pas les libellés, valeurs préremplies ou états readonly de la modale.
 - La feature est livrée en entier, ou le reste est listé comme bloqué avec sa raison.
 - Aucun schéma DB, contrat API ou décision métier n'est dérivé du code du proto ;
   toute hypothèse métier issue du proto a été validée par l'utilisateur en Phase 1.

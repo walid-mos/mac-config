@@ -4,7 +4,7 @@ macOS dotfiles managed with [GNU Stow](https://www.gnu.org/software/stow/) + a M
 
 ## Layout
 
-**Every top-level directory is a Stow package** whose internal tree mirrors `$HOME` — the package list is derived from the filesystem by the Makefile (`make help` shows it). Exceptions listed in `NONSTOW`: `docs/` (documentation), `obsidian/` (custom iCloud target, own Make target), `scripts/` (internal git tooling), and `claude/` (kept in-tree, not deployed).
+**Every top-level directory is a Stow package** whose internal tree mirrors `$HOME` — the package list is derived from the filesystem by the Makefile (`make help` shows it). Exceptions listed in `NONSTOW`: `obsidian/` (custom iCloud target, own Make target), `scripts/` (internal git tooling), and `claude/` (kept in-tree, not deployed).
 
 Two invariants carry all the knowledge:
 

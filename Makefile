@@ -13,7 +13,7 @@ STOW := stow -t $(HOME)
 # suffit à le rendre stowable. NONSTOW liste les seules exceptions : obsidian
 # (cible custom iCloud, stowé par sa propre cible), scripts (outillage git
 # interne) et claude (package conservé, non déployé).
-NONSTOW := docs obsidian scripts claude
+NONSTOW := obsidian scripts claude
 PACKAGES := $(filter-out $(NONSTOW),$(patsubst %/,%,$(wildcard */)))
 
 # Packages dont le dossier cible reçoit aussi des fichiers écrits par l'outil

@@ -107,14 +107,19 @@ function compareSurfaceEntries(left: SurfaceEntry, right: SurfaceEntry): number 
 	return priority === 0 ? left.id.localeCompare(right.id) : priority;
 }
 
-function clipSurfaceLine(line: string, width: number): string {
-	const firstLine = line.split(/[\r\n]/u, 1)[0] ?? "";
-	const tokens = firstLine.match(SURFACE_TOKEN_PATTERN) ?? [];
-	const visible = tokens.reduce(
+/** Visible column width of a line, ignoring ANSI escape sequences. */
+export function surfaceLineWidth(line: string): number {
+	const tokens = line.match(SURFACE_TOKEN_PATTERN) ?? [];
+	return tokens.reduce(
 		(total, token) => (isAnsiSequence(token) ? total : total + terminalCharWidth(token)),
 		0,
 	);
-	if (visible <= width) return firstLine;
+}
+
+function clipSurfaceLine(line: string, width: number): string {
+	const firstLine = line.split(/[\r\n]/u, 1)[0] ?? "";
+	const tokens = firstLine.match(SURFACE_TOKEN_PATTERN) ?? [];
+	if (surfaceLineWidth(firstLine) <= width) return firstLine;
 	const budget = Math.max(0, width - 1);
 	let used = 0;
 	let clipped = "";
@@ -134,10 +139,11 @@ function clipSurfaceLine(line: string, width: number): string {
 	return hasAnsi ? `${clipped}\u001b[0m` : clipped;
 }
 
-const SURFACE_TOKEN_PATTERN = /\u001b\[[0-?]*[ -/]*[@-~]|./gu;
-const ANSI_SEQUENCE_PATTERN = /^\u001b\[/u;
+const SURFACE_TOKEN_PATTERN = /\u001b\[[0-?]*[ -/]*[@-~]|\u001b\]8;;[^\u0007]*\u0007|\u001b\]8;;\u0007|./gu;
+const ANSI_SEQUENCE_PATTERN = /^\u001b(\[|\]8;;)/u;
 
 function isAnsiSequence(token: string): boolean {
+	// Both CSI (\e[…) and OSC 8 hyperlink wrappers (\e]8;;…) are zero-width.
 	return ANSI_SEQUENCE_PATTERN.test(token);
 }
 

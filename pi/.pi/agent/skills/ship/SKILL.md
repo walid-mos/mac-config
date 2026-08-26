@@ -132,7 +132,9 @@ Pour chaque maillon, dans l'ordre du stack :
    `plane_update_workitem(identifier=<id>, stateId=<In Progress uuid>)`, avant l’implémentation.
 2. **Tester pour de vrai** — suite de tests + lint + typecheck du projet après
    application. Rouge = le maillon n'avance pas, on corrige en fix direct (pas
-   une nouvelle boucle).
+   une nouvelle boucle). Si fallow se résout (skill `fallow-gate`), y ajouter le
+   gate `audit --base <branche de base du stack>` : findings introduits par le
+   maillon = correction avant push.
 3. **`/visual-check` + parcours fonctionnel** — dès que le maillon produit ou
    modifie une surface web (sauf `--no-chrome`) :
     - Charger le skill `visual-check` et l'exécuter sur les **pages du maillon**

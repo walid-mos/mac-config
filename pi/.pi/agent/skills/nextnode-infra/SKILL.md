@@ -18,7 +18,7 @@ description: >-
 
 | Package | Type | Purpose |
 |---------|------|---------|
-| `@nextnode-solutions/standards` | config | oxlint, oxfmt, TypeScript, Tailwind, Vitest, commitlint, lint-staged, semantic-release, tsdown configs |
+| `@nextnode-solutions/standards` | config | oxlint, oxfmt, TypeScript, Tailwind, Vitest, commitlint, lint-staged, semantic-release, tsdown configs, fallow changed-code gate (pre-commit script + reusable CI workflow) |
 | `@nextnode-solutions/logger` | library | Zero-dep TS logger, transports (console + HTTP), testing utilities |
 | `@nextnode-solutions/email-manager` | library | Template-first email sending (React Email + Resend), Result-pattern API |
 | `@nextnode-solutions/brand-assets` | static | SVG/PNG logos, icons, favicons, social avatars (subpath wildcard exports) |

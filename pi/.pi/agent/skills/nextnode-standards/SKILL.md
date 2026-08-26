@@ -3,13 +3,13 @@ name: nextnode-standards
 description: >-
   How to use @nextnode-solutions/standards in NextNode projects: all tooling
   configs (oxlint, oxfmt, TypeScript, tsdown, Vitest, commitlint,
-  semantic-release, Tailwind). Load when @nextnode-solutions/standards is in
-  package.json or when configuring tooling in a NextNode project.
+  semantic-release, Tailwind, fallow gate). Load when @nextnode-solutions/standards
+  is in package.json or when configuring tooling in a NextNode project.
 ---
 
 # @nextnode-solutions/standards
 
-**Source**: @nextnode/core @ 7185a94 (resync 2026-08-16)
+**Source**: @nextnode/core @ feat/fallow-gate (7281904, resync 2026-08-26 — merge pending)
 
 Centralized development standards for all NextNode projects. This is a **config-only** package - no runtime code, no build step. It exports configuration files that projects extend.
 
@@ -48,6 +48,7 @@ Use the relevant sub-file for details:
 ```bash
 # Required peer dependencies
 pnpm add -D @nextnode-solutions/standards oxlint oxfmt
+pnpm add -D fallow@<exact-version>                              # Pin exactly - match the core monorepo root package.json
 
 # Optional peer dependencies (install only what you use)
 pnpm add -D vitest                                              # If you have tests
@@ -70,6 +71,8 @@ tsdown.config.ts          # imports standards/tsdown (publishable packages)
 vitest.config.ts          # imports standards/vitest/{backend|frontend}
 commitlint.config.js      # imports standards/commitlint
 lint-staged.config.js     # imports standards/lint-staged
+.husky/pre-commit         # pnpm lint-staged + sh node_modules/@nextnode-solutions/standards/src/fallow/pre-commit.sh
+.github/workflows/code-intelligence.yml  # five-line reusable-workflow caller (see configs.md)
 .releaserc.json           # extends standards/semantic-release (for publishable packages)
 .editorconfig             # copied from standards
 .npmrc                    # copied from standards

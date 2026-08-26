@@ -87,7 +87,26 @@ pnpm exec husky init
 
 → https://typicode.github.io/husky/how-to.html#ci-server-and-docker
 
-After `husky init`, always replace the generated `prepare` with that pattern. Standard NextNode hooks: `commit-msg` → `pnpm commitlint --edit ${1}`, `pre-commit` → `pnpm lint-staged`, `pre-push` → `pnpm test`.
+After `husky init`, always replace the generated `prepare` with that pattern. Standard NextNode hooks: `commit-msg` → `pnpm commitlint --edit ${1}`, `pre-commit` → `pnpm lint-staged` then `sh node_modules/@nextnode-solutions/standards/src/fallow/pre-commit.sh`, `pre-push` → `pnpm test`.
+
+### fallow — changed-code quality gate
+
+**Export path**: `@nextnode-solutions/standards/src/fallow/pre-commit.sh`
+
+**Requires**: `fallow` as an exact-pinned devDependency at the repo root (peer range `^3.18.0`). The peer is **required**, like oxlint/oxfmt: the hook fails loudly with install instructions when the binary is missing.
+
+The script runs `fallow audit --base <merge-base upstream>`, which fails only on findings introduced by the change — pre-existing debt never blocks. Override the no-upstream fallback base with `FALLOW_BASE_REF`. Invocation contract for AI workflows (local binary → npx fallback, JSON parsing): load skill `fallow-gate`.
+
+CI gate: each repository adds a five-line caller workflow instead of copying the pipeline:
+
+```yaml
+name: Code intelligence
+on:
+    pull_request:
+jobs:
+    fallow-audit:
+        uses: NextNodeSolutions/core/.github/workflows/code-intelligence.yml@main
+```
 
 ---
 

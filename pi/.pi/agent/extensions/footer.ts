@@ -15,7 +15,8 @@ import type {
 	ReadonlyFooterDataProvider,
 	Theme,
 } from "@earendil-works/pi-coding-agent";
-import { hyperlink, truncateToWidth, visibleWidth, type TUI } from "@earendil-works/pi-tui";
+import type { TUI } from "@earendil-works/pi-tui";
+import { surfaceLineWidth } from "./ui/surface.ts";
 import { homedir } from "node:os";
 import { readFileSync } from "node:fs";
 import { execFile } from "node:child_process";
@@ -34,7 +35,8 @@ const LATTE = {
 	yellow: "#df8e1d",
 	peach: "#fe640b",
 	red: "#d20f39",
-	base: "#eff1f5", // pill text
+	base: "#eff1f5", // light pill text
+	text: "#4c4f69", // dark text — readable on pale pastels
 	surface1: "#bcc0cc",
 	subtext0: "#6c6f85",
 	overlay1: "#8c8fa1",
@@ -72,6 +74,47 @@ const THINKING_COLORS: Record<string, string> = {
 };
 
 // ── ANSI helpers (24-bit) ─────────────────────────────────────────────
+// Width/truncation/hyperlink live here instead of @earendil-works/pi-tui values:
+// that package only resolves through Pi's extension loader, and an import-free
+// module keeps the pure renderer testable under plain node --test.
+
+/** OSC 8 clickable text (same argument order as pi-tui: text first). */
+function hyperlink(text: string, url: string): string {
+	return `\u001b]8;;${url}\u0007${text}\u001b]8;;\u0007`;
+}
+
+function visibleWidth(line: string): number {
+	return surfaceLineWidth(line);
+}
+
+function truncateToWidth(line: string, width: number): string {
+	if (visibleWidth(line) <= width) return line;
+	let out = "";
+	let used = 0;
+	let linkOpen = false;
+	const tokens =
+		line.match(/\u001b\[[0-?]*[ -/]*[@-~]|\u001b\]8;;[^\u0007]*\u0007|\u001b\]8;;\u0007|./gu) ?? [];
+	for (const token of tokens) {
+		if (token.startsWith("\u001b[")) {
+			out += token;
+			continue;
+		}
+		if (token.startsWith("\u001b]8;;")) {
+			// OSC 8 wrappers are zero-width; keep them intact.
+			// Opening carries a URL (`\e]8;;URL\a`); closing is bare (`\e]8;;\a`).
+			linkOpen = !/^\u001b\]8;;\u0007$/.test(token);
+			out += token;
+			continue;
+		}
+		const w = surfaceLineWidth(token);
+		if (used + w > width) break;
+		used += w;
+		out += token;
+	}
+	// Never leak an unclosed hyperlink when truncation lands inside one.
+	return linkOpen ? `${out}\u001b]8;;\u0007` : out;
+}
+
 function rgb(hex: string): [number, number, number] {
 	const r = parseInt(hex.slice(1, 3), 16);
 	const g = parseInt(hex.slice(3, 5), 16);
@@ -109,6 +152,43 @@ function fgOn(fg: string, bg: string, s: string): string {
 
 type Segment = { bg: string; fg?: string; label: string; icon?: string };
 
+/** Relative luminance (WCAG) of a #rrggbb color, 0–1. */
+function relativeLuminance(hex: string): number {
+	if (!/^#[0-9a-f]{6}$/i.test(hex)) return 0;
+	const channel = (shift: number): number => {
+		const raw = parseInt(hex.slice(shift, shift + 2), 16) / 255;
+		return raw <= 0.03928 ? raw / 12.92 : ((raw + 0.055) / 1.055) ** 2.4;
+	};
+	return 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
+}
+
+/** Pick dark text on pale pastels, light text on saturated fills. */
+function readableOn(bg: string): string {
+	return relativeLuminance(bg) > 0.35 ? LATTE.text : LATTE.base;
+}
+
+const SEP_THIN = "\u2502"; // │ quiet vertical separator between data groups
+
+function thinSep(): string {
+	return fgHex(LATTE.surface1, SEP_THIN);
+}
+
+/** Compress a shortened path to its head and last two components: ~/…/ui/extensions */
+function compactPath(path: string, maxWidth = 34): string {
+	if (path.length <= maxWidth) return path;
+	const parts = path.split("/").filter(Boolean);
+	if (parts.length <= 2) return path;
+	const head = path.startsWith("~") ? "~/" : "/";
+	const tail = parts.slice(-2).join("/");
+	const compressed = `${head}\u2026/${tail}`;
+	return compressed.length < path.length ? compressed : path;
+}
+
+/** Hard-clamp plain text with a trailing ellipsis. */
+function clampText(text: string, maxLength: number): string {
+	return text.length <= maxLength ? text : `${text.slice(0, Math.max(1, maxLength - 1))}\u2026`;
+}
+
 /** Render fused powerline segments: rounded caps outside,  inside. */
 function powerline(segments: Segment[]): string {
 	if (segments.length === 0) return "";
@@ -116,7 +196,7 @@ function powerline(segments: Segment[]): string {
 	for (let i = 0; i < segments.length; i++) {
 		const seg = segments[i]!;
 		const text = seg.icon ? ` ${seg.icon} ${seg.label} ` : ` ${seg.label} `;
-		out += fgOn(seg.fg ?? LATTE.base, seg.bg, text);
+		out += fgOn(seg.fg ?? readableOn(seg.bg), seg.bg, text);
 		const next = segments[i + 1];
 		if (next) {
 			// hard separator: arrow in current bg color, on next segment's bg
@@ -702,7 +782,7 @@ function gitLine(s: GitStatus | null): string {
 	if (s.deleted > 0) counters.push(fgHex(LATTE.red, `-${s.deleted}`));
 	if (s.untracked > 0) counters.push(fgHex(LATTE.overlay1, `?${s.untracked}`));
 	if (s.stash > 0) counters.push(fgHex(LATTE.sapphire, `≡${s.stash}`));
-	return `${dim("git")} ${gitBar(s)} ${counters.join(dim("·") + " ")}`;
+	return `${dim("git")} ${gitBar(s)} ${counters.join(` ${dim("·")} `)}`;
 }
 
 // ── Current GitHub PR ───────────────────────────────────────────────
@@ -760,7 +840,7 @@ function openaiQuotaPart(quota: OpenAIQuota, dim: (s: string) => string): string
 		extras.push(dim(`${quota.resets} reset${quota.resets > 1 ? "s" : ""}`));
 	}
 	if (extras.length === 0) return `${head} ${fgHex(LATTE.subtext0, "—")}`;
-	return `${head}   ${extras.join("   ")}`;
+	return `${head} ${extras.join(` ${thinSep()} `)}`;
 }
 
 function gitWithPr(status: GitStatus | null, pr: GitPr | null): string {
@@ -769,6 +849,216 @@ function gitWithPr(status: GitStatus | null, pr: GitPr | null): string {
 	if (!link) return git;
 	return `${git} ${fgHex(LATTE.subtext0, "·")} ${link}`;
 }
+
+// ── Pure footer rendering (no IO — exported for tests) ───────────────
+export type FooterUsage = {
+	percent: number;
+	tokens?: number;
+	contextWindow?: number;
+};
+
+export type FooterRenderInput = {
+	width: number;
+	model: string;
+	thinkingLevel: string;
+	cwd: string;
+	branch?: string;
+	usage?: FooterUsage;
+	tokens: { input: number; output: number; cost: number };
+	statuses: readonly string[];
+	git: GitStatus | null;
+	pr: GitPr | null;
+	quotas: QuotaCache;
+	provider?: string;
+};
+
+/** Left-aligned + right-aligned on one row, clamped to width. */
+function justifyLine(left: string, right: string, width: number): string {
+	const pad = " ".repeat(Math.max(1, width - visibleWidth(left) - visibleWidth(right)));
+	return truncateToWidth(left + pad + right, width);
+}
+
+/** Quiet flat metadata: colored icon + muted label. */
+function meta(icon: string, iconColor: string, label: string): string {
+	return `${fgHex(iconColor, icon)} ${fgHex(LATTE.subtext0, label)}`;
+}
+
+function contextGroup(usage: FooterUsage, exactTokens: boolean): string {
+	const pct = Math.round(usage.percent);
+	const filled = Math.round((usage.percent / 100) * BAR_WIDTH);
+	const barColor =
+		usage.percent < 50 ? LATTE.green : usage.percent < 80 ? LATTE.peach : LATTE.red;
+	const bar =
+		fgHex(barColor, BAR_FULL.repeat(filled)) +
+		fgHex(LATTE.surface1, BAR_EMPTY.repeat(BAR_WIDTH - filled));
+	const exact =
+		exactTokens && usage.tokens != null && usage.contextWindow != null
+			? ` ${fgHex(LATTE.overlay1, `${fmtTokens(usage.tokens)}/${fmtTokens(usage.contextWindow)}`)}`
+			: "";
+	return `${fgHex(LATTE.overlay1, ICONS.context)} ${bar} ${fgHex(barColor, `${pct}%`)}${exact}`;
+}
+
+function providerQuotaParts(quotas: QuotaCache, provider: string | undefined, compact = false): string[] {
+	const dim = (s: string) => fgHex(LATTE.subtext0, s);
+	const p = (provider ?? "").toLowerCase();
+	const showXai = p.includes("xai");
+	const showKimi = p.includes("kimi");
+	const showOr = p.includes("openrouter");
+	const showOpenai = p.includes("openai");
+	const showAll = !showXai && !showKimi && !showOr && !showOpenai;
+
+	const parts: string[] = [];
+
+	if (quotas.kimi && (showKimi || showAll)) {
+		const { fiveHour, weekly } = quotas.kimi;
+		let part = `${dim("kimi")} ${dim("5h")} ${quotaGauge(fiveHour.remaining, fiveHour.limit)}`;
+		if (!compact && fiveHour.reset) {
+			part += ` ${dim(`${ICONS.reset} ${fmtReset(fiveHour.reset)}`)}`;
+		}
+		if (Number.isFinite(weekly.limit) && weekly.limit > 0) {
+			part += ` ${thinSep()} ${dim("sem")} ${quotaGauge(weekly.remaining, weekly.limit)}`;
+			if (!compact && weekly.reset) {
+				part += ` ${dim(`${ICONS.reset} ${fmtReset(weekly.reset)}`)}`;
+			}
+		}
+		parts.push(part);
+	}
+
+	if (quotas.openrouter && (showOr || showAll)) {
+		const orq = quotas.openrouter;
+		const col = balanceColor(orq.balance);
+		let part = `${dim("openrouter")} ${fgHex(col, "\u25c9")} ${fgHex(col, `$${orq.balance.toFixed(2)}`)}`;
+		if (orq.weekly && !compact) {
+			part += ` ${thinSep()} ${dim("hebdo")} ${quotaGauge(orq.weekly.remaining, orq.weekly.limit)}`;
+		}
+		parts.push(part);
+	}
+
+	if (quotas.openai && (showOpenai || showAll)) {
+		parts.push(openaiQuotaPart(quotas.openai, dim));
+	}
+
+	if (quotas.xai && (showXai || showAll)) {
+		const x = quotas.xai;
+		let bits: string[] = [];
+		if (x.tier) bits.push(fgHex(LATTE.mauve, x.tier));
+		if (x.monthly && x.monthly.limit > 0 && x.pool?.label !== "mois") {
+			const remaining = x.monthly.limit - x.monthly.used;
+			let m = `${dim("mois")} ${quotaGauge(remaining, x.monthly.limit)}`;
+			if (x.monthly.reset) {
+				m += ` ${dim(`${ICONS.reset} ${fmtReset(x.monthly.reset)}`)}`;
+			}
+			bits.push(m);
+		}
+		if (x.pool && Number.isFinite(x.pool.usedPercent)) {
+			const remaining = 100 - x.pool.usedPercent;
+			let pool = `${dim(x.pool.label)} ${quotaGauge(remaining, 100)}`;
+			if (x.pool.reset) {
+				pool += ` ${dim(`${ICONS.reset} ${fmtReset(x.pool.reset)}`)}`;
+			}
+			bits.push(pool);
+		}
+		if (x.prepaidBalance && x.prepaidBalance > 0) {
+			const col = balanceColor(x.prepaidBalance);
+			bits.push(`${fgHex(col, "\u25c9")} ${fgHex(col, `$${x.prepaidBalance.toFixed(2)}`)}`);
+		}
+		parts.push(bits.length > 0 ? `${dim("xai")} ${bits.join(` ${thinSep()} `)}` : `${dim("xai")} ${dim("\u2014")}`);
+	}
+
+	return parts;
+}
+
+export function renderFooterLines(input: FooterRenderInput): string[] {
+	const width = Math.max(0, input.width);
+
+	// ── Line 1 left: hero pill (model + thinking), never degraded ──
+	const modelGroup = powerline([
+		{ bg: LATTE.mauve, label: input.model, icon: ICONS.model },
+		{
+			bg: THINKING_COLORS[input.thinkingLevel] ?? LATTE.overlay1,
+			label: input.thinkingLevel,
+			icon: ICONS.thinking,
+		},
+	]);
+
+	const arrowsGroup = fgHex(
+		LATTE.subtext0,
+		`\u2191${fmtTokens(input.tokens.input)} \u2193${fmtTokens(input.tokens.output)}`,
+	);
+	const costGroup = fgHex(LATTE.overlay1, `$${input.tokens.cost.toFixed(3)}`);
+
+	type Variant = {
+		pathMax: number;
+		branchMax: number;
+		exactTokens: boolean;
+		hideMeta?: boolean;
+		hideArrows?: boolean;
+	};
+	// Progressive degradation: shrink quiet meta first, then drop exact tokens,
+	// then hide the meta block entirely, finally drop the arrow token counts
+	// (the hero pill, context gauge and cost are never dropped).
+	const variants: Variant[] = [
+		{ pathMax: 34, branchMax: 32, exactTokens: true },
+		{ pathMax: 22, branchMax: 20, exactTokens: true },
+		{ pathMax: 18, branchMax: 14, exactTokens: false },
+		{ pathMax: 18, branchMax: 14, exactTokens: false, hideMeta: true },
+		{ pathMax: 18, branchMax: 14, exactTokens: false, hideMeta: true, hideArrows: true },
+	];
+
+	const buildLine1 = (v: Variant): { left: string; right: string } => {
+		let left = modelGroup;
+		if (!v.hideMeta) {
+			const metaBits = [meta(ICONS.folder, LATTE.teal, compactPath(input.cwd, v.pathMax))];
+			if (input.branch) {
+				metaBits.push(meta(ICONS.branch, LATTE.sapphire, clampText(input.branch, v.branchMax)));
+			}
+			left = `${modelGroup}  ${metaBits.join(` ${thinSep()} `)}`;
+		}
+
+		const rightGroups: string[] = [];
+		if (input.statuses.length > 0) {
+			rightGroups.push(input.statuses.join("  "));
+		}
+		if (input.usage != null && Number.isFinite(input.usage.percent)) {
+			rightGroups.push(contextGroup(input.usage, v.exactTokens));
+		}
+		if (!v.hideArrows) rightGroups.push(arrowsGroup);
+		rightGroups.push(costGroup);
+		return { left, right: rightGroups.join(` ${thinSep()} `) };
+	};
+
+	let line1: string | undefined;
+	for (const v of variants) {
+		const { left, right } = buildLine1(v);
+		if (visibleWidth(left) + visibleWidth(right) + 2 <= width) {
+			line1 = justifyLine(left, right, width);
+			break;
+		}
+	}
+	line1 ??= (() => {
+		const { left, right } = buildLine1(variants[variants.length - 1]!);
+		return truncateToWidth(justifyLine(left, right, width), width);
+	})();
+
+	const lines = [line1];
+
+	// ── Line 2 left: git bar + counters (+ PR link) │ right: provider quotas ──
+	const gitPart = gitWithPr(input.git, input.pr);
+	let quotaParts = providerQuotaParts(input.quotas, input.provider);
+	if (visibleWidth(gitPart) + visibleWidth(quotaContent(quotaParts)) + 2 > width) {
+		quotaParts = providerQuotaParts(input.quotas, input.provider, true);
+	}
+	const quota = quotaContent(quotaParts);
+	lines.push(truncateToWidth(justifyLine(gitPart, quota, width), width));
+
+	return lines;
+}
+
+function quotaContent(parts: string[]): string {
+	if (parts.length === 0) return "";
+	return `${fgHex(LATTE.overlay1, ICONS.quota)} ${parts.join(` ${thinSep()} `)}`;
+}
+
 
 export default function (pi: ExtensionAPI) {
 	let enabled = true;
@@ -879,7 +1169,7 @@ export default function (pi: ExtensionAPI) {
 		}
 		footerInstalled = true;
 
-		ctx.ui.setFooter((tui: TUI, theme: Theme, footerData: ReadonlyFooterDataProvider) => {
+		ctx.ui.setFooter((tui: TUI, _theme: Theme, footerData: ReadonlyFooterDataProvider) => {
 			requestRender = () => tui.requestRender();
 			const unsubBranch = footerData.onBranchChange(() => {
 				tui.requestRender();
@@ -895,7 +1185,7 @@ export default function (pi: ExtensionAPI) {
 				invalidate() {},
 				render(width: number): string[] {
 		try {
-			return clampFooterLines(renderFooter(width, ctx, theme, footerData), width);
+			return clampFooterLines(renderFooter(width, ctx, footerData), width);
 		} catch {
 			return [""];
 		}
@@ -907,30 +1197,8 @@ export default function (pi: ExtensionAPI) {
 	function renderFooter(
 		width: number,
 		ctx: ExtensionContext,
-		theme: Theme,
 		footerData: ReadonlyFooterDataProvider,
 	): string[] {
-		// ── Line 1, left: model+thinking · path+branch ──
-		const model = readSafely(() => ctx.model?.id, undefined) || "no-model";
-		const thinking = readSafely(() => ctx.thinkingLevel, "off") ?? "off";
-		const modelGroup = powerline([
-			{ bg: LATTE.mauve, label: model, icon: ICONS.model },
-			{
-				bg: THINKING_COLORS[thinking] ?? LATTE.overlay1,
-				label: thinking,
-				icon: ICONS.thinking,
-			},
-		]);
-
-		const cwd = shortPath(readSafely(() => ctx.cwd, undefined) ?? process.cwd());
-		const branch = footerData.getGitBranch();
-		const pathSegs: Segment[] = [{ bg: LATTE.teal, label: cwd, icon: ICONS.folder }];
-		if (branch) pathSegs.push({ bg: LATTE.sapphire, label: branch, icon: ICONS.branch });
-		const pathGroup = powerline(pathSegs);
-
-		const left = `${modelGroup} ${pathGroup}`;
-
-		// ── Line 1, right: statuses · context bar + exact tokens · tokens · cost ──
 		let input = 0,
 			output = 0,
 			cost = 0;
@@ -943,125 +1211,20 @@ export default function (pi: ExtensionAPI) {
 				cost += finiteNumber(m.usage?.cost?.total) ?? 0;
 			}
 		}
-
-		let ctxPart = "";
-		const usage = readSafely(() => ctx.getContextUsage?.(), undefined);
-		if (usage?.percent != null) {
-			const pct = Math.round(usage.percent);
-			const filled = Math.round((usage.percent / 100) * BAR_WIDTH);
-			const barColor =
-				usage.percent < 50 ? LATTE.green : usage.percent < 80 ? LATTE.peach : LATTE.red;
-			const bar =
-				fgHex(barColor, BAR_FULL.repeat(filled)) +
-				fgHex(LATTE.surface1, BAR_EMPTY.repeat(BAR_WIDTH - filled));
-			const exact =
-				usage.tokens != null
-					? ` ${fgHex(LATTE.overlay1, `${fmtTokens(usage.tokens)}/${fmtTokens(usage.contextWindow)}`)}`
-					: "";
-			ctxPart = `${fgHex(LATTE.overlay1, ICONS.context)} ${bar} ${fgHex(barColor, `${pct}%`)}${exact}`;
-		}
-
-		const tokPart = theme.fg(
-			"dim",
-			`↑${fmtTokens(input)} ↓${fmtTokens(output)}  $${cost.toFixed(3)}`,
-		);
-
-		const statuses = [...footerData.getExtensionStatuses().values()].filter(Boolean);
-		const statusPart = statuses.join("  ");
-
-		const right = [statusPart, ctxPart, tokPart].filter(Boolean).join("  ");
-
-		const pad = " ".repeat(Math.max(1, width - visibleWidth(left) - visibleWidth(right)));
-		const line1 = truncateToWidth(left + pad + right, width);
-
-		// ── Line 2: git summary (left) · provider quota (right) ──
-		const lines = [line1];
-		const gitPart = gitWithPr(gitCache, prCache);
-		const dim = (s: string) => fgHex(LATTE.subtext0, s);
-		const provider = (readSafely(() => ctx.model?.provider, undefined) ?? "").toLowerCase();
-		// Show the active provider's quota; fall back to everyone if unmatched
-		const showXai = provider.includes("xai");
-		const showKimi = provider.includes("kimi");
-		const showOr = provider.includes("openrouter");
-		const showOpenai = provider.includes("openai");
-		const showAll = !showXai && !showKimi && !showOr && !showOpenai;
-
-		const quotaParts: string[] = [];
-
-		if (quotaCache.kimi && (showKimi || showAll)) {
-			const { fiveHour, weekly } = quotaCache.kimi;
-			let part =
-				`${dim("kimi 5h")} ${quotaGauge(fiveHour.remaining, fiveHour.limit)}`;
-			if (fiveHour.reset) {
-				part += ` ${dim(`${ICONS.reset} ${fmtReset(fiveHour.reset)}`)}`;
-			}
-			// limit 0 = unknown / absent weekly — skip rather than emit junk
-			if (Number.isFinite(weekly.limit) && weekly.limit > 0) {
-				part += `   ${dim("sem")} ${quotaGauge(weekly.remaining, weekly.limit)}`;
-				if (weekly.reset) {
-					part += ` ${dim(`${ICONS.reset} ${fmtReset(weekly.reset)}`)}`;
-				}
-			}
-			quotaParts.push(part);
-		}
-
-		if (quotaCache.openrouter && (showOr || showAll)) {
-			const orq = quotaCache.openrouter;
-			const col = balanceColor(orq.balance);
-			let part =
-				`${dim("openrouter")} ${fgHex(col, "◉")} ${fgHex(col, `$${orq.balance.toFixed(2)}`)}` +
-				` ${dim("crédits")}`;
-			if (orq.weekly) {
-				part += `   ${dim("hebdo")} ${quotaGauge(orq.weekly.remaining, orq.weekly.limit)}`;
-			}
-			quotaParts.push(part);
-		}
-
-		if (quotaCache.openai && (showOpenai || showAll)) {
-			quotaParts.push(openaiQuotaPart(quotaCache.openai, dim));
-		}
-
-		if (quotaCache.xai && (showXai || showAll)) {
-			const x = quotaCache.xai;
-			let part = `${dim("xai")}`;
-			if (x.tier) part += ` ${fgHex(LATTE.mauve, x.tier)}`;
-			// Legacy monthly cap — only when the primary pool isn't already monthly
-			if (x.monthly && x.monthly.limit > 0 && x.pool?.label !== "mois") {
-				const remaining = x.monthly.limit - x.monthly.used;
-				part += `   ${dim("mois")} ${quotaGauge(remaining, x.monthly.limit)}`;
-				if (x.monthly.reset) {
-					part += ` ${dim(`${ICONS.reset} ${fmtReset(x.monthly.reset)}`)}`;
-				}
-			}
-			if (x.pool && Number.isFinite(x.pool.usedPercent)) {
-				// kimi-style: show the remaining share of the usage pool
-				const remaining = 100 - x.pool.usedPercent;
-				part += `   ${dim(x.pool.label)} ${quotaGauge(remaining, 100)}`;
-				if (x.pool.reset) {
-					part += ` ${dim(`${ICONS.reset} ${fmtReset(x.pool.reset)}`)}`;
-				}
-			}
-			if (x.prepaidBalance && x.prepaidBalance > 0) {
-				const col = balanceColor(x.prepaidBalance);
-				part += `   ${fgHex(col, "◉")} ${fgHex(col, `$${x.prepaidBalance.toFixed(2)}`)} ${dim("crédits")}`;
-			}
-			// Always show at least the tier name so the provider is recognised
-			if (part === `${dim("xai")}`) {
-				part = `${dim("xai")} ${fgHex(LATTE.subtext0, "—")}`;
-			}
-			quotaParts.push(part);
-		}
-
-		const quotaContent =
-			quotaParts.length > 0
-				? `${fgHex(LATTE.overlay1, ICONS.quota)} ${quotaParts.join(dim("   ·   "))}`
-				: "";
-		const pad2 = " ".repeat(
-			Math.max(1, width - visibleWidth(gitPart) - visibleWidth(quotaContent)),
-		);
-		lines.push(truncateToWidth(gitPart + pad2 + quotaContent, width));
-
-		return lines;
+		return renderFooterLines({
+			width,
+			model: readSafely(() => ctx.model?.id, undefined) || "no-model",
+			thinkingLevel: readSafely(() => ctx.thinkingLevel, "off") ?? "off",
+			cwd: shortPath(readSafely(() => ctx.cwd, undefined) ?? process.cwd()),
+			branch: footerData.getGitBranch() || undefined,
+			usage: readSafely(() => ctx.getContextUsage?.(), undefined),
+			tokens: { input, output, cost },
+			statuses: [...footerData.getExtensionStatuses().values()].filter(Boolean),
+			git: gitCache,
+			pr: prCache,
+			quotas: quotaCache,
+			provider: readSafely(() => ctx.model?.provider, undefined)?.toLowerCase(),
+		});
 	}
 
 	pi.on("session_start", async (_event, ctx) => {

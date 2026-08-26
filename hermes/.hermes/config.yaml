@@ -1,7 +1,7 @@
 model:
-  default: gpt-5.6-terra
-  provider: openai-codex
-  base_url: https://chatgpt.com/backend-api/codex
+  default: stealth/ox-alpha
+  provider: nous
+  base_url: https://inference-api.nousresearch.com/v1
 agent:
   disabled_toolsets:
     - kanban
@@ -106,6 +106,7 @@ skills:
     - systematic-debugging
     - test-driven-development
 command_allowlist:
+  - execute_code
   - delete in root path
 _config_version: 39
 custom_providers:

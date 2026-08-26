@@ -3,8 +3,8 @@
  *
  * No filled pills: colored icons and tinted text sit directly on the
  * terminal background; groups are separated by thin verticals.
- * Line 1: 󰚩 model │ ✻ thinking   path │····· statuses │ context gauge │ arrows │ cost
- * Line 2:  branch │ churn bar + counters + PR #n │····· provider quotas
+ * Line 1: 󰚩 model │ ✻ thinking │ path │····· statuses │ context gauge ▰▰▱▱ │ arrows │ cost
+ * Line 2:  branch │ churn ▰▰▱▱ + counters + PR #n │····· provider quotas
  */
 
 import type { AssistantMessage } from "@earendil-works/pi-ai";
@@ -51,8 +51,8 @@ const ICONS = {
 	reset: "↺",
 };
 const BAR_WIDTH = 8;
-const BAR_FULL = "█";
-const BAR_EMPTY = "░";
+const BAR_FULL = "\u25b0"; // ▰ filled meter cell — light outline, optically centered
+const BAR_EMPTY = "\u25b1"; // ▱ empty meter cell
 const QUOTA_POLL_MS = 5 * 60 * 1000;
 const GIT_POLL_MS = 4000;
 const PR_POLL_MS = 30_000;
@@ -935,7 +935,7 @@ export function renderFooterLines(input: FooterRenderInput): string[] {
 	const buildLine1 = (v: Variant): { left: string; right: string } => {
 		let left = modelGroup;
 		if (!v.hideMeta) {
-			left = `${modelGroup}  ${meta(ICONS.folder, LATTE.teal, compactPath(input.cwd, v.pathMax))}`;
+			left = `${modelGroup} ${thinSep()} ${meta(ICONS.folder, LATTE.teal, compactPath(input.cwd, v.pathMax))}`;
 		}
 
 		const rightGroups: string[] = [];

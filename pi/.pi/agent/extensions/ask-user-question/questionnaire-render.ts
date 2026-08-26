@@ -261,7 +261,7 @@ function helpText(state: QuestionnaireState): string {
 	const q = state.currentQuestion();
 	const navigation = state.isMulti
 		? state.editorHasFocus()
-			? "Tab/Shift+Tab navigate"
+			? "Tab/Shift+Tab or ←→ at input edges navigate"
 			: "Tab/←→ navigate"
 		: undefined;
 

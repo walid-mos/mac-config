@@ -51,6 +51,21 @@ function cursorOnLastRow(state: QuestionnaireState, editor: Editor): boolean {
 	return cursor.line === editor.getLines().length - 1;
 }
 
+/** True when ←/→ should navigate between questionnaire tabs instead of moving
+ * within the editor buffer. */
+function cursorAtBufferStart(editor: Editor): boolean {
+	const cursor = editor.getCursor();
+	return cursor.line === 0 && cursor.col === 0;
+}
+
+function cursorAtBufferEnd(editor: Editor): boolean {
+	const cursor = editor.getCursor();
+	const lines = editor.getLines();
+	const lastLine = lines[lines.length - 1];
+	if (lastLine === undefined) return false;
+	return cursor.line === lines.length - 1 && cursor.col >= lastLine.length;
+}
+
 export function runQuestionnaire<TUi>(
 	custom: <T>(factory: CustomFactory<T>) => Promise<T>,
 	questions: Question[],
@@ -141,6 +156,18 @@ export function runQuestionnaire<TUi>(
 					refresh();
 					return;
 				}
+			}
+			// ←/→ at the input's buffer edges navigate between questions. Inside
+			// the buffer they retain the editor's normal cursor movement.
+			if (q && !state.isOpenEnded(q) && state.isMulti && matchesKey(data, Key.right) && cursorAtBufferEnd(editor)) {
+				state.enterTab((state.tab + 1) % state.totalTabs);
+				refresh();
+				return;
+			}
+			if (q && !state.isOpenEnded(q) && state.isMulti && matchesKey(data, Key.left) && cursorAtBufferStart(editor)) {
+				state.enterTab((state.tab - 1 + state.totalTabs) % state.totalTabs);
+				refresh();
+				return;
 			}
 			// ↑/↓ at the editor's buffer edges leave the editor for the neighbouring
 			// option row; inside the buffer they move the cursor.

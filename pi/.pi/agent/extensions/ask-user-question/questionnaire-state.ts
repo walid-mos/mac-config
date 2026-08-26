@@ -192,14 +192,13 @@ export class QuestionnaireState {
 		const q = this.currentQuestion();
 		if (!q) return NO_EFFECT;
 		const text = submittedValue.trim();
-		// The Editor already cleared its buffer: the next saveDraft (auto-advance)
-		// would otherwise wipe the draft we are about to record.
-		this.skipNextDraftSave = true;
-
 		if (this.isOpenEnded(q)) {
 			const answer = text || UI_TEXT.noResponse;
 			if (text) this.drafts.set(q.id, text);
 			this.answers.set(q.id, { kind: "single", id: q.id, value: answer, label: answer, wasCustom: true });
+			// The Editor already cleared its buffer: the next saveDraft (auto-advance)
+			// would otherwise wipe the draft we just recorded.
+			this.skipNextDraftSave = true;
 			return ["advance"];
 		}
 
@@ -208,7 +207,9 @@ export class QuestionnaireState {
 			// its buffer before onSubmit fired).
 			if (text) this.drafts.set(q.id, text);
 			else this.drafts.delete(q.id);
-			return this.commitMultiSelection(q);
+			const effects = this.commitMultiSelection(q);
+			if (effects.includes("advance")) this.skipNextDraftSave = true;
+			return effects;
 		}
 
 		if (!text) {
@@ -217,6 +218,9 @@ export class QuestionnaireState {
 		}
 		this.drafts.set(q.id, text);
 		this.answers.set(q.id, { kind: "single", id: q.id, value: text, label: text, wasCustom: true });
+		// The Editor already cleared its buffer before onSubmit; preserve the
+		// submitted draft when the component immediately advances tabs.
+		this.skipNextDraftSave = true;
 		return ["advance"];
 	}
 

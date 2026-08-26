@@ -7,6 +7,7 @@ brew "stow"
 brew "starship"
 brew "zoxide"
 brew "fzf"
+brew "jq"
 brew "fastfetch"
 
 # Éditeurs & outillage dev

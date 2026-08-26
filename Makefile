@@ -10,9 +10,9 @@ export PATH := /opt/homebrew/bin:/usr/local/bin:$(PATH)
 STOW := stow -t $(HOME)
 
 # Chaque dossier à la racine du repo est un package Stow — ajouter un dossier
-# suffit à le rendre stowable. NONSTOW liste les seules exceptions : docs
-# (documentation), obsidian (cible custom iCloud, stowé par sa propre cible),
-# scripts (outillage git interne) et claude (package conservé, non déployé).
+# suffit à le rendre stowable. NONSTOW liste les seules exceptions : obsidian
+# (cible custom iCloud, stowé par sa propre cible), scripts (outillage git
+# interne) et claude (package conservé, non déployé).
 NONSTOW := docs obsidian scripts claude
 PACKAGES := $(filter-out $(NONSTOW),$(patsubst %/,%,$(wildcard */)))
 
@@ -30,7 +30,7 @@ NOFOLD := colima docker gh git herdr hermes homebrew languages rclone rtk
 
 # Hooks post-install chaînés par `make install` (cible <nom>-post ; rust et crit
 # n'ont pas de package Stow — rustup gère ~/.rustup/~/.cargo, Crit est une formula brew).
-POSTS := crit dev-dirs gh herdr hermes nvim pi rp rtk rust
+POSTS := crit dev-dirs gh herdr hermes nvim pi rtk rust
 
 # Obsidian : le vault vit dans iCloud, seule la config .obsidian est stowée
 # (symlinks relatifs → portables entre machines). Les binaires (thème, plugins,
@@ -325,11 +325,6 @@ pi-test:
 
 herdr-pi-smoke: herdr
 	@python3 scripts/test-herdr-pi-startup.py
-
-rp-post:
-	@command -v node >/dev/null || command -v fnm >/dev/null \
-		|| { echo "node not found — install it (fnm install --lts) so 'rp' can serve plan.html"; exit 0; }
-	@echo "rp ready: \`rp <slug>\` will serve plan.html and wait for /submit"
 
 # crit : formula brew (binaire) + skills Pi officiels installés dans un HOME
 # temporaire, puis copiés dans ~/.pi/agent/external/skills/{crit,crit-cli}.

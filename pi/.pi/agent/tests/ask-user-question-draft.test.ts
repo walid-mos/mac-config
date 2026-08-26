@@ -138,6 +138,39 @@ function testEmptyMultiSelectSubmitDoesNotSkipFollowingDraft(): void {
 	assert.equal(editor.getText(), "replacement draft", "replacement multi-select draft is saved");
 }
 
+function testEmptyOpenEndedSubmitClearsPreviousDraft(): void {
+	const editor = makeEditor();
+	const openEndedQuestions = [
+		{ id: "q1", label: "Q1", prompt: "Question 1 ?", options: [], allowOther: true, multiSelect: false },
+		questions[1],
+	];
+	const state = new QuestionnaireState(openEndedQuestions, editor);
+	editor.setText("old answer");
+	assert.deepEqual(state.submitEditorText(editor.getText()), ["advance"]);
+	editor.clearLikeRealTui();
+	advanceToNextQuestion(state);
+	state.enterTab(0);
+	assert.equal(editor.getText(), "old answer");
+	assert.deepEqual(state.submitEditorText(""), ["advance"]);
+	editor.clearLikeRealTui();
+	advanceToNextQuestion(state);
+	state.enterTab(0);
+	assert.equal(editor.getText(), "", "cleared open-ended answer is not restored as a stale draft");
+}
+
+function testDuplicateOptionValuesUseSavedIndex(): void {
+	const editor = makeEditor();
+	const duplicateValueQuestions = [
+		{ id: "q1", label: "Q1", prompt: "Question 1 ?", options: [{ value: "same", label: "Option A" }, { value: "same", label: "Option B" }], allowOther: true, multiSelect: false },
+		questions[1],
+	];
+	const state = new QuestionnaireState(duplicateValueQuestions, editor);
+	assert.deepEqual(state.selectOption(1), ["advance"]);
+	advanceToNextQuestion(state);
+	state.enterTab(0);
+	assert.equal(state.cursor, 1, "the saved second index wins over the duplicate value fallback");
+}
+
 const tests: Array<[string, () => void]> = [
 	["committed custom text survives the auto-advance tab switch", testCommittedCustomTextSurvivesTabSwitch],
 	["open-ended free answer survives the auto-advance", testOpenEndedAnswerSurvivesAdvance],
@@ -146,6 +179,8 @@ const tests: Array<[string, () => void]> = [
 	["selected regular option is restored on revisit", testSelectedRegularOptionIsRestored],
 	["empty submit does not skip the following draft", testEmptySubmitDoesNotSkipFollowingDraft],
 	["empty multi-select submit does not skip the following draft", testEmptyMultiSelectSubmitDoesNotSkipFollowingDraft],
+	["empty open-ended submit clears the previous draft", testEmptyOpenEndedSubmitClearsPreviousDraft],
+	["duplicate option values use the saved index", testDuplicateOptionValuesUseSavedIndex],
 ];
 
 for (const [name, test] of tests) {

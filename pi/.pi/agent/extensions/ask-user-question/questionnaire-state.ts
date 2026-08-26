@@ -195,6 +195,7 @@ export class QuestionnaireState {
 		if (this.isOpenEnded(q)) {
 			const answer = text || UI_TEXT.noResponse;
 			if (text) this.drafts.set(q.id, text);
+			else this.drafts.delete(q.id);
 			this.answers.set(q.id, { kind: "single", id: q.id, value: answer, label: answer, wasCustom: true });
 			// The Editor already cleared its buffer: the next saveDraft (auto-advance)
 			// would otherwise wipe the draft we just recorded.
@@ -380,6 +381,8 @@ export class QuestionnaireState {
 		const opts = this.currentOptions();
 		const answer = this.answers.get(q.id);
 		if (answer?.kind === "single" && !answer.wasCustom) {
+			const savedIndex = answer.index === undefined ? -1 : answer.index - 1;
+			if (savedIndex >= 0 && opts[savedIndex]?.value === answer.value) return savedIndex;
 			const selectedIndex = opts.findIndex((option) => option.value === answer.value);
 			if (selectedIndex >= 0) return selectedIndex;
 		}

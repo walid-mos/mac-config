@@ -686,13 +686,13 @@ function clampFooterLines(lines: string[], width: number): string[] {
 }
 
 /** Line 2 left: branch │ slim churn bar + counters (+ PR link appended later). */
-function gitLine(s: GitStatus | null, branch?: string): string {
+function gitLine(s: GitStatus | null, branch?: string, maxBranch = 28): string {
 	const dim = (t: string) => fgHex(LATTE.subtext0, t);
 	const groups: string[] = [];
 
 	if (branch) {
 		groups.push(
-			`${fgHex(LATTE.sapphire, ICONS.branch)} ${fgHex(LATTE.sapphire, clampText(branch, 28))}`,
+			`${fgHex(LATTE.sapphire, ICONS.branch)} ${fgHex(LATTE.sapphire, clampText(branch, maxBranch))}`,
 		);
 	}
 
@@ -782,8 +782,14 @@ function openaiQuotaPart(quota: OpenAIQuota, dim: (s: string) => string, compact
 	return `${head} ${extras.join(` ${thinSep()} `)}`;
 }
 
-function gitWithPr(status: GitStatus | null, pr: GitPr | null, branch?: string): string {
-	const groups = [gitLine(status, branch), prLink(pr)].filter(Boolean);
+function gitWithPr(
+	status: GitStatus | null,
+	pr: GitPr | null,
+	branch?: string,
+	maxBranch = 28,
+	withPr = true,
+): string {
+	const groups = [gitLine(status, branch, maxBranch), withPr ? prLink(pr) : ""].filter(Boolean);
 	return groups.join(` ${thinSep()} `);
 }
 
@@ -919,7 +925,7 @@ export function renderFooterLines(input: FooterRenderInput): string[] {
 	);
 	const costGroup = fgHex(LATTE.text, `$${input.tokens.cost.toFixed(3)}`);
 
-	type Variant = { pathMax: number; exactTokens: boolean; hideMeta?: boolean; hideArrows?: boolean };
+	type Variant = { pathMax: number; exactTokens: boolean; hideMeta?: boolean };
 	// Progressive degradation: shrink quiet meta first, then drop exact tokens,
 	// then hide the meta block entirely, finally drop the arrow token counts
 	// (the hero pill, context gauge and cost are never dropped).
@@ -928,54 +934,76 @@ export function renderFooterLines(input: FooterRenderInput): string[] {
 		{ pathMax: 22, exactTokens: true },
 		{ pathMax: 18, exactTokens: false },
 		{ pathMax: 18, exactTokens: false, hideMeta: true },
-		{ pathMax: 18, exactTokens: false, hideMeta: true, hideArrows: true },
 	];
 
-	const buildLine1 = (v: Variant): { left: string; right: string } => {
+	const buildLeft = (v: Variant): string => {
 		let left = modelGroup;
 		if (!v.hideMeta) {
 			left = `${modelGroup} ${thinSep()} ${meta(ICONS.folder, LATTE.teal, compactPath(input.cwd, v.pathMax))}`;
 		}
-
-		const rightGroups: string[] = [];
-		if (input.statuses.length > 0) {
-			rightGroups.push(input.statuses.join("  "));
-		}
-		if (input.usage != null && Number.isFinite(input.usage.percent)) {
-			rightGroups.push(contextGroup(input.usage, v.exactTokens));
-		}
-		if (!v.hideArrows) rightGroups.push(arrowsGroup);
-		rightGroups.push(costGroup);
-		return { left, right: rightGroups.join(` ${thinSep()} `) };
+		return left;
 	};
-
+	// ── Line 1 right: provider quotas — model usage lives with the model ──
+	const quotaOf = (compact: boolean): string =>
+		quotaContent(providerQuotaParts(input.quotas, input.provider, compact));
 	let line1: string | undefined;
 	for (const v of variants) {
-		const { left, right } = buildLine1(v);
+		const left = buildLeft(v);
+		const right = quotaOf(false);
 		if (visibleWidth(left) + visibleWidth(right) + 2 <= width) {
 			line1 = justifyLine(left, right, width);
 			break;
 		}
 	}
-	line1 ??= (() => {
-		const { left, right } = buildLine1(variants[variants.length - 1]!);
-		return truncateToWidth(justifyLine(left, right, width), width);
-	})();
-
-	const lines = [line1];
-
-	// ── Line 2 left: git bar + counters (+ PR link) │ right: provider quotas ──
-	const gitPart = gitWithPr(input.git, input.pr, input.branch);
-	let quotaParts = providerQuotaParts(input.quotas, input.provider);
-	if (visibleWidth(gitPart) + visibleWidth(quotaContent(quotaParts)) + 2 > width) {
-		quotaParts = providerQuotaParts(input.quotas, input.provider, true);
+	if (line1 === undefined) {
+		const left = buildLeft(variants[variants.length - 1]!);
+		const compactQuota = quotaOf(true);
+		line1 =
+			visibleWidth(left) + visibleWidth(compactQuota) + 2 <= width
+				? justifyLine(left, compactQuota, width)
+				: truncateToWidth(justifyLine(left, compactQuota, width), width);
 	}
-	const quota = quotaContent(quotaParts);
-	lines.push(truncateToWidth(justifyLine(gitPart, quota, width), width));
-
-	return lines;
+	// ── Line 2: git left │ statuses + context + arrows + cost right ──
+	const dataRight = (exactTokens: boolean, withArrows: boolean): string => {
+		const rightGroups: string[] = [];
+		if (input.statuses.length > 0) {
+			rightGroups.push(input.statuses.join("  "));
+		}
+		if (input.usage != null && Number.isFinite(input.usage.percent)) {
+			rightGroups.push(contextGroup(input.usage, exactTokens));
+		}
+		if (withArrows) rightGroups.push(arrowsGroup);
+		rightGroups.push(costGroup);
+		return rightGroups.join(` ${thinSep()} `);
+	};
+	// Degradation ladder: keep the richest right side as long as some left
+	// variant fits — the cost is the very last thing either side gives up.
+	const rights: string[] = [
+		dataRight(true, true),
+		dataRight(false, true),
+		dataRight(false, false),
+		costGroup,
+	];
+	const lefts: string[] = [
+		gitWithPr(input.git, input.pr, input.branch),
+		gitWithPr(input.git, input.pr, input.branch, 28, false),
+		gitWithPr(input.git, input.pr, input.branch, 10, false),
+		gitWithPr(input.git, input.pr, input.branch, 8, false),
+		gitWithPr(input.git, input.pr, undefined, 28, false),
+	];
+	let line2: string | undefined;
+	for (const right of rights) {
+		for (const left of lefts) {
+			if (visibleWidth(left) + visibleWidth(right) + 2 <= width) {
+				line2 = justifyLine(left, right, width);
+				break;
+			}
+		}
+		if (line2 !== undefined) break;
+	}
+	line2 ??= truncateToWidth(justifyLine(lefts[0]!, costGroup, width), width);
+	return [line1, line2];
 }
-
 function quotaContent(parts: string[]): string {
 	if (parts.length === 0) return "";
 	return `${fgHex(LATTE.subtext0, ICONS.quota)} ${parts.join(` ${thinSep()} `)}`;

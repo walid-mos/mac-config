@@ -759,17 +759,18 @@ function prLink(pr: GitPr | null): string {
 }
 
 
-function usageWindowPart(window: UsageWindow, dim: (s: string) => string): string {
-	const remaining = 100 - window.usedPercent;
-	const reset = window.reset ? ` ${dim(`${ICONS.reset} ${fmtReset(window.reset)}`)}` : "";
-	return `${dim(window.label)} ${quotaGauge(remaining, 100)}${reset}`;
-}
 
-function openaiQuotaPart(quota: OpenAIQuota, dim: (s: string) => string): string {
+function openaiQuotaPart(quota: OpenAIQuota, dim: (s: string) => string, compact = false): string {
 	const head = quota.plan
 		? `${dim("openai")} ${fgHex(LATTE.mauve, quota.plan)}`
 		: dim("openai");
-	const extras = quota.windows.map((window) => usageWindowPart(window, dim));
+	const resets = compact ? [] : quota.windows.map((window) => window.reset).filter(Boolean);
+	const extras = quota.windows.map(
+		(window) => `${dim(window.label)} ${quotaGauge(100 - window.usedPercent, 100)}`,
+	);
+	if (resets.length > 0) {
+		extras.push(dim(`${ICONS.reset} ${resets.map((r) => fmtReset(r)).join(" \u00b7 ")}`));
+	}
 	if (quota.credits !== undefined) {
 		const col = balanceColor(quota.credits);
 		extras.push(`${fgHex(col, "◉")} ${fgHex(col, `$${quota.credits.toFixed(2)}`)} ${dim("crédits")}`);
@@ -847,15 +848,13 @@ function providerQuotaParts(quotas: QuotaCache, provider: string | undefined, co
 
 	if (quotas.kimi && (showKimi || showAll)) {
 		const { fiveHour, weekly } = quotas.kimi;
+		const resets = [fiveHour.reset, weekly.reset].filter((r) => !compact && r);
 		let part = `${dim("kimi")} ${dim("5h")} ${quotaGauge(fiveHour.remaining, fiveHour.limit)}`;
-		if (!compact && fiveHour.reset) {
-			part += ` ${dim(`${ICONS.reset} ${fmtReset(fiveHour.reset)}`)}`;
-		}
 		if (Number.isFinite(weekly.limit) && weekly.limit > 0) {
 			part += ` ${thinSep()} ${dim("sem")} ${quotaGauge(weekly.remaining, weekly.limit)}`;
-			if (!compact && weekly.reset) {
-				part += ` ${dim(`${ICONS.reset} ${fmtReset(weekly.reset)}`)}`;
-			}
+		}
+		if (resets.length > 0) {
+			part += ` ${thinSep()} ${dim(`${ICONS.reset} ${resets.map((r) => fmtReset(r)).join(" \u00b7 ")}`)}`;
 		}
 		parts.push(part);
 	}
@@ -864,35 +863,36 @@ function providerQuotaParts(quotas: QuotaCache, provider: string | undefined, co
 		const orq = quotas.openrouter;
 		const col = balanceColor(orq.balance);
 		let part = `${dim("openrouter")} ${fgHex(col, "\u25c9")} ${fgHex(col, `$${orq.balance.toFixed(2)}`)}`;
-		if (orq.weekly && !compact) {
+		if (orq.weekly) {
 			part += ` ${thinSep()} ${dim("hebdo")} ${quotaGauge(orq.weekly.remaining, orq.weekly.limit)}`;
+			if (!compact && orq.weekly.reset) {
+				part += ` ${thinSep()} ${dim(`${ICONS.reset} ${fmtReset(orq.weekly.reset)}`)}`;
+			}
 		}
 		parts.push(part);
 	}
 
 	if (quotas.openai && (showOpenai || showAll)) {
-		parts.push(openaiQuotaPart(quotas.openai, dim));
+		parts.push(openaiQuotaPart(quotas.openai, dim, compact));
 	}
 
 	if (quotas.xai && (showXai || showAll)) {
 		const x = quotas.xai;
 		let bits: string[] = [];
 		if (x.tier) bits.push(fgHex(LATTE.mauve, x.tier));
+		const xresets: string[] = [];
 		if (x.monthly && x.monthly.limit > 0 && x.pool?.label !== "mois") {
 			const remaining = x.monthly.limit - x.monthly.used;
-			let m = `${dim("mois")} ${quotaGauge(remaining, x.monthly.limit)}`;
-			if (x.monthly.reset) {
-				m += ` ${dim(`${ICONS.reset} ${fmtReset(x.monthly.reset)}`)}`;
-			}
-			bits.push(m);
+			bits.push(`${dim("mois")} ${quotaGauge(remaining, x.monthly.limit)}`);
+			if (x.monthly.reset) xresets.push(x.monthly.reset);
 		}
 		if (x.pool && Number.isFinite(x.pool.usedPercent)) {
 			const remaining = 100 - x.pool.usedPercent;
-			let pool = `${dim(x.pool.label)} ${quotaGauge(remaining, 100)}`;
-			if (x.pool.reset) {
-				pool += ` ${dim(`${ICONS.reset} ${fmtReset(x.pool.reset)}`)}`;
-			}
-			bits.push(pool);
+			bits.push(`${dim(x.pool.label)} ${quotaGauge(remaining, 100)}`);
+			if (x.pool.reset) xresets.push(x.pool.reset);
+		}
+		if (!compact && xresets.length > 0) {
+			bits.push(dim(`${ICONS.reset} ${xresets.map((r) => fmtReset(r)).join(" \u00b7 ")}`));
 		}
 		if (x.prepaidBalance && x.prepaidBalance > 0) {
 			const col = balanceColor(x.prepaidBalance);

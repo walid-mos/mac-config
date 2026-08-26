@@ -34,11 +34,14 @@ export function orderedWidgetLines(width: number, theme: Theme): string[] {
 class OrderedWidgetHost {
 	private readonly unsubscribe: () => void;
 
-	constructor(
-		private readonly tui: TUI,
-		private readonly theme: Theme,
-		private readonly placement: WidgetPlacement,
-	) {
+	private readonly tui: TUI;
+	private readonly theme: Theme;
+	private readonly placement: WidgetPlacement;
+
+	constructor(tui: TUI, theme: Theme, placement: WidgetPlacement) {
+		this.tui = tui;
+		this.theme = theme;
+		this.placement = placement;
 		this.unsubscribe = subscribeSurfaceChanges(() => this.requestRender());
 	}
 

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { Check } from "typebox/value";
 import { AskParams, normalizeQuestions } from "../extensions/ask-user-question/schema.ts";
 
 function testValueFallsBackToLabel(): void {
@@ -26,9 +27,27 @@ function testDefaultsApplied(): void {
 	assert.equal(question.multiSelect, false);
 }
 
+function testSchemaAcceptsOmittedOptionValue(): void {
+	assert.equal(
+		Check(AskParams, {
+			questions: [{ id: "scope", prompt: "Which scope?", options: [{ label: "Full repo" }] }],
+		}),
+		true,
+	);
+}
+
+function testExplicitEmptyOptionValueIsPreserved(): void {
+	const [question] = normalizeQuestions([
+		{ id: "empty", prompt: "Empty value?", options: [{ value: "", label: "Empty value" }] },
+	]);
+	assert.equal(question.options[0]?.value, "");
+}
+
 const tests: Array<[string, () => void]> = [
 	["missing option value falls back to label", testValueFallsBackToLabel],
 	["defaults applied to raw payload", testDefaultsApplied],
+	["schema accepts omitted option value", testSchemaAcceptsOmittedOptionValue],
+	["explicit empty option value is preserved", testExplicitEmptyOptionValueIsPreserved],
 ];
 
 for (const [name, test] of tests) {

@@ -53,7 +53,7 @@ type RawQuestion = AskParamsInput["questions"][number];
 export function normalizeQuestions(raw: RawQuestion[]): Question[] {
 	return raw.map((q, i) => ({
 		...q,
-		options: (q.options ?? []).map((option) => ({ ...option, value: option.value || option.label })),
+		options: (q.options ?? []).map((option) => ({ ...option, value: option.value ?? option.label })),
 		label: q.label || `Q${i + 1}`,
 		allowOther: q.allowOther !== false,
 		multiSelect: q.multiSelect === true,

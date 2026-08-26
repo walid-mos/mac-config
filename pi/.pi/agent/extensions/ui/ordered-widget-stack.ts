@@ -18,47 +18,44 @@ export type OrderedWidgetEntry = {
 	render: (width: number, theme: Theme) => string[];
 };
 
-type MountedHost = {
-	component: OrderedWidgetHost;
-};
-
 type WidgetPlacement = SurfacePlacement;
 
-const mountedHosts = new Map<WidgetPlacement, MountedHost>();
-const surfaceEntriesByPlacement = new Map<WidgetPlacement, Map<string, () => void>>();
+/**
+ * Single source of truth for the adapter side: which host component is
+ * currently mounted for each placement. Entry bookkeeping lives in the
+ * surface registry; this map only tracks the mounted pi widget per placement.
+ */
+type PlacementBinding = { host?: OrderedWidgetHost };
 
-export function orderedWidgetLines(width: number, theme: Theme): string[] {
-	return surfaceRegistry.render("aboveEditor", width, theme);
-}
+const bindingsByPlacement = new Map<WidgetPlacement, PlacementBinding>();
 
 class OrderedWidgetHost {
 	private readonly unsubscribe: () => void;
 
 	private readonly tui: TUI;
-	private readonly theme: Theme;
+	private readonly readTheme: () => Theme;
 	private readonly placement: WidgetPlacement;
 
-	constructor(tui: TUI, theme: Theme, placement: WidgetPlacement) {
+	constructor(tui: TUI, readTheme: () => Theme, placement: WidgetPlacement) {
 		this.tui = tui;
-		this.theme = theme;
+		this.readTheme = readTheme;
 		this.placement = placement;
-		this.unsubscribe = subscribeSurfaceChanges(() => this.requestRender());
+		this.unsubscribe = subscribeSurfaceChanges(() => this.tui.requestRender());
 	}
 
 	render(width: number): string[] {
-		return surfaceRegistry.render(this.placement, width, this.theme);
+		return surfaceRegistry.render(this.placement, width, this.readTheme());
 	}
 
-	invalidate(): void {}
+	/** Called by pi-tui on theme changes and other global invalidations: re-render with live theme. */
+	invalidate(): void {
+		this.tui.requestRender();
+	}
 
 	dispose(): void {
 		this.unsubscribe();
-		const mounted = mountedHosts.get(this.placement);
-		if (mounted?.component === this) mountedHosts.delete(this.placement);
-	}
-
-	requestRender(): void {
-		this.tui.requestRender();
+		const binding = bindingsByPlacement.get(this.placement);
+		if (binding?.host === this) binding.host = undefined;
 	}
 }
 
@@ -80,47 +77,45 @@ export function setOrderedSurfaceWidget(
 		removeSurfaceEntry(ui, key, placement);
 		return;
 	}
-
-	const handles = getSurfaceHandles(placement);
-	const unregister = surfaceRegistry.register({
+	surfaceRegistry.register({
 		id: key,
 		placement,
 		priority: entry.priority,
 		render: ({ width, theme }) => (theme === undefined ? [] : entry.render(width, theme)),
 	});
-	handles.set(key, unregister);
 	mountHost(ui, placement);
 }
 
 function removeSurfaceEntry(ui: ExtensionUIContext, key: string, placement: WidgetPlacement): void {
-	const handles = getSurfaceHandles(placement);
-	const unregister = handles.get(key);
-	if (unregister === undefined) return;
-	handles.delete(key);
-	unregister();
+	const removed = surfaceRegistry.unregister(key);
+	if (!removed) return;
 	if (surfaceRegistry.hasEntries(placement)) return;
-	ui.setWidget(HOST_WIDGET_IDS[placement], undefined);
-	const host = mountedHosts.get(placement);
-	host?.component.dispose();
+	unmountHost(ui, placement);
 }
 
 function mountHost(ui: ExtensionUIContext, placement: WidgetPlacement): void {
-	if (mountedHosts.has(placement)) return;
+	const binding = getBinding(placement);
+	if (binding.host !== undefined) return;
 	ui.setWidget(
 		HOST_WIDGET_IDS[placement],
-		(tui, theme) => {
-			const component = new OrderedWidgetHost(tui, theme, placement);
-			mountedHosts.set(placement, { component });
-			return component;
+		(tui) => {
+			const host = new OrderedWidgetHost(tui, () => ui.theme, placement);
+			binding.host = host;
+			return host;
 		},
 		{ placement },
 	);
 }
 
-function getSurfaceHandles(placement: WidgetPlacement): Map<string, () => void> {
-	const existing = surfaceEntriesByPlacement.get(placement);
+function unmountHost(ui: ExtensionUIContext, placement: WidgetPlacement): void {
+	bindingsByPlacement.get(placement)?.host?.dispose();
+	ui.setWidget(HOST_WIDGET_IDS[placement], undefined);
+}
+
+function getBinding(placement: WidgetPlacement): PlacementBinding {
+	const existing = bindingsByPlacement.get(placement);
 	if (existing !== undefined) return existing;
-	const handles = new Map<string, () => void>();
-	surfaceEntriesByPlacement.set(placement, handles);
-	return handles;
+	const binding: PlacementBinding = {};
+	bindingsByPlacement.set(placement, binding);
+	return binding;
 }

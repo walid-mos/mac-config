@@ -9,21 +9,24 @@ test("keeps above-editor widgets in priority order without remounting on updates
 	let registrations = 0;
 	let removals = 0;
 	let rendersRequested = 0;
+	let activeTheme: Record<string, never> = {};
 	let component: { dispose?(): void; render(width: number): string[] } | undefined;
 	const tui = { requestRender: () => { rendersRequested += 1; } };
-	const theme = {};
 	const ui = {
+		get theme(): Record<string, never> {
+			return activeTheme;
+		},
 		setWidget(
 			_id: string,
 			content: ((host: typeof tui, colors: typeof theme) => { dispose?(): void; render(width: number): string[] }) | undefined,
 			_options?: { placement?: string },
-		): void {
+			): void {
 			if (content === undefined) {
 				removals += 1;
 				return;
 			}
 			registrations += 1;
-			component = content(tui, theme);
+			component = content(tui, activeTheme);
 		},
 	};
 
@@ -63,4 +66,36 @@ test("keeps above-editor widgets in priority order without remounting on updates
 	setOrderedAboveEditorWidget(ui, "activity", undefined);
 	setOrderedAboveEditorWidget(ui, "background", undefined);
 	assert.equal(removals, 1);
+});
+
+test("re-renders with the live ui theme after invalidation", () => {
+	let rendersRequested = 0;
+	let component: { invalidate?(): void; render(width: number): string[] } | undefined;
+	const tui = { requestRender: () => { rendersRequested += 1; } };
+	let activeTheme: { accent?: string } = { accent: "mauve" };
+	const ui = {
+		get theme(): { accent?: string } {
+			return activeTheme;
+		},
+		setWidget(
+			_id: string,
+			content: ((host: typeof tui, colors: unknown) => { invalidate?(): void; render(width: number): string[] }) | undefined,
+		): void {
+			if (content === undefined) return;
+			component = content(tui, activeTheme);
+		},
+	};
+
+	setOrderedAboveEditorWidget(ui, "themed", {
+		priority: 1,
+		render: (_width, theme) => [`accent:${String(theme.accent)}`],
+	});
+
+	assert.deepEqual(component?.render(80), ["accent:mauve"]);
+
+	activeTheme = { accent: "blue" };
+	component?.invalidate?.();
+	assert.deepEqual(component?.render(80), ["accent:blue"]);
+	// register() fired before the host subscribed; invalidate() is the one observed render.
+	assert.equal(rendersRequested, 1);
 });

@@ -73,7 +73,10 @@ predicates, mappers, constants/member sets, schemas/DTOs, validation, error
 maps, route/wire values, state derivations, and repeated I/O shapes. Run exact
 identifier/export and distinctive literal/member-set searches once here;
 record their bounded hits in `retrievalCandidates`. Reviewers verify those hits
-and broaden only when their angle leaves a specific seed unresolved.
+and broaden only when their angle leaves a specific seed unresolved. When
+fallow resolves (load skill `fallow-gate`), merge its `dupes --near
+--changed-since` clone groups into `retrievalCandidates` as deterministic
+leads — same status as any lead, never proof.
 
 `cacheKey = hash(version + range + focus + files + workspace)`, where
 `workspace` includes HEAD, status/diff hashes, and package/alias/architecture
@@ -183,8 +186,11 @@ that contract.
 
 After each set, rerun `LOCK`. If it fails, revert only that set, classify it as
 follow-up, and restore green. If the workspace fingerprint changed since Phase
-1, invalidate the cache and rediscover before applying stale evidence. Leave
-changes unstaged unless the caller's active workflow owns commits.
+1, invalidate the cache and rediscover before applying stale evidence. After
+the last set, also run the fallow audit gate (skill `fallow-gate`) when the
+binary resolves: findings introduced by an applied set revert that set, like a
+red `LOCK`. Leave changes unstaged unless the caller's active workflow owns
+commits.
 
 ## Cost and telemetry
 

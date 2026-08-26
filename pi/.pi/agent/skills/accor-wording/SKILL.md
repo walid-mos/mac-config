@@ -47,6 +47,8 @@ List files per scope with `git ls-files` (APP) and `find` (PROTO). Embed the
 | `hotel-side`           | `src/pages/hotel-home/`, `src/pages/bar-programme/`, hôtel features              | `src/components/hotel-home/`, `hotel-demo/`, `steps/`, hotel-i18n      |
 | `auth-gates-errors`    | `src/pages/login/`, forbidden/not-found, gates, navigation                       | `src/components/auth/`, `src/components/errors/`, pages-erreur.md      |
 
+### Reader task (every `reader`)
+
 ```
 Audit question: every user-visible string in the app (i18n, hardcoded, aria-label, placeholder, title, errors, tooltips) must match the proto for the SAME screen/element, character-exact, FR and EN.
 

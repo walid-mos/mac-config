@@ -1,18 +1,129 @@
 model:
-  default: stealth/ox-alpha
-  provider: nous
-  base_url: https://inference-api.nousresearch.com/v1
+  default: gpt-5.6-terra
+  provider: openai-codex
+  base_url: https://chatgpt.com/backend-api/codex
+agent:
+  disabled_toolsets:
+    - kanban
 skills:
-  disabled: []
+  disabled:
+    - apple-notes
+    - apple-reminders
+    - findmy
+    - imessage
+    - claude-code
+    - claude-to-hermes-migration
+    - codex
+    - computer-use
+    - cron-web-agent-patterns
+    - hermes-cron-gateway-ops
+    - hermes-ops
+    - keychain-session-auth
+    - legacy-workspace-audit
+    - merge-reconciler
+    - opencode
+    - browser-capture-agents
+    - architecture-diagram
+    - ascii-art
+    - ascii-video
+    - baoyu-infographic
+    - claude-design
+    - comfyui
+    - design-md
+    - excalidraw
+    - gpt-image-asset-pipeline
+    - humanizer
+    - manim-video
+    - p5js
+    - popular-web-designs
+    - pretext
+    - sketch
+    - songwriting-and-ai-music
+    - touchdesigner-mcp
+    - sdlc-review
+    - email-inbox-triage
+    - himalaya
+    - email-account-setup
+    - email-accounts
+    - email-accounts-setup
+    - email-multi-account-setup
+    - codebase-inspection
+    - github-auth
+    - github-code-review
+    - github-issue-to-pr
+    - github-issues
+    - github-pr-workflow
+    - github-repo-management
+    - mail-account-hygiene
+    - gif-search
+    - songsee
+    - youtube-content
+    - evaluating-llms-harness
+    - weights-and-biases
+    - huggingface-hub
+    - llama-cpp
+    - serving-llms-vllm
+    - obsidian
+    - airtable
+    - box
+    - document-to-action-items
+    - docx
+    - financial-expense-auditing
+    - google-workspace
+    - maps
+    - meeting-action-items
+    - nano-pdf
+    - notion
+    - ocr-and-documents
+    - pdf
+    - personal-finance-tracking
+    - powerpoint
+    - product-price-monitor
+    - session-librarian
+    - spending-audit
+    - teams-meeting-pipeline
+    - weekly-review-planning
+    - xlsx
+    - arxiv
+    - blocked-page-recovery
+    - blogwatcher
+    - competitor-news-monitor
+    - grounded-citations
+    - llm-wiki
+    - research-paper-writing
+    - web-source-verification
+    - openhue
+    - xurl
+    - dogfood
+    - hermes-agent-skill-authoring
+    - inspecting-hermes-desktop-dom
+    - node-inspect-debugger
+    - plan
+    - python-debugpy
+    - requesting-code-review
+    - simplify-code
+    - spike
+    - systematic-debugging
+    - test-driven-development
 command_allowlist:
   - delete in root path
-_config_version: 37
+_config_version: 39
 custom_providers:
   - name: Gemma 4
     base_url: http://localhost:8080/v1
     model: mlx-community/gemma-4-12B-it-4bit
     models:
       - mlx-community/gemma-4-12B-it-4bit
+platform_toolsets:
+  cli: []
+  cron:
+    - browser
+    - file
+known_plugin_toolsets:
+  cli:
+    - a2a
+  cron:
+    - a2a
 
 # ── Security ──────────────────────────────────────────────────────────
 # Secret redaction is ON by default — strings that look like API keys,

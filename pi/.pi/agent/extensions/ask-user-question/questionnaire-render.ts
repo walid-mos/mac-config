@@ -259,9 +259,12 @@ function answerSummaryLine(questionLabel: string, answer: Answer, theme: Questio
 
 function helpText(state: QuestionnaireState): string {
 	const q = state.currentQuestion();
+	const canNavigateAtInputEdges = q !== undefined && !state.isOpenEnded(q);
 	const navigation = state.isMulti
 		? state.editorHasFocus()
-			? "Tab/Shift+Tab or ←→ at input edges navigate"
+			? canNavigateAtInputEdges
+				? "Tab/Shift+Tab or ←→ at input edges navigate"
+				: "Tab/Shift+Tab navigate"
 			: "Tab/←→ navigate"
 		: undefined;
 

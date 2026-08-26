@@ -6,6 +6,8 @@
     "pnpm",
     "--config.strict-dep-builds=false"
   ],
+  "shellPath": "/bin/bash",
+  "shellCommandPrefix": "shopt -s expand_aliases\nsource ~/.config/zsh/aliases",
   "quietStartup": true,
   "enableAnalytics": false,
   "enableInstallTelemetry": false,
@@ -23,10 +25,11 @@
   "enabledModels": [
     "openai-codex/gpt-5.6-sol",
     "xai/grok-4.6",
-    "openai-codex/gpt-5.6-terra",
     "kimi-coding/k3",
+    "openrouter/stealth/ox-alpha",
     "openrouter/deepseek/deepseek-v4-flash",
-    "openai-codex/gpt-5.6-luna"
+    "openai-codex/gpt-5.6-luna",
+    "openai-codex/gpt-5.6-terra"
   ],
   "hideThinkingBlock": false
 }

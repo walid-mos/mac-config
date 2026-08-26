@@ -11,11 +11,16 @@ export type SurfaceEntry = {
 	id: string;
 	placement: SurfacePlacement;
 	priority?: number;
+	/** Maximum rendered lines kept for this entry; extra lines collapse into a truncation marker. */
+	maxLines?: number;
 	render: (context: SurfaceRenderContext) => readonly string[];
 };
 
+export const DEFAULT_MAX_SURFACE_LINES = 10;
+
 export type SurfaceRegistry = {
 	register: (entry: SurfaceEntry) => () => void;
+	unregister: (id: string) => boolean;
 	clear: () => void;
 	hasEntries: (placement?: SurfacePlacement) => boolean;
 	render: (placement: SurfacePlacement, width: number, theme?: Theme) => string[];
@@ -43,6 +48,13 @@ export function createSurfaceRegistry(): SurfaceRegistry {
 		};
 	}
 
+	function unregister(id: string): boolean {
+		if (!entries.has(id)) return false;
+		entries.delete(id);
+		notify();
+		return true;
+	}
+
 	function clear(): void {
 		if (entries.size === 0) return;
 		entries.clear();
@@ -59,11 +71,7 @@ export function createSurfaceRegistry(): SurfaceRegistry {
 		return [...entries.values()]
 			.filter((entry) => entry.placement === placement)
 			.sort(compareSurfaceEntries)
-			.flatMap((entry) =>
-				entry
-					.render({ width: safeWidth, theme })
-					.map((line) => clipSurfaceLine(line, safeWidth)),
-			);
+			.flatMap((entry) => renderSurfaceEntry(entry, safeWidth, theme));
 	}
 
 	function subscribe(listener: () => void): () => void {
@@ -71,13 +79,27 @@ export function createSurfaceRegistry(): SurfaceRegistry {
 		return () => listeners.delete(listener);
 	}
 
-	return { register, clear, hasEntries, render, subscribe };
+	return { register, unregister, clear, hasEntries, render, subscribe };
 }
 
 export const surfaceRegistry = createSurfaceRegistry();
 
 export function subscribeSurfaceChanges(listener: () => void): () => void {
 	return surfaceRegistry.subscribe(listener);
+}
+
+function renderSurfaceEntry(entry: SurfaceEntry, width: number, theme: Theme | undefined): string[] {
+	let lines: readonly string[];
+	try {
+		lines = entry.render({ width, theme });
+	} catch (error: unknown) {
+		const message = error instanceof Error ? error.message : String(error);
+		return [`[surface] ${entry.id}: render failed (${message})`].map((line) => clipSurfaceLine(line, width));
+	}
+	const maxLines = entry.maxLines ?? DEFAULT_MAX_SURFACE_LINES;
+	const visible = lines.slice(0, maxLines).map((line) => clipSurfaceLine(line, width));
+	if (lines.length <= maxLines) return visible;
+	return [...visible, `… (+${String(lines.length - maxLines)} lines)`];
 }
 
 function compareSurfaceEntries(left: SurfaceEntry, right: SurfaceEntry): number {

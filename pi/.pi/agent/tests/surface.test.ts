@@ -30,6 +30,55 @@ test("keeps every rendered line in the single normal view", () => {
 	assert.deepEqual(registry.render("aboveEditor", 80), ["summary", "detail", "full detail"]);
 });
 
+test("caps entries at maxLines with a truncation marker", () => {
+	const registry = createSurfaceRegistry();
+	const manyLines = Array.from({ length: 13 }, (_, index) => `line ${String(index + 1)}`);
+
+	registry.register(entry({ id: "capped-default", render: () => manyLines }));
+	registry.register(entry({ id: "capped-custom", maxLines: 2, render: () => manyLines }));
+
+	assert.deepEqual(registry.render("aboveEditor", 80), [
+		"line 1",
+		"line 2",
+		"… (+11 lines)",
+		"line 1",
+		"line 2",
+		"line 3",
+		"line 4",
+		"line 5",
+		"line 6",
+		"line 7",
+		"line 8",
+		"line 9",
+		"line 10",
+		"… (+3 lines)",
+	]);
+});
+
+test("isolates render failures per entry without dropping siblings", () => {
+	const registry = createSurfaceRegistry();
+	registry.register(entry({ id: "broken", priority: 1, render: () => { throw new Error("boom"); } }));
+	registry.register(entry({ id: "healthy", priority: 2, render: () => ["ok"] }));
+
+	assert.deepEqual(registry.render("aboveEditor", 80), ["[surface] broken: render failed (boom)", "ok"]);
+	const [fallback] = registry.render("aboveEditor", 10);
+	assert.equal(fallback?.endsWith("…"), true);
+});
+
+test("unregister removes an entry by id and reports whether it existed", () => {
+	const registry = createSurfaceRegistry();
+	let changes = 0;
+	registry.subscribe(() => {
+		changes += 1;
+	});
+	registry.register(entry({ id: "status", placement: "belowEditor", render: () => ["status"] }));
+
+	assert.equal(registry.unregister("missing"), false);
+	assert.equal(registry.unregister("status"), true);
+	assert.deepEqual(registry.render("belowEditor", 80), []);
+	assert.equal(changes, 2);
+});
+
 test("truncates ANSI-colored lines without exposing escape fragments", () => {
 	const registry = createSurfaceRegistry();
 	registry.register(entry({ id: "colored", render: () => ["\u001b[31mabcdef\u001b[0m"] }));

@@ -75,10 +75,25 @@ function testManualEraseStillClearsDraft(): void {
 	assert.equal(state.initialState().drafts.q1, undefined, "manual erase still clears the draft");
 }
 
+function testSelectingRegularOptionClearsCustomDraft(): void {
+	const editor = makeEditor();
+	const state = new QuestionnaireState(questions, editor);
+	state.moveCursor(1); // focus the custom input
+	editor.setText("draft abandonné");
+	state.moveCursor(-1); // return to the regular option without clearing the input
+	assert.deepEqual(state.selectOption(0), ["advance"]);
+	state.enterTab(state.advanceTarget() as number);
+	state.enterTab(0);
+	assert.equal(editor.getText(), "", "custom input is cleared after selecting a regular option");
+	assert.equal(state.cursor, 0, "regular option is selected on revisit");
+	assert.equal(state.initialState().drafts.q1, undefined, "custom draft is discarded");
+}
+
 const tests: Array<[string, () => void]> = [
 	["committed custom text survives the auto-advance tab switch", testCommittedCustomTextSurvivesTabSwitch],
 	["open-ended free answer survives the auto-advance", testOpenEndedAnswerSurvivesAdvance],
 	["manually erased draft is still discarded", testManualEraseStillClearsDraft],
+	["selecting a regular option discards the custom draft", testSelectingRegularOptionClearsCustomDraft],
 ];
 
 for (const [name, test] of tests) {

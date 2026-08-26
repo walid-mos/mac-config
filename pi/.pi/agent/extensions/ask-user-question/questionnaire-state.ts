@@ -228,6 +228,8 @@ export class QuestionnaireState {
 		if (!this.isOpenEnded(q) && index === this.chatActionIndex()) return this.requestChat();
 		const opt = this.currentOptions()[index];
 		if (!opt) return NO_EFFECT;
+		this.editor.setText("");
+		this.drafts.delete(q.id);
 		this.optionIndex = index;
 		this.answers.set(q.id, { kind: "single", id: q.id, value: opt.value, label: opt.label, wasCustom: false, index: index + 1 });
 		return ["advance"];

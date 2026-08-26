@@ -374,6 +374,11 @@ export class QuestionnaireState {
 
 	private initialOptionIndex(q: Question): number {
 		const opts = this.currentOptions();
+		const answer = this.answers.get(q.id);
+		if (answer?.kind === "single" && !answer.wasCustom) {
+			const selectedIndex = opts.findIndex((option) => option.value === answer.value);
+			if (selectedIndex >= 0) return selectedIndex;
+		}
 		if (this.drafts.has(q.id)) {
 			const otherIndex = opts.findIndex((o) => o.isOther);
 			if (otherIndex >= 0) return otherIndex;

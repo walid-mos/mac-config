@@ -26,7 +26,12 @@ Tickets / épiques = Plane.so via `plane_*`. Crit = UI de review (plans et diffs
 - Toujours fusionner une branche avec `git merge --no-ff` afin de conserver un merge commit visible. Ne jamais fast-forward une fusion.
 - Ne pas pousser systématiquement.
 - Ne jamais signaler comme modification un fichier présent dans `git status` mais absent de `git diff` et `git diff --cached` ; c’est un effet de filtre Git sans changement à committer (notamment `pi/.pi/agent/settings.json`).
-- Avant chaque commit, découper le travail en changements minimaux, chacun limité à un seul comportement ou domaine et valide/testable indépendamment. Ne jamais regrouper configuration, migration, refactor et correctifs de compatibilité sans dépendance stricte.
+- **Commit atomique — définition unique** : un commit est atomique si et seulement si les 4 critères sont réunis :
+    1. **Une seule intention** : un comportement ajouté/modifié, un correctif ou un refactor unique — révertible en une commande sans casser le reste.
+    2. **Autonome** : compile et passe les tests à ce commit précis (`git checkout <sha>` + suite locale au vert), pas seulement en bout de branche.
+    3. **Domaine unique** : config, migration, refactor et fix ne cohabitent dans un même commit que liés par une dépendance stricte ; sinon → commits séparés ordonnés.
+    4. **Message fidèle** : Conventional Commit `type(scope): description` décrivant cette seule intention.
+       Avant chaque commit, découper le travail pour satisfaire ces critères. Jamais de commit fourre-tout ni "WIP".
 
 ## Fixtures locales
 

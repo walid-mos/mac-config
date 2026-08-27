@@ -2,12 +2,12 @@
 name: visual-check
 user-invocable: true
 description: >-
-    Visually verify frontend UI after code changes: auto-detect project pages,
-    open them in headless Chromium via pi-frontend-check, capture screenshots
-    the LLM sees, analyze layout/styling/console errors, and report issues.
-    Use after local execution, after editing UI code, before committing, or as the
-    per-maillon gate in /ship and /stack — whenever the rendered output needs
-    a pair of AI eyes.
+  Visually verify frontend UI after code changes: auto-detect project pages,
+  open them in headless Chromium via pi-frontend-check, capture screenshots
+  the LLM sees, analyze layout/styling/console errors, and report issues.
+  Use after local execution, after editing UI code, before committing, or as the
+  per-maillon gate in /ship and /stack — whenever the rendered output needs
+  a pair of AI eyes.
 ---
 
 # Visual Check
@@ -40,6 +40,7 @@ for proto / staging comparison (`accor-ship` vs the deployed proto).
 
 ## Mode 1 : Local (dev serveur)
 
+
 ### 1. Build + lance le serveur
 
 Si le caller a déjà un serveur (ex. `accor-ship` → `pnpm dev:compliance`)
@@ -47,12 +48,12 @@ ou a donné commande/port : **réutiliser**, ne pas en lancer un second.
 Sinon : package manager du repo (`pnpm` si `pnpm-lock.yaml`, sinon `npm`)
 et le script `dev` du `package.json`. Fallback framework :
 
-| Framework    | Commande                              | Port |
-| ------------ | ------------------------------------- | ---- |
-| Astro        | `<pm> run build && npx astro preview` | 4321 |
-| Next.js      | `<pm> run dev`                        | 3000 |
-| Vite / React | `<pm> run dev`                        | 5173 |
-| Autre        | `ask_user_question`                   | —    |
+| Framework | Commande | Port |
+|-----------|----------|------|
+| Astro | `<pm> run build && npx astro preview` | 4321 |
+| Next.js | `<pm> run dev` | 3000 |
+| Vite / React | `<pm> run dev` | 5173 |
+| Autre | `ask_user_question` | — |
 
 Lancer en arrière-plan seulement si rien n'écoute déjà. Attendre
 "ready" / "listening", noter le port.
@@ -68,10 +69,10 @@ Toujours essayer dans cet ordre :
    liens internes, dédupliquer, exclure anchors `#` et liens externes.
 4. **Structure du projet** : détecter le framework et lister les fichiers de
    routes :
-    - Astro : `src/pages/**/*.astro`
-    - Next.js : `app/**/page.tsx`
-    - SvelteKit : `src/routes/**/+page.svelte`
-    - Autre : demander via `ask_user_question`
+   - Astro : `src/pages/**/*.astro`
+   - Next.js : `app/**/page.tsx`
+   - SvelteKit : `src/routes/**/+page.svelte`
+   - Autre : demander via `ask_user_question`
 5. **Fallback** : demander les paths via `ask_user_question`.
 
 Limiter à **10 pages max** par run.
@@ -87,10 +88,10 @@ Allowed when the user (or a caller skill) gives the URL.
 
 1. **Base URL** donnée par l'utilisateur ou le caller (sinon `ask_user_question`).
 2. Détection des pages :
-    - D'abord les paths explicitement donnés (ex: `/about`)
-    - Puis tenter le `sitemap.xml` sur le domaine
-    - Puis `frontend_eval` pour lister les liens internes depuis la homepage
-    - Fallback : `ask_user_question`
+   - D'abord les paths explicitement donnés (ex: `/about`)
+   - Puis tenter le `sitemap.xml` sur le domaine
+   - Puis `frontend_eval` pour lister les liens internes depuis la homepage
+   - Fallback : `ask_user_question`
 3. Même workflow de check que le mode local.
 
 ### Cas d'usage typiques
@@ -110,7 +111,6 @@ frontend_open <url>
 ```
 
 **Le LLM doit activement regarder le screenshot retourné** et juger :
-
 - La page s'affiche-t-elle correctement ?
 - Éléments superposés, tronqués, invisibles ?
 - Polices, couleurs, espacements cohérents ?
@@ -120,7 +120,6 @@ frontend_open <url>
 ### 2. Console
 
 Lire le **console health** retourné par `frontend_open` :
-
 - Erreurs JS non catchées
 - Requêtes 4xx/5xx
 - Erreurs de rendu ou de composant
@@ -166,19 +165,16 @@ Compiler un rapport structuré :
 ## Visual Check Report
 
 ### Pages OK
-
 - / — clean, rendu correct en desktop 1440×1000
 - /pricing — clean
 
 ### Pages avec anomalies
-
 - /about
-    - Console: 1 image 404 (logo.svg)
-    - Visuel: le footer chevauche le contenu sur mobile (375px)
-    - Suggestion: vérifier le min-height du container
+  - Console: 1 image 404 (logo.svg)
+  - Visuel: le footer chevauche le contenu sur mobile (375px)
+  - Suggestion: vérifier le min-height du container
 
 ### Pages inaccessibles
-
 - /dashboard — 404, la route n'existe plus
 ```
 
@@ -216,12 +212,14 @@ persistants :
 
 ```json
 {
-	"pages": ["/", "/about", "/pricing", "/dashboard"],
-	"viewports": [{ "width": 1440, "height": 1000 }],
-	"buildCommand": "npm run build",
-	"devCommand": "npm run dev",
-	"port": 3000,
-	"externalUrl": "https://staging.example.com"
+  "pages": ["/", "/about", "/pricing", "/dashboard"],
+  "viewports": [
+    { "width": 1440, "height": 1000 }
+  ],
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "port": 3000,
+  "externalUrl": "https://staging.example.com"
 }
 ```
 

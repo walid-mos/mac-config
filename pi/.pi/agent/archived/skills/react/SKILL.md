@@ -2,21 +2,21 @@
 name: react
 user-invocable: false
 description: >-
-    React component design judgment: composition, effect discipline, derived
-    state, data flow, Jotai. MUST be loaded whenever writing or modifying React
-    components (*.jsx, *.tsx), alongside "coding" and the language skill
-    (typescript). Mechanical rules are linted by
-    @nextnode-solutions/standards; this skill covers what the linter cannot judge.
+  React component design judgment: composition, effect discipline, derived
+  state, data flow, Jotai. MUST be loaded whenever writing or modifying React
+  components (*.jsx, *.tsx), alongside "coding" and the language skill
+  (typescript). Mechanical rules are linted by
+  @nextnode-solutions/standards; this skill covers what the linter cannot judge.
 ---
 
 # React - Mandatory Rules
+
 
 References: [effects.md](effects.md) (how to fix every `no-use-effect` / `exhaustive-deps` warning), [composition.md](composition.md) (SOLID for components), [patterns.md](patterns.md) (data flow, RULE 6/7 examples), [jotai.md](jotai.md) (shared state).
 
 ## RULE 0 - Composition is everything (highest priority)
 
 Composition over inheritance, over configuration, over prop drilling.
-
 - `children` and render slots, NOT config props.
 - Reduce prop drilling with composition BEFORE reaching for Jotai or Context.
 - Class inheritance for components is FORBIDDEN.
@@ -25,7 +25,6 @@ Composition over inheritance, over configuration, over prop drilling.
 ## RULE 1 - You do not need useEffect (most of the time)
 
 Effects are an escape hatch to synchronize with **external systems** (browser APIs, third-party widgets, subscriptions). No external system: no Effect. Ask "why does this code run?":
-
 - User interaction happened --> event handler.
 - Component displayed --> Effect (maybe), always with a cleanup function.
 - Computed value from state/props --> calculate during render.
@@ -54,7 +53,7 @@ NOT state if any is true: unchanged over time (constant), passed from parent (pr
 
 ## RULE 6 - Render components, don't call them
 
-A function that takes props-like inputs **or** returns whole view/page subtrees IS a component: give it a `PascalCase` name, own scope, mount it as `<Name />`. Never invoke it as `renderThing(...)` - it gets no identity, no hooks/memo boundary, and drags its concern (e.g. routing) into the caller. ALLOWED exception: a small pure helper returning _child fragments_, consumed in ONE spot of its owner's render, no props, no page-level dispatch. Example pair in [patterns.md](patterns.md).
+A function that takes props-like inputs **or** returns whole view/page subtrees IS a component: give it a `PascalCase` name, own scope, mount it as `<Name />`. Never invoke it as `renderThing(...)` - it gets no identity, no hooks/memo boundary, and drags its concern (e.g. routing) into the caller. ALLOWED exception: a small pure helper returning *child fragments*, consumed in ONE spot of its owner's render, no props, no page-level dispatch. Example pair in [patterns.md](patterns.md).
 
 ## RULE 7 - React 19 refs are plain props (no forwardRef)
 
@@ -73,13 +72,13 @@ A truly tiny, private sub-component used by exactly one component may co-locate 
 
 ## State management
 
-| Need                                             | Use                                                      |
-| ------------------------------------------------ | -------------------------------------------------------- |
-| Local UI state (toggle, form input)              | `useState`, in the closest common parent                 |
-| Complex local state (multi-field, many handlers) | `useReducer`                                             |
-| Sub-tree scoping only                            | Context                                                  |
-| Distant shared state (auth, locale, flags)       | Jotai atoms - [jotai.md](jotai.md)                       |
-| Server state (fetch, cache, sync, invalidation)  | React Query / SWR / RSC - never `useState` + `useEffect` |
+| Need | Use |
+|---|---|
+| Local UI state (toggle, form input) | `useState`, in the closest common parent |
+| Complex local state (multi-field, many handlers) | `useReducer` |
+| Sub-tree scoping only | Context |
+| Distant shared state (auth, locale, flags) | Jotai atoms - [jotai.md](jotai.md) |
+| Server state (fetch, cache, sync, invalidation) | React Query / SWR / RSC - never `useState` + `useEffect` |
 
 - **Immutable updates always**: new references (`setItems([...items, item])`); in-place `push`/`splice`/field assignment keeps the reference and React skips the re-render (`coding` RULE 7).
 - **Group state that changes together**: one `useState({ x: 0, y: 0 })` over two coupled `useState`.
@@ -89,25 +88,25 @@ A truly tiny, private sub-component used by exactly one component may co-locate 
 
 ## Quick Reference - Judgment Beyond the Linter
 
-| Pattern                                                          | Verdict   | Instead                                                               |
-| ---------------------------------------------------------------- | --------- | --------------------------------------------------------------------- |
-| Computed value stored in state                                   | FORBIDDEN | Compute during render                                                 |
-| `useEffect` to sync derived state                                | FORBIDDEN | Inline or `useMemo` ([effects.md](effects.md))                        |
-| `useEffect` to respond to user action                            | FORBIDDEN | Event handler                                                         |
-| `useEffect` to notify parent                                     | FORBIDDEN | Callback in event handler                                             |
-| Chain of Effects triggering each other                           | FORBIDDEN | Consolidate in handler                                                |
-| Reset state via `useEffect` on prop change                       | FORBIDDEN | `key` prop to remount                                                 |
-| `useMount` / `useEffectOnce` wrappers                            | FORBIDDEN | Proper `useEffect` with deps                                          |
-| Suppressing `exhaustive-deps`                                    | FORBIDDEN | Dependency-removal checklist                                          |
-| Class inheritance for components                                 | FORBIDDEN | Composition                                                           |
-| `forwardRef` in a React 19 codebase                              | FORBIDDEN | `ref` is a plain prop (RULE 7)                                        |
-| God-component with config props                                  | FORBIDDEN | `children` / slots ([composition.md](composition.md))                 |
-| Component-shaped function called as `renderThing(props)`         | FORBIDDEN | Extract & mount as JSX (RULE 6)                                       |
-| Sub-component with state/effects kept inline "for convenience"   | FORBIDDEN | Own file (RULE 8 exception is tiny+private+single-use)                |
+| Pattern | Verdict | Instead |
+|---|---|---|
+| Computed value stored in state | FORBIDDEN | Compute during render |
+| `useEffect` to sync derived state | FORBIDDEN | Inline or `useMemo` ([effects.md](effects.md)) |
+| `useEffect` to respond to user action | FORBIDDEN | Event handler |
+| `useEffect` to notify parent | FORBIDDEN | Callback in event handler |
+| Chain of Effects triggering each other | FORBIDDEN | Consolidate in handler |
+| Reset state via `useEffect` on prop change | FORBIDDEN | `key` prop to remount |
+| `useMount` / `useEffectOnce` wrappers | FORBIDDEN | Proper `useEffect` with deps |
+| Suppressing `exhaustive-deps` | FORBIDDEN | Dependency-removal checklist |
+| Class inheritance for components | FORBIDDEN | Composition |
+| `forwardRef` in a React 19 codebase | FORBIDDEN | `ref` is a plain prop (RULE 7) |
+| God-component with config props | FORBIDDEN | `children` / slots ([composition.md](composition.md)) |
+| Component-shaped function called as `renderThing(props)` | FORBIDDEN | Extract & mount as JSX (RULE 6) |
+| Sub-component with state/effects kept inline "for convenience" | FORBIDDEN | Own file (RULE 8 exception is tiny+private+single-use) |
 | Imperative component fusing subscription + render + coordination | FORBIDDEN | Renderer module + `use*` hook + presentational shell (composition.md) |
-| Effect body with inline logic beyond wiring + cleanup            | FORBIDDEN | Extract pure logic to a module fn; keep the effect thin               |
-| Duplicated JSX / stateful logic (3rd copy)                       | FORBIDDEN | Extract a component / custom hook                                     |
-| Asserting internal state / hook order / blind snapshots          | FORBIDDEN | Test visible behaviour via RTL                                        |
-| `useMemo`/`useCallback`/`memo` by default                        | AVOID     | Memoize only proven hot paths                                         |
-| Context for shared state                                         | AVOID     | Jotai atoms                                                           |
-| Prop drilling through 3+ layers                                  | AVOID     | Compose with children, then Jotai                                     |
+| Effect body with inline logic beyond wiring + cleanup | FORBIDDEN | Extract pure logic to a module fn; keep the effect thin |
+| Duplicated JSX / stateful logic (3rd copy) | FORBIDDEN | Extract a component / custom hook |
+| Asserting internal state / hook order / blind snapshots | FORBIDDEN | Test visible behaviour via RTL |
+| `useMemo`/`useCallback`/`memo` by default | AVOID | Memoize only proven hot paths |
+| Context for shared state | AVOID | Jotai atoms |
+| Prop drilling through 3+ layers | AVOID | Compose with children, then Jotai |

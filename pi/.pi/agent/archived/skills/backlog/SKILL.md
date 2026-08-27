@@ -2,12 +2,12 @@
 name: backlog
 user-invocable: true
 description: >-
-    Turn a feature idea or an angle of attack into a published Plane backlog:
-    relentless interview, then a spec, then epics and agent-executable tickets
-    with real blocking edges. Trigger on /backlog, "transforme ça en tickets",
-    "fais-moi les épiques", "mets ça dans Plane", "spec cette feature",
-    "découpe cette feature en tickets", "construis le backlog".
-    Lookup seul ("c'est quoi MINA-12") : plane_* tools, pas ce skill.
+  Turn a feature idea or an angle of attack into a published Plane backlog:
+  relentless interview, then a spec, then epics and agent-executable tickets
+  with real blocking edges. Trigger on /backlog, "transforme ça en tickets",
+  "fais-moi les épiques", "mets ça dans Plane", "spec cette feature",
+  "découpe cette feature en tickets", "construis le backlog".
+  Lookup seul ("c'est quoi MINA-12") : plane_* tools, pas ce skill.
 ---
 
 # Backlog
@@ -32,7 +32,6 @@ The required artifact shapes and the post-publication report are defined in
 ## Prerequisites
 
 Gates 2–4 are Markdown + `ask_user_question` (grouped by round):
-
 - **Gate 2** : questions via `ask_user_question`
 - **Gate 3** : spec in `docs/interviews/<feature-slug>/spec.md`
 - **Gate 4** : breakdown in Markdown, approval via `ask_user_question`
@@ -62,7 +61,7 @@ shared understanding. This is the stage that makes the rest possible: a
 ticket cannot be autonomous if a decision inside it is still open.
 
 Exit condition: **zero open decisions in the area being specced.** Anything
-genuinely undecidable now goes to _Hors périmètre_ in the spec, never into a
+genuinely undecidable now goes to *Hors périmètre* in the spec, never into a
 ticket as "à trancher".
 
 ## 3. Spec
@@ -99,7 +98,7 @@ publish it yet.
   context window, this ticket's body, and the repo. Nothing else. Repeat the
   vocabulary and decisions it needs instead of pointing at the epic.
 - **Traps are part of the deliverable.** Every footgun you hit while
-  exploring goes in _Pièges_ — that is the difference between a ticket an
+  exploring goes in *Pièges* — that is the difference between a ticket an
   agent completes and one it breaks.
 - **Never close or restructure existing epics** as a side effect.
 

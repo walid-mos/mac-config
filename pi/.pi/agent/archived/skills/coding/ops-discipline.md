@@ -1,5 +1,6 @@
 # AI Operational Discipline
 
+
 ---
 
 ## OPS 1 - Context Discipline (Grep Before Read)
@@ -23,6 +24,7 @@ read it.
 
 ## OPS 2 - Model selection stays at the role level
 
+
 ---
 
 ## OPS 3 - Routing Is Not an Excuse to Skip
@@ -34,9 +36,9 @@ because doing it properly needs a separate task, a second file, or a
 config/CSS touch.
 
 - **The only legitimate skip is an honest value-vs-cost call.** "It needs
-  a separate task", "it spans CSS _and_ JS", "it's adjacent to my diff"
+  a separate task", "it spans CSS *and* JS", "it's adjacent to my diff"
   are routing/scope facts, not skip reasons.
-- **Watch the tell.** If the reason for _not_ doing something is a
+- **Watch the tell.** If the reason for *not* doing something is a
   process rule rather than "the change isn't worth the cost", that's
   rationalized inaction. Re-decide on value alone, then route correctly.
 - **Cross-boundary debt still counts.** A value duplicated across

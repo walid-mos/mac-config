@@ -2,10 +2,10 @@
 name: accor-wording
 user-invocable: true
 description: >-
-    Audit exhaustif du wording FR/EN de @astore/menu-compliance contre le proto
-    drinks-menu-compliance (source de vérité), via local execution multi-agents avec
-    vérification adversariale. Trigger on /accor-wording, "audit le wording",
-    "check le drift de wording", "vérifie le wording contre le proto".
+  Audit exhaustif du wording FR/EN de @astore/menu-compliance contre le proto
+  drinks-menu-compliance (source de vérité), via local execution multi-agents avec
+  vérification adversariale. Trigger on /accor-wording, "audit le wording",
+  "check le drift de wording", "vérifie le wording contre le proto".
 ---
 
 # accor-wording — audit de drift de wording contre le proto
@@ -14,6 +14,9 @@ Vérifie que chaque chaîne visible par l'utilisateur dans
 `apps/menu-compliance` est **strictement identique** (au caractère près) au
 wording du prototype [drinks-menu-compliance](https://github.com/VianneyBertrand/drinks-menu-compliance),
 la source de vérité. FR **et** EN.
+
+
+
 
 ## Phase 0 — Setup (you, inline)
 
@@ -37,15 +40,16 @@ List files per scope with `git ls-files` (APP) and `find` (PROTO). Embed the
 
 ## Phase 2 — Fan-out (verbatim)
 
+
 ### Scopes (`UNITS` keys)
 
-| Key                    | Scope app (`apps/menu-compliance`)                                               | Scope proto                                                            |
-| ---------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `catalogue-i18n`       | `src/shared/i18n/locales/fr.json` + `en.json`, mécanique `t()`                   | `src/lib/backoffice-i18n.ts`, `src/lib/hotel-i18n.ts`, composants      |
-| `bo-sidebar-workspace` | `src/widgets/bo-sidebar/`, `src/entities/workspace/`, `src/entities/session/`    | `src/components/backoffice/`, `src/lib/backoffice-i18n.ts`             |
-| `bo-pages-panels`      | `src/pages/back-office-home/`, pages CRUD, widgets, entités catégorie/partenaire | `src/pages/backoffice/`, `src/components/backoffice/`, backoffice-i18n |
-| `hotel-side`           | `src/pages/hotel-home/`, `src/pages/bar-programme/`, hôtel features              | `src/components/hotel-home/`, `hotel-demo/`, `steps/`, hotel-i18n      |
-| `auth-gates-errors`    | `src/pages/login/`, forbidden/not-found, gates, navigation                       | `src/components/auth/`, `src/components/errors/`, pages-erreur.md      |
+| Key | Scope app (`apps/menu-compliance`) | Scope proto |
+|---|---|---|
+| `catalogue-i18n` | `src/shared/i18n/locales/fr.json` + `en.json`, mécanique `t()` | `src/lib/backoffice-i18n.ts`, `src/lib/hotel-i18n.ts`, composants |
+| `bo-sidebar-workspace` | `src/widgets/bo-sidebar/`, `src/entities/workspace/`, `src/entities/session/` | `src/components/backoffice/`, `src/lib/backoffice-i18n.ts` |
+| `bo-pages-panels` | `src/pages/back-office-home/`, pages CRUD, widgets, entités catégorie/partenaire | `src/pages/backoffice/`, `src/components/backoffice/`, backoffice-i18n |
+| `hotel-side` | `src/pages/hotel-home/`, `src/pages/bar-programme/`, hôtel features | `src/components/hotel-home/`, `hotel-demo/`, `steps/`, hotel-i18n |
+| `auth-gates-errors` | `src/pages/login/`, forbidden/not-found, gates, navigation | `src/components/auth/`, `src/components/errors/`, pages-erreur.md |
 
 ### Reader task (every `reader`)
 
@@ -66,12 +70,12 @@ RULES:
 
 ### EXCLUDE (before any verifier)
 
-| Écran / classe                                                         | Raison                                  |
-| ---------------------------------------------------------------------- | --------------------------------------- |
-| `pages/forbidden/`, `pages/not-found/`, `app/ui/GateError`             | Pages d'erreur non encore implémentées  |
-| `pages/login/`                                                         | Écran jetable, remplacé au cutover OIDC |
-| Textes d'erreur inventés (deleteConflict, undoFailed, error générique) | Proto ne modélise pas ces toasts        |
-| FR figé dans l'EN du proto que l'app traduit proprement                | Pas un drift                            |
+| Écran / classe | Raison |
+|---|---|
+| `pages/forbidden/`, `pages/not-found/`, `app/ui/GateError` | Pages d'erreur non encore implémentées |
+| `pages/login/` | Écran jetable, remplacé au cutover OIDC |
+| Textes d'erreur inventés (deleteConflict, undoFailed, error générique) | Proto ne modélise pas ces toasts |
+| FR figé dans l'EN du proto que l'app traduit proprement | Pas un drift |
 
 Verifier extra: invented error toasts and proto-FR-stuck-in-EN that the app translates → `isReal=false`.
 

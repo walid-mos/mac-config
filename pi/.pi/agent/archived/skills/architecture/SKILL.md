@@ -2,19 +2,19 @@
 name: architecture
 user-invocable: true
 description: >-
-    Validate and improve a codebase's architecture: find shallow modules, tight
-    coupling, and missing seams, then propose ranked "deepening" refactors that
-    raise testability and AI-navigability. Use when the user runs /architecture,
-    asks to review or improve architecture, find refactoring opportunities,
-    reduce coupling, consolidate tightly-coupled modules, or make a codebase
-    easier to test.
+  Validate and improve a codebase's architecture: find shallow modules, tight
+  coupling, and missing seams, then propose ranked "deepening" refactors that
+  raise testability and AI-navigability. Use when the user runs /architecture,
+  asks to review or improve architecture, find refactoring opportunities,
+  reduce coupling, consolidate tightly-coupled modules, or make a codebase
+  easier to test.
 ---
 
 # Architecture Review
 
 Surface architectural friction and propose **deepening opportunities** - refactors that turn shallow modules into deep ones, for **locality** and **testability**.
 
-This skill is the _launchable workflow_. The doctrine and vocabulary live in [`../coding/architecture.md`](../coding/architecture.md). **Load that file first** - use its terms exactly (module, interface, depth, seam, adapter, leverage, locality); do not drift into "component / service / API / boundary".
+This skill is the *launchable workflow*. The doctrine and vocabulary live in [`../coding/architecture.md`](../coding/architecture.md). **Load that file first** - use its terms exactly (module, interface, depth, seam, adapter, leverage, locality); do not drift into "component / service / API / boundary".
 
 ## Workflow
 
@@ -25,11 +25,12 @@ This skill is the _launchable workflow_. The doctrine and vocabulary live in [`.
 
 ### 2. Explore
 
+
 Map where you feel friction — don't follow rigid heuristics:
 
 - Where does understanding one concept require bouncing between many small modules?
 - Where are modules **shallow** (ARCH 0 signals)?
-- Where were pure functions extracted only for testability, but the real bugs hide in how they're _called_ (no locality)?
+- Where were pure functions extracted only for testability, but the real bugs hide in how they're *called* (no locality)?
 - Where do tightly-coupled modules leak across their seams? Where does high-level policy import low-level detail directly?
 - What is untested or hard to test through its current interface?
 

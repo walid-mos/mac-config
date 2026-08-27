@@ -1,10 +1,10 @@
 ---
 name: coding
 description: >-
-    Language-agnostic coding judgment that MUST be loaded whenever writing or
-    modifying code in ANY language. Covers what no linter can judge: abstraction
-    levels, naming by domain, DRY vs AHA, SOLID, purity, error design.
-    Mechanical style rules are left to the linter.
+  Language-agnostic coding judgment that MUST be loaded whenever writing or
+  modifying code in ANY language. Covers what no linter can judge: abstraction
+  levels, naming by domain, DRY vs AHA, SOLID, purity, error design.
+  Mechanical style rules are left to the linter.
 ---
 
 # Coding Rules - Mandatory, Language-Agnostic

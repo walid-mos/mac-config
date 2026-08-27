@@ -2,14 +2,14 @@
 name: accor
 user-invocable: true
 description: >-
-    Règles OBLIGATOIRES du client Accor (monorepo product-data-apps : @astore/api,
-    @astore/menu-compliance, @astore/ui, apps/portail, apps/product-benchmark).
-    Nomenclature git (branches, commits, titres de PR), périmètre intouchable
-    (Terraform, product-benchmark), architecture (Clean Arch côté api, FSD côté
-    fronts), modèle d'auth (data mart Snowflake), baseline qualité. À appliquer pour
-    product-data-apps et ses worktrees (noms product-data-apps*), pas pour tout
-    clients/accor. Trigger on /accor, ou dès qu'un fichier du monorepo
-    product-data-apps (ou d'un worktree associé) est touché (branche, commit, PR, code).
+  Règles OBLIGATOIRES du client Accor (monorepo product-data-apps : @astore/api,
+  @astore/menu-compliance, @astore/ui, apps/portail, apps/product-benchmark).
+  Nomenclature git (branches, commits, titres de PR), périmètre intouchable
+  (Terraform, product-benchmark), architecture (Clean Arch côté api, FSD côté
+  fronts), modèle d'auth (data mart Snowflake), baseline qualité. À appliquer pour
+  product-data-apps et ses worktrees (noms product-data-apps*), pas pour tout
+  clients/accor. Trigger on /accor, ou dès qu'un fichier du monorepo
+  product-data-apps (ou d'un worktree associé) est touché (branche, commit, PR, code).
 ---
 
 # accor — règles obligatoires du monorepo product-data-apps
@@ -22,7 +22,6 @@ privée transverse. Les `AGENTS.md` existants des apps/packages (`apps/api/`,
 ## 1. Nomenclature git — non négociable
 
 **Branches** : `<type>/<TICKET?>-<kebab-desc>`.
-
 - `<type>` ∈ `feat` `fix` `chore` `docs` `refactor` `test` (le type dominant du diff).
 - `<TICKET>` = l'id Jira quand le travail en a un (`DA-178`) ; **omis** s'il n'y en a pas
   (ex. `feat/pre-push-ai-review`).
@@ -32,24 +31,24 @@ privée transverse. Les `AGENTS.md` existants des apps/packages (`apps/api/`,
   (`auth-rewire-02-server-authority`), `mc-partners-05-...`.
 
 **Titres de PR** : Conventional Commit `<type>(scope): <description>`.
-
 - Avec ticket, le style repo est `<type>(scope): DA-xxx — <description>`
   (ex. `feat(menu-compliance): DA-178 — partners CRUD view`).
 - `<scope>` = zone touchée : `api`, `menu-compliance`, `ui`, `benchmark`, `auth`, `hooks`.
 
 **Commits** : Conventional Commits, mêmes types/scopes. Atomiques — un commit compile et
-teste seul. Impératif, expliquer le _pourquoi_ quand il n'est pas évident.
+teste seul. Impératif, expliquer le *pourquoi* quand il n'est pas évident.
 
 **Base & flux** : brancher depuis `develop` à jour ; ouvrir la PR **contre `develop`**
-(intégration → déploie l'env _dev_ ; `main` = _prod_, promotions uniquement).
+(intégration → déploie l'env *dev* ; `main` = *prod*, promotions uniquement).
 
-**Stacks** : via `gh stack`. Découpe : contrat Stack
-([slicing.md](../stack/references/slicing.md)) — pas de seuils ni d'algorithme
+**Stacks** : via `gh stack`. Découpage : contrat Stack
+([slicing.md](../../archived/skills/stack/references/slicing.md), archivé avec
+l'ancienne pile d'orchestration) — pas de seuils ni d'algorithme
 ici. Ordre livré : `dev → simplify maillon → simplify global → submit`.
 
 > ⚠️ **Renommer une branche sur GitHub FERME ses PR** (le head ref est immuable, l'ancien
 > nom disparaît → GitHub ferme la PR). Corollaire : **nommer correctement dès la création**.
-> Une PR ne se supprime pas sur GitHub (seules les _issues_ le peuvent) — une fermée reste en
+> Une PR ne se supprime pas sur GitHub (seules les *issues* le peuvent) — une fermée reste en
 > historique. Si un renommage a fermé des PR, recréer les PR sur les nouvelles branches et
 > laisser `Superseded by #NN` sur les anciennes.
 
@@ -70,7 +69,7 @@ ici. Ordre livré : `dev → simplify maillon → simplify global → submit`.
   Import strictement vers le bas (`pages → widgets → features → entities → shared`), jamais
   latéral ni montant. Public API par slice (`index.ts`). Détail : `apps/menu-compliance/AGENTS.md`.
 - **Front product-data-apps vs proto** : invariant privé dans
-  `clients/accor/AGENTS.md` (section _product-data-apps — front uniquement_). Ticket =
+  `clients/accor/AGENTS.md` (section *product-data-apps — front uniquement*). Ticket =
   scope ; proto déployé = vérité visuelle/comportementale **dans ce scope** ;
   inspecter le repo source puis **réimplémenter** (pas copier). Même politique hors
   `/accor-ship`.
@@ -84,7 +83,7 @@ ici. Ordre livré : `dev → simplify maillon → simplify global → submit`.
 - **Aucun commentaire narratif.** Une ligne max, seulement une contrainte/invariant que le
   code ne peut pas exprimer. Jamais paraphraser le code ni s'adresser au reviewer.
 - **Baseline avant « fini »** : `pnpm typecheck && pnpm lint && pnpm test` verts — sortie
-  réelle, jamais supposée. Le front lit les types depuis le _build_ de l'api
+  réelle, jamais supposée. Le front lit les types depuis le *build* de l'api
   (`pnpm --filter @astore/api build` avant de typechecker un front).
 - **i18n** : un seul catalogue `shared/i18n/locales/*.json`, un seul lookup `t()`. Ajouter
   chaque clé dans `fr.json` **et** `en.json`.

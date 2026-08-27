@@ -2,13 +2,13 @@
 name: accor-ship
 user-invocable: true
 description: >-
-    Développer une feature du produit Menu Compliance (front @astore/menu-compliance
-    + API @astore/api) dans le monorepo accor product-data-apps, en stack de PR :
-    chaque maillon implémenté via local execution (front/code en parallèle : ticket = scope,
-    proto = vérité visuelle/comportementale 1:1 sur ce scope), simplify par maillon puis global,
-    sous le /goal auto-continue loop.
-    Trigger on /accor-ship, ou quand l'utilisateur décrit une feature Menu
-    Compliance à livrer dans ce repo.
+  Développer une feature du produit Menu Compliance (front @astore/menu-compliance
+  + API @astore/api) dans le monorepo accor product-data-apps, en stack de PR :
+  chaque maillon implémenté via local execution (front/code en parallèle : ticket = scope,
+  proto = vérité visuelle/comportementale 1:1 sur ce scope), simplify par maillon puis global,
+  sous le /goal auto-continue loop.
+  Trigger on /accor-ship, ou quand l'utilisateur décrit une feature Menu
+  Compliance à livrer dans ce repo.
 ---
 
 # accor-ship
@@ -32,11 +32,11 @@ sont acquis — l'utilisateur ne fournit que **la feature** (et un ticket au bes
 
 ## Périmètre — figé, non négociable
 
-| Touche                                                                                                | Ne touche pas                                          |
-| ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| `apps/menu-compliance` (front, `@astore/menu-compliance`)                                             | `apps/product-benchmark` — jamais, sous aucun prétexte |
-| `apps/api` (back, `@astore/api`) — pour l'API dont la feature a besoin                                | `apps/portail` sauf demande explicite                  |
-| `packages/ui`, `packages/oxlint-config` si un changement partagé l'exige et reste couplé à la feature |                                                        |
+| Touche | Ne touche pas |
+|--------|---------------|
+| `apps/menu-compliance` (front, `@astore/menu-compliance`) | `apps/product-benchmark` — jamais, sous aucun prétexte |
+| `apps/api` (back, `@astore/api`) — pour l'API dont la feature a besoin | `apps/portail` sauf demande explicite |
+| `packages/ui`, `packages/oxlint-config` si un changement partagé l'exige et reste couplé à la feature | |
 
 Toute modification hors de ce périmètre se signale et se justifie avant de committer.
 
@@ -44,7 +44,7 @@ Toute modification hors de ce périmètre se signale et se justifie avant de com
 
 **Ticket / spec** : périmètre livré + autorité **backend / métier**.
 **Prototype** : seule vérité du **rendu visuel** et du **comportement front
-observable** _à l'intérieur de ce périmètre_ — pas de l'app entière.
+observable** *à l'intérieur de ce périmètre* — pas de l'app entière.
 
 - Déployé : `https://drinks-menu-compliance-vite.vercel.app`
 - Source : `https://github.com/VianneyBertrand/drinks-menu-compliance`
@@ -66,7 +66,7 @@ exactement ce qu'on veut sur le scope ticket**, **code de très mauvaise qualit�
 Deux règles opposées :
 
 1. **Fidélité visuelle et comportementale 1:1 sur les surfaces/flux du ticket.**
-   Récupérer _obligatoirement les assets visuels requis par ce scope_ — images,
+   Récupérer *obligatoirement les assets visuels requis par ce scope* — images,
    icônes, SVG, polices, tokens de couleur, espacements, structure de layout.
    CSS/outcome (rendu calculé, responsive, états, animations) indiscernable du
    proto déployé.
@@ -87,7 +87,7 @@ modèle de données / base**.
 - **INTERDIT** de dériver du proto un schéma DB, des colonnes, un modèle de données,
   des valeurs par défaut persistées, une règle métier ou une décision produit lue
   dans ses hacks (`src/lib/*`, commentaires de débriefs, fixtures, localStorage).
-  Le proto montre _ce que l'écran affiche_, jamais _comment on le stocke_.
+  Le proto montre *ce que l'écran affiche*, jamais *comment on le stocke*.
 - Sources de vérité côté back : **le ticket/la spec**, l'architecture du repo
   (`AGENTS.md`), et l'existant en base. Le modèle de données se conçoit depuis le
   besoin, pas depuis les types du proto.
@@ -97,7 +97,7 @@ modèle de données / base**.
   gravée en schéma DB ou en contrat API. La citer avec sa source ; ne jamais la
   présenter comme acquise.
 - Ce qui reste légitime à lire dans le proto pour le back : les libellés affichés
-  et la forme des écrans, pour dimensionner les DTO _après_ validation du modèle.
+  et la forme des écrans, pour dimensionner les DTO *après* validation du modèle.
 
 Récupérer le proto : `git clone` du repo en scratchpad ou lecture via `gh`/WebFetch
 pour inventorier assets et markup ; ouvrir l'URL déployée via `/visual-check`

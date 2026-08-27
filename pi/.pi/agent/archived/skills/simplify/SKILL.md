@@ -2,18 +2,19 @@
 name: simplify
 user-invocable: true
 description: >-
-    Post-implementation cleanup of a behavior-locked diff. Maps the repository,
-    searches semantic duplication across layers with four parallel readers,
-    canonicalizes findings, and applies only verified behavior-preserving fixes.
-    Trigger on /simplify, "simplifie le diff", "cleanup avant review", "simplify
-    last commit", or "simplify les PR 12 et 13". Not for initial implementation
-    or correctness bugs.
+  Post-implementation cleanup of a behavior-locked diff. Maps the repository,
+  searches semantic duplication across layers with four parallel readers,
+  canonicalizes findings, and applies only verified behavior-preserving fixes.
+  Trigger on /simplify, "simplifie le diff", "cleanup avant review", "simplify
+  last commit", or "simplify les PR 12 et 13". Not for initial implementation
+  or correctness bugs.
 ---
 
 # Simplify
 
 Simplify code that already works. The objective is less duplicated **knowledge**,
 less accidental complexity, and less future drift — not merely fewer lines.
+
 
 - [classification and clarity guards](references/taxonomy.md)
 - [same-knowledge discovery protocol](references/discovery.md)
@@ -22,16 +23,16 @@ less accidental complexity, and less future drift — not merely fewer lines.
 
 Treat unrecognized free text as `FOCUS`.
 
-| Input                       | Scope                                                                                        |
-| --------------------------- | -------------------------------------------------------------------------------------------- |
-| none                        | default base (`develop`, else `main`, else GitHub default) through `HEAD`, plus working tree |
-| `last` / `HEAD`             | `git show HEAD`, plus working tree                                                           |
-| `HEAD~N` / `last N commits` | `HEAD~N...HEAD`, plus working tree                                                           |
-| `#12` / `pr 12`             | PR diff; apply only changes present locally                                                  |
-| several PRs                 | union; apply only changes present locally                                                    |
-| `maillon`                   | stack branch versus parent; `gh stack view`, then fork-point fallback                        |
-| `global` / `stack`          | whole stack versus default base                                                              |
-| path                        | restrict the resolved range to that path                                                     |
+| Input | Scope |
+|---|---|
+| none | default base (`develop`, else `main`, else GitHub default) through `HEAD`, plus working tree |
+| `last` / `HEAD` | `git show HEAD`, plus working tree |
+| `HEAD~N` / `last N commits` | `HEAD~N...HEAD`, plus working tree |
+| `#12` / `pr 12` | PR diff; apply only changes present locally |
+| several PRs | union; apply only changes present locally |
+| `maillon` | stack branch versus parent; `gh stack view`, then fork-point fallback |
+| `global` / `stack` | whole stack versus default base |
+| path | restrict the resolved range to that path |
 
 Set explicit `RANGE`, sorted `FILES`, and `FOCUS`. Exclude generated files before
 research: lockfiles, snapshots such as `**/migrations/meta/*_snapshot.json`,
@@ -87,6 +88,7 @@ caps reached, and cache hit/miss.
 
 ## 2. Four parallel semantic readers
 
+
 Search allocation is asymmetric by design: reuse gets the largest budget
 because wider semantic-clone discovery has the highest recall value. The other
 lanes remain independent safeguards. **Do not rerun manifest searches.** Reuse
@@ -95,6 +97,7 @@ same-knowledge candidates; efficiency follows only execution/I/O seeds;
 altitude follows only owner/mechanism candidates. A lane broadens a search only
 for an unresolved seed relevant to its angle and logs why. Pass paths and IDs,
 never transcripts or source dumps.
+
 
 `FINDINGS_SCHEMA` must enforce this compact shape:
 

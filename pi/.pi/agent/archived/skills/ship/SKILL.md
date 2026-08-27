@@ -2,19 +2,20 @@
 name: ship
 user-invocable: true
 description: >-
-    Execute a whole Plane epic autonomously: worktree from the base branch, every
-    child ticket implemented and tested with atomic commits, sliced into a stack
-    of readable PRs, each maillon implemented via local execution (parallel front/code),
-    visually and functionally verified via /visual-check, simplified via
-    /simplify, and submitted — under the /goal auto-continue loop.
-    Trigger on /ship, "réalise l'épique X", "implémente toutes les tâches de MINA-1",
-    "lance la feature". Lookup seul ("c'est quoi le ticket X") : plane_* tools, pas /ship.
+  Execute a whole Plane epic autonomously: worktree from the base branch, every
+  child ticket implemented and tested with atomic commits, sliced into a stack
+  of readable PRs, each maillon implemented via local execution (parallel front/code),
+  visually and functionally verified via /visual-check, simplified via
+  /simplify, and submitted — under the /goal auto-continue loop.
+  Trigger on /ship, "réalise l'épique X", "implémente toutes les tâches de MINA-1",
+  "lance la feature". Lookup seul ("c'est quoi le ticket X") : plane_* tools, pas /ship.
 ---
 
 # Ship
 
 Take one Plane epic from Backlog to an open **stack of pull requests**, without
 asking the user anything between the first ticket and the submit.
+
 
 ## Objectif — engager le loop /goal
 
@@ -65,18 +66,18 @@ L'extension `/goal` auto-continue alors de tour en tour jusqu'à `met` /
 
 ## FORBIDDEN / MANDATORY
 
-| FORBIDDEN                                                   | MANDATORY                                                                     |
-| ----------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| Demander une clarification au milieu de l'épique            | Tout ce qui manque se décide en Phase 1, avant le premier commit              |
-| Une PR fourre-tout de toute l'épique                        | Stack de maillons selon [slicing.md](../stack/references/slicing.md)          |
-| Un commit fourre-tout par ticket                            | Plusieurs commits atomiques, chacun compilable et testable seul               |
-| Couper un maillon au milieu d'un état incohérent            | Un maillon compile, teste vert et se relit seul avant de passer au suivant    |
-| Passer un ticket en Done sans que sa branche soit poussée   | Push de la branche d'abord, transition Plane ensuite                          |
-| Marquer une tâche faite avec des tests rouges ou non lancés | Lancer les tests réellement et coller la sortie en cas d'échec                |
-| Réduire le périmètre en silence                             | Livrer le reste en entier et dire explicitement ce qui est bloqué et pourquoi |
-| Inventer le contenu d'un ticket de mémoire                  | `plane_get_workitem` sur chacun, description lue avant d'écrire du code       |
-| Travailler directement sur `main`                           | Worktree ou branche dédiée depuis `--base`                                    |
-| `gh stack submit` avant `/simplify` global                  | Ordre imposé : dev → simplify par maillon → simplify global → submit          |
+| FORBIDDEN | MANDATORY |
+|-----------|-----------|
+| Demander une clarification au milieu de l'épique | Tout ce qui manque se décide en Phase 1, avant le premier commit |
+| Une PR fourre-tout de toute l'épique | Stack de maillons selon [slicing.md](../stack/references/slicing.md) |
+| Un commit fourre-tout par ticket | Plusieurs commits atomiques, chacun compilable et testable seul |
+| Couper un maillon au milieu d'un état incohérent | Un maillon compile, teste vert et se relit seul avant de passer au suivant |
+| Passer un ticket en Done sans que sa branche soit poussée | Push de la branche d'abord, transition Plane ensuite |
+| Marquer une tâche faite avec des tests rouges ou non lancés | Lancer les tests réellement et coller la sortie en cas d'échec |
+| Réduire le périmètre en silence | Livrer le reste en entier et dire explicitement ce qui est bloqué et pourquoi |
+| Inventer le contenu d'un ticket de mémoire | `plane_get_workitem` sur chacun, description lue avant d'écrire du code |
+| Travailler directement sur `main` | Worktree ou branche dédiée depuis `--base` |
+| `gh stack submit` avant `/simplify` global | Ordre imposé : dev → simplify par maillon → simplify global → submit |
 
 ## Phase 1 — Orient & découper
 
@@ -130,24 +131,24 @@ Pour chaque maillon, dans l'ordre du stack :
 
 1. **In Progress** — passer tous les tickets du maillon en
    `plane_update_workitem(identifier=<id>, stateId=<In Progress uuid>)`, avant l’implémentation.
-2. **Tester pour de vrai** — suite de tests + lint + typecheck du projet après
+3. **Tester pour de vrai** — suite de tests + lint + typecheck du projet après
    application. Rouge = le maillon n'avance pas, on corrige en fix direct (pas
    une nouvelle boucle). Si fallow se résout (skill `fallow-gate`), y ajouter le
    gate `audit --base <branche de base du stack>` : findings introduits par le
    maillon = correction avant push.
-3. **`/visual-check` + parcours fonctionnel** — dès que le maillon produit ou
+4. **`/visual-check` + parcours fonctionnel** — dès que le maillon produit ou
    modifie une surface web (sauf `--no-chrome`) :
-    - Charger le skill `visual-check` et l'exécuter sur les **pages du maillon**
-      (paths du ticket / proto, pas un crawl de tout le site).
-    - En plus du rendu : exercer le **parcours d'acceptation** du ticket avec
-      `frontend_act` (click, type, submit…) et `frontend_eval` pour les critères
-      exacts (texte, état, compteurs). Console clean exigée.
-    - Anomalie visuelle, console error, ou parcours cassé = maillon non fini.
-      Corriger en fix direct, re-check, puis seulement push.
-      Maillon purement back/infra dispensé — le dire.
-4. **Push** — pousser la branche du maillon (`gh stack push` ou `git push`). Le
+   - Charger le skill `visual-check` et l'exécuter sur les **pages du maillon**
+     (paths du ticket / proto, pas un crawl de tout le site).
+   - En plus du rendu : exercer le **parcours d'acceptation** du ticket avec
+     `frontend_act` (click, type, submit…) et `frontend_eval` pour les critères
+     exacts (texte, état, compteurs). Console clean exigée.
+   - Anomalie visuelle, console error, ou parcours cassé = maillon non fini.
+     Corriger en fix direct, re-check, puis seulement push.
+   Maillon purement back/infra dispensé — le dire.
+5. **Push** — pousser la branche du maillon (`gh stack push` ou `git push`). Le
    push crée seulement la branche distante, **pas** la PR (submit en Phase 4).
-5. **Done** — `plane_update_workitem(identifier=<id>, stateId=<Done uuid>)` pour
+6. **Done** — `plane_update_workitem(identifier=<id>, stateId=<Done uuid>)` pour
    chaque ticket du maillon, seulement après le push.
 
 Si un split en cours de route s'impose : ré-appliquer le contrat Stack,

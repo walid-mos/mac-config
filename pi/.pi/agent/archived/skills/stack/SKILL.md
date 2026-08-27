@@ -2,12 +2,12 @@
 name: stack
 user-invocable: true
 description: >-
-    Découper un travail de dev décrit librement en un stack de pull requests
-    propres : features ordonnées, chacune sur une branche empilée, commits
-    atomiques, tests verts, /visual-check par maillon UI, /simplify par maillon
-    puis global, puis submit du
-    stack. Pour le dev hors Plane et tout ce qui passe par /goal. Trigger on
-    /stack, "découpe ça en PR", "empile les PR", "développe cette feature en stack".
+  Découper un travail de dev décrit librement en un stack de pull requests
+  propres : features ordonnées, chacune sur une branche empilée, commits
+  atomiques, tests verts, /visual-check par maillon UI, /simplify par maillon
+  puis global, puis submit du
+  stack. Pour le dev hors Plane et tout ce qui passe par /goal. Trigger on
+  /stack, "découpe ça en PR", "empile les PR", "développe cette feature en stack".
 ---
 
 # Stack
@@ -63,7 +63,7 @@ dans `/stack`).
 2. **Worktree & init** — `git fetch`, worktree depuis `--base` à jour.
    `gh stack init --base <base> <slug-01-maillon>`. Nommage des maillons :
    `<slug>-NN-<slug-maillon>` (NN à deux chiffres, du bas vers le haut).
-3. **`/simplify global`** sur le diff complet du stack, avant tout submit.
+4. **`/simplify global`** sur le diff complet du stack, avant tout submit.
 
 Le stack reste **local** — aucune branche ni PR n'est poussée. Le push est
 manuel (`git push` ou `gh stack push`), quand le développeur est prêt.

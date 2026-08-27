@@ -61,6 +61,7 @@ def deploy_pi(home: Path, stow: str, make: str) -> None:
         raise RuntimeError("legacy --no-folding fixture unexpectedly folded extensions")
     local_static_resources = (
         agent / "extensions" / "local-only.ts",
+        agent / "prompts" / "local-only.md",
         agent / "skills" / "local-only" / "SKILL.md",
         agent / "tests" / "local-only.test.ts",
         agent / "themes" / "local-only.json",
@@ -76,14 +77,16 @@ def deploy_pi(home: Path, stow: str, make: str) -> None:
 def require_expected_layout(home: Path) -> None:
     agent = home / ".pi" / "agent"
     external_skills = agent / "external" / "skills"
-    expected_links = (agent / "extensions", agent / "skills")
+    expected_links = (agent / "extensions", agent / "prompts", agent / "skills")
     runtime_paths = (agent, agent / "sessions", agent / "agents", agent / "npm", agent / "auth.json", external_skills)
     missing_links = [str(path) for path in expected_links if not path.is_symlink()]
     linked_runtime_paths = [str(path) for path in runtime_paths if path.is_symlink()]
     expected_versioned_skill = agent / "skills" / "coding" / "SKILL.md"
+    expected_review_prompt = agent / "prompts" / "review.md"
     expected_external_skill = external_skills / "pi-config-test" / "SKILL.md"
     discarded_static_resources = (
         agent / "extensions" / "local-only.ts",
+        agent / "prompts" / "local-only.md",
         agent / "skills" / "local-only" / "SKILL.md",
         agent / "tests" / "local-only.test.ts",
         agent / "themes" / "local-only.json",
@@ -100,7 +103,7 @@ def require_expected_layout(home: Path) -> None:
         for path, expected in preserved_runtime.items()
         if not path.is_file() or path.read_text(encoding="utf-8") != expected
     ]
-    if missing_links or linked_runtime_paths or changed_runtime or retained_static_resources or not expected_versioned_skill.is_file() or not expected_external_skill.is_file() or settings.get("skills") != ["~/.pi/agent/external/skills"]:
+    if missing_links or linked_runtime_paths or changed_runtime or retained_static_resources or not expected_versioned_skill.is_file() or not expected_review_prompt.is_file() or not expected_external_skill.is_file() or settings.get("skills") != ["~/.pi/agent/external/skills"]:
         details = []
         if missing_links:
             details.append(f"static Pi directories must be symlinks: {', '.join(missing_links)}")
@@ -112,6 +115,8 @@ def require_expected_layout(home: Path) -> None:
             details.append(f"unversioned static resources survived Stow reset: {', '.join(retained_static_resources)}")
         if not expected_versioned_skill.is_file():
             details.append(f"versioned coding skill missing: {expected_versioned_skill}")
+        if not expected_review_prompt.is_file():
+            details.append(f"versioned /review prompt missing: {expected_review_prompt}")
         if not expected_external_skill.is_file():
             details.append(f"external skill missing: {expected_external_skill}")
         if settings.get("skills") != ["~/.pi/agent/external/skills"]:

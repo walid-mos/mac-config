@@ -231,19 +231,20 @@ nvim-post:
 		|| echo "ripgrep non installé — telescope live_grep échouera"
 
 # pi-dirs crée les répertoires runtime avant Stow : ~/.pi/agent reste réel car
-# sessions/ et npm/ existent. Les descendants statiques extensions/, skills/,
-# tests/ et themes/ sont supprimés puis recréés par Stow : le repo est leur unique
+# sessions/ et npm/ existent. Les descendants statiques extensions/, prompts/,
+# skills/, tests/ et themes/ sont supprimés puis recréés par Stow : le repo est leur unique
 # source de vérité. auth.json, models-store.json, npm/, sessions/ et external/
 # restent locaux hors repo.
 pi: | pi-dirs
 	@$(STOW) --no-folding -D pi
 	@rm -rf \
 		"$(HOME)/.pi/agent/extensions" \
+		"$(HOME)/.pi/agent/prompts" \
 		"$(HOME)/.pi/agent/skills" \
 		"$(HOME)/.pi/agent/tests" \
 		"$(HOME)/.pi/agent/themes"
 	@$(STOW) -R pi
-	@for path in extensions skills tests themes; do \
+	@for path in extensions prompts skills tests themes; do \
 		[ -L "$(HOME)/.pi/agent/$$path" ] || { \
 			echo "déploiement Pi incomplet: ~/.pi/agent/$$path n'est pas géré par Stow" >&2; \
 			exit 1; \

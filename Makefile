@@ -313,6 +313,7 @@ pi-update: crit-post pi-post
 pi-test:
 	@python3 scripts/test-pi-config.py
 	@python3 scripts/test-pi-startup.py
+	@python3 scripts/test-git-filters.py
 
 herdr-pi-smoke: herdr
 	@python3 scripts/test-herdr-pi-startup.py
@@ -407,9 +408,10 @@ dev-dirs:
 # le cwd de la commande (status, diff, add...).
 git-filters:
 	@git config filter.pi-settings.clean "$(CURDIR)/scripts/git-filter-pi-settings-clean.sh"
+	@git config filter.hermes-config.clean "$(CURDIR)/scripts/git-filter-hermes-config-clean.sh"
 	@git config filter.claude-settings.clean "$(CURDIR)/scripts/git-filter-claude-settings-clean.sh"
-	@chmod +x scripts/git-filter-pi-settings-clean.sh scripts/git-filter-claude-settings-clean.sh
-	@echo "filtres pi-settings + claude-settings actifs — les settings.json ne bougent que sur vrais changements (jq requis)"
+	@chmod +x scripts/git-filter-pi-settings-clean.sh scripts/git-filter-hermes-config-clean.sh scripts/git-filter-claude-settings-clean.sh
+	@echo "filtres pi-settings + hermes-config + claude-settings actifs — les clés runtime ne bougent que sur vrais changements"
 
 # Zscaler pose son PAC (127.0.0.1:9000/systemproxy-*.pac) sur tous les services
 # réseau et le laisse en place même arrêté ; macOS coupe alors le relais de

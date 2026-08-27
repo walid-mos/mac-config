@@ -25,6 +25,8 @@ Deux emplacements existent, portés par pi et centralisés ici :
 - `ordered-widget-stack.ts` — hôte widget unique par placement (monté via
   `setOrderedAboveEditorWidget` / `setOrderedSurfaceWidget`) qui rend les
   entrées du registre dans l'ordre de priorité.
+- `terminal-text.ts` — primitives mutualisées de largeur, troncature ANSI/OSC 8
+  et hyperliens terminal. Les surfaces et le footer partagent cette implémentation.
 
 ## Règles
 

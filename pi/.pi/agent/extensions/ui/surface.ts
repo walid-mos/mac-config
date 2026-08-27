@@ -1,4 +1,5 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
+import { terminalLineWidth, truncateTerminalLine } from "./terminal-text.ts";
 
 export type SurfacePlacement = "aboveEditor" | "belowEditor";
 
@@ -107,60 +108,10 @@ function compareSurfaceEntries(left: SurfaceEntry, right: SurfaceEntry): number 
 	return priority === 0 ? left.id.localeCompare(right.id) : priority;
 }
 
-/** Visible column width of a line, ignoring ANSI escape sequences. */
-export function surfaceLineWidth(line: string): number {
-	const tokens = line.match(SURFACE_TOKEN_PATTERN) ?? [];
-	return tokens.reduce(
-		(total, token) => (isAnsiSequence(token) ? total : total + terminalCharWidth(token)),
-		0,
-	);
-}
+/** Compatibility alias for existing surface clients and tests. */
+export const surfaceLineWidth = terminalLineWidth;
 
 function clipSurfaceLine(line: string, width: number): string {
 	const firstLine = line.split(/[\r\n]/u, 1)[0] ?? "";
-	const tokens = firstLine.match(SURFACE_TOKEN_PATTERN) ?? [];
-	if (surfaceLineWidth(firstLine) <= width) return firstLine;
-	const budget = Math.max(0, width - 1);
-	let used = 0;
-	let clipped = "";
-	let hasAnsi = false;
-	for (const token of tokens) {
-		if (isAnsiSequence(token)) {
-			hasAnsi = true;
-			clipped += token;
-			continue;
-		}
-		const tokenWidth = terminalCharWidth(token);
-		if (used + tokenWidth > budget) break;
-		used += tokenWidth;
-		clipped += token;
-	}
-	clipped += "…";
-	return hasAnsi ? `${clipped}\u001b[0m` : clipped;
-}
-
-const SURFACE_TOKEN_PATTERN = /\u001b\[[0-?]*[ -/]*[@-~]|\u001b\]8;;[^\u0007]*\u0007|\u001b\]8;;\u0007|./gu;
-const ANSI_SEQUENCE_PATTERN = /^\u001b(\[|\]8;;)/u;
-
-function isAnsiSequence(token: string): boolean {
-	// Both CSI (\e[…) and OSC 8 hyperlink wrappers (\e]8;;…) are zero-width.
-	return ANSI_SEQUENCE_PATTERN.test(token);
-}
-
-function terminalCharWidth(token: string): number {
-	const codePoint = token.codePointAt(0) ?? 0;
-	if (
-		(codePoint >= 0x1100 && codePoint <= 0x115f) ||
-		(codePoint >= 0x2329 && codePoint <= 0x232a) ||
-		(codePoint >= 0x2e80 && codePoint <= 0xa4cf) ||
-		(codePoint >= 0xac00 && codePoint <= 0xd7a3) ||
-		(codePoint >= 0xf900 && codePoint <= 0xfaff) ||
-		(codePoint >= 0xfe10 && codePoint <= 0xfe6f) ||
-		(codePoint >= 0xff00 && codePoint <= 0xff60) ||
-		(codePoint >= 0xffe0 && codePoint <= 0xffe6) ||
-		(codePoint >= 0x1f300 && codePoint <= 0x1faff)
-	) {
-		return 2;
-	}
-	return 1;
+	return truncateTerminalLine(firstLine, width, "…");
 }

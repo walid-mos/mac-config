@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import test from "node:test";
 import { Check } from "typebox/value";
 import { AskParams, normalizeQuestions } from "../extensions/ask-user-question/schema.ts";
 
@@ -43,15 +44,7 @@ function testExplicitEmptyOptionValueIsPreserved(): void {
 	assert.equal(question.options[0]?.value, "");
 }
 
-const tests: Array<[string, () => void]> = [
-	["missing option value falls back to label", testValueFallsBackToLabel],
-	["defaults applied to raw payload", testDefaultsApplied],
-	["schema accepts omitted option value", testSchemaAcceptsOmittedOptionValue],
-	["explicit empty option value is preserved", testExplicitEmptyOptionValueIsPreserved],
-];
-
-for (const [name, test] of tests) {
-	test();
-	console.log(`ok  ${name}`);
-}
-console.log(`${tests.length} passed`);
+test("missing option value falls back to label", testValueFallsBackToLabel);
+test("defaults applied to raw payload", testDefaultsApplied);
+test("schema accepts omitted option value", testSchemaAcceptsOmittedOptionValue);
+test("explicit empty option value is preserved", testExplicitEmptyOptionValueIsPreserved);

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import test from "node:test";
 import { runQuestionnaire } from "../extensions/ask-user-question/questionnaire-component.ts";
 import type { QuestionnairePalette } from "../extensions/ask-user-question/questionnaire-render.ts";
 
@@ -93,13 +94,8 @@ function testLeftEdgeReturnsToPreviousQuestion(): void {
 	assert.match(renderedText(component), /abc/);
 }
 
-const tests: Array<[string, () => void]> = [
-	["right edge advances while internal right/left movement stays in the question", testRightEdgeAdvancesAndInternalArrowDoesNot],
-	["left edge returns to the previous question", testLeftEdgeReturnsToPreviousQuestion],
-];
-
-for (const [name, test] of tests) {
-	test();
-	console.log(`ok  ${name}`);
-}
-console.log(`${tests.length} passed`);
+test(
+	"right edge advances while internal right/left movement stays in the question",
+	testRightEdgeAdvancesAndInternalArrowDoesNot,
+);
+test("left edge returns to the previous question", testLeftEdgeReturnsToPreviousQuestion);

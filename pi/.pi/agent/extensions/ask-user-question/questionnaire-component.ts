@@ -107,6 +107,11 @@ export function runQuestionnaire<TUi>(
 			if (chat) done({ questions, answers: state.collectedAnswers(), cancelled: false, chat });
 		}
 
+		function switchTab(delta: -1 | 1): void {
+			state.enterTab((state.tab + delta + state.totalTabs) % state.totalTabs);
+			refresh();
+		}
+
 		function applyEffects(effects: QuestionnaireEffect[]): void {
 			for (const effect of effects) {
 				applyEffect(effect);
@@ -147,26 +152,22 @@ export function runQuestionnaire<TUi>(
 			const q = state.currentQuestion();
 			if (state.isMulti) {
 				if (matchesKey(data, Key.tab)) {
-					state.enterTab((state.tab + 1) % state.totalTabs);
-					refresh();
+					switchTab(1);
 					return;
 				}
 				if (matchesKey(data, Key.shift("tab"))) {
-					state.enterTab((state.tab - 1 + state.totalTabs) % state.totalTabs);
-					refresh();
+					switchTab(-1);
 					return;
 				}
 			}
 			// ←/→ at the input's buffer edges navigate between questions. Inside
 			// the buffer they retain the editor's normal cursor movement.
-			if (q && !state.isOpenEnded(q) && state.isMulti && matchesKey(data, Key.right) && cursorAtBufferEnd(editor)) {
-				state.enterTab((state.tab + 1) % state.totalTabs);
-				refresh();
+			if (state.canNavigateTabsFromInputEdges() && matchesKey(data, Key.right) && cursorAtBufferEnd(editor)) {
+				switchTab(1);
 				return;
 			}
-			if (q && !state.isOpenEnded(q) && state.isMulti && matchesKey(data, Key.left) && cursorAtBufferStart(editor)) {
-				state.enterTab((state.tab - 1 + state.totalTabs) % state.totalTabs);
-				refresh();
+			if (state.canNavigateTabsFromInputEdges() && matchesKey(data, Key.left) && cursorAtBufferStart(editor)) {
+				switchTab(-1);
 				return;
 			}
 			// ↑/↓ at the editor's buffer edges leave the editor for the neighbouring
@@ -239,13 +240,11 @@ export function runQuestionnaire<TUi>(
 
 			if (state.isMulti) {
 				if (matchesKey(data, Key.tab) || matchesKey(data, Key.right)) {
-					state.enterTab((state.tab + 1) % state.totalTabs);
-					refresh();
+					switchTab(1);
 					return;
 				}
 				if (matchesKey(data, Key.shift("tab")) || matchesKey(data, Key.left)) {
-					state.enterTab((state.tab - 1 + state.totalTabs) % state.totalTabs);
-					refresh();
+					switchTab(-1);
 					return;
 				}
 			}

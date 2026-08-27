@@ -76,6 +76,11 @@ export class QuestionnaireState {
 		return q.options.length === 0;
 	}
 
+	canNavigateTabsFromInputEdges(): boolean {
+		const question = this.currentQuestion();
+		return this.isMulti && question !== undefined && !this.isOpenEnded(question);
+	}
+
 	/** The synthetic row immediately below the answer options. */
 	chatActionIndex(): number {
 		const q = this.currentQuestion();

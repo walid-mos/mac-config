@@ -20,7 +20,6 @@ brew "ripgrep"
 brew "herdr"
 brew "rtk"
 brew "hermes-agent"
-brew "crit"
 cask "hermes-desktop"
 brew "mlx-lm"    # MLX framework (Apple Silicon)
 brew "pipx"      # Python app isolation

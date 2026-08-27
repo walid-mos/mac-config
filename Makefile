@@ -10,10 +10,10 @@ export PATH := /opt/homebrew/bin:/usr/local/bin:$(PATH)
 STOW := stow -t $(HOME)
 
 # Chaque dossier à la racine du repo est un package Stow — ajouter un dossier
-# suffit à le rendre stowable. NONSTOW liste les seules exceptions : docs
-# (documentation), obsidian (cible custom iCloud, stowé par sa propre cible),
-# scripts (outillage git interne) et claude (package conservé, non déployé).
-NONSTOW := docs obsidian scripts claude
+# suffit à le rendre stowable. NONSTOW liste les seules exceptions : obsidian
+# (cible custom iCloud, stowé par sa propre cible), scripts (outillage git
+# interne) et claude (package conservé, non déployé).
+NONSTOW := obsidian scripts claude
 PACKAGES := $(filter-out $(NONSTOW),$(patsubst %/,%,$(wildcard */)))
 
 # Packages dont le dossier cible reçoit aussi des fichiers écrits par l'outil
@@ -30,25 +30,17 @@ NOFOLD := colima docker gh git herdr hermes homebrew languages rclone rtk
 
 # Hooks post-install chaînés par `make install` (cible <nom>-post ; rust et crit
 # n'ont pas de package Stow — rustup gère ~/.rustup/~/.cargo, Crit est une formula brew).
-POSTS := crit dev-dirs gh herdr hermes nvim pi rp rtk rust
+POSTS := crit dev-dirs gh herdr hermes nvim pi rtk rust
 
 # Obsidian : le vault vit dans iCloud, seule la config .obsidian est stowée
-# (symlinks relatifs → portables entre machines). Les binaires (thème, plugins,
-# fonts) ne sont pas versionnés : obsidian-post les installe depuis cette liste
-# unique id=owner/repo — les data dirs des plugins en sont dérivés.
+# (symlinks relatifs → portables entre machines). Les binaires (thème,
+# plugins) vivent en fichiers réels dans le vault : iCloud les synchronise et
+# Obsidian réinstalle nativement les plugins manquants au premier lancement.
+# Les fonts système sont dans le Brewfile.
 OBSIDIAN_VAULT_DIR := $(HOME)/Library/Mobile Documents/iCloud~md~obsidian/Documents/Brain
 OBSIDIAN_VAULT := $(OBSIDIAN_VAULT_DIR)/.obsidian
-OBSIDIAN_PLUGINS := \
-	obsidian-style-settings=obsidian-community/obsidian-style-settings \
-	obsidian-hider=kepano/obsidian-hider \
-	obsidian-icon-folder=florianwoelki/obsidian-iconize \
-	settings-search=javalent/settings-search \
-	shiki-highlighter=mprojectscode/obsidian-shiki-plugin \
-	folder-notes=LostPaul/obsidian-folder-notes \
-	notebook-navigator=johansan/notebook-navigator
-OBSIDIAN_PLUGIN_DATA := $(foreach spec,$(OBSIDIAN_PLUGINS),$(firstword $(subst =, ,$(spec))))
 
-.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs pi-update pi-test herdr-pi-smoke hermes-dirs hermes-gemma obsidian obsidian-save obsidian-post proxy-reset dev-dirs git-filters
+.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs pi-update pi-test herdr-pi-smoke hermes-dirs hermes-gemma obsidian obsidian-save proxy-reset dev-dirs git-filters
 
 help:
 	@echo "Targets:"
@@ -62,7 +54,6 @@ help:
 	@echo ""
 	@echo "  obsidian       Stow la config versionnée dans le vault Brain (iCloud)"
 	@echo "  obsidian-save  Ré-adopte (--adopt) les fichiers qu'Obsidian a dé-symlinkés"
-	@echo "  obsidian-post  Installe thème AnuPpuccin, plugins communautaires et fonts"
 	@echo "  dev-dirs       Scaffolde ~/Development/{clients,tools,nextnode} (idempotent)"
 	@echo "  git-filters    Configure les clean filters git (.gitattributes) dans .git/config"
 	@echo ""
@@ -104,7 +95,7 @@ brew-bundle:
 	@echo "→ brew bundle (Brewfile)"
 	@brew bundle --file=Brewfile
 
-install all: git-filters $(PACKAGES) $(addsuffix -post,$(POSTS)) obsidian obsidian-post
+install all: git-filters $(PACKAGES) $(addsuffix -post,$(POSTS)) obsidian
 
 # -R (restow) est idempotent : premier stow ou réparation de drift, même geste.
 # Seul point d'invocation de stow pour les packages — NOFOLD s'applique ici.
@@ -322,14 +313,10 @@ pi-update: crit-post pi-post
 pi-test:
 	@python3 scripts/test-pi-config.py
 	@python3 scripts/test-pi-startup.py
+	@python3 scripts/test-git-filters.py
 
 herdr-pi-smoke: herdr
 	@python3 scripts/test-herdr-pi-startup.py
-
-rp-post:
-	@command -v node >/dev/null || command -v fnm >/dev/null \
-		|| { echo "node not found — install it (fnm install --lts) so 'rp' can serve plan.html"; exit 0; }
-	@echo "rp ready: \`rp <slug>\` will serve plan.html and wait for /submit"
 
 # crit : formula brew (binaire) + skills Pi officiels installés dans un HOME
 # temporaire, puis copiés dans ~/.pi/agent/external/skills/{crit,crit-cli}.
@@ -392,7 +379,6 @@ rust-post:
 		|| echo "rust non installé — étape ignorée"
 
 obsidian:
-	@for id in $(OBSIDIAN_PLUGIN_DATA); do mkdir -p "$(OBSIDIAN_VAULT)/plugins/$$id"; done
 	@stow -d obsidian -t "$(OBSIDIAN_VAULT_DIR)" -R Brain
 	@echo "config Obsidian stowée (symlinks) dans le vault Brain"
 
@@ -422,27 +408,10 @@ dev-dirs:
 # le cwd de la commande (status, diff, add...).
 git-filters:
 	@git config filter.pi-settings.clean "$(CURDIR)/scripts/git-filter-pi-settings-clean.sh"
+	@git config filter.hermes-config.clean "$(CURDIR)/scripts/git-filter-hermes-config-clean.sh"
 	@git config filter.claude-settings.clean "$(CURDIR)/scripts/git-filter-claude-settings-clean.sh"
-	@chmod +x scripts/git-filter-pi-settings-clean.sh scripts/git-filter-claude-settings-clean.sh
-	@echo "filtres pi-settings + claude-settings actifs — les settings.json ne bougent que sur vrais changements (jq requis)"
-
-obsidian-post:
-	@mkdir -p "$(OBSIDIAN_VAULT)/themes/AnuPpuccin" "$(OBSIDIAN_VAULT)/plugins"
-	@echo "→ thème AnuPpuccin"
-	@curl -fsSL -o "$(OBSIDIAN_VAULT)/themes/AnuPpuccin/theme.css" https://github.com/AnubisNekhet/AnuPpuccin/releases/latest/download/theme.css
-	@curl -fsSL -o "$(OBSIDIAN_VAULT)/themes/AnuPpuccin/manifest.json" https://github.com/AnubisNekhet/AnuPpuccin/releases/latest/download/manifest.json
-	@for spec in $(OBSIDIAN_PLUGINS); do \
-		id=$${spec%%=*}; repo=$${spec#*=}; dir="$(OBSIDIAN_VAULT)/plugins/$$id"; \
-		echo "→ plugin $$id"; mkdir -p "$$dir"; \
-		curl -fsSL -o "$$dir/main.js" "https://github.com/$$repo/releases/latest/download/main.js" || { echo "échec $$id/main.js"; exit 1; }; \
-		curl -fsSL -o "$$dir/manifest.json" "https://github.com/$$repo/releases/latest/download/manifest.json" || { echo "échec $$id/manifest.json"; exit 1; }; \
-		curl -fsSL -o "$$dir/styles.css" "https://github.com/$$repo/releases/latest/download/styles.css" || rm -f "$$dir/styles.css"; \
-	done
-	@if command -v brew >/dev/null; then \
-		brew list --cask font-ia-writer-quattro >/dev/null 2>&1 || brew install --cask font-ia-writer-quattro; \
-		brew list --cask font-inter >/dev/null 2>&1 || brew install --cask font-inter; \
-	else echo "brew indisponible — installe les fonts iA Writer Quattro et Inter à la main"; fi
-	@echo "thème + plugins prêts — au premier lancement par machine : Settings → Community plugins → désactiver Restricted mode"
+	@chmod +x scripts/git-filter-pi-settings-clean.sh scripts/git-filter-hermes-config-clean.sh scripts/git-filter-claude-settings-clean.sh
+	@echo "filtres pi-settings + hermes-config + claude-settings actifs — les clés runtime ne bougent que sur vrais changements"
 
 # Zscaler pose son PAC (127.0.0.1:9000/systemproxy-*.pac) sur tous les services
 # réseau et le laisse en place même arrêté ; macOS coupe alors le relais de

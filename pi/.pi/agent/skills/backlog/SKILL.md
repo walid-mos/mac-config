@@ -25,6 +25,10 @@ Four gates, in order. Do not skip forward, do not merge them.
 
 Nothing is written to Plane before the user approves the breakdown (gate 4).
 
+The required artifact shapes and the post-publication report are defined in
+[deliverables.md](deliverables.md). This active Pi version uses Markdown and
+`ask_user_question`; the archived Claude HTML workflow is historical only.
+
 ## Prerequisites
 
 Gates 2–4 are Markdown + `ask_user_question` (grouped by round):

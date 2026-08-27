@@ -6,6 +6,11 @@
 # changements de config. Valeurs canoniques : scripts/git-filter-pi-settings-clean.sh
 pi/.pi/agent/settings.json filter=pi-settings
 
+# Hermes réécrit les trois clés de modèle actif à chaque changement de modèle.
+# Le filtre les normalise sans masquer les autres changements de config.
+# Valeurs canoniques : scripts/git-filter-hermes-config-clean.sh
+hermes/.hermes/config.yaml filter=hermes-config
+
 # settings.json est réécrit par Claude Code à la volée (modèle actif via
 # /model) : même mécanisme. Valeur canonique : scripts/git-filter-claude-settings-clean.sh
 claude/.claude/settings.json filter=claude-settings

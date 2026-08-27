@@ -14,8 +14,6 @@
 
 ## Plane
 
-Tickets / épiques = Plane.so via `plane_*`. Crit = UI de review (plans et diffs). Jamais les confondre. Si l'utilisateur parle d'un ticket ou d'une épique, appeler `plane_*` — ne pas grep le repo.
-
 ## Maintenance du harness
 
 - TOUJOURS charger le skill `harness-tuning` avant de créer/modifier un skill, une extension Pi ou l'AGENTS.md.

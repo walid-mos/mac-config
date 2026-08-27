@@ -28,9 +28,10 @@ PACKAGES := $(filter-out $(NONSTOW),$(patsubst %/,%,$(wildcard */)))
 # sessions, sa mémoire et ~/.hermes/.env (secrets) hors repo.
 NOFOLD := colima docker gh git herdr hermes homebrew languages rclone rtk
 
-# Hooks post-install chaînés par `make install` (cible <nom>-post ; rust et crit
-# n'ont pas de package Stow — rustup gère ~/.rustup/~/.cargo, Crit est une formula brew).
-POSTS := crit dev-dirs gh herdr hermes nvim pi rtk rust
+# Hooks post-install chaînés par `make install` (cible <nom>-post ; rust et 
+# n'ont pas de package Stow — rustup gère ~/.rustup/~/.cargo).
+POSTS :=  dev-dirs gh herdr hermes nvim pi rtk rust
+
 
 # Obsidian : le vault vit dans iCloud, seule la config .obsidian est stowée
 # (symlinks relatifs → portables entre machines). Les binaires (thème,
@@ -40,7 +41,7 @@ POSTS := crit dev-dirs gh herdr hermes nvim pi rtk rust
 OBSIDIAN_VAULT_DIR := $(HOME)/Library/Mobile Documents/iCloud~md~obsidian/Documents/Brain
 OBSIDIAN_VAULT := $(OBSIDIAN_VAULT_DIR)/.obsidian
 
-.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs pi-update pi-test herdr-pi-smoke hermes-dirs hermes-gemma obsidian obsidian-save proxy-reset dev-dirs git-filters
+.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs pi-update pi-test  herdr-pi-smoke hermes-dirs hermes-gemma obsidian obsidian-save proxy-reset dev-dirs git-filters
 
 help:
 	@echo "Targets:"
@@ -58,7 +59,6 @@ help:
 	@echo "  git-filters    Configure les clean filters git (.gitattributes) dans .git/config"
 	@echo ""
 	@echo "  proxy-reset    Retire le PAC proxy laissé par Zscaler (rétablit le relais Apple)"
-	@echo "  crit-post      Installe Crit et ses skills Pi officiels"
 	@echo "  pi-update      Met à jour Pi et tous ses packages"
 	@echo "  pi-test        Vérifie Stow puis stress-test le démarrage réel de Pi"
 	@echo "  herdr-pi-smoke Isolated Herdr named-session smoke: 20+ rapid Pi pane starts"
@@ -306,7 +306,7 @@ pi-post:
 	@python3 scripts/pi-patch-assistant-thinking.py
 	@python3 scripts/pi-patch-prompt-history.py
 
-pi-update: crit-post pi-post
+pi-update:  pi-post
 
 # Gate unique du harness : validation isolée du déploiement Stow et des ressources
 # du repo, puis stress-test de la configuration live. Aucun restow du HOME réel.
@@ -317,46 +317,6 @@ pi-test:
 
 herdr-pi-smoke: herdr
 	@python3 scripts/test-herdr-pi-startup.py
-
-# crit : formula brew (binaire) + skills Pi officiels installés dans un HOME
-# temporaire, puis copiés dans ~/.pi/agent/external/skills/{crit,crit-cli}.
-# Cela laisse ~/.pi/agent/skills entièrement géré par Stow. --force rafraîchit
-# les skills; l'échec de l'installation ou de la copie fait échouer la recette.
-# Nettoyage Plannotator : binaire / état / dep npm orphelins. Un `git reset`
-# + ancienne cible `plannotator-post` peut tout réinstaller.
-crit-post: export FNM_DIR := $(HOME)/.local/share/fnm
-crit-post: export PNPM_HOME := $(HOME)/.local/share/pnpm
-crit-post: export PATH := $(HOME)/.local/share/pnpm/bin:$(HOME)/.local/share/pnpm:$(PATH)
-crit-post:
-	@command -v brew >/dev/null || { \
-		echo "brew indisponible — installation de Crit impossible (https://crit.md)" >&2; \
-		exit 1; \
-	}
-	@if brew list --formula crit >/dev/null 2>&1; then \
-		echo "→ mise à jour de crit (brew)"; \
-		brew upgrade crit; \
-	else \
-		echo "→ installation de crit (brew)"; \
-		brew install crit; \
-	fi
-	@temporary_home="$$(mktemp -d)"; trap 'rm -rf "$$temporary_home"' EXIT; \
-		HOME="$$temporary_home" crit install pi --force; \
-		external="$(HOME)/.pi/agent/external/skills"; mkdir -p "$$external"; \
-		for skill in crit crit-cli; do \
-			source="$$temporary_home/.pi/agent/skills/$$skill"; \
-			[ -d "$$source" ] || { echo "Crit n'a pas installé le skill $$skill" >&2; exit 1; }; \
-			rm -rf "$$external/$$skill"; cp -R "$$source" "$$external/$$skill"; \
-		done; \
-		PI_CODING_AGENT_DIR="$(HOME)/.pi/agent/external" python3 scripts/patch-crit-pi-skill.py
-	@echo "crit prêt: $$(crit --version 2>/dev/null | head -1) — skills Pi ajustés dans ~/.pi/agent/external/skills/{crit,crit-cli}"
-	@if command -v pi >/dev/null && pi list 2>/dev/null | grep -Fq '@plannotator/pi-extension'; then \
-		pi remove npm:@plannotator/pi-extension; \
-	fi
-	@if [ -f "$(HOME)/.pi/agent/npm/package.json" ] && grep -Fq '@plannotator/pi-extension' "$(HOME)/.pi/agent/npm/package.json"; then \
-		( cd "$(HOME)/.pi/agent/npm" && pnpm remove @plannotator/pi-extension ); \
-	fi
-	@rm -f "$(HOME)/.local/bin/plannotator"
-	@rm -rf "$(HOME)/.plannotator"
 
 rtk-post:
 	@if ! command -v rtk >/dev/null; then \

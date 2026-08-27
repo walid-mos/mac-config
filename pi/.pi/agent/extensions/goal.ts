@@ -10,6 +10,9 @@
  * stuck → stop (stuck stays terminal). Evaluator failure retries once with
  * a fallback; two invalid replies → pause without auto-continuing.
  */
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type {
 	Api,
@@ -28,15 +31,6 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { ABOVE_EDITOR_PRIORITY, setOrderedAboveEditorWidget } from "./ui/ordered-widget-stack.ts";
-function pickPreferredModel<T extends { id: string }>(
-    available: readonly T[], preferredIds: readonly string[],
-): T | undefined {
-    for (const needle of preferredIds) {
-        const hit = available.find(model => model.id.includes(needle));
-        if (hit) return hit;
-    }
-    return undefined;
-}
 
 const ENTRY_TYPE = "goal-state";
 const MAX_CONDITION_CHARS = 4000;
@@ -390,8 +384,45 @@ async function judgeCondition(
 
 function pickEvaluatorModels(ctx: ExtensionContext): Model<Api>[] {
 	const available = ctx.modelRegistry.getAvailable();
-	const selected = undefined;
+	const selected = resolveEvaluatorModel(available, readConfiguredEvaluatorKey());
 	return selectEvaluatorAttempts(available, selected, ctx.model);
+}
+
+function resolveEvaluatorModel<T extends { provider: string; id: string }>(
+	available: readonly T[],
+	selectedKey: string | undefined,
+): T | undefined {
+	if (selectedKey === undefined) return undefined;
+	return available.find((model) => `${model.provider}/${model.id}` === selectedKey);
+}
+
+function pickPreferredModel<T extends { id: string }>(
+	available: readonly T[],
+	preferredIds: readonly string[],
+): T | undefined {
+	for (const needle of preferredIds) {
+		const hit = available.find((model) => model.id.includes(needle));
+		if (hit) return hit;
+	}
+	return undefined;
+}
+
+/** Optional override key (provider/model) for the /goal evaluator, read from
+ * ~/.pi/agent/orchestration.json if present. No config file is required. */
+function readConfiguredEvaluatorKey(): string | undefined {
+	try {
+		const raw = readFileSync(join(homedir(), ".pi", "agent", "orchestration.json"), "utf8");
+		const parsed: unknown = JSON.parse(raw);
+		if (!parsed || typeof parsed !== "object") return undefined;
+		const roles = (parsed as { roles?: unknown }).roles;
+		if (!roles || typeof roles !== "object") return undefined;
+		const entry = (roles as Record<string, unknown>)["goal-evaluator"];
+		if (!entry || typeof entry !== "object") return undefined;
+		const model = (entry as { model?: unknown }).model;
+		return typeof model === "string" && model.length > 0 ? model : undefined;
+	} catch {
+		return undefined;
+	}
 }
 
 export function selectEvaluatorAttempts<T extends EvaluatorModelIdentity>(

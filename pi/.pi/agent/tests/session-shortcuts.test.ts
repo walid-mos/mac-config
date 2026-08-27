@@ -22,8 +22,10 @@ function loadExtension(): { command: CommandDefinition; input: InputHandler } {
 			assert.equal(name, "clear");
 			command = definition;
 		},
-		on(event: string, handler: InputHandler) {
-			assert.equal(event, "input");
+		on(event: string, handler: InputHandler | ((...args: unknown[]) => unknown)) {
+			// L'extension enregistre d'autres handlers (ex: session_start) :
+			// le mock ne capture que celui dont les tests ont besoin.
+			if (event !== "input") return;
 			input = handler;
 		},
 	};

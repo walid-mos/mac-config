@@ -168,10 +168,10 @@ function renderChatAction(
 	width: number,
 	sink: LineSink,
 ): void {
-	// Keep this affordance visually separate without adding a selectable state.
+	// Keep this affordance visually separate with a single blank line before
+	// the rule; the chat row follows immediately (double gap felt bloated).
 	sink("");
 	sink(theme.fg("dim", "─".repeat(width)));
-	sink("");
 
 	const isCursor = state.isChatAction();
 	const prefix = isCursor ? theme.fg("accent", "> ") : "  ";
@@ -261,7 +261,9 @@ function helpText(state: QuestionnaireState): string {
 	const q = state.currentQuestion();
 	const navigation = state.isMulti
 		? state.editorHasFocus()
-			? "Tab/Shift+Tab navigate"
+			? state.canNavigateTabsFromInputEdges()
+				? "Tab/Shift+Tab or ←→ at input edges navigate"
+				: "Tab/Shift+Tab navigate"
 			: "Tab/←→ navigate"
 		: undefined;
 

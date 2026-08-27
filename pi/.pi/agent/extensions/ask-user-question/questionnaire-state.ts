@@ -36,6 +36,10 @@ export class QuestionnaireState {
 	private readonly answers = new Map<string, Answer>();
 	private readonly multiSelections = new Map<string, Set<number>>();
 	private readonly drafts = new Map<string, string>();
+	/** Set by submitEditorText: the TUI Editor clears its buffer BEFORE calling
+	 * onSubmit, so the empty buffer seen by the auto-advance's saveDraft must not
+	 * be treated as "the user erased the draft". Consumed once. */
+	private skipNextDraftSave = false;
 
 	constructor(
 		private readonly questions: Question[],
@@ -70,6 +74,11 @@ export class QuestionnaireState {
 
 	isOpenEnded(q: Question): boolean {
 		return q.options.length === 0;
+	}
+
+	canNavigateTabsFromInputEdges(): boolean {
+		const question = this.currentQuestion();
+		return this.isMulti && question !== undefined && !this.isOpenEnded(question);
 	}
 
 	/** The synthetic row immediately below the answer options. */
@@ -188,10 +197,14 @@ export class QuestionnaireState {
 		const q = this.currentQuestion();
 		if (!q) return NO_EFFECT;
 		const text = submittedValue.trim();
-
 		if (this.isOpenEnded(q)) {
 			const answer = text || UI_TEXT.noResponse;
+			if (text) this.drafts.set(q.id, text);
+			else this.drafts.delete(q.id);
 			this.answers.set(q.id, { kind: "single", id: q.id, value: answer, label: answer, wasCustom: true });
+			// The Editor already cleared its buffer: the next saveDraft (auto-advance)
+			// would otherwise wipe the draft we just recorded.
+			this.skipNextDraftSave = true;
 			return ["advance"];
 		}
 
@@ -200,7 +213,9 @@ export class QuestionnaireState {
 			// its buffer before onSubmit fired).
 			if (text) this.drafts.set(q.id, text);
 			else this.drafts.delete(q.id);
-			return this.commitMultiSelection(q);
+			const effects = this.commitMultiSelection(q);
+			if (effects.includes("advance")) this.skipNextDraftSave = true;
+			return effects;
 		}
 
 		if (!text) {
@@ -209,6 +224,9 @@ export class QuestionnaireState {
 		}
 		this.drafts.set(q.id, text);
 		this.answers.set(q.id, { kind: "single", id: q.id, value: text, label: text, wasCustom: true });
+		// The Editor already cleared its buffer before onSubmit; preserve the
+		// submitted draft when the component immediately advances tabs.
+		this.skipNextDraftSave = true;
 		return ["advance"];
 	}
 
@@ -220,6 +238,8 @@ export class QuestionnaireState {
 		if (!this.isOpenEnded(q) && index === this.chatActionIndex()) return this.requestChat();
 		const opt = this.currentOptions()[index];
 		if (!opt) return NO_EFFECT;
+		this.editor.setText("");
+		this.drafts.delete(q.id);
 		this.optionIndex = index;
 		this.answers.set(q.id, { kind: "single", id: q.id, value: opt.value, label: opt.label, wasCustom: false, index: index + 1 });
 		return ["advance"];
@@ -353,6 +373,10 @@ export class QuestionnaireState {
 	}
 
 	private saveDraft(questionId: string): void {
+		if (this.skipNextDraftSave) {
+			this.skipNextDraftSave = false;
+			return;
+		}
 		const text = this.typedText();
 		if (text) this.drafts.set(questionId, text);
 		else this.drafts.delete(questionId); // keeps the row static again
@@ -360,6 +384,13 @@ export class QuestionnaireState {
 
 	private initialOptionIndex(q: Question): number {
 		const opts = this.currentOptions();
+		const answer = this.answers.get(q.id);
+		if (answer?.kind === "single" && !answer.wasCustom) {
+			const savedIndex = answer.index === undefined ? -1 : answer.index - 1;
+			if (savedIndex >= 0 && opts[savedIndex]?.value === answer.value) return savedIndex;
+			const selectedIndex = opts.findIndex((option) => option.value === answer.value);
+			if (selectedIndex >= 0) return selectedIndex;
+		}
 		if (this.drafts.has(q.id)) {
 			const otherIndex = opts.findIndex((o) => o.isOther);
 			if (otherIndex >= 0) return otherIndex;

@@ -51,6 +51,21 @@ function cursorOnLastRow(state: QuestionnaireState, editor: Editor): boolean {
 	return cursor.line === editor.getLines().length - 1;
 }
 
+/** True when ←/→ should navigate between questionnaire tabs instead of moving
+ * within the editor buffer. */
+function cursorAtBufferStart(editor: Editor): boolean {
+	const cursor = editor.getCursor();
+	return cursor.line === 0 && cursor.col === 0;
+}
+
+function cursorAtBufferEnd(editor: Editor): boolean {
+	const cursor = editor.getCursor();
+	const lines = editor.getLines();
+	const lastLine = lines[lines.length - 1];
+	if (lastLine === undefined) return false;
+	return cursor.line === lines.length - 1 && cursor.col >= lastLine.length;
+}
+
 export function runQuestionnaire<TUi>(
 	custom: <T>(factory: CustomFactory<T>) => Promise<T>,
 	questions: Question[],
@@ -90,6 +105,11 @@ export function runQuestionnaire<TUi>(
 		function finishChat(): void {
 			const chat = state.chatRequest();
 			if (chat) done({ questions, answers: state.collectedAnswers(), cancelled: false, chat });
+		}
+
+		function switchTab(delta: -1 | 1): void {
+			state.enterTab((state.tab + delta + state.totalTabs) % state.totalTabs);
+			refresh();
 		}
 
 		function applyEffects(effects: QuestionnaireEffect[]): void {
@@ -132,15 +152,23 @@ export function runQuestionnaire<TUi>(
 			const q = state.currentQuestion();
 			if (state.isMulti) {
 				if (matchesKey(data, Key.tab)) {
-					state.enterTab((state.tab + 1) % state.totalTabs);
-					refresh();
+					switchTab(1);
 					return;
 				}
 				if (matchesKey(data, Key.shift("tab"))) {
-					state.enterTab((state.tab - 1 + state.totalTabs) % state.totalTabs);
-					refresh();
+					switchTab(-1);
 					return;
 				}
+			}
+			// ←/→ at the input's buffer edges navigate between questions. Inside
+			// the buffer they retain the editor's normal cursor movement.
+			if (state.canNavigateTabsFromInputEdges() && matchesKey(data, Key.right) && cursorAtBufferEnd(editor)) {
+				switchTab(1);
+				return;
+			}
+			if (state.canNavigateTabsFromInputEdges() && matchesKey(data, Key.left) && cursorAtBufferStart(editor)) {
+				switchTab(-1);
+				return;
 			}
 			// ↑/↓ at the editor's buffer edges leave the editor for the neighbouring
 			// option row; inside the buffer they move the cursor.
@@ -212,13 +240,11 @@ export function runQuestionnaire<TUi>(
 
 			if (state.isMulti) {
 				if (matchesKey(data, Key.tab) || matchesKey(data, Key.right)) {
-					state.enterTab((state.tab + 1) % state.totalTabs);
-					refresh();
+					switchTab(1);
 					return;
 				}
 				if (matchesKey(data, Key.shift("tab")) || matchesKey(data, Key.left)) {
-					state.enterTab((state.tab - 1 + state.totalTabs) % state.totalTabs);
-					refresh();
+					switchTab(-1);
 					return;
 				}
 			}

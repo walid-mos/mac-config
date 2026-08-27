@@ -7,7 +7,9 @@ import { Type, type Static } from "typebox";
 import type { Question } from "./questionnaire-model";
 
 const QuestionOptionSchema = Type.Object({
-	value: Type.String({ description: "The value returned when selected" }),
+	value: Type.Optional(
+		Type.String({ description: "The value returned when selected (defaults to label when omitted)" }),
+	),
 	label: Type.String({ description: "Short display label for the option" }),
 	description: Type.Optional(Type.String({ description: "Optional explanation shown below label" })),
 	recommended: Type.Optional(
@@ -45,11 +47,13 @@ export const AskParams = Type.Object({
 export type AskParamsInput = Static<typeof AskParams>;
 type RawQuestion = AskParamsInput["questions"][number];
 
-/** Apply defaults to the raw payload: empty option list, Q1/Q2 labels, allowOther on. */
+/** Apply defaults to the raw payload: empty option list, Q1/Q2 labels, allowOther on.
+ * Options missing `value` (the LLM omits it often) fall back to their label so the
+ * domain QuestionOption invariant (value: string) always holds. */
 export function normalizeQuestions(raw: RawQuestion[]): Question[] {
 	return raw.map((q, i) => ({
 		...q,
-		options: q.options ?? [],
+		options: (q.options ?? []).map((option) => ({ ...option, value: option.value ?? option.label })),
 		label: q.label || `Q${i + 1}`,
 		allowOther: q.allowOther !== false,
 		multiSelect: q.multiSelect === true,

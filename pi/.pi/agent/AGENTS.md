@@ -14,6 +14,8 @@
 
 ## Plane
 
+Si l'utilisateur parle d'un ticket ou d'une épique Plane.so, appeler `plane_*` — ne pas grep le repo.
+
 ## Maintenance du harness
 
 - TOUJOURS charger le skill `harness-tuning` avant de créer/modifier un skill, une extension Pi ou l'AGENTS.md.

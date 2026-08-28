@@ -12,9 +12,14 @@ métadonnées et affordances cliquables dans les bordures.
 ╰─ ouvrir ⤢ · /json open ───────────────────────────────╯
 ```
 
-- **Streaming** : une fence ```json ouverte est consommée et remplacée par le
-  cadre lui-même, coloré et grossissant ligne à ligne (bordure basse
-  `génération…`) ; pas de phase « brut puis boîte d'un coup ».
+- **Streaming** : le cadre de croissance couvre les deux formes d'émission :
+  une fence ```json ouverte (consommée et remplacée par le cadre), et le JSON
+  **brut sans fence** (`findOpenRawJson` : dernier ancrage ligne-start `{`/`[`,
+  non équilibré, validé par troncature au dernier point structurel + parse du
+  fragment refermé — le modèle n'enveloppe pas toujours son JSON). Dans les deux
+  cas le cadre grossit ligne à ligne (bordure basse `génération…` ou `⤢ +N
+lignes`) puis devient la boîte exacte à la complétion ; pas de phase « brut
+  puis boîte d'un coup ».
 - JSON ≤ `JSON_MAX_LINES` lignes (18) : pretty complet.
 - Plus grand : 18 premières lignes, bordure basse = marqueur cliquable
   `⤢ +N lignes · tout voir` (ouvre le blob complet via le handler OS).
@@ -43,7 +48,8 @@ correspondants, gérés ici :
 - `detect.ts` — scan pur du markdown : fences ```json (et fences sans langage
   parseables) + JSON brut ancré en début de ligne, équilibré (scan conscient des
   chaînes) et parseable. En deçà de `MIN_RAW_LENGTH` sur une seule ligne, le JSON
-  inline de la prose n'est pas touché.
+  inline de la prose n'est pas touché. + JSON brut en cours de génération
+  (`findOpenRawJson`, voir Streaming).
 - `render.ts` — rendu pur du bloc : coloration JSON maison palette Latte
   (`highlightJsonLine`), boîte box-drawing + ANSI truecolor, cap
   `JSON_MAX_LINES`, compensation des échappements markdown pour l'alignement.

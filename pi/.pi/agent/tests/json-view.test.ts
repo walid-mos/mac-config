@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { extractJsonBlocks, MIN_RAW_LENGTH } from "../extensions/json-view/detect.ts";
+import { extractJsonBlocks, findOpenRawJson, MIN_RAW_LENGTH } from "../extensions/json-view/detect.ts";
 import {
 	escapeMarkdownOutsideAnsi,
 	formatJsonBytes,
@@ -55,6 +55,26 @@ test("detect : fence non JSON ignorée", () => {
 	assert.deepEqual(extractJsonBlocks(markdown), []);
 });
 
+test("detect : JSON brut en cours de génération détecté (sans fence)", () => {
+	const partial = 'Texte avant.\n\n{\n  "id": 1,\n  "nom": "Projet Atlas",\n  "reg';
+	const open = findOpenRawJson(partial);
+	assert.ok(open);
+	assert.equal(open.start, partial.indexOf("{"));
+	assert.ok(open.content.startsWith("{"));
+	// Chaîne entamée coupée en plein milieu.
+	assert.ok(findOpenRawJson('{\n  "nom": "Projet At'));
+	// Un bloc d'exemple non JSON reste ignoré.
+	assert.equal(findOpenRawJson("Exemple :\n\n{ a: 1, b: (x) => { return x; }"), undefined);
+	// Une fence ouverte a la priorité.
+	assert.equal(findOpenRawJson('```json\n{"a":'), undefined);
+	// JSON complet → bloc exact, pas de cadre de croissance.
+	assert.equal(findOpenRawJson(`${SMALL}`), undefined);
+	// JSON court sur une seule ligne = inline de prose.
+	assert.equal(findOpenRawJson(`texte {"a": 1`), undefined);
+	// Candidat à l'intérieur d'une fence fermée ignoré.
+	assert.equal(findOpenRawJson('```\n{"x":\n```\nTexte final.'), undefined);
+});
+
 test("detect : JSON brut minifié en début de ligne", () => {
 	const raw = JSON.stringify({
 		kind: "review",
@@ -94,6 +114,30 @@ test("detect : JSON inline court et prose intact", () => {
 test("detect : JSON non strict ignoré", () => {
 	const markdown = `{ a: 1, b: () => 2 } et puis rien`;
 	assert.deepEqual(extractJsonBlocks(markdown), []);
+});
+
+test("transform : JSON brut en cours de génération = cadre qui grossit (sans fence)", () => {
+	const partial = 'Voici :\n\n{\n  "id": 1,\n  "nom": "Projet Atlas",\n  "stat';
+	const result = transformMarkdown(partial, { expanded: false, width: 96 });
+	const plain = result.replace(ANSI_STRIP, "").replace(OSC_STRIP, "");
+	assert.ok(plain.startsWith("Voici :\n\n╭─ json ·"), "cadre de croissance sur JSON brut");
+	assert.ok(plain.includes('"nom": "Projet Atlas"'));
+	assert.ok(plain.includes("génération…"));
+
+	// Une fois complet : boîte exacte, plus de cadre de croissance.
+	const complete = transformMarkdown(`Voici :\n\n${SMALL}\n\nAprès.`, { expanded: false, width: 96 });
+	const plainComplete = complete.replace(ANSI_STRIP, "");
+	assert.ok(plainComplete.includes("╭─ json ·"));
+	assert.ok(!plainComplete.includes("génération…"));
+});
+
+test("transform : enveloppe du cadre de croissance calée sur la largeur (JSON brut)", () => {
+	const partial = '{\n  "id": 1,\n  "nom": "Projet Atlas",\n  "reg';
+	const result = transformMarkdown(partial, { expanded: false, width: 80 });
+	for (const row of result.split("\n")) {
+		const visible = row.replace(ANSI_STRIP, "").replace(OSC_STRIP, "");
+		if (/^[╭│╰]/.test(visible)) assert.equal([...visible].length, 80, JSON.stringify(visible.slice(0, 40)));
+	}
 });
 
 test("transform : fence ouverte non fermée (streaming) = cadre qui grandit", () => {

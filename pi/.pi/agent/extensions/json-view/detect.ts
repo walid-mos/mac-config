@@ -1,4 +1,5 @@
-/** Détection de blocs JSON dans du markdown : fences ```json et JSON brut ancré en début de ligne. */
+/** Détection de blocs JSON dans du markdown : fences ```json, JSON brut ancré
+ * en début de ligne, et JSON brut en cours de génération (streaming). */
 
 export type JsonSource = "fence" | "raw";
 
@@ -70,6 +71,105 @@ export function findOpenJsonFence(markdown: string): OpenJsonFence | undefined {
 
 function overlaps(occupied: Array<[number, number]>, start: number, end: number): boolean {
 	return occupied.some(([from, to]) => start < to && end > from);
+}
+
+/** Le JSON « en cours de frappe » peut s'arrêter n'importe où : milieu d'une
+ * chaîne, d'une clé, juste après une virgule. Stratégie : tronquer au dernier
+ * point structurel viable (contenu complet, puis ouvertures/commas en
+ * remontant), réparer la chaîne entamée, refermer les accolades, parser. Le
+ * premier candidat qui parse valide le fragment. */
+function parsesAsIncompleteJson(content: string): boolean {
+	const structural: number[] = [];
+	let inString = false;
+	let escaped = false;
+	for (let i = 0; i < content.length; i++) {
+		const char = content[i];
+		if (inString) {
+			if (escaped) escaped = false;
+			else if (char === "\\") escaped = true;
+			else if (char === '"') inString = false;
+			continue;
+		}
+		if (char === '"') inString = true;
+		else if (char === "{" || char === "[" || char === ",") structural.push(i);
+	}
+
+	const candidates: string[] = [content];
+	for (let k = structural.length - 1; k >= 0 && candidates.length < 12; k--) {
+		const pos = structural[k];
+		candidates.push(content.slice(0, pos));
+		if (content[pos] !== ",") candidates.push(content.slice(0, pos + 1));
+	}
+
+	for (const base of candidates) {
+		if (base.length === 0) continue;
+		const stack: string[] = [];
+		let stringOpen = false;
+		let hasEscape = false;
+		for (let i = 0; i < base.length; i++) {
+			const char = base[i];
+			if (stringOpen) {
+				if (hasEscape) hasEscape = false;
+				else if (char === "\\") hasEscape = true;
+				else if (char === '"') stringOpen = false;
+				continue;
+			}
+			if (char === '"') stringOpen = true;
+			else if (char === "{" || char === "[") stack.push(char === "{" ? "}" : "]");
+			else if (char === "}" || char === "]") stack.pop();
+		}
+		let suffix = "";
+		if (hasEscape) suffix += "\\\\"; // backslash orphelin : à échapper lui-même
+		if (stringOpen || hasEscape) suffix += '"';
+		try {
+			JSON.parse(base + suffix + stack.reverse().join(""));
+			return true;
+		} catch {
+			// candidat suivant
+		}
+	}
+	return false;
+}
+
+export interface OpenRawJson {
+	/** Offset du `{` / `[` d'ouverture dans le texte donné. */
+	start: number;
+	/** Fragment JSON inachevé, tel qu'écrit. */
+	content: string;
+}
+
+/**
+ * JSON brut SANS fence, en cours de génération : dernier ancrage ligne-start
+ * `{` / `[` hors fences, pas encore équilibré, mais qui devient du JSON valide
+ * une fois refermé. C'est le déclencheur du cadre de croissance quand le modèle
+ * n'enveloppe pas son JSON dans une fence. Une fence ouverte a la priorité
+ * (findOpenJsonFence) ; un JSON complet est un bloc exact (extractJsonBlocks).
+ */
+export function findOpenRawJson(markdown: string): OpenRawJson | undefined {
+	if (findOpenJsonFence(markdown)) return undefined;
+
+	const occupied: Array<[number, number]> = [];
+	for (const match of markdown.matchAll(FENCE_PATTERN)) {
+		occupied.push([match.index, match.index + match[0].length]);
+	}
+	const openers = [...markdown.matchAll(/^```/gm)].map((m) => m.index);
+	if (openers.length % 2 === 1) occupied.push([openers[openers.length - 1], markdown.length]);
+
+	let candidate: number | undefined;
+	for (const match of markdown.matchAll(RAW_START_PATTERN)) {
+		const lineStart = match.index;
+		if (overlaps(occupied, lineStart, lineStart + 1)) continue;
+		candidate = lineStart + match[0].indexOf(match[1]);
+	}
+	if (candidate === undefined) return undefined;
+
+	const content = markdown.slice(candidate);
+	// Complet → boîte exacte via extractJsonBlocks, pas de cadre de croissance.
+	if (findBalancedEnd(content, 0) !== -1) return undefined;
+	// JSON brut court sur une seule ligne = inline de la prose (cf. MIN_RAW_LENGTH).
+	if (!content.includes("\n") && content.length < MIN_RAW_LENGTH) return undefined;
+	if (!parsesAsIncompleteJson(content)) return undefined;
+	return { start: candidate, content };
 }
 
 function parseJson(raw: string): unknown | undefined {

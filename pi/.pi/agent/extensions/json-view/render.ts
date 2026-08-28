@@ -7,7 +7,7 @@
 
 import { LATTE, fgHex } from "../footer/style.ts";
 import { hyperlink, terminalLineWidth, truncateTerminalLine } from "../ui/terminal-text.ts";
-import { extractJsonBlocks, findOpenJsonFence, type JsonBlock } from "./detect.ts";
+import { extractJsonBlocks, findOpenJsonFence, findOpenRawJson, type JsonBlock } from "./detect.ts";
 
 /** Cap dur par défaut : un JSON replié n'affiche au plus que ces lignes de contenu. */
 export const JSON_MAX_LINES = 18;
@@ -217,7 +217,7 @@ export interface JsonTransformOptions {
 export function transformMarkdown(markdown: string, options: JsonTransformOptions): string {
 	const blocks = extractJsonBlocks(markdown);
 	const open = findOpenJsonFence(markdown);
-	if (blocks.length === 0 && !open) return markdown;
+	if (blocks.length === 0 && !open && !findOpenRawJson(markdown)) return markdown;
 
 	let result = "";
 	let cursor = 0;
@@ -243,6 +243,15 @@ export function transformMarkdown(markdown: string, options: JsonTransformOption
 	}
 
 	const tail = markdown.slice(cursor);
+	// JSON brut sans fence, en cours de génération : même cadre de croissance que
+	// pour une fence ouverte, jusqu'à ce que le JSON complet devienne un bloc
+	// exact (extractJsonBlocks). Le modèle n'enveloppe pas toujours son JSON.
+	const openRaw = findOpenRawJson(tail);
+	if (openRaw) {
+		result = padBeforeBlock(result + tail.slice(0, openRaw.start));
+		result += renderOpenJsonFence(openRaw.content, { expanded: options.expanded, width: options.width });
+		return `${result}\n\n`;
+	}
 	// Évite l'empilement de lignes vides quand le markdown reprend déjà par une séparation.
 	result += tail.replace(/^\n+/, (leading) => (result.endsWith("\n\n") && leading.length > 0 ? "" : leading));
 	return result;

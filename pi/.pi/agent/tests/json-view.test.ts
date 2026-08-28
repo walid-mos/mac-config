@@ -171,6 +171,16 @@ test("transform : toutes les rangées du bloc calées sur la largeur", () => {
 	}
 });
 
+test("transform : phase streaming = bloc monochrome sans ESC ni backslash", () => {
+	const tricky = JSON.stringify({ note: "*gras* et <tag>", n: 3, ok: true, plus: "x" }, null, 2);
+	const result = transformMarkdown(tricky, { expanded: true, width: 96, streaming: true });
+	assert.ok(!result.includes("\u001b"), "aucun ESC en streaming");
+	assert.ok(!result.includes("\\"), "pas de backslash d'échappement");
+	assert.ok(result.includes("∗gras∗"));
+	assert.ok(result.includes("‹tag›"));
+	assert.ok(result.startsWith("╭─ json ·"));
+});
+
 test("escapeMarkdownOutsideAnsi : ANSI intact, markdown spécial échappé", () => {
 	const ansi = "\u001b[38;2;1;2;3m[text]\u001b[39m";
 	assert.equal(escapeMarkdownOutsideAnsi(ansi), ansi);

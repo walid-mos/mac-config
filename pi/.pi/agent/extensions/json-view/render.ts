@@ -94,11 +94,12 @@ export function highlightJsonLine(line: string): string {
 	return out;
 }
 
-function boxRow(width: number, content: string, renderedVisible: number): string {
+function boxRow(width: number, content: string, renderedVisible: number, plain = false): string {
 	// renderedVisible = largeur APRÈS consommation des backslashes d'échappement
 	// par marked : c'est elle qui décide de la position du bord droit.
 	const pad = Math.max(0, width - renderedVisible - 4);
-	return `${fgHex(C_BORDER, "│")} ${content}${" ".repeat(pad)} ${fgHex(C_BORDER, "│")}`;
+	const bar = plain ? "│" : fgHex(C_BORDER, "│");
+	return `${bar} ${content}${" ".repeat(pad)} ${plain ? "│" : fgHex(C_BORDER, "│")}`;
 }
 
 function boxEdge(
@@ -107,9 +108,11 @@ function boxEdge(
 	right: string,
 	labelAnsi: string,
 	labelVisible: number,
+	plain = false,
 ): string {
 	// total = left(1) + ─(1) + espace(1) + label + espace(1) + fill + right(1)
 	const fill = Math.max(2, width - labelVisible - 5);
+	if (plain) return `${left}─ ${labelAnsi} ${"─".repeat(fill)}${right}`;
 	return `${fgHex(C_BORDER, `${left}─ `)}${labelAnsi} ${fgHex(C_BORDER, `${"─".repeat(fill)}${right}`)}`;
 }
 
@@ -120,6 +123,26 @@ export interface JsonRenderOptions {
 	width: number;
 	/** URL file:// du blob persisté, pour les liens cliquables OSC 8. */
 	linkUrl?: string;
+	/** Phase streaming : aucun ESC ni backslash (le renderer partiel les salit). */
+	streaming?: boolean;
+}
+
+/** Jumeaux unicode des spéciaux markdown pour la phase streaming (sans backslash, sans ESC). */
+const STREAMING_TWINS: Record<string, string> = {
+	"*": "∗",
+	"`": "´",
+	"<": "‹",
+	">": "›",
+	"~": "∼",
+};
+
+function sanitizeForStreaming(line: string): string {
+	// Retire les séquences ANSI résiduelles et remplace les spéciaux markdown
+	// par leurs jumeaux unicode : rien qui puisse être sali par le rendu partiel.
+	return line
+		.replace(/\u001b\[[0-;]*[ -/]*[@-~]/g, "")
+		.replace(/\u001b\]8;;[^\u0007]*\u0007/g, "")
+		.replace(/[\\*`<>~]/g, (char) => (char === "\\" ? "" : STREAMING_TWINS[char] ?? char));
 }
 
 /**
@@ -133,12 +156,23 @@ export function renderJsonBox(block: JsonBlock, options: JsonRenderOptions): str
 	const width = Math.max(20, Math.floor(options.width));
 
 	const titleText = `json · ${formatJsonBytes(Buffer.byteLength(pretty))} · ${allLines.length.toLocaleString("fr-FR")} lignes`;
-	const title = `${fgHex(C_TITLE, `${BOLD}json${BOLD_OFF}`)}${fgHex(C_META, titleText.slice(4))}`;
-	const rows = [boxEdge(width, "╭", "╮", title, titleText.length)];
+	const title = options.streaming
+		? titleText
+		: `${fgHex(C_TITLE, `${BOLD}json${BOLD_OFF}`)}${fgHex(C_META, titleText.slice(4))}`;
+	const rows = [boxEdge(width, "╭", "╮", title, titleText.length, options.streaming)];
 
 	const capped = !options.expanded && allLines.length > JSON_MAX_LINES;
 	const shown = capped ? allLines.slice(0, JSON_MAX_LINES) : allLines;
 	for (const line of shown) {
+		if (options.streaming) {
+			// Phase streaming : le renderer partiel retire les préfixes ESC (tout ANSI
+			// devient de la gwaille) et affiche les backslashes littéralement. Version
+			// monochrome à jumeaux unicode ; le bloc exact arrive à la finalisation.
+			const plain = sanitizeForStreaming(line);
+			const budget = Math.max(8, width - 4);
+			rows.push(boxRow(width, plain.slice(0, budget), Math.min(terminalLineWidth(line), budget), true));
+			continue;
+		}
 		// Échapper avant la coloration (sinon le backslash ajouté serait re-échappé),
 		// puis compenser le pad : marked consomme les backslashes au rendu.
 		const escaped = escapeMarkdownOutsideAnsi(line);
@@ -151,11 +185,13 @@ export function renderJsonBox(block: JsonBlock, options: JsonRenderOptions): str
 	const bottomLabel = capped
 		? `⤢ +${(allLines.length - JSON_MAX_LINES).toLocaleString("fr-FR")} lignes · tout voir`
 		: `ouvrir ⤢ · /json open`;
-	const bottomAnsi = options.linkUrl
-		? fgHex(C_LINK, hyperlink(bottomLabel, options.linkUrl))
-		: fgHex(C_META, bottomLabel);
+	const bottomAnsi = options.streaming
+		? bottomLabel
+		: options.linkUrl
+			? fgHex(C_LINK, hyperlink(bottomLabel, options.linkUrl))
+			: fgHex(C_META, bottomLabel);
 	const bottomVisible = terminalLineWidth(bottomLabel);
-	rows.push(boxEdge(width, "╰", "╯", bottomAnsi, bottomVisible));
+	rows.push(boxEdge(width, "╰", "╯", bottomAnsi, bottomVisible, options.streaming));
 
 	return rows.join("\n");
 }
@@ -188,7 +224,12 @@ export function transformMarkdown(markdown: string, options: JsonTransformOption
 		result += markdown.slice(cursor, block.start);
 		result = padBeforeBlock(result);
 		const linkUrl = options.persist?.(block.raw, block.parsed);
-		result += renderJsonBox(block, { expanded: options.expanded, width: options.width, linkUrl });
+		result += renderJsonBox(block, {
+			expanded: options.expanded,
+			width: options.width,
+			linkUrl,
+			streaming: options.streaming,
+		});
 		result += "\n\n";
 		cursor = block.end;
 	}

@@ -1,11 +1,11 @@
 /** json-view : détection, formatage et inspection des blocs JSON du transcript. */
 export { extractJsonBlocks, findBalancedEnd, MIN_RAW_LENGTH, type JsonBlock } from "./json-view/detect.ts";
 export {
-	escapeMarkdownText,
+	escapeMarkdownOutsideAnsi,
 	formatJsonBytes,
+	highlightJsonLine,
 	JSON_MAX_LINES,
-	renderJsonBlock,
-	renderJsonHeader,
+	renderJsonBox,
 	transformMarkdown,
 } from "./json-view/render.ts";
 export { persistJson, recentBlobs, readBlob, setBlobDir, type JsonBlob } from "./json-view/blob-store.ts";

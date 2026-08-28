@@ -1,22 +1,39 @@
-# json-view — affichage des blocs JSON du transcript
+# json-view — blocs JSON spécialisés dans le transcript
 
-Détecte le JSON dans les messages user/assistant, le reformate et l'isole du texte
-environnant avec un séparateur slim (pas de fence : pi rend les marqueurs ` ``` `
-littéralement), cappé à `JSON_MAX_LINES` lignes par défaut, et permet de l'ouvrir.
+Détecte le JSON dans les messages user/assistant et le rend dans un bloc spécialisé :
+boîte arrondie aux couleurs Catppuccin Latte (palette importée du footer), JSON
+coloré syntaxiquement (clés bleu, chaînes vert, nombres peach, littéraux mauve),
+métadonnées et affordances cliquables dans les bordures.
 
 ```
-── json · 160 o · 13 lignes · ouvrir ⤢ ────────────────
-{
-  "nom": "test",
-  …
+╭─ json · 127 o · 10 lignes ────────────────────────────╮
+│ {                                                     │
+│   "nom": "test",                                     │
+╰─ ouvrir ⤢ · /json open ───────────────────────────────╯
 ```
 
-- JSON ≤ `JSON_MAX_LINES` lignes : pretty complet.
-- JSON plus grand : 18 premières lignes + marqueur cliquable
-  `[⤢ +N lignes · tout voir]` (ouvre le blob complet via le handler OS).
+- JSON ≤ `JSON_MAX_LINES` lignes (18) : pretty complet.
+- Plus grand : 18 premières lignes, bordure basse = marqueur cliquable
+  `⤢ +N lignes · tout voir` (ouvre le blob complet via le handler OS).
 - Déplié (`/json`) : pretty complet, sans cap.
-- Le contenu est échappé markdown (`*`, `_`, `` ` ``, `[`, `<`, …) pour ne pas
-  être interprété par le renderer.```
+
+## Comment ça marche (contraintes renderer)
+
+Le transformer ne peut produire que du markdown, et pi-tui rend les marqueurs
+de fence ` ``` ` littéralement. Le bloc est donc dessiné en caractères
+box-drawing + **ANSI truecolor brut dans le texte markdown** — vérifié : les
+séquences traversent le renderer markdown de pi-tui intactes. Trois pièges
+correspondants, gérés ici :
+
+1. les caractères spéciaux markdown (`*`, `` ` ``, `<`, …) sont échappés hors
+   séquences ANSI (`escapeMarkdownOutsideAnsi`) ;
+2. `[` / `]` ne sont pas échappés (pi-tui rend `\[` littéral) — aucun lien
+   markdown dans le bloc : les liens sont des hyperliens **OSC 8 bruts**
+   (helper `hyperlink()` de `ui/terminal-text.ts`), donc aucun `](` dans le
+   flux qui pourrait former un lien parasite avec un `[` de séquence ANSI ;
+3. marked consomme les backslashes d'échappement au rendu : le pad des rangées
+   est compensé du nombre d'échappements pour garder le bord droit à l'exacte
+   largeur du terminal (`availableWidth`).```
 
 ## Modules
 
@@ -24,9 +41,9 @@ littéralement), cappé à `JSON_MAX_LINES` lignes par défaut, et permet de l'o
   parseables) + JSON brut ancré en début de ligne, équilibré (scan conscient des
   chaînes) et parseable. En deçà de `MIN_RAW_LENGTH` sur une seule ligne, le JSON
   inline de la prose n'est pas touché.
-- `render.ts` — rendu markdown pur : séparateur slim dimensionné à la largeur
-  (`── json · … ──`), pretty en texte brut échappé, cap `JSON_MAX_LINES` avec
-  marqueur cliquable au-delà quand l'état global pi est replié.
+- `render.ts` — rendu pur du bloc : coloration JSON maison palette Latte
+  (`highlightJsonLine`), boîte box-drawing + ANSI truecolor, cap
+  `JSON_MAX_LINES`, compensation des échappements markdown pour l'alignement.
 - `blob-store.ts` — persiste chaque JSON pretty dans `$TMPDIR/pi-json-view/<hash>.json`
   (une écriture par contenu, historique borné à 100 blobs pour `/json open [n]`).
 - `runtime.ts` — enregistre le `registerMarkdownTransformer` et la commande `/json`.
@@ -40,10 +57,9 @@ littéralement), cappé à `JSON_MAX_LINES` lignes par défaut, et permet de l'o
   re-rend tous les blocs JSON avec le nouvel état. En TUI uniquement.
 - `/json open [n]` — ouvre le n-ième JSON le plus récent (défaut 1) dans
   l'éditeur multi-lignes pi ; **Ctrl+G** y ouvre `$EDITOR` (nvim) sur le blob.
-- Clic sur `ouvrir ⤢` ou sur le marqueur `⤢ +N lignes` — les liens markdown sont
-  rendus en OSC 8 par pi-tui ; le clic ouvre le JSON complet via le handler par
-  défaut de l'OS (pas d'expansion in place : pi n'expose pas les clics aux
-  extensions).
+- Clic sur `ouvrir ⤢` ou sur `⤢ +N lignes · tout voir` — hyperliens OSC 8 ;
+  le clic ouvre le JSON complet via le handler par défaut de l'OS (pas
+  d'expansion in place : pi n'expose pas les clics aux extensions).
 
 ## Persistance
 

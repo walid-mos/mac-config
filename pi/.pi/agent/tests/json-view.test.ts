@@ -5,7 +5,9 @@ import { join } from "node:path";
 import test from "node:test";
 import { extractJsonBlocks, MIN_RAW_LENGTH } from "../extensions/json-view/detect.ts";
 import {
+	escapeMarkdownOutsideAnsi,
 	formatJsonBytes,
+	highlightJsonLine,
 	JSON_MAX_LINES,
 	transformMarkdown,
 } from "../extensions/json-view/render.ts";
@@ -94,27 +96,51 @@ test("detect : JSON non strict ignoré", () => {
 	assert.deepEqual(extractJsonBlocks(markdown), []);
 });
 
-test("transform : bloc isolé avec séparateur slim, sans fence", () => {
+const ANSI_STRIP = /\u001b\[[0-9;]*m/g;
+const OSC_STRIP = /\u001b\]8;;[^\u0007]*\u0007/g;
+
+function visibleLines(markdown: string): string[] {
+	return markdown.split("\n").map((line) => [...line.replace(ANSI_STRIP, "").replace(OSC_STRIP, "")].length);
+}
+
+test("transform : bloc spécialisé, sans fence", () => {
 	const markdown = `Avant.\n${SMALL}\nAprès.`;
-	const result = transformMarkdown(markdown, { expanded: false, width: 120, persist: () => "file:///tmp/x.json" });
-	assert.match(result, /^Avant\.\n\n/);
-	assert.match(result, /── json · \d[,\d]* o · 7 lignes · \[ouvrir ⤢\]\(file:\/\/\/tmp\/x\.json\) ─+\n/);
-	assert.match(result, /\n\{\n  "a": 1,\n  "b": \\\[\n    2,\n    3\n  \\\]\n\}\n\nAprès\.$/);
+	const result = transformMarkdown(markdown, { expanded: false, width: 96, persist: () => "file:///tmp/x.json" });
+	const rows = result.split("\n").map((row) => row.replace(ANSI_STRIP, ""));
+	assert.match(rows[0], /^Avant\.$/);
+	const boxStart = rows.findIndex((row) => row.startsWith("╭─"));
+	assert.ok(boxStart > 0);
+	assert.ok(rows[boxStart].includes("json ·"));
+	assert.ok(rows[boxStart].trimEnd().endsWith("╮"));
+	assert.ok(rows.some((row) => row.includes("\"a\"")));
+	assert.ok(rows.some((row) => row.trimEnd().endsWith("╯") && row.includes("ouvrir ⤢") && row.includes("file:///tmp/x.json")));
 	assert.ok(!result.includes("```"));
+});
+
+test("transform : contenu coloré (truecolor) et markdown resté littéral", () => {
+	const tricky = JSON.stringify({ note: "*gras* et <tag>", n: 3, ok: true }, null, 2);
+	const result = transformMarkdown(tricky, { expanded: true, width: 96 });
+	assert.ok((result.match(/\u001b\[38;2;30;102;245m/g) ?? []).length >= 2, "clés en bleu");
+	assert.ok(result.includes("\u001b[38;2;64;160;43m"), "chaînes en vert");
+	assert.ok(result.includes("\u001b[38;2;254;100;11m"), "nombres en peach");
+	assert.ok(result.includes("\u001b[38;2;136;57;239m"), "littéraux en mauve");
+	assert.ok(result.includes("\\*gras\\*"), "astérisques échappés");
+	assert.ok(result.includes("\\<tag\\>"), "chevrons échappés");
 });
 
 test("transform : gros JSON replié = 18 premières lignes + marqueur cliquable", () => {
 	const markdown = `${BIG}`;
-	const result = transformMarkdown(markdown, { expanded: false, width: 80, persist: () => "file:///tmp/big.json" });
+	const result = transformMarkdown(markdown, { expanded: false, width: 96, persist: () => "file:///tmp/big.json" });
 	assert.ok(result.includes("164 lignes"));
 	assert.ok(result.includes('"item-3"'));
 	assert.ok(!result.includes('"item-4"'));
-	assert.ok(result.includes("[⤢ +146 lignes · tout voir](file:///tmp/big.json)"));
+	assert.ok(result.includes("⤢ +146 lignes · tout voir"));
+	assert.ok(result.includes("file:///tmp/big.json"));
 	assert.ok(!result.includes("```"));
 });
 
 test("transform : déplié = pretty complet même pour un gros JSON", () => {
-	const result = transformMarkdown(BIG, { expanded: true, width: 80 });
+	const result = transformMarkdown(BIG, { expanded: true, width: 96 });
 	assert.ok(result.includes('"item-39"'));
 	assert.ok(!result.includes("tout voir"));
 });
@@ -122,7 +148,7 @@ test("transform : déplié = pretty complet même pour un gros JSON", () => {
 test("transform : JSON sous le seuil reste complet quand replié", () => {
 	const lines = SMALL.split("\n").length;
 	assert.ok(lines <= JSON_MAX_LINES);
-	const result = transformMarkdown(SMALL, { expanded: false, width: 80 });
+	const result = transformMarkdown(SMALL, { expanded: false, width: 96 });
 	assert.ok(result.includes('"b"'));
 	assert.ok(!result.includes("tout voir"));
 });
@@ -132,21 +158,30 @@ test("transform : sans JSON, markdown intact", () => {
 	assert.equal(transformMarkdown(markdown, { expanded: false, width: 80 }), markdown);
 });
 
-test("transform : contenu markdown-escapé (pas d'interprétation)", () => {
-	const tricky = JSON.stringify({ note: "*gras* et `code` et <tag> et [lien]" }, null, 2);
-	const result = transformMarkdown(tricky, { expanded: true, width: 80 });
-	assert.ok(result.includes("\\*gras\\*"));
-	assert.ok(result.includes("\\`code\\`"));
-	assert.ok(result.includes("\\<tag\\>"));
-	assert.ok(result.includes("\\[lien\\]"));
+test("transform : toutes les rangées du bloc calées sur la largeur", () => {
+	const result = transformMarkdown(`${SMALL}\n\n${BIG}`, { expanded: false, width: 96, persist: () => "file:///tmp/x.json" });
+	const boxRows = result
+		.split("\n")
+		.map((row) => row.replace(ANSI_STRIP, ""))
+		.filter((row) => /^[╭│╰]/.test(row));
+	assert.ok(boxRows.length > 20);
+	for (const row of boxRows) {
+		const [visible] = visibleLines(row);
+		assert.equal(visible, 96, `rangée décalée : ${JSON.stringify(row.slice(0, 40))}`);
+	}
 });
 
-test("transform : séparateur calé sur la largeur", () => {
-	const result = transformMarkdown(SMALL, { expanded: false, width: 80, persist: () => "file:///tmp/x.json" });
-	const header = result.split("\n").find((line) => line.startsWith("── json")) ?? "";
-	// Largeur visible = syntaxe lien retirée, un caractère par colonne.
-	const visible = header.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
-	assert.equal([...visible].length, 80);
+test("escapeMarkdownOutsideAnsi : ANSI intact, markdown spécial échappé", () => {
+	const ansi = "\u001b[38;2;1;2;3m[text]\u001b[39m";
+	assert.equal(escapeMarkdownOutsideAnsi(ansi), ansi);
+	assert.equal(escapeMarkdownOutsideAnsi("a*b`c<d~e"), "a\\*b\\`c\\<d\\~e");
+});
+
+test("highlightJsonLine : clés bleues, chaînes vertes, ponctuation grise", () => {
+	const colored = highlightJsonLine('  "nom": "test",');
+	assert.ok(colored.includes("\u001b[38;2;30;102;245m\"nom\"\u001b[39m"));
+	assert.ok(colored.includes("\u001b[38;2;64;160;43m\"test\"\u001b[39m"));
+	assert.ok(colored.includes("\u001b[38;2;140;143;161m:\u001b[39m"));
 });
 
 test("blob-store : un fichier par contenu, historique ordonné", () => {

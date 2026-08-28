@@ -46,6 +46,28 @@ export function findBalancedEnd(text: string, openIndex: number): number {
 	return -1;
 }
 
+export interface OpenJsonFence {
+	start: number;
+	content: string;
+}
+
+/**
+ * Dernière fence ouverte (sans fermeture) = streaming en cours. Ne la renvoie
+ * que si son contenu est candidat JSON : langage `json`, ou sans langage avec
+ * contenu qui commence par `{` / `[`.
+ */
+export function findOpenJsonFence(markdown: string): OpenJsonFence | undefined {
+	const openers = [...markdown.matchAll(/^[ \t]{0,3}```([^\n]*)\n/gm)];
+	if (openers.length === 0) return undefined;
+	const last = openers[openers.length - 1];
+	const lastStart = last.index;
+	if (markdown.indexOf("```", lastStart + 3) !== -1) return undefined;
+	const lang = (last[1] ?? "").trim().split(/\s+/)[0]?.toLowerCase() ?? "";
+	const content = markdown.slice(lastStart + last[0].length);
+	if (lang !== "json" && (lang !== "" || !/^[ \t]*[{[]/.test(content))) return undefined;
+	return { start: lastStart, content };
+}
+
 function overlaps(occupied: Array<[number, number]>, start: number, end: number): boolean {
 	return occupied.some(([from, to]) => start < to && end > from);
 }

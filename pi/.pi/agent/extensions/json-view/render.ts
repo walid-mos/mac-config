@@ -7,7 +7,7 @@
 
 import { LATTE, fgHex } from "../footer/style.ts";
 import { hyperlink, terminalLineWidth, truncateTerminalLine } from "../ui/terminal-text.ts";
-import { extractJsonBlocks, type JsonBlock } from "./detect.ts";
+import { extractJsonBlocks, findOpenJsonFence, type JsonBlock } from "./detect.ts";
 
 /** Cap dur par défaut : un JSON replié n'affiche au plus que ces lignes de contenu. */
 export const JSON_MAX_LINES = 18;
@@ -196,6 +196,49 @@ export function renderJsonBox(block: JsonBlock, options: JsonRenderOptions): str
 	return rows.join("\n");
 }
 
+/**
+ * Cadre pendant le streaming d'une fence ```json ouverte : grossit ligne à
+ * ligne, contenu coloré ligne à ligne (sans parse ni blob — pas encore du JSON
+ * valide). La boîte exacte remplace ce cadre à la fermeture de la fence.
+ */
+export function renderOpenJsonFence(content: string, options: JsonRenderOptions): string {
+	const rawLines = content.replace(/\n+$/, "").split("\n").filter((line, i, arr) => line.length > 0 || i < arr.length - 1);
+	const allLines = rawLines.length > 0 ? rawLines : [""];
+	const width = Math.max(20, Math.floor(options.width));
+
+	const titleText = `json · ${formatJsonBytes(Buffer.byteLength(content))} · ${allLines.length.toLocaleString("fr-FR")} lignes`;
+	const title = options.streaming
+		? titleText
+		: `${fgHex(C_TITLE, `${BOLD}json${BOLD_OFF}`)}${fgHex(C_META, titleText.slice(4))}`;
+	const rows = [boxEdge(width, "╭", "╮", title, titleText.length, options.streaming)];
+
+	const capped = !options.expanded && allLines.length > JSON_MAX_LINES;
+	const shown = capped ? allLines.slice(0, JSON_MAX_LINES) : allLines;
+	for (const line of shown) {
+		if (options.streaming) {
+			const plain = sanitizeForStreaming(line);
+			const budget = Math.max(8, width - 4);
+			rows.push(boxRow(width, plain.slice(0, budget), Math.min(terminalLineWidth(line), budget), true));
+			continue;
+		}
+		const escaped = escapeMarkdownOutsideAnsi(line);
+		const escapes = escaped.length - line.length;
+		const budget = Math.max(8, width - 4 - escapes);
+		const colored = truncateTerminalLine(highlightJsonLine(escaped), budget, "…");
+		rows.push(boxRow(width, colored, terminalLineWidth(colored) - escapes));
+	}
+
+	const bottomLabel = capped
+		? `⤢ +${(allLines.length - JSON_MAX_LINES).toLocaleString("fr-FR")} lignes`
+		: options.streaming
+			? "génération…"
+			: "/json open";
+	const bottomAnsi = options.streaming ? bottomLabel : fgHex(C_LINK, bottomLabel);
+	rows.push(boxEdge(width, "╰", "╯", bottomAnsi, terminalLineWidth(bottomLabel), options.streaming));
+
+	return rows.join("\n");
+}
+
 function padBeforeBlock(text: string): string {
 	if (text.length === 0) return "";
 	if (/\n[ \t]*\n$/.test(text)) return text;
@@ -216,7 +259,8 @@ export interface JsonTransformOptions {
  */
 export function transformMarkdown(markdown: string, options: JsonTransformOptions): string {
 	const blocks = extractJsonBlocks(markdown);
-	if (blocks.length === 0) return markdown;
+	const open = findOpenJsonFence(markdown);
+	if (blocks.length === 0 && !open) return markdown;
 
 	let result = "";
 	let cursor = 0;
@@ -232,6 +276,18 @@ export function transformMarkdown(markdown: string, options: JsonTransformOption
 		});
 		result += "\n\n";
 		cursor = block.end;
+	}
+
+	// Fence ```json ouverte (streaming) : consommée et remplacée par le cadre qui
+	// grossit ligne à ligne, au lieu du rendu code natif de pi (indenté, cassé).
+	if (open) {
+		result = padBeforeBlock(result + markdown.slice(cursor, open.start));
+		result += renderOpenJsonFence(open.content, {
+			expanded: options.expanded,
+			width: options.width,
+			streaming: options.streaming,
+		});
+		return `${result}\n\n`;
 	}
 
 	const tail = markdown.slice(cursor);

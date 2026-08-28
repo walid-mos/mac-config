@@ -96,11 +96,19 @@ test("detect : JSON non strict ignoré", () => {
 	assert.deepEqual(extractJsonBlocks(markdown), []);
 });
 
-test("transform : fence ouverte non fermée (streaming) jamais boxée", () => {
+test("transform : fence ouverte non fermée (streaming) = cadre qui grandit", () => {
 	const partial = 'Voici :\n\n```json\n{\n  "id": 5,\n  "actif": true\n}';
 	const result = transformMarkdown(partial, { expanded: false, width: 96, streaming: true });
-	assert.ok(!result.includes("╭"), "pas de boîte dans une fence ouverte");
-	assert.equal(result, partial);
+	// La fence est consommée et remplacée par le cadre (pas de rendu code natif).
+	assert.ok(!result.includes("```"));
+	assert.ok(result.startsWith("Voici :\n\n╭─ json ·"));
+	assert.ok(result.includes('"id": 5'));
+	assert.ok(result.includes("génération…"));
+	assert.ok(!result.includes("\u001b"), "monochrome en streaming");
+	// Croissance : une fence plus grosse produit un cadre avec plus de lignes.
+	const grown = transformMarkdown(`${partial.slice(0, -1)},\n  "email": "user5@example.com"\n}`, { expanded: false, width: 96, streaming: true });
+	assert.ok(grown.includes('"email"'));
+	assert.ok(!grown.includes("```"));
 });
 
 const ANSI_STRIP = /\u001b\[[0-9;]*m/g;

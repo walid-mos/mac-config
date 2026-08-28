@@ -75,6 +75,28 @@ test("detect : JSON brut en cours de génération détecté (sans fence)", () =>
 	assert.equal(findOpenRawJson('```\n{"x":\n```\nTexte final.'), undefined);
 });
 
+test("detect : prose commençant par { jamais prise pour du JSON en cours", () => {
+	// Accolade nue + texte libre : la troncature à `{` donnerait `{}` → rejeté.
+	assert.equal(findOpenRawJson("Un template :\n\n{\n  et voila du texte libre"), undefined);
+	// Membre JSON apparent suivi de prose : la queue rejetée par le garde-fou 2.
+	assert.equal(
+		findOpenRawJson('{\n  "titre": "Mon doc",\n  ceci n est pas du json mais voila'),
+		undefined,
+	);
+	assert.equal(
+		findOpenRawJson('{\n  "cle": "valeur",\n  and then prose that is not json'),
+		undefined,
+	);
+	// Liste markdown à crochets non terminée.
+	assert.equal(findOpenRawJson("[Note] ceci est une note en cours"), undefined);
+	// Un vrai flux, lui, passe toujours : coupure après virgule, dans une clé,
+	// dans une chaîne, ou en pleine valeur.
+	assert.ok(findOpenRawJson('{\n  "id": 1,'));
+	assert.ok(findOpenRawJson('{\n  "id": 1,\n  "reg'));
+	assert.ok(findOpenRawJson('{\n  "id": 1,\n  "nom": "Projet At'));
+	assert.ok(findOpenRawJson('{\n  "id": 1,\n  "poids": 7')); 
+});
+
 test("detect : JSON brut minifié en début de ligne", () => {
 	const raw = JSON.stringify({
 		kind: "review",

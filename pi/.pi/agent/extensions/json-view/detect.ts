@@ -77,7 +77,14 @@ function overlaps(occupied: Array<[number, number]>, start: number, end: number)
  * chaîne, d'une clé, juste après une virgule. Stratégie : tronquer au dernier
  * point structurel viable (contenu complet, puis ouvertures/commas en
  * remontant), réparer la chaîne entamée, refermer les accolades, parser. Le
- * premier candidat qui parse valide le fragment. */
+ * premier candidat qui parse valide le fragment.
+ *
+ * Deux gardes-fous anti-faux-positifs (prose commençant par `{`) :
+ * - le fragment refermé ne doit pas être vide (`{}` / `[]`) — sinon tronquer
+ *   jusqu'à l'accolade nue ferait passer n'importe quoi ;
+ * - ce qui a été jeté par la troncature doit ressembler au début d'une valeur
+ *   JSON (`"`, chiffre, `-`, `{`, `[`, t/f/n) — une queue de prose (" and then
+ *   …") rejette le candidat. */
 function parsesAsIncompleteJson(content: string): boolean {
 	const structural: number[] = [];
 	let inString = false;
@@ -121,12 +128,23 @@ function parsesAsIncompleteJson(content: string): boolean {
 		let suffix = "";
 		if (hasEscape) suffix += "\\\\"; // backslash orphelin : à échapper lui-même
 		if (stringOpen || hasEscape) suffix += '"';
+		let parsed: unknown;
 		try {
-			JSON.parse(base + suffix + stack.reverse().join(""));
-			return true;
+			parsed = JSON.parse(base + suffix + stack.reverse().join(""));
 		} catch {
-			// candidat suivant
+			continue;
 		}
+		// Garde-fou 1 : `{}` / `[]` = troncature jusqu'à l'accolade nue → rejet.
+		const empty =
+			typeof parsed !== "object" ||
+			parsed === null ||
+			(Array.isArray(parsed) ? parsed.length === 0 : Object.keys(parsed).length === 0);
+		if (empty) continue;
+		// Garde-fou 2 : la queue jetée doit amorcer une valeur JSON.
+		let rest = content.slice(base.length).replace(/^[ \t\r\n]+/, "");
+		if (rest.startsWith(",")) rest = rest.slice(1).replace(/^[ \t\r\n]+/, "");
+		if (rest.length > 0 && !/^["\-0-9{[\dtfn]/.test(rest)) continue;
+		return true;
 	}
 	return false;
 }

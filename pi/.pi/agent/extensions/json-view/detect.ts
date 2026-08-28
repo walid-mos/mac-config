@@ -74,6 +74,14 @@ export function extractJsonBlocks(markdown: string): JsonBlock[] {
 		occupied.push([start, start + match[0].length]);
 	}
 
+	// Fence ouverte non fermée (streaming) : son contenu est du code en cours de
+	// frappe, rendu par pi avec son propre cadre — on ne le boxe surtout pas
+	// à l'intérieur (sinon boîte dans fence = rendu cassé).
+	const openers = [...markdown.matchAll(/^```/gm)].map((m) => m.index);
+	if (openers.length % 2 === 1) {
+		occupied.push([openers[openers.length - 1], markdown.length]);
+	}
+
 	for (const match of markdown.matchAll(FENCE_PATTERN)) {
 		const start = match.index;
 		const end = start + match[0].length;

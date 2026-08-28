@@ -96,6 +96,13 @@ test("detect : JSON non strict ignoré", () => {
 	assert.deepEqual(extractJsonBlocks(markdown), []);
 });
 
+test("transform : fence ouverte non fermée (streaming) jamais boxée", () => {
+	const partial = 'Voici :\n\n```json\n{\n  "id": 5,\n  "actif": true\n}';
+	const result = transformMarkdown(partial, { expanded: false, width: 96, streaming: true });
+	assert.ok(!result.includes("╭"), "pas de boîte dans une fence ouverte");
+	assert.equal(result, partial);
+});
+
 const ANSI_STRIP = /\u001b\[[0-9;]*m/g;
 const OSC_STRIP = /\u001b\]8;;[^\u0007]*\u0007/g;
 

@@ -98,15 +98,15 @@ test("detect : JSON non strict ignoré", () => {
 
 test("transform : fence ouverte non fermée (streaming) = cadre qui grandit", () => {
 	const partial = 'Voici :\n\n```json\n{\n  "id": 5,\n  "actif": true\n}';
-	const result = transformMarkdown(partial, { expanded: false, width: 96, streaming: true });
+	const result = transformMarkdown(partial, { expanded: false, width: 96 });
 	// La fence est consommée et remplacée par le cadre (pas de rendu code natif).
 	assert.ok(!result.includes("```"));
-	assert.ok(result.startsWith("Voici :\n\n╭─ json ·"));
-	assert.ok(result.includes('"id": 5'));
-	assert.ok(result.includes("génération…"));
-	assert.ok(!result.includes("\u001b"), "monochrome en streaming");
-	// Croissance : une fence plus grosse produit un cadre avec plus de lignes.
-	const grown = transformMarkdown(`${partial.slice(0, -1)},\n  "email": "user5@example.com"\n}`, { expanded: false, width: 96, streaming: true });
+	const plain = result.replace(ANSI_STRIP, "").replace(OSC_STRIP, "");
+	assert.ok(plain.startsWith("Voici :\n\n╭─ json ·"));
+	assert.ok(plain.includes('"id": 5'));
+	assert.ok(plain.includes("génération…"));
+	assert.ok(result.includes("\u001b[38;2;30;102;245m"), "clés colorées pendant le streaming");
+	const grown = transformMarkdown(`${partial.slice(0, -1)},\n  "email": "user5@example.com"\n}`, { expanded: false, width: 96 });
 	assert.ok(grown.includes('"email"'));
 	assert.ok(!grown.includes("```"));
 });
@@ -186,14 +186,13 @@ test("transform : toutes les rangées du bloc calées sur la largeur", () => {
 	}
 });
 
-test("transform : phase streaming = bloc monochrome sans ESC ni backslash", () => {
+test("transform : cadre de croissance coloré dès le streaming", () => {
 	const tricky = JSON.stringify({ note: "*gras* et <tag>", n: 3, ok: true, plus: "x" }, null, 2);
-	const result = transformMarkdown(tricky, { expanded: true, width: 96, streaming: true });
-	assert.ok(!result.includes("\u001b"), "aucun ESC en streaming");
-	assert.ok(!result.includes("\\"), "pas de backslash d'échappement");
-	assert.ok(result.includes("∗gras∗"));
-	assert.ok(result.includes("‹tag›"));
-	assert.ok(result.startsWith("╭─ json ·"));
+	const result = transformMarkdown(tricky, { expanded: true, width: 96 });
+	assert.ok(result.includes("\u001b[38;2;30;102;245m"), "clés en bleu");
+	assert.ok(result.includes("\\*gras\\*"), "astérisques échappés");
+	const plain = result.replace(ANSI_STRIP, "");
+	assert.ok(plain.startsWith("╭─ json ·"));
 });
 
 test("escapeMarkdownOutsideAnsi : ANSI intact, markdown spécial échappé", () => {

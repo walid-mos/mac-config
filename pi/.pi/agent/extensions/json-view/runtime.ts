@@ -22,9 +22,6 @@ export function registerJsonViewExtension(pi: ExtensionAPI): void {
 		return transformMarkdown(markdown, {
 			expanded: ui?.getToolsExpanded() ?? false,
 			width: context.availableWidth,
-			// Phase streaming : le rendu partiel salit l'ANSI et les backslashes —
-			// bloc monochrome à jumeaux unicode, le bloc exact arrive à la finalisation.
-			streaming: context.isStreaming,
 			persist: persistJson,
 		});
 	});

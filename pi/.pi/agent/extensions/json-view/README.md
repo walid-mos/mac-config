@@ -13,8 +13,8 @@ métadonnées et affordances cliquables dans les bordures.
 ```
 
 - **Streaming** : une fence ```json ouverte est consommée et remplacée par le
-  cadre lui-même (monochrome, jumeaux unicode, bordure basse `génération…`),
-  qui grossit ligne à ligne ; pas de phase « brut puis boîte d'un coup ».
+  cadre lui-même, coloré et grossissant ligne à ligne (bordure basse
+  `génération…`) ; pas de phase « brut puis boîte d'un coup ».
 - JSON ≤ `JSON_MAX_LINES` lignes (18) : pretty complet.
 - Plus grand : 18 premières lignes, bordure basse = marqueur cliquable
   `⤢ +N lignes · tout voir` (ouvre le blob complet via le handler OS).

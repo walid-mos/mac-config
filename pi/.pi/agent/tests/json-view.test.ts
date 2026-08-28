@@ -75,6 +75,20 @@ test("detect : JSON brut en cours de génération détecté (sans fence)", () =>
 	assert.equal(findOpenRawJson('```\n{"x":\n```\nTexte final.'), undefined);
 });
 
+test("detect : tableau d'objets en cours — la racine [ gagne, pas le dernier {", () => {
+	const items = Array.from(
+		{ length: 11 },
+		(_, i) => `  {"id": ${i + 1}, "name": "item-0${i + 1}"},`,
+	).join("\n");
+	const fragment = `[\n${items}\n  {"id": 12, "name": "item-`;
+	const open = findOpenRawJson(fragment);
+	assert.ok(open);
+	assert.equal(open.start, 0, "ancrage = racine [");
+	assert.ok(open.content.startsWith("["));
+	// Coupe nette après un objet complet : même comportement.
+	assert.ok(findOpenRawJson(`${fragment.slice(0, fragment.lastIndexOf("},") + 2)}`));
+});
+
 test("detect : prose commençant par { jamais prise pour du JSON en cours", () => {
 	// Accolade nue + texte libre : la troncature à `{` donnerait `{}` → rejeté.
 	assert.equal(findOpenRawJson("Un template :\n\n{\n  et voila du texte libre"), undefined);

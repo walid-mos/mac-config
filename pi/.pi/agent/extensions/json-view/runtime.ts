@@ -1,11 +1,11 @@
 /** Enregistrement de l'extension : transformateur markdown + commande /json. */
 
 import type { ExtensionAPI, ExtensionUIContext } from "@earendil-works/pi-coding-agent";
-import { blobByRecency, persistJson, recentBlobs, type JsonBlob } from "./blob-store.ts";
+import { blobByRecency, persistJson, readBlob, recentBlobs, type JsonBlob } from "./blob-store.ts";
 import { formatJsonBytes, transformMarkdown } from "./render.ts";
 
 function blobTitle(blob: JsonBlob): string {
-	return `json · ${formatJsonBytes(blob.bytes)} · ${blob.pretty.split("\n").length} lignes`;
+	return `json · ${formatJsonBytes(blob.bytes)} · ${readBlob(blob).split("\n").length} lignes`;
 }
 
 const USAGE = "Usage : /json (plier/déplier) · /json open [n] (n = n-ième JSON le plus récent)";
@@ -41,12 +41,12 @@ export function registerJsonViewExtension(pi: ExtensionAPI): void {
 			if (sub === undefined || sub === "toggle") {
 				const next = !ctx.ui.getToolsExpanded();
 				ctx.ui.setToolsExpanded(next);
-				ctx.ui.notify(
-					next
-						? "JSON déplié — les blocs déjà affichés se redessinent au prochain rendu"
-						: "JSON replié (aperçus minifiés au-delà du seuil)",
-					"info",
-				);
+				// pi ne rejoue pas les transformers au toggle (cache Markdown clé sur texte+largeur).
+				// reload() reconstruit le transcript depuis les messages : les blocs JSON sont
+				// re-rendus immédiatement avec le nouvel état. L'état d'expansion survit au
+				// reload (porté par interactive-mode), le registre des blobs par index.json.
+				ctx.ui.notify(next ? "JSON déplié" : "JSON replié (aperçus minifiés)", "info");
+				if (ctx.mode === "tui") await ctx.reload();
 				return;
 			}
 
@@ -60,7 +60,7 @@ export function registerJsonViewExtension(pi: ExtensionAPI): void {
 					);
 					return;
 				}
-				await ctx.ui.editor(blobTitle(blob), blob.pretty);
+				await ctx.ui.editor(blobTitle(blob), readBlob(blob));
 				return;
 			}
 

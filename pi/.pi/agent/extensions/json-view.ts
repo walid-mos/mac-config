@@ -6,5 +6,5 @@ export {
 	renderJsonBlock,
 	transformMarkdown,
 } from "./json-view/render.ts";
-export { persistJson, recentBlobs, setBlobDir, type JsonBlob } from "./json-view/blob-store.ts";
+export { persistJson, recentBlobs, readBlob, setBlobDir, type JsonBlob } from "./json-view/blob-store.ts";
 export { registerJsonViewExtension as default } from "./json-view/runtime.ts";

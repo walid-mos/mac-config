@@ -9,7 +9,13 @@ import {
 	formatJsonBytes,
 	transformMarkdown,
 } from "../extensions/json-view/render.ts";
-import { persistJson, recentBlobs, setBlobDir } from "../extensions/json-view/blob-store.ts";
+import {
+	blobByRecency,
+	persistJson,
+	readBlob,
+	recentBlobs,
+	setBlobDir,
+} from "../extensions/json-view/blob-store.ts";
 
 const MINI = JSON.stringify({ kind: "review", session: "render-fixture-v2" });
 const SMALL = JSON.stringify({ a: 1, b: [2, 3] }, null, 2);
@@ -145,6 +151,23 @@ test("blob-store : un fichier par contenu, historique ordonné", () => {
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}
+});
+
+test("blob-store : historique réhydraté après reset (simulate reload)", () => {
+	const dir = mkdtempSync(join(tmpdir(), "json-view-test-"));
+	setBlobDir(dir);
+	const url = persistJson(BIG, JSON.parse(BIG));
+	assert.ok(url);
+
+	// ctx.reload() réimporte le module : historique vidé, puis relu depuis index.json.
+	setBlobDir(`${dir}/`);
+	const blob = blobByRecency(1);
+	assert.ok(blob);
+	assert.equal(blob.url, url);
+	// readBlob rend le contenu sans le retour à la ligne final d'écriture.
+	assert.equal(readBlob(blob), BIG);
+
+	rmSync(dir, { recursive: true, force: true });
 });
 
 test("formatJsonBytes : unités françaises", () => {

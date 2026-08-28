@@ -20,14 +20,6 @@ export const MIN_RAW_LENGTH = 60;
 
 const FENCE_PATTERN = /```([^\n]*)\n([\s\S]*?)```/g;
 const RAW_START_PATTERN = /^[ \t]*([{[])/gm;
-const HEADER_TAIL_PATTERN = /\*json · [^\n]*\*[ \t]*\n(?:[ \t]*\n)?$/;
-
-/** Rend l'idempotence : ré-absorbe un en-tête json-view déjà généré juste avant une fence. */
-function absorbHeader(markdown: string, fenceStart: number): number {
-	const before = markdown.slice(0, fenceStart);
-	const header = before.match(HEADER_TAIL_PATTERN);
-	return header ? fenceStart - header[0].length : fenceStart;
-}
 
 /** Repère le `}` / `]` fermant en tenant compte des chaînes et des échappements. */
 export function findBalancedEnd(text: string, openIndex: number): number {
@@ -91,13 +83,13 @@ export function extractJsonBlocks(markdown: string): JsonBlock[] {
 		// Une fence explicitement étiquetée json est toujours reformatée ; sans langage,
 		// on exige un contenu substantiel pour ne pas retoucher un exemple de code court.
 		if (lang === "json") {
-			blocks.push({ source: "fence", start: absorbHeader(markdown, start), end, raw: body, parsed: parseJson(body) });
+			blocks.push({ source: "fence", start, end, raw: body, parsed: parseJson(body) });
 			continue;
 		}
 		if (lang !== "" || body.length < MIN_RAW_LENGTH) continue;
 		const parsed = parseJson(body);
 		if (parsed === undefined) continue;
-		blocks.push({ source: "fence", start: absorbHeader(markdown, start), end, raw: body, parsed });
+		blocks.push({ source: "fence", start, end, raw: body, parsed });
 	}
 
 	for (const match of markdown.matchAll(RAW_START_PATTERN)) {

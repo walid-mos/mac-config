@@ -1,11 +1,22 @@
 # json-view — affichage des blocs JSON du transcript
 
 Détecte le JSON dans les messages user/assistant, le reformate et l'isole du texte
-environnant, l'aperçoit minifié quand il est gros, et permet de l'ouvrir dans l'éditeur.
+environnant avec un séparateur slim (pas de fence : pi rend les marqueurs ` ``` `
+littéralement), cappé à `JSON_MAX_LINES` lignes par défaut, et permet de l'ouvrir.
 
-````
-*json · 42 Ko · 1 240 lignes · /json open · ouvrir ⤢*
+```
+── json · 160 o · 13 lignes · ouvrir ⤢ ────────────────
+{
+  "nom": "test",
+  …
+```
 
+- JSON ≤ `JSON_MAX_LINES` lignes : pretty complet.
+- JSON plus grand : 18 premières lignes + marqueur cliquable
+  `[⤢ +N lignes · tout voir]` (ouvre le blob complet via le handler OS).
+- Déplié (`/json`) : pretty complet, sans cap.
+- Le contenu est échappé markdown (`*`, `_`, `` ` ``, `[`, `<`, …) pour ne pas
+  être interprété par le renderer.```
 
 ## Modules
 
@@ -13,9 +24,9 @@ environnant, l'aperçoit minifié quand il est gros, et permet de l'ouvrir dans 
   parseables) + JSON brut ancré en début de ligne, équilibré (scan conscient des
   chaînes) et parseable. En deçà de `MIN_RAW_LENGTH` sur une seule ligne, le JSON
   inline de la prose n'est pas touché.
-- `render.ts` — rendu markdown pur : en-tête (type, taille, lignes, lien, hint),
-  bloc ```json pretty, ou aperçu minifié tronqué à la largeur au-delà de
-  `COLLAPSED_LINE_THRESHOLD` lignes tant que l'état global pi est replié.
+- `render.ts` — rendu markdown pur : séparateur slim dimensionné à la largeur
+  (`── json · … ──`), pretty en texte brut échappé, cap `JSON_MAX_LINES` avec
+  marqueur cliquable au-delà quand l'état global pi est replié.
 - `blob-store.ts` — persiste chaque JSON pretty dans `$TMPDIR/pi-json-view/<hash>.json`
   (une écriture par contenu, historique borné à 100 blobs pour `/json open [n]`).
 - `runtime.ts` — enregistre le `registerMarkdownTransformer` et la commande `/json`.
@@ -29,8 +40,10 @@ environnant, l'aperçoit minifié quand il est gros, et permet de l'ouvrir dans 
   re-rend tous les blocs JSON avec le nouvel état. En TUI uniquement.
 - `/json open [n]` — ouvre le n-ième JSON le plus récent (défaut 1) dans
   l'éditeur multi-lignes pi ; **Ctrl+G** y ouvre `$EDITOR` (nvim) sur le blob.
-- Clic sur `ouvrir ⤢` — les liens markdown sont rendus en OSC 8 par pi-tui ;
-  le clic ouvre le handler par défaut de l'OS sur le fichier `.json` persisté.
+- Clic sur `ouvrir ⤢` ou sur le marqueur `⤢ +N lignes` — les liens markdown sont
+  rendus en OSC 8 par pi-tui ; le clic ouvre le JSON complet via le handler par
+  défaut de l'OS (pas d'expansion in place : pi n'expose pas les clics aux
+  extensions).
 
 ## Persistance
 
@@ -51,9 +64,8 @@ environnant, l'aperçoit minifié quand il est gros, et permet de l'ouvrir dans 
    cache de `Markdown` + `expanded` dans `MarkdownTransformContext`, et
    `setToolsExpanded` qui bump l'epoch avant `requestRender(true)` — c'est ce que
    fait omp en propre via des composants `Expandable`.
-4. **Le clic ouvre le handler OS par défaut**, pas nvim directement. Pour
+3. **Le clic ouvre le handler OS par défaut**, pas nvim directement. Pour
    router le clic vers nvim il faudrait soit un scheme handler OS, soit un
    support upstream des handlers de liens custom.
-5. Heuristique : JSON inline court (< `MIN_RAW_LENGTH`), JSON non strict
+4. Heuristique : JSON inline court (< `MIN_RAW_LENGTH`), JSON non strict
    (clés sans guillemets, etc.) et fences imbriquées ne sont pas reformatés.
-````

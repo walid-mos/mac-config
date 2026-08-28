@@ -5,8 +5,8 @@ import { join } from "node:path";
 import test from "node:test";
 import { extractJsonBlocks, MIN_RAW_LENGTH } from "../extensions/json-view/detect.ts";
 import {
-	COLLAPSED_LINE_THRESHOLD,
 	formatJsonBytes,
+	JSON_MAX_LINES,
 	transformMarkdown,
 } from "../extensions/json-view/render.ts";
 import {
@@ -94,36 +94,37 @@ test("detect : JSON non strict ignoré", () => {
 	assert.deepEqual(extractJsonBlocks(markdown), []);
 });
 
-test("transform : bloc isolé avec en-tête et fence", () => {
+test("transform : bloc isolé avec séparateur slim, sans fence", () => {
 	const markdown = `Avant.\n${SMALL}\nAprès.`;
-	const result = transformMarkdown(markdown, { expanded: false, width: 120 });
-	assert.match(result, /\*json · \d[,\d]* o · 7 lignes · `\/json open`\*\n\n/);
-	assert.match(result, /```json\n\{\n  "a": 1,\n  "b": \[\n    2,\n    3\n  \]\n\}\n```/);
+	const result = transformMarkdown(markdown, { expanded: false, width: 120, persist: () => "file:///tmp/x.json" });
 	assert.match(result, /^Avant\.\n\n/);
-	assert.match(result, /```\n\nAprès\.$/);
+	assert.match(result, /── json · \d[,\d]* o · 7 lignes · \[ouvrir ⤢\]\(file:\/\/\/tmp\/x\.json\) ─+\n/);
+	assert.match(result, /\n\{\n  "a": 1,\n  "b": \\\[\n    2,\n    3\n  \\\]\n\}\n\nAprès\.$/);
+	assert.ok(!result.includes("```"));
 });
 
-test("transform : gros JSON replié = aperçu minifié tronqué", () => {
+test("transform : gros JSON replié = 18 premières lignes + marqueur cliquable", () => {
 	const markdown = `${BIG}`;
-	const result = transformMarkdown(markdown, { expanded: false, width: 80 });
-	const fence = result.match(/```json\n(.*)\n```/s)?.[1] ?? "";
-	assert.ok(fence.endsWith(" …"));
-	const previewLine = fence.replace(/ …$/, "");
-	assert.ok([...previewLine].length <= 78);
+	const result = transformMarkdown(markdown, { expanded: false, width: 80, persist: () => "file:///tmp/big.json" });
 	assert.ok(result.includes("164 lignes"));
+	assert.ok(result.includes('"item-3"'));
+	assert.ok(!result.includes('"item-4"'));
+	assert.ok(result.includes("[⤢ +146 lignes · tout voir](file:///tmp/big.json)"));
+	assert.ok(!result.includes("```"));
 });
 
 test("transform : déplié = pretty complet même pour un gros JSON", () => {
 	const result = transformMarkdown(BIG, { expanded: true, width: 80 });
 	assert.ok(result.includes('"item-39"'));
-	assert.ok(!result.includes("…\n```"));
+	assert.ok(!result.includes("tout voir"));
 });
 
 test("transform : JSON sous le seuil reste complet quand replié", () => {
 	const lines = SMALL.split("\n").length;
-	assert.ok(lines <= COLLAPSED_LINE_THRESHOLD);
+	assert.ok(lines <= JSON_MAX_LINES);
 	const result = transformMarkdown(SMALL, { expanded: false, width: 80 });
 	assert.ok(result.includes('"b"'));
+	assert.ok(!result.includes("tout voir"));
 });
 
 test("transform : sans JSON, markdown intact", () => {
@@ -131,10 +132,21 @@ test("transform : sans JSON, markdown intact", () => {
 	assert.equal(transformMarkdown(markdown, { expanded: false, width: 80 }), markdown);
 });
 
-test("transform : idempotent", () => {
-	const once = transformMarkdown(SMALL, { expanded: false, width: 80, persist: () => "file:///tmp/x.json" });
-	const twice = transformMarkdown(once, { expanded: false, width: 80, persist: () => "file:///tmp/x.json" });
-	assert.equal(twice, once);
+test("transform : contenu markdown-escapé (pas d'interprétation)", () => {
+	const tricky = JSON.stringify({ note: "*gras* et `code` et <tag> et [lien]" }, null, 2);
+	const result = transformMarkdown(tricky, { expanded: true, width: 80 });
+	assert.ok(result.includes("\\*gras\\*"));
+	assert.ok(result.includes("\\`code\\`"));
+	assert.ok(result.includes("\\<tag\\>"));
+	assert.ok(result.includes("\\[lien\\]"));
+});
+
+test("transform : séparateur calé sur la largeur", () => {
+	const result = transformMarkdown(SMALL, { expanded: false, width: 80, persist: () => "file:///tmp/x.json" });
+	const header = result.split("\n").find((line) => line.startsWith("── json")) ?? "";
+	// Largeur visible = syntaxe lien retirée, un caractère par colonne.
+	const visible = header.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
+	assert.equal([...visible].length, 80);
 });
 
 test("blob-store : un fichier par contenu, historique ordonné", () => {

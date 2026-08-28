@@ -1,17 +1,17 @@
-/** Mise en forme markdown d'un bloc JSON détecté : en-tête, aperçu minifié ou bloc complet. */
+/** Mise en forme markdown d'un bloc JSON détecté : séparateur slim, pas de fence, cap de lignes. */
 
-import { truncateTerminalLine } from "../ui/terminal-text.ts";
+import { terminalLineWidth } from "../ui/terminal-text.ts";
 import { extractJsonBlocks, type JsonBlock } from "./detect.ts";
 
-/** Au-delà de ce nombre de lignes en mode replié, le JSON est affiché minifié sur une ligne. */
-export const COLLAPSED_LINE_THRESHOLD = 16;
+/** Cap dur par défaut : un JSON replié n'affiche au plus que ces lignes de pretty. */
+export const JSON_MAX_LINES = 18;
 
 export interface JsonRenderOptions {
-	/** État global d'expansion de pi (ctrl+o). Déplié = bloc pretty complet. */
+	/** État global d'expansion de pi (/json). Déplié = pretty complet, sans cap. */
 	expanded: boolean;
 	/** Colonnes disponibles pour le contenu du message. */
 	width: number;
-	/** URL file:// du blob persisté, pour le lien cliquable de l'en-tête. */
+	/** URL file:// du blob persisté, pour les liens cliquables. */
 	linkUrl?: string;
 }
 
@@ -25,29 +25,52 @@ export function prettyJson(parsed: unknown): string {
 	return JSON.stringify(parsed, null, 2);
 }
 
-/** En-tête sobre : type, taille, nb de lignes, lien cliquable, commande d'ouverture. */
+/**
+ * Neutralise la syntaxe markdown dans le JSON affiché en texte brut :
+ * sans ça, `"note": "*gras*"` ou `<tag>` seraient interprétés par le renderer.
+ */
+export function escapeMarkdownText(text: string): string {
+	return text.replace(/([\\`*_\[\]<>~])/g, "\\$1");
+}
+
+/**
+ * Séparateur slim dimensionné à la largeur : `── json · 160 o · 13 lignes · lien ────`.
+ * Le lien clic ouvre le blob complet via le handler OS (OSC 8).
+ */
 export function renderJsonHeader(pretty: string, options: JsonRenderOptions): string {
 	const lines = pretty.split("\n").length.toLocaleString("fr-FR");
 	const bytes = formatJsonBytes(Buffer.byteLength(pretty));
-	const open = options.linkUrl ? ` · [ouvrir ⤢](${options.linkUrl})` : "";
-	return `*json · ${bytes} · ${lines} lignes · \`/json open\`${open}*`;
+	const openUrl = options.linkUrl;
+	const labelPlain = `── json · ${bytes} · ${lines} lignes${openUrl ? " · ouvrir ⤢" : ""}`;
+	const labelMd = openUrl
+		? `── json · ${bytes} · ${lines} lignes · [ouvrir ⤢](${openUrl})`
+		: labelPlain;
+	const used = terminalLineWidth(labelPlain) + 1;
+	const rule = "─".repeat(Math.max(3, options.width - used));
+	return `${labelMd} ${rule}`;
 }
 
-/** Rend un bloc JSON : en-tête séparateur + fence (complète, ou aperçu minifié si replié). */
+/** Ligne de fin de bloc replié : cliquable, ouvre le JSON complet. */
+function renderTruncatedMarker(hiddenLines: number, linkUrl: string | undefined): string {
+	const label = `⤢ +${hiddenLines.toLocaleString("fr-FR")} lignes · tout voir`;
+	return linkUrl ? `[${label}](${linkUrl})` : `${label} — /json open`;
+}
+
+/** Rend un bloc JSON : séparateur slim + pretty en texte brut (cappé à JSON_MAX_LINES si replié). */
 export function renderJsonBlock(block: JsonBlock, options: JsonRenderOptions): string {
 	const pretty = prettyJson(block.parsed);
+	const allLines = pretty.split("\n");
 	const header = renderJsonHeader(pretty, options);
-	const lineCount = pretty.split("\n").length;
 
-	if (!options.expanded && lineCount > COLLAPSED_LINE_THRESHOLD) {
-		const minified = JSON.stringify(block.parsed);
-		// Place réservée au suffixe " …" pour rester dans la largeur du terminal.
-		const budget = Math.max(20, options.width - 2);
-		const preview = `${truncateTerminalLine(minified, budget)} …`;
-		return `${header}\n\n\`\`\`json\n${preview}\n\`\`\``;
+	let contentLines = allLines;
+	let marker: string | undefined;
+	if (!options.expanded && allLines.length > JSON_MAX_LINES) {
+		contentLines = allLines.slice(0, JSON_MAX_LINES);
+		marker = renderTruncatedMarker(allLines.length - JSON_MAX_LINES, options.linkUrl);
 	}
 
-	return `${header}\n\n\`\`\`json\n${pretty}\n\`\`\``;
+	const content = escapeMarkdownText(contentLines.join("\n"));
+	return marker ? `${header}\n${content}\n${marker}` : `${header}\n${content}`;
 }
 
 function padBeforeBlock(text: string): string {
@@ -66,7 +89,7 @@ export interface JsonTransformOptions {
 
 /**
  * Réécrit le markdown en isolant chaque bloc JSON détecté : lignes vides autour,
- * en-tête descriptif, fence dédiée. Ne modifie rien en l'absence de JSON.
+ * séparateur slim, pretty en texte brut. Ne modifie rien en l'absence de JSON.
  */
 export function transformMarkdown(markdown: string, options: JsonTransformOptions): string {
 	const blocks = extractJsonBlocks(markdown);

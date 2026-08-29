@@ -1,8 +1,9 @@
-// installed by herdr
-// managed by herdr; reinstalling or updating the integration overwrites this file.
-// add custom hooks/plugins beside this file instead of editing it.
+// installed by herdr, then maintained in the stow repository:
+// stock v8 + two local fixes (see PATCHES below). Re-running
+// `herdr integration install pi` overwrites this file and loses the fixes —
+// restore it with `make pi` (stow) instead.
 // HERDR_INTEGRATION_ID=pi
-// HERDR_INTEGRATION_VERSION=6
+// HERDR_INTEGRATION_VERSION=8
 // @ts-nocheck
 
 import net from "node:net";
@@ -52,6 +53,8 @@ function sendRequestAttempt(request: unknown, timeoutMs: number): Promise<boolea
   });
 }
 
+// PATCH 1/2 — herdr reporting is best-effort and must never reject into Pi
+// lifecycle hooks (stock v8 lets socket errors bubble out of sendRequest).
 async function sendRequest(request: unknown): Promise<void> {
   try {
     if (await sendRequestAttempt(request, 500)) {
@@ -59,7 +62,7 @@ async function sendRequest(request: unknown): Promise<void> {
     }
     await sendRequestAttempt(request, 1500);
   } catch {
-    // Herdr reporting is best-effort and must never reject into Pi lifecycle hooks.
+    // Best-effort: ignore delivery failures.
   }
 }
 
@@ -152,6 +155,9 @@ function sendState(state: AgentState, message?: string, seq = nextReportSeq()): 
   });
 }
 
+// PATCH 2/2 — release authority when Pi quits for real. Stock v8 dropped this:
+// without pane.release_agent on user quit, Herdr keeps showing a phantom agent
+// in a pane that is back to being a plain shell.
 function releaseAgent(): Promise<void> {
   return sendRequest({
     id: `${source}:release:${Date.now()}:${Math.random().toString(36).slice(2)}`,
@@ -256,7 +262,9 @@ export default function (pi) {
   });
 
   pi.on("session_start", async (event, ctx) => {
-    if (ctx?.hasUI !== true) {
+    // TUI only: RPC/JSON/print modes are headless (no PTY herdr can display),
+    // and RPC still reports hasUI=true, so mode is the reliable gate.
+    if (ctx?.mode !== "tui") {
       return;
     }
     rootSession = true;

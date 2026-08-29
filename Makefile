@@ -138,28 +138,39 @@ gh-post:
 # dans config.toml : sans lui, alt+hjkl n'a aucun effet côté herdr. Le pendant
 # nvim du plugin est géré par lazy (lua/plugins/herdr-nav.lua), installé au 1er
 # lancement de nvim — rien à faire ici pour ce versant.
-# Notifications desktop de pi-notify : macOS n'affiche une bannière que pour
-# un .app registré — le binaire nu de la formula brew est livré mais avalé.
-# On copie donc le bundle terminal-notifier.app vers /Applications/Pi.app
-# (nom « Pi », icône Ghostty, bundle id app.pi.notifier) et on le registre
-# dans LaunchServices. Idempotent : reconstruit seulement si absent.
+# Notifications desktop de pi-notify : deux contraintes macOS —
+# 1. une bannière n'est levée que pour un .app registré (binaire nu = avalé) ;
+# 2. l'exécution d'une action au clic via terminal-notifier dépend d'un
+#    relaunch du processus qui perd la réponse (cf. scripts/notifier/).
+# `make notifier-app` construit donc Pi.app : bundle copié de la formula brew
+# terminal-notifier (nom « Pi », icône Ghostty, bundle id app.pi.notifier),
+# exécutable remplacé par le poster résident Swift compilé à la volée.
+# Idempotent : reconstruit si absent ou si la source est plus récente.
 notifier-app:
-	@if [ -x "/opt/homebrew/opt/terminal-notifier/terminal-notifier.app/Contents/MacOS/terminal-notifier" ]; then \
-		if [ ! -x /Applications/Pi.app/Contents/MacOS/terminal-notifier ]; then \
-			rm -rf /Applications/Pi.app; \
-			cp -R "/opt/homebrew/opt/terminal-notifier/terminal-notifier.app" /Applications/Pi.app; \
-			if [ -f /Applications/Ghostty.app/Contents/Resources/Ghostty.icns ]; then \
-				cp /Applications/Ghostty.app/Contents/Resources/Ghostty.icns /Applications/Pi.app/Contents/Resources/Pi.icns; \
-				/usr/libexec/PlistBuddy -c "Set :CFBundleIconFile Pi" /Applications/Pi.app/Contents/Info.plist; \
-			fi; \
-			/usr/libexec/PlistBuddy -c "Set :CFBundleName Pi" \
-				-c "Set :CFBundleIdentifier app.pi.notifier" /Applications/Pi.app/Contents/Info.plist; \
-			plutil -insert CFBundleDisplayName -string "Pi" /Applications/Pi.app/Contents/Info.plist 2>/dev/null \
-				|| /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Pi" /Applications/Pi.app/Contents/Info.plist; \
-			/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f /Applications/Pi.app; \
-			echo "Pi.app prête : /Applications/Pi.app (active Bannières dans Réglages › Notifications si besoin)"; \
+	@if [ ! -x /opt/homebrew/opt/terminal-notifier/terminal-notifier.app/Contents/MacOS/terminal-notifier ]; then \
+		echo "terminal-notifier absent (brew bundle) — Pi.app non construite"; exit 0; fi
+	@if [ ! -f scripts/notifier/pi-notify.swift ]; then \
+		echo "scripts/notifier/pi-notify.swift absent — Pi.app non construite"; exit 0; fi
+	@if [ ! -x /Applications/Pi.app/Contents/MacOS/pi-notify ] \
+		|| [ scripts/notifier/pi-notify.swift -nt /Applications/Pi.app/Contents/MacOS/pi-notify ]; then \
+		rm -rf /Applications/Pi.app; \
+		cp -R /opt/homebrew/opt/terminal-notifier/terminal-notifier.app /Applications/Pi.app; \
+		if [ -f /Applications/Ghostty.app/Contents/Resources/Ghostty.icns ]; then \
+			cp /Applications/Ghostty.app/Contents/Resources/Ghostty.icns /Applications/Pi.app/Contents/Resources/Pi.icns; \
+			/usr/libexec/PlistBuddy -c "Set :CFBundleIconFile Pi" /Applications/Pi.app/Contents/Info.plist; \
 		fi; \
-	else echo "terminal-notifier absent (brew bundle) — Pi.app non construite"; fi
+		swiftc -O -o /Applications/Pi.app/Contents/MacOS/pi-notify scripts/notifier/pi-notify.swift \
+			-framework AppKit -framework UserNotifications; \
+		/usr/libexec/PlistBuddy \
+			-c "Set :CFBundleName Pi" \
+			-c "Set :CFBundleExecutable pi-notify" \
+			-c "Set :CFBundleIdentifier app.pi.notifier" /Applications/Pi.app/Contents/Info.plist; \
+		plutil -insert CFBundleDisplayName -string "Pi" /Applications/Pi.app/Contents/Info.plist 2>/dev/null \
+			|| /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Pi" /Applications/Pi.app/Contents/Info.plist; \
+		codesign --force --sign - /Applications/Pi.app; \
+		/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f /Applications/Pi.app; \
+		echo "Pi.app prête : /Applications/Pi.app (accepte la demande de notifications au premier envoi)"; \
+	fi
 
 herdr-post:
 	@if ! command -v herdr >/dev/null; then \

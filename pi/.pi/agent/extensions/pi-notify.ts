@@ -21,20 +21,20 @@ import { execFile, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 
-// Notificateur prioritaire : bundle /Applications/Pi.app (copie signée par la
-// cible Makefile `notifier-app` du bundle brew terminal-notifier, icône
-// Ghostty, bundle id app.pi.notifier). Un binaire hors bundle est livré mais
-// jamais affiché : macOS exige un .app registré pour lever une bannière.
-const NOTIFIER = [
-  "/Applications/Pi.app/Contents/MacOS/terminal-notifier",
-  "/opt/homebrew/bin/terminal-notifier",
-].find((candidate) => existsSync(candidate));
+// Poster prioritaire : le helper résident /Applications/Pi.app (construit par
+// `make notifier-app`, source scripts/notifier/pi-notify.swift). Il poste la
+// notification et gère lui-même le clic (activation Ghostty + focus pane) :
+// terminal-notifier, lui, dépend d'un relaunch qui perd la réponse du clic.
+// Repli : binaire brew terminal-notifier avec -execute (best-effort).
+const HELPER = "/Applications/Pi.app/Contents/MacOS/pi-notify";
+const NOTIFIER = "/opt/homebrew/bin/terminal-notifier";
 const HERDR = "/opt/homebrew/bin/herdr";
 const SOCKET = process.env.HERDR_SOCKET_PATH;
 const PANE_ID = process.env.HERDR_PANE_ID;
 
 function enabled(): boolean {
-  return process.env.HERDR_ENV === "1" && !!PANE_ID && !!NOTIFIER && !!SOCKET;
+  return process.env.HERDR_ENV === "1" && !!PANE_ID && !!SOCKET
+    && (existsSync(HELPER) || existsSync(NOTIFIER));
 }
 
 function ghosttyFrontmost(): Promise<boolean> {
@@ -58,19 +58,35 @@ function focusThisPaneOnWatch(): string {
   // dans $TMPDIR/herdr et le focus rate silencieusement. On embarque donc le
   // chemin du socket (lu à l'émission) dans la commande elle-même.
   return [
-    "open -ga Ghostty",
+    "open -a Ghostty",
     "sleep 0.2",
-    `HERDR_SOCKET_PATH='${SOCKET}' ${HERDR} pane focus --direction up --pane ${PANE_ID}`,
+    `HERDR_SOCKET_PATH='${SOCKET}' ${HERDR} agent focus ${PANE_ID}`,
   ].join("; ");
 }
 
 function showNotification(title: string, message: string): void {
+  const common = ["-title", title, "-subtitle", `pane ${PANE_ID}`, "-message", message];
+  if (existsSync(HELPER)) {
+    // Helper lancé PAR LaunchServices (check-in obligatoire pour que usernoted
+    // route la réponse du clic vers l'instance résidente) — un exec direct du
+    // binaire ne suffit pas. On remplace d'abord une instance résidente du
+    // même pane (une notif plus ancienne en attente est de toute façon
+    // remplacée, même groupement par pane).
+    spawn("pkill", ["-f", `MacOS/pi-notify .*-pane ${PANE_ID}( |$)`], { stdio: "ignore" })
+      .unref?.();
+    // `open --args` ne transmet les arguments qu'au lancement d'une NOUVELLE
+    // instance — d'où le pkill juste avant.
+    spawn(
+      "/usr/bin/open",
+      ["-a", "Pi", "--args", ...common, "-pane", PANE_ID!, "-socket", SOCKET!, "-timeout", "90"],
+      { detached: true, stdio: "ignore" },
+    ).unref?.();
+    return;
+  }
   spawn(
     NOTIFIER,
     [
-      "-title", title,
-      "-subtitle", `pane ${PANE_ID}`,
-      "-message", message,
+      ...common,
       "-group", `pi-${PANE_ID}`,
       "-execute", focusThisPaneOnWatch(),
     ],

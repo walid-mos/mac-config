@@ -1,161 +1,293 @@
 // Notifications desktop propres pour Pi sous Herdr.
 //
-// Problème historique : herdr (delivery = "system") retombait sur
-// `osascript display notification` faute de terminal-notifier dans le PATH
-// GUI → notifications attribuées à « Script Editor », clic infonctionnel.
+// Herdr continue de remonter l'état des agents pour les panes, mais ses toasts
+// sont coupés. Cette extension est l'unique canal desktop : fin de tâche et
+// décision requise, avec clic vers la pane Herdr émettrice.
 //
-// Fonctionnement :
-// - l'intégration herdr-agent-state.ts continue de remonter les états au
-//   serveur pour l'affichage des panes, mais les toasts Herdr sont coupés ;
-// - cette extension est l'unique canal de notification : à la fin d'une tâche
-//   ou lorsqu'une décision est requise, elle émet toujours une notification
-//   macOS, que Ghostty soit au premier plan ou non ;
-// - au clic : activation de Ghostty puis focus de LA pane émettrice
-//   (HERDR_PANE_ID).
-//
-// Best-effort absolu : aucune erreur ne doit remonter dans le cycle de Pi.
+// Best-effort absolu : aucune erreur de notification ne doit remonter dans Pi.
 
-import { execFile, spawn } from "node:child_process";
+import { spawn as nodeSpawn, type SpawnOptions } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 
-// Poster prioritaire : le helper résident /Applications/Pi.app (construit par
-// `make notifier-app`, source scripts/notifier/pi-notify.swift). Il poste la
-// notification et gère lui-même le clic (activation Ghostty + focus pane) :
-// terminal-notifier, lui, dépend d'un relaunch qui perd la réponse du clic.
-// Repli : binaire brew terminal-notifier avec -execute (best-effort).
 const HELPER = "/Applications/Pi.app/Contents/MacOS/pi-notify";
 const NOTIFIER = "/opt/homebrew/bin/terminal-notifier";
 const HERDR = "/opt/homebrew/bin/herdr";
-const SOCKET = process.env.HERDR_SOCKET_PATH;
-const PANE_ID = process.env.HERDR_PANE_ID;
+const OPEN = "/usr/bin/open";
+const PKILL = "/usr/bin/pkill";
 
-function enabled(): boolean {
-  return process.env.HERDR_ENV === "1" && !!PANE_ID && !!SOCKET
-    && (existsSync(HELPER) || existsSync(NOTIFIER));
+export type NotificationEnvironment = {
+  HERDR_ENV?: string;
+  HERDR_PANE_ID?: string;
+  HERDR_SOCKET_PATH?: string;
+};
+
+export type ChildProcessLike = {
+  on(event: "error", listener: (error: Error) => void): ChildProcessLike;
+  once(
+    event: "close",
+    listener: (code: number | null, signal: NodeJS.Signals | null) => void,
+  ): ChildProcessLike;
+  unref?(): void;
+};
+
+export type NotificationOperations = {
+  exists(file: string): boolean;
+  spawn(command: string, args: readonly string[], options: SpawnOptions): ChildProcessLike;
+};
+
+type ProcessResult =
+  | { outcome: "started" }
+  | { outcome: "closed"; code: number | null }
+  | { outcome: "failed" };
+
+type NotificationRequest = {
+  pane: string;
+  socket: string;
+  title: string;
+  message: string;
+};
+
+type PaneQueue = {
+  generation: number;
+  tail: Promise<void>;
+};
+
+const defaultOperations: NotificationOperations = {
+  exists: existsSync,
+  spawn(command, args, options) {
+    return nodeSpawn(command, [...args], options);
+  },
+};
+
+function runBestEffort(
+  operations: NotificationOperations,
+  command: string,
+  args: readonly string[],
+  options: SpawnOptions,
+  waitForClose: boolean,
+): Promise<ProcessResult> {
+  return new Promise(function executeProcess(resolve) {
+    let settled = false;
+    const finish = (result: ProcessResult) => {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    };
+
+    try {
+      const child = operations.spawn(command, args, options);
+      // Keep a permanent listener: even a surprising second `error` event must
+      // remain harmless after the launch promise has already settled.
+      child.on("error", () => finish({ outcome: "failed" }));
+      if (waitForClose) {
+        child.once("close", (code) => finish({ outcome: "closed", code }));
+      }
+      if (options.detached) child.unref?.();
+      if (!waitForClose) finish({ outcome: "started" });
+    } catch {
+      finish({ outcome: "failed" });
+    }
+  });
 }
 
-function focusThisPaneOnWatch(): string {
-  // Au clic, terminal-notifier est relancé par LaunchServices dans un contexte
-  // GUI sans nos variables : sans HERDR_SOCKET_PATH, `herdr` cherche son socket
-  // dans $TMPDIR/herdr et le focus rate silencieusement. On embarque donc le
-  // chemin du socket (lu à l'émission) dans la commande elle-même.
+function detachedOptions(): SpawnOptions {
+  return { detached: true, stdio: "ignore" };
+}
+
+function shellQuote(value: string): string {
+  return `'${value.replaceAll("'", `'\\''`)}'`;
+}
+
+function regexQuote(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function fallbackFocusCommand(request: NotificationRequest): string {
   return [
     "open -a Ghostty",
     "sleep 0.2",
-    `HERDR_SOCKET_PATH='${SOCKET}' ${HERDR} agent focus ${PANE_ID}`,
+    `HERDR_SOCKET_PATH=${shellQuote(request.socket)} ${HERDR} agent focus ${shellQuote(request.pane)}`,
   ].join("; ");
 }
 
-function showNotification(title: string, message: string): void {
-  const common = ["-title", title, "-subtitle", `pane ${PANE_ID}`, "-message", message];
-  if (existsSync(HELPER)) {
-    // Helper lancé PAR LaunchServices (check-in obligatoire pour que usernoted
-    // route la réponse du clic vers l'instance résidente) — un exec direct du
-    // binaire ne suffit pas. -n force une nouvelle instance : sans lui, une
-    // registration LS fantôme (après kill d'une instance) ferait échouer le
-    // open silencieusement. On attend la fin du pkill avant le lancement : en
-    // parallèle, il pouvait tuer par course la nouvelle instance. La prochaine
-    // notification de la pane remplace ainsi proprement la précédente.
-    execFile(
-      "/usr/bin/pkill",
-      ["-f", `MacOS/pi-notify .*-pane ${PANE_ID}( |$)`],
-      { timeout: 750 },
-      () => {
-        spawn(
-          "/usr/bin/open",
-          ["-n", "/Applications/Pi.app", "--args", ...common, "-pane", PANE_ID!, "-socket", SOCKET!],
-          { detached: true, stdio: "ignore" },
-        ).unref?.();
-      },
+function commonArguments(request: NotificationRequest): string[] {
+  return [
+    "-title",
+    request.title,
+    "-subtitle",
+    `pane ${request.pane}`,
+    "-message",
+    request.message,
+  ];
+}
+
+export function notificationEnabled(
+  environment: NotificationEnvironment,
+  operations: NotificationOperations = defaultOperations,
+): boolean {
+  const hasHerdrContext = environment.HERDR_ENV === "1"
+    && Boolean(environment.HERDR_PANE_ID)
+    && Boolean(environment.HERDR_SOCKET_PATH);
+  return hasHerdrContext && (operations.exists(HELPER) || operations.exists(NOTIFIER));
+}
+
+export class NotificationPoster {
+  private readonly queues = new Map<string, PaneQueue>();
+  private readonly operations: NotificationOperations;
+
+  constructor(operations: NotificationOperations = defaultOperations) {
+    this.operations = operations;
+  }
+
+  notify(request: NotificationRequest): void {
+    if (this.operations.exists(HELPER)) {
+      this.replaceNative(request);
+      return;
+    }
+    if (this.operations.exists(NOTIFIER)) this.postFallback(request);
+  }
+
+  waitForIdle(pane: string): Promise<void> {
+    return this.queues.get(pane)?.tail ?? Promise.resolve();
+  }
+
+  private replaceNative(request: NotificationRequest): void {
+    const queue = this.queues.get(request.pane) ?? { generation: 0, tail: Promise.resolve() };
+    const generation = queue.generation + 1;
+    queue.generation = generation;
+    queue.tail = queue.tail
+      .then(() => this.runNativeReplacement(request, queue, generation))
+      .catch(() => undefined);
+    this.queues.set(request.pane, queue);
+  }
+
+  private async runNativeReplacement(
+    request: NotificationRequest,
+    queue: PaneQueue,
+    generation: number,
+  ): Promise<void> {
+    if (queue.generation !== generation) return;
+    const stopped = await runBestEffort(
+      this.operations,
+      PKILL,
+      ["-f", `MacOS/pi-notify .*-pane ${regexQuote(request.pane)}( |$)`],
+      { stdio: "ignore", timeout: 750 },
+      true,
     );
-    return;
+    if (queue.generation !== generation || !this.canLaunchAfter(stopped)) return;
+
+    await runBestEffort(
+      this.operations,
+      OPEN,
+      [
+        "-n",
+        "/Applications/Pi.app",
+        "--args",
+        ...commonArguments(request),
+        "-pane",
+        request.pane,
+        "-socket",
+        request.socket,
+      ],
+      { ...detachedOptions(), timeout: 2_000 },
+      true,
+    );
   }
-  spawn(
-    NOTIFIER,
-    [
-      ...common,
-      "-group", `pi-${PANE_ID}`,
-      "-execute", focusThisPaneOnWatch(),
-    ],
-    { detached: true, stdio: "ignore" },
-  ).unref?.();
+
+  private canLaunchAfter(result: ProcessResult): boolean {
+    return result.outcome === "closed" && (result.code === 0 || result.code === 1);
+  }
+
+  private postFallback(request: NotificationRequest): void {
+    void runBestEffort(
+      this.operations,
+      NOTIFIER,
+      [
+        ...commonArguments(request),
+        "-group",
+        `pi-${request.pane}`,
+        "-execute",
+        fallbackFocusCommand(request),
+      ],
+      detachedOptions(),
+      false,
+    );
+  }
 }
 
-function notify(title: string, message: string): void {
-  try {
-    showNotification(title, message);
-  } catch {
-    // Best-effort : silencieux.
-  }
+export function extractFinalSnippet(message: unknown): string {
+  const candidate = message as { role?: string; content?: unknown } | undefined;
+  if (candidate?.role !== "assistant" || !Array.isArray(candidate.content)) return "";
+  return candidate.content
+    .filter((part): part is { type: "text"; text: string } => {
+      const value = part as { type?: string; text?: unknown } | undefined;
+      return value?.type === "text" && typeof value.text === "string";
+    })
+    .map((part) => part.text.trim())
+    .filter(Boolean)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .slice(0, 160);
 }
 
-export default function (pi: any) {
-  if (!enabled()) {
-    return;
-  }
+type ExtensionDependencies = {
+  environment: NotificationEnvironment;
+  operations: NotificationOperations;
+  poster: NotificationPoster;
+  processCwd(): string;
+};
 
-  let running = false;
-  let blockedSeen = false;
-  let lastSnippet = "";
+export function createPiNotifyExtension(
+  overrides: Partial<ExtensionDependencies> = {},
+): (pi: any) => void {
+  const operations = overrides.operations ?? defaultOperations;
+  const environment = overrides.environment ?? process.env;
+  const poster = overrides.poster ?? new NotificationPoster(operations);
+  const processCwd = overrides.processCwd ?? process.cwd;
 
-  function cwdName(ctx: any): string {
-    const cwd = typeof ctx?.cwd === "string" && ctx.cwd ? ctx.cwd : process.cwd();
-    return path.basename(cwd);
-  }
+  return function registerPiNotify(pi: any) {
+    if (!notificationEnabled(environment, operations)) return;
 
-  // Dernier texte assistant = contenu informatif de la notification « Terminé ».
-  pi.on("message_end", (event: any) => {
-    const message = event?.message;
-    if (message?.role !== "assistant") {
-      return;
-    }
-    const text = (Array.isArray(message.content) ? message.content : [])
-      .filter((part: any) => part?.type === "text" && typeof part.text === "string")
-      .map((part: any) => part.text.trim())
-      .filter(Boolean)
-      .join(" ")
-      .replace(/\s+/g, " ");
-    if (text) {
-      lastSnippet = text.slice(0, 160);
-    }
-  });
+    const pane = environment.HERDR_PANE_ID!;
+    const socket = environment.HERDR_SOCKET_PATH!;
+    let running = false;
+    let lastSnippet = "";
 
-  pi.on("agent_start", (_event: any, ctx: any) => {
-    if (ctx?.mode !== "tui") {
-      return;
-    }
-    running = true;
-    lastSnippet = "";
-  });
-
-  pi.on("agent_settled", (_event: any, ctx: any) => {
-    if (ctx?.mode !== "tui" || ctx?.isIdle?.() !== true || !running) {
-      return;
-    }
-    running = false;
-    notify(`Pi · ${cwdName(ctx)} — terminé`, lastSnippet || "Prêt pour la suite");
-  });
-
-  // Pi attend un choix utilisateur (ask_user_question) : l'agent est toujours
-  // « running », agent_settled ne tirera pas → il faut notifier ici.
-  pi.on("tool_execution_start", (event: any, ctx: any) => {
-    if (ctx?.mode !== "tui" || event?.toolName !== "ask_user_question") {
-      return;
-    }
-    void notify(`Pi · ${cwdName(ctx)} — décision requise`, "Une question attend ton choix");
-  });
-
-  // Événement de la couche herdr (sessions Pi) : agent bloqué.
-  pi.events.on("herdr:blocked", (data: any) => {
-    if (data?.active) {
-      if (blockedSeen) {
-        return;
+    const cwdName = (ctx: any): string => {
+      const cwd = typeof ctx?.cwd === "string" && ctx.cwd ? ctx.cwd : processCwd();
+      return path.basename(cwd);
+    };
+    const notify = (title: string, message: string): void => {
+      try {
+        poster.notify({ pane, socket, title, message });
+      } catch {
+        // Best-effort : silencieux, y compris pour une opération injectée défaillante.
       }
-      blockedSeen = true;
-      void notify("Pi — attention requise", String(data.label ?? "Blocage détecté"));
-    } else {
-      blockedSeen = false;
-    }
-  });
+    };
+
+    pi.on("message_end", function onMessageEnd(event: any) {
+      const snippet = extractFinalSnippet(event?.message);
+      if (snippet) lastSnippet = snippet;
+    });
+
+    pi.on("agent_start", function onAgentStart(_event: any, ctx: any) {
+      if (ctx?.mode !== "tui") return;
+      running = true;
+      lastSnippet = "";
+    });
+
+    pi.on("agent_settled", function onAgentSettled(_event: any, ctx: any) {
+      if (ctx?.mode !== "tui" || ctx?.isIdle?.() !== true || !running) return;
+      running = false;
+      notify(`Pi · ${cwdName(ctx)} — terminé`, lastSnippet || "Prêt pour la suite");
+    });
+
+    pi.on("tool_execution_start", function onToolExecutionStart(event: any, ctx: any) {
+      if (ctx?.mode !== "tui" || event?.toolName !== "ask_user_question") return;
+      notify(`Pi · ${cwdName(ctx)} — décision requise`, "Une question attend ton choix");
+    });
+  };
 }
+
+export default createPiNotifyExtension();

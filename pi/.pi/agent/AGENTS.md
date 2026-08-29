@@ -6,6 +6,10 @@
 - Si échec : le dire, pas combler. Citer la source.
 - Pour du code : docs officielles à jour, pas la syntaxe mémorisée.
 
+## Développement
+
+- Toujours traiter le code comme greenfield : ne jamais ajouter de rétrocompatibilité, migration, shim, fallback ou support d’un état historique, sauf demande explicite de l’utilisateur.
+
 ## Questions à l'utilisateur
 
 - TOUJOURS `ask_user_question` — jamais de question en texte libre.

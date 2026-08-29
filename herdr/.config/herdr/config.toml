@@ -1,7 +1,9 @@
 onboarding = false
 
 [ui.toast]
-delivery = "system"
+# Canal unique : l'extension Pi émet toujours une notification macOS avec son
+# et clic vers la pane source. Aucun toast Herdr en parallèle.
+delivery = "off"
 
 [theme]
 name = "catppuccin-latte"
@@ -93,3 +95,7 @@ command = "herdr-nvim-nav.up"
 key = "alt+l"
 type = "plugin_action"
 command = "herdr-nvim-nav.right"
+
+# Le son est porté par l'unique notification macOS de pi-notify.
+[ui.sound]
+enabled = false

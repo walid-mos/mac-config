@@ -69,16 +69,15 @@ function showNotification(title: string, message: string): void {
   if (existsSync(HELPER)) {
     // Helper lancé PAR LaunchServices (check-in obligatoire pour que usernoted
     // route la réponse du clic vers l'instance résidente) — un exec direct du
-    // binaire ne suffit pas. On remplace d'abord une instance résidente du
-    // même pane (une notif plus ancienne en attente est de toute façon
-    // remplacée, même groupement par pane).
+    // binaire ne suffit pas. -n force une nouvelle instance : sans lui, une
+    // registration LS fantôme (après kill d'une instance) ferait échouer le
+    // open silencieusement. Le pkill préalable évite le cumul d'instances
+    // résidentes du même pane.
     spawn("pkill", ["-f", `MacOS/pi-notify .*-pane ${PANE_ID}( |$)`], { stdio: "ignore" })
       .unref?.();
-    // `open --args` ne transmet les arguments qu'au lancement d'une NOUVELLE
-    // instance — d'où le pkill juste avant.
     spawn(
       "/usr/bin/open",
-      ["-a", "Pi", "--args", ...common, "-pane", PANE_ID!, "-socket", SOCKET!, "-timeout", "90"],
+      ["-n", "/Applications/Pi.app", "--args", ...common, "-pane", PANE_ID!, "-socket", SOCKET!, "-timeout", "90"],
       { detached: true, stdio: "ignore" },
     ).unref?.();
     return;

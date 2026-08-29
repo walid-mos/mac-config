@@ -68,6 +68,10 @@ final class Handler: NSObject, NSApplicationDelegate, UNUserNotificationCenterDe
         }
         content.body = message
         content.threadIdentifier = "pi-\(pane)"
+        // Son : c'est la notification desktop qui porte l'alerte quand
+        // l'utilisateur est hors de Ghostty (le son herdr est coupé, cf.
+        // herdr/.config/herdr/config.toml [ui.sound]).
+        content.sound = UNNotificationSound.default
 
         // Identifiant stable par pane : une nouvelle notification remplace la
         // précédente (équivalent de -group chez terminal-notifier).
@@ -141,24 +145,20 @@ final class Handler: NSObject, NSApplicationDelegate, UNUserNotificationCenterDe
         DispatchQueue.global().async { [weak self] in
             let env = ProcessInfo.processInfo.environment
 
-            // 1. Ghostty au premier plan. « -a » seul : PAS de -g (arrière-plan),
-            //    première cause de « le clic ne ramène pas ».
-            run("/usr/bin/open", ["-a", "Ghostty"], environment: env)
-
-            // 2. Laisser l'app réellement s'activer avant de déplacer le focus
-            //    de pane dans herdr.
-            Thread.sleep(forTimeInterval: 0.3)
-
-            // 3. Focus de la pane émettrice via `agent focus <pane_id>` : c'est
-            //    la seule forme qui cible la pane elle-même (`pane focus` cible
-            //    un *voisin* de --pane selon --direction). Socket embarqué à
-            //    l'émission : le contexte GUI du clic n'a pas les variables
-            //    herdr et le CLI chercherait son socket dans $TMPDIR/herdr.
+            // 1. Focus de la pane émettrice d'abord : c'est un état serveur
+            //    herdr (~10 ms), indépendant du GUI. Le TUI affichera la bonne
+            //    pane dès que Ghostty remontera. Socket embarqué à l'émission :
+            //    le contexte GUI du clic n'a pas les variables herdr et le CLI
+            //    chercherait son socket dans $TMPDIR/herdr.
             var herdrEnv = env
             herdrEnv["HERDR_SOCKET_PATH"] = self?.socket
             run("/opt/homebrew/bin/herdr",
                 ["agent", "focus", self?.pane ?? ""],
                 environment: herdrEnv)
+
+            // 2. Ghostty au premier plan. « -a » seul : PAS de -g (arrière-plan),
+            //    première cause de « le clic ne ramène pas ».
+            run("/usr/bin/open", ["-a", "Ghostty"], environment: env)
 
             completionHandler()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {

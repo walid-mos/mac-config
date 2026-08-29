@@ -160,7 +160,7 @@ notifier-app:
 			/usr/libexec/PlistBuddy -c "Set :CFBundleIconFile Pi" /Applications/Pi.app/Contents/Info.plist; \
 		fi; \
 		swiftc -O -o /Applications/Pi.app/Contents/MacOS/pi-notify scripts/notifier/pi-notify.swift \
-			-framework AppKit -framework UserNotifications; \
+			-framework AppKit -framework UserNotifications || exit 1; \
 		/usr/libexec/PlistBuddy \
 			-c "Set :CFBundleName Pi" \
 			-c "Set :CFBundleExecutable pi-notify" \

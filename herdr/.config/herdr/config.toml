@@ -100,3 +100,9 @@ command = "herdr-nvim-nav.up"
 key = "alt+l"
 type = "plugin_action"
 command = "herdr-nvim-nav.right"
+
+# Son : porté par la notification desktop de pi-notify (UNNotificationSound),
+# émise précisément quand l'utilisateur est hors de Ghostty. Couper ici évite
+# la double sonnerie (herdr + notification) au même instant.
+[ui.sound]
+enabled = false

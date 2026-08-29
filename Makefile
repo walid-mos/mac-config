@@ -30,7 +30,7 @@ NOFOLD := colima docker gh git herdr hermes homebrew languages rclone rtk
 
 # Hooks post-install chaînés par `make install` (cible <nom>-post ; rust et 
 # n'ont pas de package Stow — rustup gère ~/.rustup/~/.cargo).
-POSTS :=  dev-dirs gh herdr hermes nvim pi rtk rust notifier
+POSTS :=  dev-dirs gh herdr hermes nvim pi rtk rust
 
 
 # Obsidian : le vault vit dans iCloud, seule la config .obsidian est stowée
@@ -95,7 +95,7 @@ brew-bundle:
 	@echo "→ brew bundle (Brewfile)"
 	@brew bundle --file=Brewfile
 
-install all: git-filters $(PACKAGES) $(addsuffix -post,$(POSTS)) obsidian
+install all: git-filters notifier-app $(PACKAGES) $(addsuffix -post,$(POSTS)) obsidian
 
 # -R (restow) est idempotent : premier stow ou réparation de drift, même geste.
 # Seul point d'invocation de stow pour les packages — NOFOLD s'applique ici.

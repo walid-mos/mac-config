@@ -136,21 +136,31 @@ export function blendHex(from: string, to: string, t: number): string {
 const FADE_TOKEN = /\x1b\]8;[^\x07]*\x07|\x1b\[[0-?]*[ -/]*[@-~]|[^\x1b]+/g;
 const TRUECOLOR = /^\x1b\[38;2;(\d+);(\d+);(\d+)m$/;
 
+const sgrOf = (hex: string): string => {
+	const [r, g, b] = rgb(hex);
+	return `\x1b[38;2;${r};${g};${b}m`;
+};
+
 /** Fondu vers le fond d'une ligne déjà colorée : chaque couleur vraie est
- * mélangée vers C_BASE ; les segments nus (héritant du texte par défaut) sont
- * recolorés en texte fondu. Bold, liens OSC 8 et largeur visible : intacts. */
+ * mélangée vers C_BASE — la SGR est réémise SEULE (c'est une séquence, pas du
+ * texte), et le texte du token la suit nue pour en hériter. Les segments nus
+ * hors token (héritant du texte par défaut) sont seuls recolorés. Bold, liens
+ * OSC 8 et largeur visible : intacts. */
 function fadeLine(line: string, t: number): string {
 	if (t <= 0) return line;
 	let out = "";
+	let colored = false; // une couleur vraie est active : le texte qui suit hérite
 	for (const token of line.matchAll(FADE_TOKEN)) {
 		const s = token[0];
 		const color = TRUECOLOR.exec(s);
 		if (color) {
-			out += fgHex(blendHex(`#${hex2(+color[1])}${hex2(+color[2])}${hex2(+color[3])}`, C_BASE, t), s);
+			colored = true;
+			out += sgrOf(blendHex(`#${hex2(+color[1])}${hex2(+color[2])}${hex2(+color[3])}`, C_BASE, t));
 		} else if (s.startsWith("\x1b")) {
+			if (s === "\x1b[39m") colored = false; // reset couleur → défaut ensuite
 			out += s;
-		} else if (/\S/.test(s)) {
-			out += fgHex(blendHex(LATTE.text, C_BASE, t), s);
+		} else if (!colored && /\S/.test(s)) {
+			out += `${sgrOf(blendHex(LATTE.text, C_BASE, t))}${s}\x1b[39m`;
 		} else {
 			out += s;
 		}

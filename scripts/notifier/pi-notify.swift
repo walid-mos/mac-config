@@ -15,14 +15,14 @@
 // - rester résident jusqu'au clic ou à la fermeture explicite : c'est lui qui
 //   exécute l'action, sans expiration qui casserait les clics tardifs.
 //
-// Au clic : activation de Ghostty puis
-//   HERDR_SOCKET_PATH=<socket> herdr pane focus --direction up --pane <pane>
+// Au clic : focus de la pane puis activation de Ghostty :
+//   HERDR_SOCKET_PATH=<socket> herdr agent focus <pane>
 // (socket lu à l'émission : le contexte GUI du clic n'a pas les variables
 // herdr et le CLI chercherait son socket dans $TMPDIR/herdr).
 //
 // Usage : open -a Pi --args -title T [-subtitle S] [-message M]
 //                -pane ID -socket PATH
-// Erreurs : exit 1-3, silencieuses (best-effort par contrat).
+// Erreurs : terminaison silencieuse (best-effort par contrat).
 
 import AppKit
 import UserNotifications
@@ -41,13 +41,12 @@ final class Handler: NSObject, NSApplicationDelegate, UNUserNotificationCenterDe
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let argv = ProcessInfo.processInfo.arguments
-        NSLog("pi-notify: didFinishLaunching argv=%@", argv.joined(separator: " | "))
         func arg(_ name: String) -> String? {
             guard let i = argv.firstIndex(of: name), i + 1 < argv.count else { return nil }
             return argv[i + 1]
         }
         debugEnabled = argv.contains("-debug")
-        debug("didFinishLaunching")
+        debug("didFinishLaunching argv=\(argv.joined(separator: " | "))")
         guard let pane = arg("-pane"), let socket = arg("-socket") else {
             debug("ERREUR : -pane/-socket manquants")
             NSApp.terminate(nil)
@@ -91,15 +90,21 @@ final class Handler: NSObject, NSApplicationDelegate, UNUserNotificationCenterDe
                 DispatchQueue.main.async { self?.finish() }
                 return
             }
-            center.add(request) { addError in
+            center.add(request) { [weak self] addError in
                 self?.debug("add() error=\(String(describing: addError))")
+                guard addError != nil else { return }
+                DispatchQueue.main.async { self?.finish() }
             }
         }
     }
 
+    // `handled` n'est consulté et muté que sur le thread principal. Les
+    // callbacks UserNotifications pouvant arriver hors de ce thread, tous les
+    // chemins de terminaison y convergent avant d'arbitrer clic/erreur/refus.
     func finish() {
+        dispatchPrecondition(condition: .onQueue(.main))
         guard !handled else { return }
-        debug("finish (refus ou fermeture)")
+        debug("finish (refus, erreur ou fermeture)")
         handled = true
         NSApp.terminate(nil)
     }
@@ -120,6 +125,17 @@ final class Handler: NSObject, NSApplicationDelegate, UNUserNotificationCenterDe
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
+        DispatchQueue.main.async { [weak self] in
+            self?.handle(response, completionHandler: completionHandler)
+                ?? completionHandler()
+        }
+    }
+
+    private func handle(
+        _ response: UNNotificationResponse,
+        completionHandler: @escaping () -> Void
+    ) {
+        dispatchPrecondition(condition: .onQueue(.main))
         debug("didReceive action=\(response.actionIdentifier)")
         guard !handled else {
             completionHandler()
@@ -127,7 +143,7 @@ final class Handler: NSObject, NSApplicationDelegate, UNUserNotificationCenterDe
         }
         guard response.actionIdentifier == UNNotificationDefaultActionIdentifier else {
             completionHandler()
-            DispatchQueue.main.async { [weak self] in self?.finish() }
+            finish()
             return
         }
         handled = true

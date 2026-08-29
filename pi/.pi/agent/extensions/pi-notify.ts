@@ -30,10 +30,11 @@ const NOTIFIER = [
   "/opt/homebrew/bin/terminal-notifier",
 ].find((candidate) => existsSync(candidate));
 const HERDR = "/opt/homebrew/bin/herdr";
+const SOCKET = process.env.HERDR_SOCKET_PATH;
 const PANE_ID = process.env.HERDR_PANE_ID;
 
 function enabled(): boolean {
-  return process.env.HERDR_ENV === "1" && !!PANE_ID && !!NOTIFIER;
+  return process.env.HERDR_ENV === "1" && !!PANE_ID && !!NOTIFIER && !!SOCKET;
 }
 
 function ghosttyFrontmost(): Promise<boolean> {
@@ -52,10 +53,14 @@ function ghosttyFrontmost(): Promise<boolean> {
 }
 
 function focusThisPaneOnWatch(): string {
+  // Au clic, terminal-notifier est relancé par LaunchServices dans un contexte
+  // GUI sans nos variables : sans HERDR_SOCKET_PATH, `herdr` cherche son socket
+  // dans $TMPDIR/herdr et le focus rate silencieusement. On embarque donc le
+  // chemin du socket (lu à l'émission) dans la commande elle-même.
   return [
     "open -ga Ghostty",
     "sleep 0.2",
-    `${HERDR} pane focus --direction up --pane ${PANE_ID}`,
+    `HERDR_SOCKET_PATH='${SOCKET}' ${HERDR} pane focus --direction up --pane ${PANE_ID}`,
   ].join("; ");
 }
 

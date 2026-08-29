@@ -55,7 +55,7 @@ def main() -> int:
         shutil.copy2(SWIFT, swift)
         icon = root / "Ghostty.icns"
         icon.write_bytes(b"icon-one")
-        destination = root / "Applications" / "Pi.app"
+        destination = root / "Applications" / "Pi Notifications.app"
         builder = root / "build-notifier-app.sh"
         shutil.copy2(BUILDER, builder)
         builder.chmod(builder.stat().st_mode | stat.S_IXUSR)
@@ -130,8 +130,8 @@ out.chmod(0o755)
 
         with (destination / "Contents" / "Info.plist").open("rb") as stream:
             installed = plistlib.load(stream)
-        assert installed["CFBundleName"] == "Pi"
-        assert installed["CFBundleDisplayName"] == "Pi"
+        assert installed["CFBundleName"] == "Pi Notifications"
+        assert installed["CFBundleDisplayName"] == "Pi Notifications"
         assert installed["CFBundleExecutable"] == "pi-notify"
         assert installed["CFBundleIdentifier"] == "app.pi.notifier"
         assert (destination / "Contents" / "Resources" / "pi-notify-input.sha256").is_file()

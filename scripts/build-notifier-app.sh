@@ -3,9 +3,9 @@ set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 SOURCE_APP=${NOTIFIER_APP_SOURCE:-/opt/homebrew/opt/terminal-notifier/terminal-notifier.app}
-DEST_APP=${NOTIFIER_APP_DEST:-/Applications/Pi.app}
+DEST_APP=${NOTIFIER_APP_DEST:-"/Applications/Pi Notifications.app"}
 SWIFT_SOURCE=${PI_NOTIFY_SWIFT_SOURCE:-$ROOT/scripts/notifier/pi-notify.swift}
-ICON_SOURCE=${NOTIFIER_ICON_SOURCE:-/Applications/Ghostty.app/Contents/Resources/Ghostty.icns}
+ICON_SOURCE=${NOTIFIER_ICON_SOURCE:-$ROOT/scripts/notifier/Pi.icns}
 SWIFTC=${SWIFTC:-swiftc}
 PLIST_BUDDY=${PLIST_BUDDY:-/usr/libexec/PlistBuddy}
 PLUTIL=${PLUTIL:-/usr/bin/plutil}
@@ -18,11 +18,11 @@ DEST_EXECUTABLE=$DEST_APP/Contents/MacOS/pi-notify
 DEST_PLIST=$DEST_APP/Contents/Info.plist
 
 if [[ ! -x "$SOURCE_EXECUTABLE" ]]; then
-  echo "terminal-notifier absent (brew bundle) — Pi.app non construite"
+  echo "terminal-notifier absent (brew bundle) — Pi Notifications.app non construite"
   exit 0
 fi
 if [[ ! -f "$SWIFT_SOURCE" ]]; then
-  echo "$SWIFT_SOURCE absent — Pi.app non construite"
+  echo "$SWIFT_SOURCE absent — Pi Notifications.app non construite"
   exit 0
 fi
 
@@ -47,8 +47,8 @@ input_hash() {
     printf 'builder\t%s\n' "$(hash_file "$0")"
     printf 'swift\t%s\n' "$(hash_file "$SWIFT_SOURCE")"
     printf '%s\n' \
-      'bundle-name=Pi' \
-      'bundle-display-name=Pi' \
+      'bundle-name=Pi Notifications' \
+      'bundle-display-name=Pi Notifications' \
       'bundle-executable=pi-notify' \
       'bundle-identifier=app.pi.notifier' \
       'swift-flags=-O -framework AppKit -framework UserNotifications'
@@ -68,15 +68,15 @@ plist_equals() {
 is_current() {
   local expected=$1 stamp=$DEST_APP/$STAMP_RELATIVE
   [[ -x "$DEST_EXECUTABLE" && -f "$stamp" && $(<"$stamp") == "$expected" ]] || return 1
-  plist_equals CFBundleName Pi \
-    && plist_equals CFBundleDisplayName Pi \
+  plist_equals CFBundleName "Pi Notifications" \
+    && plist_equals CFBundleDisplayName "Pi Notifications" \
     && plist_equals CFBundleExecutable pi-notify \
     && plist_equals CFBundleIdentifier app.pi.notifier
 }
 
 EXPECTED_HASH=$(input_hash)
 if is_current "$EXPECTED_HASH"; then
-  echo "Pi.app déjà conforme : $DEST_APP"
+  echo "Pi Notifications.app déjà conforme : $DEST_APP"
   exit 0
 fi
 
@@ -98,10 +98,10 @@ fi
   -framework AppKit -framework UserNotifications
 rm -f "$TEMP_APP/Contents/MacOS/terminal-notifier"
 "$PLIST_BUDDY" \
-  -c "Set :CFBundleName Pi" \
+  -c "Set :CFBundleName Pi Notifications" \
   -c "Set :CFBundleExecutable pi-notify" \
   -c "Set :CFBundleIdentifier app.pi.notifier" "$TEMP_APP/Contents/Info.plist"
-"$PLUTIL" -replace CFBundleDisplayName -string Pi "$TEMP_APP/Contents/Info.plist"
+"$PLUTIL" -replace CFBundleDisplayName -string "Pi Notifications" "$TEMP_APP/Contents/Info.plist"
 printf '%s\n' "$EXPECTED_HASH" > "$TEMP_APP/$STAMP_RELATIVE"
 "$CODESIGN" --force --sign - "$TEMP_APP"
 
@@ -109,4 +109,4 @@ rm -rf "$DEST_APP"
 mv "$TEMP_APP" "$DEST_APP"
 "$LSREGISTER" -f "$DEST_APP"
 trap - EXIT
-echo "Pi.app prête : $DEST_APP (accepte la demande de notifications au premier envoi)"
+echo "Pi Notifications.app prête : $DEST_APP (accepte la demande de notifications au premier envoi)"

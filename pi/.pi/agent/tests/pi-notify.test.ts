@@ -11,7 +11,7 @@ import {
   type NotificationOperations,
 } from "../extensions/pi-notify.ts";
 
-const HELPER = "/Applications/Pi.app/Contents/MacOS/pi-notify";
+const HELPER = "/Applications/Pi Notifications.app/Contents/MacOS/pi-notify";
 const NOTIFIER = "/opt/homebrew/bin/terminal-notifier";
 const OPEN = "/usr/bin/open";
 const PKILL = "/usr/bin/pkill";
@@ -80,7 +80,7 @@ test("activation requires Herdr context and at least one poster", () => {
   assert.equal(notificationEnabled(ENVIRONMENT, operations), true);
 });
 
-test("native helper kills the pane resident before opening Pi.app", async () => {
+test("native helper kills the pane resident before opening Pi Notifications.app", async () => {
   const operations = new FakeOperations();
   operations.available.add(HELPER);
   const poster = new NotificationPoster(operations);
@@ -97,7 +97,7 @@ test("native helper kills the pane resident before opening Pi.app", async () => 
   assert.equal(open?.options.detached, true);
   assert.equal(open?.options.stdio, "ignore");
   assert.equal(open?.child.unrefCalled, true);
-  assert.deepEqual(open?.args.slice(0, 4), ["-n", "/Applications/Pi.app", "--args", "-title"]);
+  assert.deepEqual(open?.args.slice(0, 4), ["-n", "/Applications/Pi Notifications.app", "--args", "-title"]);
   assert.ok(open?.args.includes("Native body"));
   assert.ok(open?.args.includes("/tmp/pane-native.sock"));
 

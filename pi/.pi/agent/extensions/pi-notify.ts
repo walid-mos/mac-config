@@ -10,7 +10,7 @@ import { spawn as nodeSpawn, type SpawnOptions } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 
-const HELPER = "/Applications/Pi.app/Contents/MacOS/pi-notify";
+const HELPER = "/Applications/Pi Notifications.app/Contents/MacOS/pi-notify";
 const NOTIFIER = "/opt/homebrew/bin/terminal-notifier";
 const HERDR = "/opt/homebrew/bin/herdr";
 const OPEN = "/usr/bin/open";
@@ -182,7 +182,7 @@ export class NotificationPoster {
       OPEN,
       [
         "-n",
-        "/Applications/Pi.app",
+        "/Applications/Pi Notifications.app",
         "--args",
         ...commonArguments(request),
         "-pane",

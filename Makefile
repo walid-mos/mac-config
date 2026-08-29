@@ -62,7 +62,7 @@ help:
 	@echo "  pi-update      Met à jour Pi et tous ses packages"
 	@echo "  pi-test        Vérifie Stow puis stress-test le démarrage réel de Pi"
 	@echo "  pi-notify-test Tests comportementaux isolés de l'extension de notifications"
-	@echo "  notifier-app-test Teste le build et l'invalidation de Pi.app dans un dossier temporaire"
+	@echo "  notifier-app-test Teste le build et l'invalidation de Pi Notifications.app dans un dossier temporaire"
 	@echo "  herdr-pi-smoke Isolated Herdr named-session smoke: 20+ rapid Pi pane starts"
 	@echo "  hermes-gemma   Installe le superviseur Gemma (démarre/arrête avec Hermes.app)"
 	@echo ""
@@ -140,7 +140,7 @@ gh-post:
 # dans config.toml : sans lui, alt+hjkl n'a aucun effet côté herdr. Le pendant
 # nvim du plugin est géré par lazy (lua/plugins/herdr-nav.lua), installé au 1er
 # lancement de nvim — rien à faire ici pour ce versant.
-# Pi.app est un poster résident Swift ; terminal-notifier fournit son bundle
+# Pi Notifications.app est un poster résident Swift ; terminal-notifier fournit son bundle
 # source et reste le fallback de l'extension. Le script couvre par hash le Swift,
 # sa propre logique, le bundle, l'Info.plist, l'icône et les métadonnées attendues.
 notifier-app:

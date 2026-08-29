@@ -6,7 +6,7 @@
 // log usernoted « Launching … for legacy response » sans exécution).
 //
 // Contraintes que ce helper respecte, apprises à l'inverse :
-// - être lancé PAR LaunchServices (`open -a Pi --args …`) : un exec direct du
+// - être lancé PAR LaunchServices (`open -a "Pi Notifications" --args …`) : un exec direct du
 //   binaire ne fait pas de check-in launchservicesd et usernoted ne route pas
 //   la réponse du clic vers l'instance vivante — il relance une instance vide ;
 // - avoir un cycle de vie NSApplication complet (`app.run()`) : sans ça,
@@ -20,7 +20,7 @@
 // (socket lu à l'émission : le contexte GUI du clic n'a pas les variables
 // herdr et le CLI chercherait son socket dans $TMPDIR/herdr).
 //
-// Usage : open -a Pi --args -title T [-subtitle S] [-message M]
+// Usage : open -a "Pi Notifications" --args -title T [-subtitle S] [-message M]
 //                -pane ID -socket PATH
 // Erreurs : terminaison silencieuse (best-effort par contrat).
 
@@ -54,7 +54,7 @@ final class Handler: NSObject, NSApplicationDelegate, UNUserNotificationCenterDe
         }
         self.pane = pane
         self.socket = socket
-        let title = arg("-title") ?? "Pi"
+        let title = arg("-title") ?? "Pi Notifications"
         let subtitle = arg("-subtitle")
         let message = arg("-message") ?? ""
 

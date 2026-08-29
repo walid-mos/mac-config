@@ -67,9 +67,9 @@ final class Handler: NSObject, NSApplicationDelegate, UNUserNotificationCenterDe
         content.body = message
         content.threadIdentifier = "pi-\(pane)"
         content.categoryIdentifier = "pi-notification"
-        // Volontairement SILENCIEUX : le son est joué par herdr ([ui.sound])
-        // pour le même événement, partout et exactement une fois — remettre un
-        // son ici recréerait la double sonnerie hors de Ghostty.
+        // Cette notification est l'unique alerte, dans Ghostty comme ailleurs.
+        // Le mode Concentration garde le dernier mot sur sa présentation.
+        content.sound = UNNotificationSound.default
 
         // Identifiant stable par pane : une nouvelle notification remplace la
         // précédente (équivalent de -group chez terminal-notifier).
@@ -85,7 +85,7 @@ final class Handler: NSObject, NSApplicationDelegate, UNUserNotificationCenterDe
                 options: [.customDismissAction]
             )
         ])
-        center.requestAuthorization(options: [.alert]) { [weak self] granted, error in
+        center.requestAuthorization(options: [.alert, .sound]) { [weak self] granted, error in
             self?.debug("requestAuthorization granted=\(granted) error=\(String(describing: error))")
             guard granted else {
                 DispatchQueue.main.async { self?.finish() }
@@ -112,7 +112,7 @@ final class Handler: NSObject, NSApplicationDelegate, UNUserNotificationCenterDe
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
         debug("willPresent (bannière réclamée)")
-        completionHandler([.banner, .list])
+        completionHandler([.banner, .list, .sound])
     }
 
     func userNotificationCenter(

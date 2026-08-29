@@ -4,16 +4,14 @@
 // `osascript display notification` faute de terminal-notifier dans le PATH
 // GUI → notifications attribuées à « Script Editor », clic infonctionnel.
 //
-// Fonctionnement (travail de concert avec la couche Herdr) :
-// - l'intégration officielle herdr (herdr-agent-state.ts) remonte déjà
-//   working/blocked/idle au serveur herdr, qui affiche des toasts in-app ;
-// - cette extension ajoute la couche desktop, pane-scoped : au moment où Pi
-//   se stabilise (fin de tâche) ou demande une décision, elle émet une
-//   notification via terminal-notifier (notification macOS native) et surtout
-//   `-execute` : au clic → activation de Ghostty + `herdr pane focus`
-//   sur LA pane qui a émis la notification (HERDR_PANE_ID).
-//   NB : pas de `-sender com.mitchellh.ghostty` — charger le bundle Ghostty
-//   fait hanguer terminal-notifier et la notification n'apparaît jamais.
+// Fonctionnement :
+// - l'intégration herdr-agent-state.ts continue de remonter les états au
+//   serveur pour l'affichage des panes, mais les toasts Herdr sont coupés ;
+// - cette extension est l'unique canal de notification : à la fin d'une tâche
+//   ou lorsqu'une décision est requise, elle émet toujours une notification
+//   macOS, que Ghostty soit au premier plan ou non ;
+// - au clic : activation de Ghostty puis focus de LA pane émettrice
+//   (HERDR_PANE_ID).
 //
 // Best-effort absolu : aucune erreur ne doit remonter dans le cycle de Pi.
 
@@ -35,21 +33,6 @@ const PANE_ID = process.env.HERDR_PANE_ID;
 function enabled(): boolean {
   return process.env.HERDR_ENV === "1" && !!PANE_ID && !!SOCKET
     && (existsSync(HELPER) || existsSync(NOTIFIER));
-}
-
-function ghosttyFrontmost(): Promise<boolean> {
-  // Silencieux : seulement un sondage d'état, jamais de notification.
-  // En cas d'échec (timeout, binaire absent) on notifie quand même.
-  return new Promise((resolve) => {
-    execFile(
-      "/usr/bin/osascript",
-      ['-e', 'application "Ghostty" is frontmost'],
-      { timeout: 750 },
-      (error, stdout) => {
-        resolve(!error && String(stdout).trim() === "true");
-      },
-    );
-  });
 }
 
 function focusThisPaneOnWatch(): string {
@@ -99,12 +82,8 @@ function showNotification(title: string, message: string): void {
   ).unref?.();
 }
 
-async function notify(title: string, message: string): Promise<void> {
+function notify(title: string, message: string): void {
   try {
-    if (await ghosttyFrontmost()) {
-      // L'utilisateur regarde déjà herdr : toast in-app + son suffisent.
-      return;
-    }
     showNotification(title, message);
   } catch {
     // Best-effort : silencieux.
@@ -150,12 +129,12 @@ export default function (pi: any) {
     lastSnippet = "";
   });
 
-  pi.on("agent_settled", async (_event: any, ctx: any) => {
+  pi.on("agent_settled", (_event: any, ctx: any) => {
     if (ctx?.mode !== "tui" || ctx?.isIdle?.() !== true || !running) {
       return;
     }
     running = false;
-    await notify(`Pi · ${cwdName(ctx)} — terminé`, lastSnippet || "Prêt pour la suite");
+    notify(`Pi · ${cwdName(ctx)} — terminé`, lastSnippet || "Prêt pour la suite");
   });
 
   // Pi attend un choix utilisateur (ask_user_question) : l'agent est toujours

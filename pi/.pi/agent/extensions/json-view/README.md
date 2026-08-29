@@ -21,9 +21,12 @@ métadonnées et affordances cliquables dans les bordures.
 lignes`) puis devient la boîte exacte à la complétion ; pas de phase « brut
   puis boîte d'un coup ».
 - JSON ≤ `JSON_MAX_LINES` lignes (18) : pretty complet.
-- Plus grand : 18 premières lignes, bordure basse = marqueur cliquable
-  `⤢ +N lignes · tout voir` (ouvre le blob complet via le handler OS).
-- Déplié (`/json`) : pretty complet, sans cap.
+- Plus grand : 15 lignes à pleine intensité, puis 3 lignes dissoutes vers le
+  fond (mélange RGB croissant 50 % → 88 %) et une rangée `· · ·` centrée dont
+  les points s'éteignent un à un — la coupe se voit, elle ne se devine pas.
+  Bordure basse = marqueur cliquable `⤢ +N lignes · tout voir` (ouvre le blob
+  complet via le handler OS).
+- Déplié (`/json`) : pretty complet, sans cap, ni fondu ni points.
 
 ## Comment ça marche (contraintes renderer)
 

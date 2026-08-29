@@ -4,12 +4,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { extractJsonBlocks, findOpenRawJson, MIN_RAW_LENGTH } from "../extensions/json-view/detect.ts";
+import { LATTE, fgHex, rgb } from "../extensions/footer/style.ts";
 import {
+	blendHex,
+	C_BASE,
 	escapeMarkdownOutsideAnsi,
 	formatJsonBytes,
 	highlightJsonLine,
 	JSON_MAX_LINES,
+	renderJsonBox,
 	transformMarkdown,
+	type JsonBlock,
 } from "../extensions/json-view/render.ts";
 import {
 	blobByRecency,
@@ -232,6 +237,37 @@ test("transform : gros JSON replié = 18 premières lignes + marqueur cliquable"
 	assert.ok(result.includes("⤢ +146 lignes · tout voir"));
 	assert.ok(result.includes("file:///tmp/big.json"));
 	assert.ok(!result.includes("```"));
+});
+
+const ansiColor = (hex: string): string => {
+	const [r, g, b] = rgb(hex);
+	return `\x1b[38;2;${r};${g};${b}m`;
+};
+
+test("render : coupe repliée = bande de fondu + « · · · » ; coupe absente si non capé", () => {
+	const block = { raw: BIG, parsed: JSON.parse(BIG) } as JsonBlock;
+	const capped = renderJsonBox(block, { expanded: false, width: 96 });
+	// Une seule rangée de points, centrée, trois fondu croissants.
+	const dotsRows = capped.split("\n").filter((row) => row.replace(/\x1b\[[0-9;]*m/g, "").includes("· · ·"));
+	assert.equal(dotsRows.length, 1, "une seule rangée de points");
+	const dotsRow = dotsRows[0];
+	assert.ok(capped.includes(ansiColor(blendHex(LATTE.overlay1, C_BASE, 0.55))), "point 1 fondu");
+	assert.ok(capped.includes(ansiColor(blendHex(LATTE.overlay1, C_BASE, 0.9))), "point 3 très pâle");
+	// Dernière ligne de contenu dissoute : aucune couleur pure de la palette
+	// (hors la bordure, chrome de la boîte).
+	const border = ansiColor(LATTE.overlay1);
+	const paletteAnsi = Object.values(LATTE).map(ansiColor).filter((c) => c !== border);
+	const contentRows = capped.split("\n").filter((row) => row.includes("│"));
+	const lastContent = contentRows[contentRows.length - 2]; // avant la rangée de points
+	const colors = [...lastContent.matchAll(/\x1b\[38;2;\d+;\d+;\d+m/g)].map((m) => m[0]).filter((c) => c !== border);
+	assert.ok(colors.length > 0, "la dernière ligne de contenu est colorée");
+	assert.ok(colors.every((c) => !paletteAnsi.includes(c)), "fondu : que des mélanges");
+	// La 1re ligne de contenu reste à pleine intensité (vert Latte pur).
+	assert.ok(capped.includes(ansiColor(LATTE.green)));
+	// Non capé : ni rangée de points ni fondu.
+	const full = renderJsonBox(block, { expanded: true, width: 96 });
+	assert.ok(!full.split("\n").some((row) => row.replace(/\x1b\[[0-9;]*m/g, "").includes("· · ·")));
+	assert.ok(!full.includes(ansiColor(blendHex(LATTE.green, C_BASE, 0.5))));
 });
 
 test("transform : déplié = pretty complet même pour un gros JSON", () => {

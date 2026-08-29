@@ -5,7 +5,7 @@
  * markdown sont échappés hors séquences ANSI pour éviter toute interprétation.
  */
 
-import { LATTE, fgHex } from "../footer/style.ts";
+import { LATTE, fgHex, rgb } from "../footer/style.ts";
 import { hyperlink, terminalLineWidth, truncateTerminalLine } from "../ui/terminal-text.ts";
 import { extractJsonBlocks, findOpenJsonFence, findOpenRawJson, type JsonBlock } from "./detect.ts";
 
@@ -21,6 +21,13 @@ const C_LITERAL = LATTE.mauve;
 const C_TITLE = LATTE.mauve;
 const C_META = LATTE.subtext0;
 const C_LINK = LATTE.sapphire;
+/** Fond du message (Catppuccin Latte base) : cible du fondu de troncature. */
+export const C_BASE = "#eff1f5";
+
+/** Lignes de la bande de fondu, et fondu croissant de chaque point de « · · · ». */
+const FADE_ROWS = 3;
+const FADE_STEPS = [0.5, 0.72, 0.88];
+const DOTS_FADE = [0.55, 0.75, 0.9];
 
 const BOLD = "\x1b[1m";
 const BOLD_OFF = "\x1b[22m";
@@ -116,6 +123,66 @@ function boxEdge(
 	return `${fgHex(C_BORDER, `${left}─ `)}${labelAnsi} ${fgHex(C_BORDER, `${"─".repeat(fill)}${right}`)}`;
 }
 
+const hex2 = (value: number): string => value.toString(16).padStart(2, "0");
+
+/** Mélange deux couleurs hexadécimales : t = 0 → from, t = 1 → to. */
+export function blendHex(from: string, to: string, t: number): string {
+	const [r1, g1, b1] = rgb(from);
+	const [r2, g2, b2] = rgb(to);
+	const mix = (a: number, b: number) => Math.round(a + (b - a) * t);
+	return `#${[mix(r1, r2), mix(g1, g2), mix(b1, b2)].map(hex2).join("")}`;
+}
+
+const FADE_TOKEN = /\x1b\]8;[^\x07]*\x07|\x1b\[[0-?]*[ -/]*[@-~]|[^\x1b]+/g;
+const TRUECOLOR = /^\x1b\[38;2;(\d+);(\d+);(\d+)m$/;
+
+/** Fondu vers le fond d'une ligne déjà colorée : chaque couleur vraie est
+ * mélangée vers C_BASE ; les segments nus (héritant du texte par défaut) sont
+ * recolorés en texte fondu. Bold, liens OSC 8 et largeur visible : intacts. */
+function fadeLine(line: string, t: number): string {
+	if (t <= 0) return line;
+	let out = "";
+	for (const token of line.matchAll(FADE_TOKEN)) {
+		const s = token[0];
+		const color = TRUECOLOR.exec(s);
+		if (color) {
+			out += fgHex(blendHex(`#${hex2(+color[1])}${hex2(+color[2])}${hex2(+color[3])}`, C_BASE, t), s);
+		} else if (s.startsWith("\x1b")) {
+			out += s;
+		} else if (/\S/.test(s)) {
+			out += fgHex(blendHex(LATTE.text, C_BASE, t), s);
+		} else {
+			out += s;
+		}
+	}
+	return out;
+}
+
+/** Rangée « · · · » centrée : trois points de plus en plus pâles, écho de la
+ * bande de fondu — le « … » de troncature sans casser l'alignement. */
+function dotsRow(width: number): string {
+	const dots = DOTS_FADE.map((t) => fgHex(blendHex(LATTE.overlay1, C_BASE, t), "·"));
+	const dotsVisible = 5; // « · · · »
+	const pad = Math.max(0, Math.floor((width - 4 - dotsVisible) / 2));
+	return boxRow(width, `${" ".repeat(pad)}${dots[0]} ${dots[1]} ${dots[2]}`, dotsVisible + pad);
+}
+
+/** Rangées de contenu communes à la boîte exacte et au cadre de streaming :
+ * cap JSON_MAX_LINES si replié, avec bande de fondu + « · · · » sur la coupe. */
+function pushContentRows(rows: string[], lines: string[], width: number, capped: boolean): void {
+	const shown = capped ? lines.slice(0, JSON_MAX_LINES) : lines;
+	const solid = capped ? shown.length - FADE_ROWS : shown.length;
+	shown.forEach((line, i) => {
+		const escaped = escapeMarkdownOutsideAnsi(line);
+		const escapes = escaped.length - line.length;
+		const budget = Math.max(8, width - 4 - escapes);
+		let colored = truncateTerminalLine(highlightJsonLine(escaped), budget, "…");
+		if (i >= solid) colored = fadeLine(colored, FADE_STEPS[i - solid]);
+		rows.push(boxRow(width, colored, terminalLineWidth(colored) - escapes));
+	});
+	if (capped) rows.push(dotsRow(width));
+}
+
 export interface JsonRenderOptions {
 	/** État global d'expansion de pi (/json). Déplié = pretty complet, sans cap. */
 	expanded: boolean;
@@ -140,16 +207,7 @@ export function renderJsonBox(block: JsonBlock, options: JsonRenderOptions): str
 	const rows = [boxEdge(width, "╭", "╮", title, titleText.length)];
 
 	const capped = !options.expanded && allLines.length > JSON_MAX_LINES;
-	const shown = capped ? allLines.slice(0, JSON_MAX_LINES) : allLines;
-	for (const line of shown) {
-		// Échapper avant la coloration (sinon le backslash ajouté serait re-échappé),
-		// puis compenser le pad : marked consomme les backslashes au rendu.
-		const escaped = escapeMarkdownOutsideAnsi(line);
-		const escapes = escaped.length - line.length;
-		const budget = Math.max(8, width - 4 - escapes);
-		const colored = truncateTerminalLine(highlightJsonLine(escaped), budget, "…");
-		rows.push(boxRow(width, colored, terminalLineWidth(colored) - escapes));
-	}
+	pushContentRows(rows, allLines, width, capped);
 
 	const bottomLabel = capped
 		? `⤢ +${(allLines.length - JSON_MAX_LINES).toLocaleString("fr-FR")} lignes · tout voir`
@@ -178,14 +236,7 @@ export function renderOpenJsonFence(content: string, options: JsonRenderOptions)
 	const rows = [boxEdge(width, "╭", "╮", title, titleText.length)];
 
 	const capped = !options.expanded && allLines.length > JSON_MAX_LINES;
-	const shown = capped ? allLines.slice(0, JSON_MAX_LINES) : allLines;
-	for (const line of shown) {
-		const escaped = escapeMarkdownOutsideAnsi(line);
-		const escapes = escaped.length - line.length;
-		const budget = Math.max(8, width - 4 - escapes);
-		const colored = truncateTerminalLine(highlightJsonLine(escaped), budget, "…");
-		rows.push(boxRow(width, colored, terminalLineWidth(colored) - escapes));
-	}
+	pushContentRows(rows, allLines, width, capped);
 
 	const bottomLabel = capped
 		? `⤢ +${(allLines.length - JSON_MAX_LINES).toLocaleString("fr-FR")} lignes`

@@ -41,7 +41,7 @@ POSTS :=  dev-dirs gh herdr hermes nvim pi rtk rust
 OBSIDIAN_VAULT_DIR := $(HOME)/Library/Mobile Documents/iCloud~md~obsidian/Documents/Brain
 OBSIDIAN_VAULT := $(OBSIDIAN_VAULT_DIR)/.obsidian
 
-.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs pi-update pi-test  notifier-app herdr-pi-smoke hermes-dirs hermes-gemma obsidian obsidian-save proxy-reset dev-dirs git-filters
+.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs pi-update pi-test  notifier-app notifier-app-test herdr-pi-smoke hermes-dirs hermes-gemma obsidian obsidian-save proxy-reset dev-dirs git-filters
 
 help:
 	@echo "Targets:"
@@ -61,6 +61,7 @@ help:
 	@echo "  proxy-reset    Retire le PAC proxy laissé par Zscaler (rétablit le relais Apple)"
 	@echo "  pi-update      Met à jour Pi et tous ses packages"
 	@echo "  pi-test        Vérifie Stow puis stress-test le démarrage réel de Pi"
+	@echo "  notifier-app-test Teste le build et l'invalidation de Pi.app dans un dossier temporaire"
 	@echo "  herdr-pi-smoke Isolated Herdr named-session smoke: 20+ rapid Pi pane starts"
 	@echo "  hermes-gemma   Installe le superviseur Gemma (démarre/arrête avec Hermes.app)"
 	@echo ""
@@ -138,39 +139,14 @@ gh-post:
 # dans config.toml : sans lui, alt+hjkl n'a aucun effet côté herdr. Le pendant
 # nvim du plugin est géré par lazy (lua/plugins/herdr-nav.lua), installé au 1er
 # lancement de nvim — rien à faire ici pour ce versant.
-# Notifications desktop de pi-notify : deux contraintes macOS —
-# 1. une bannière n'est levée que pour un .app registré (binaire nu = avalé) ;
-# 2. l'exécution d'une action au clic via terminal-notifier dépend d'un
-#    relaunch du processus qui perd la réponse (cf. scripts/notifier/).
-# `make notifier-app` construit donc Pi.app : bundle copié de la formula brew
-# terminal-notifier (nom « Pi », icône Ghostty, bundle id app.pi.notifier),
-# exécutable remplacé par le poster résident Swift compilé à la volée.
-# Idempotent : reconstruit si absent ou si la source est plus récente.
+# Pi.app est un poster résident Swift ; terminal-notifier fournit son bundle
+# source et reste le fallback de l'extension. Le script couvre par hash le Swift,
+# sa propre logique, le bundle, l'Info.plist, l'icône et les métadonnées attendues.
 notifier-app:
-	@if [ ! -x /opt/homebrew/opt/terminal-notifier/terminal-notifier.app/Contents/MacOS/terminal-notifier ]; then \
-		echo "terminal-notifier absent (brew bundle) — Pi.app non construite"; exit 0; fi
-	@if [ ! -f scripts/notifier/pi-notify.swift ]; then \
-		echo "scripts/notifier/pi-notify.swift absent — Pi.app non construite"; exit 0; fi
-	@if [ ! -x /Applications/Pi.app/Contents/MacOS/pi-notify ] \
-		|| [ scripts/notifier/pi-notify.swift -nt /Applications/Pi.app/Contents/MacOS/pi-notify ]; then \
-		rm -rf /Applications/Pi.app; \
-		cp -R /opt/homebrew/opt/terminal-notifier/terminal-notifier.app /Applications/Pi.app; \
-		if [ -f /Applications/Ghostty.app/Contents/Resources/Ghostty.icns ]; then \
-			cp /Applications/Ghostty.app/Contents/Resources/Ghostty.icns /Applications/Pi.app/Contents/Resources/Pi.icns; \
-			/usr/libexec/PlistBuddy -c "Set :CFBundleIconFile Pi" /Applications/Pi.app/Contents/Info.plist; \
-		fi; \
-		swiftc -O -o /Applications/Pi.app/Contents/MacOS/pi-notify scripts/notifier/pi-notify.swift \
-			-framework AppKit -framework UserNotifications || exit 1; \
-		/usr/libexec/PlistBuddy \
-			-c "Set :CFBundleName Pi" \
-			-c "Set :CFBundleExecutable pi-notify" \
-			-c "Set :CFBundleIdentifier app.pi.notifier" /Applications/Pi.app/Contents/Info.plist; \
-		plutil -insert CFBundleDisplayName -string "Pi" /Applications/Pi.app/Contents/Info.plist 2>/dev/null \
-			|| /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Pi" /Applications/Pi.app/Contents/Info.plist; \
-		codesign --force --sign - /Applications/Pi.app; \
-		/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f /Applications/Pi.app; \
-		echo "Pi.app prête : /Applications/Pi.app (accepte la demande de notifications au premier envoi)"; \
-	fi
+	@scripts/build-notifier-app.sh
+
+notifier-app-test:
+	@python3 scripts/test-notifier-build.py
 
 herdr-post:
 	@if ! command -v herdr >/dev/null; then \

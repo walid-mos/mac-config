@@ -251,7 +251,12 @@ export function extractJsonBlocks(markdown: string): JsonBlock[] {
 		const lineStart = match.index;
 		const openIndex = lineStart + match[0].indexOf(match[1]);
 		const endIndex = findBalancedEnd(markdown, openIndex);
-		if (endIndex === -1) continue;
+		// Un ancrage non équilibré s'étend jusqu'à la fin du texte : tout ce qui
+		// suit est du JSON en cours de génération — le cadre de croissance
+		// (findOpenRawJson) s'en charge. Extraire les objets intérieurs complétés
+		// produirait une boîte par élément du tableau et un coût O(n²) à chaque
+		// mise à jour du stream.
+		if (endIndex === -1) break;
 		if (overlaps(occupied, lineStart, endIndex)) continue;
 		const raw = markdown.slice(openIndex, endIndex);
 		if (raw.length < MIN_RAW_LENGTH && !raw.includes("\n")) continue;

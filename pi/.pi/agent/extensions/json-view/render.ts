@@ -278,7 +278,10 @@ export interface JsonTransformOptions {
 export function transformMarkdown(markdown: string, options: JsonTransformOptions): string {
 	const blocks = extractJsonBlocks(markdown);
 	const open = findOpenJsonFence(markdown);
-	if (blocks.length === 0 && !open && !findOpenRawJson(markdown)) return markdown;
+	// Une seule détection du JSON brut par mise à jour : réutilisée pour le
+	// retour anticipé et pour le rendu (le scan est O(n) sur tout le message).
+	const openRaw = blocks.length === 0 && !open ? findOpenRawJson(markdown) : undefined;
+	if (blocks.length === 0 && !open && !openRaw) return markdown;
 
 	let result = "";
 	let cursor = 0;
@@ -307,10 +310,10 @@ export function transformMarkdown(markdown: string, options: JsonTransformOption
 	// JSON brut sans fence, en cours de génération : même cadre de croissance que
 	// pour une fence ouverte, jusqu'à ce que le JSON complet devienne un bloc
 	// exact (extractJsonBlocks). Le modèle n'enveloppe pas toujours son JSON.
-	const openRaw = findOpenRawJson(tail);
-	if (openRaw) {
-		result = padBeforeBlock(result + tail.slice(0, openRaw.start));
-		result += renderOpenJsonFence(openRaw.content, { expanded: options.expanded, width: options.width });
+	const tailOpenRaw = cursor === 0 ? openRaw : findOpenRawJson(tail);
+	if (tailOpenRaw) {
+		result = padBeforeBlock(result + tail.slice(0, tailOpenRaw.start));
+		result += renderOpenJsonFence(tailOpenRaw.content, { expanded: options.expanded, width: options.width });
 		return `${result}\n\n`;
 	}
 	// Évite l'empilement de lignes vides quand le markdown reprend déjà par une séparation.

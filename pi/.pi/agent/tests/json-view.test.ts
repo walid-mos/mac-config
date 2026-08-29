@@ -270,6 +270,26 @@ test("render : coupe repliée = bande de fondu + « · · · » ; coupe absente 
 	assert.ok(!full.includes(ansiColor(blendHex(LATTE.green, C_BASE, 0.5))));
 });
 
+test("transform : tableau en cours d'émission = un cadre, pas une boîte par objet", () => {
+	// Objets complétés assez longs pour passer MIN_RAW_LENGTH : sans le break sur
+	// l'ancrage non équilibré, chacun deviendrait sa propre boîte (O(n²)).
+	const items = Array.from(
+		{ length: 40 },
+		(_, i) => `  { "id": ${i}, "name": "item-${i}", "desc": "élément de charge numéro ${i}" },`,
+	).join("\n");
+	const result = transformMarkdown(`[\n${items}\n  { "id": 41, `, { expanded: false, width: 96 });
+	const strip = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, "");
+	assert.equal(strip(result).split("json ·").length - 1, 1, "un seul cadre");
+	assert.ok(result.includes("génération…") || result.includes("⤢"));
+	// Un bloc complet suivi d'un tail en cours : les deux formes coexistent.
+	const complete = JSON.stringify({ kind: "review", session: "render-fixture-v2", note: "assez long pour passer le seuil" }, null, 2);
+	const mixed = transformMarkdown(`${complete}\n\n[\n  { "id": 1, "name": "a" },`, {
+		expanded: false,
+		width: 96,
+	});
+	assert.equal(strip(mixed).split("json ·").length - 1, 2, "bloc complet + cadre de croissance");
+});
+
 test("transform : déplié = pretty complet même pour un gros JSON", () => {
 	const result = transformMarkdown(BIG, { expanded: true, width: 96 });
 	assert.ok(result.includes('"item-39"'));

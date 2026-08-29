@@ -9,10 +9,11 @@
 //   working/blocked/idle au serveur herdr, qui affiche des toasts in-app ;
 // - cette extension ajoute la couche desktop, pane-scoped : au moment où Pi
 //   se stabilise (fin de tâche) ou demande une décision, elle émet une
-//   notification via terminal-notifier avec `-sender com.mitchellh.ghostty`
-//   (notification attribuée à Ghostty, icône comprise) et surtout
+//   notification via terminal-notifier (notification macOS native) et surtout
 //   `-execute` : au clic → activation de Ghostty + `herdr pane focus`
 //   sur LA pane qui a émis la notification (HERDR_PANE_ID).
+//   NB : pas de `-sender com.mitchellh.ghostty` — charger le bundle Ghostty
+//   fait hanguer terminal-notifier et la notification n'apparaît jamais.
 //
 // Best-effort absolu : aucune erreur ne doit remonter dans le cycle de Pi.
 
@@ -57,7 +58,6 @@ function showNotification(title: string, message: string): void {
       "-title", title,
       "-subtitle", `pane ${PANE_ID}`,
       "-message", message,
-      "-sender", "com.mitchellh.ghostty",
       "-group", `pi-${PANE_ID}`,
       "-execute", focusThisPaneOnWatch(),
     ],

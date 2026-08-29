@@ -53,8 +53,7 @@ de l'ANSI truecolor brut, que le renderer markdown de pi-tui laisse passer.
 - `json-box.ts` : adapte un bloc complet ou un stream au cadre partagé.
 - `transform-markdown.ts` : remplace les plages détectées sans mélanger
   détection, stockage et rendu.
-- `blob-store.ts` : persistance des JSON pretty par hash et historique de
-  récence pour `/json open`.
+- `blob-store.ts` : persistance privée, index de récence et éviction.
 
 ## Commandes
 
@@ -71,11 +70,17 @@ Le parseur de commande n'accepte que des entiers positifs complets : `2suffix`,
 
 ## Persistance
 
-- `$TMPDIR/pi-json-view/<hash>.json` — un fichier par contenu (une écriture,
-  ensuite réutilisé) ; c'est la cible des liens cliquables et de `/json open`.
-- `$TMPDIR/pi-json-view/index.json` — historique borné à 100 blobs. Nécessaire
-  car `ctx.reload()` réimporte les extensions (`moduleCache: false`) : le registre
-  en mémoire est vidé à chaque reload et relu depuis l'index.
+- `$TMPDIR/pi-json-view/<hash>.json` : un fichier par contenu pretty-printé.
+- `$TMPDIR/pi-json-view/index.json` : métadonnées minimales `{ hash, bytes }`
+  pour les 100 blobs les plus récents.
+- Répertoire en mode `0700`, fichiers en `0600`.
+- Les chemins et URL sont toujours reconstruits depuis le hash ; un index
+  altéré ne peut pas faire lire un chemin arbitraire.
+- L'éviction de l'index supprime aussi le fichier, afin de borner l'espace
+  disque et la rétention de contenu.
+
+L'index disque est nécessaire parce que `ctx.reload()` réimporte les extensions
+avec un cache de modules vide.
 
 ## Limites connues
 

@@ -8,7 +8,7 @@ import type { JsonValue } from './json-value.ts'
 export type JsonTransformOptions = {
 	expanded: boolean
 	width: number
-	persist?: (raw: string, parsed: JsonValue) => string | undefined
+	persist?: (parsed: JsonValue) => string | undefined
 }
 
 type CompleteRender = {
@@ -25,10 +25,10 @@ function padBeforeBlock(markdown: string): string {
 
 function completeBlockOptions(
 	options: JsonTransformOptions,
-	block: JsonBlock,
+	parsed: JsonValue,
 ): JsonRenderOptions {
 	const sharedOptions = { expanded: options.expanded, width: options.width }
-	const linkUrl = options.persist?.(block.raw, block.parsed)
+	const linkUrl = options.persist?.(parsed)
 	if (linkUrl) return { ...sharedOptions, linkUrl }
 	return sharedOptions
 }

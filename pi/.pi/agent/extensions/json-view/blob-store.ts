@@ -1,26 +1,43 @@
-/** Registre des blobs JSON détectés : fichier temporaire par contenu (hash) + historique pour /json open. */
-
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import {
+	chmodSync,
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	renameSync,
+	rmSync,
+	writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 import { prettyJson } from './json-value.ts'
 
 import type { JsonValue } from './json-value.ts'
 
-export type JsonBlob = {
+const STORE = {
+	MAX_BLOBS: 100,
+	HASH_LENGTH: 12,
+	DIRECTORY_MODE: 0o700,
+	FILE_MODE: 0o600,
+} as const
+
+const HASH_PATTERN = new RegExp(`^[\\da-f]{${STORE.HASH_LENGTH}}$`)
+
+type JsonBlobIndexEntry = {
 	hash: string
-	path: string
-	/** URL file:// pour les liens OSC 8 cliquables. */
-	url: string
 	bytes: number
 }
 
-/** Historique borné : les blocs les plus récents restent ouvrables via /json open [n]. */
-const MAX_BLOBS = 100
+export type JsonBlob = JsonBlobIndexEntry & {
+	path: string
+	url: string
+}
 
-let blobDirectory = process.env.PI_JSON_VIEW_DIR ?? join(tmpdir(), 'pi-json-view')
+let blobDirectory = resolve(
+	process.env.PI_JSON_VIEW_DIR ?? join(tmpdir(), 'pi-json-view'),
+)
 let blobs: JsonBlob[] = []
 let hasLoaded = false
 
@@ -28,87 +45,130 @@ function indexPath(): string {
 	return join(blobDirectory, 'index.json')
 }
 
-/** Réhydrate l'historique depuis le disque : ctx.reload() réimporte ce module à zéro. */
+function blobFromEntry(entry: JsonBlobIndexEntry): JsonBlob {
+	const path = join(blobDirectory, `${entry.hash}.json`)
+	return { ...entry, path, url: pathToFileURL(path).href }
+}
+
+function isIndexEntry(
+	entryCandidate: unknown,
+): entryCandidate is JsonBlobIndexEntry {
+	if (typeof entryCandidate !== 'object' || entryCandidate === null)
+		return false
+	if (!('hash' in entryCandidate) || !('bytes' in entryCandidate))
+		return false
+	return (
+		typeof entryCandidate.hash === 'string' &&
+		HASH_PATTERN.test(entryCandidate.hash) &&
+		typeof entryCandidate.bytes === 'number' &&
+		Number.isSafeInteger(entryCandidate.bytes) &&
+		entryCandidate.bytes > 0
+	)
+}
+
+function readIndex(): JsonBlob[] {
+	const parsed: unknown = JSON.parse(readFileSync(indexPath(), 'utf8'))
+	if (!Array.isArray(parsed)) return []
+	return parsed
+		.filter(isIndexEntry)
+		.slice(-STORE.MAX_BLOBS)
+		.map(blobFromEntry)
+		.filter(blob => existsSync(blob.path))
+}
+
 function ensureLoaded(): void {
 	if (hasLoaded) return
 	hasLoaded = true
 	try {
-		const raw: unknown = JSON.parse(readFileSync(indexPath(), 'utf8'))
-		if (Array.isArray(raw)) {
-			blobs = raw.filter(
-				(entry): entry is JsonBlob =>
-					typeof entry?.hash === 'string' &&
-					typeof entry?.path === 'string' &&
-					typeof entry?.url === 'string',
-			)
-		}
+		blobs = readIndex()
 	} catch {
 		blobs = []
 	}
 }
 
-function saveIndex(): void {
+function privateWrite(path: string, content: string): void {
+	writeFileSync(path, content, { encoding: 'utf8', mode: STORE.FILE_MODE })
+	chmodSync(path, STORE.FILE_MODE)
+}
+
+function removeFile(path: string): void {
 	try {
-		writeFileSync(indexPath(), JSON.stringify(blobs), 'utf8')
+		rmSync(path, { force: true })
 	} catch {
-		// L'historique est un confort : une écriture ratée ne doit rien casser.
+		// Cleanup is best effort on the transcript rendering path.
 	}
 }
 
-/** Change le répertoire de persistance ; l'historique sera réhydraté depuis ce répertoire. */
+function saveIndex(): void {
+	const temporaryPath = `${indexPath()}.${process.pid}.tmp`
+	try {
+		mkdirSync(blobDirectory, {
+			recursive: true,
+			mode: STORE.DIRECTORY_MODE,
+		})
+		chmodSync(blobDirectory, STORE.DIRECTORY_MODE)
+		const entries = blobs.map(({ hash, bytes }) => ({ hash, bytes }))
+		privateWrite(temporaryPath, JSON.stringify(entries))
+		renameSync(temporaryPath, indexPath())
+	} catch {
+		removeFile(temporaryPath)
+	}
+}
+
+function removeEvictedFiles(evictedBlobs: JsonBlob[]): void {
+	for (const blob of evictedBlobs) removeFile(blob.path)
+}
+
+function rememberBlob(blob: JsonBlob): void {
+	const nextBlobs = [...blobs, blob]
+	const firstRetainedIndex = Math.max(0, nextBlobs.length - STORE.MAX_BLOBS)
+	removeEvictedFiles(nextBlobs.slice(0, firstRetainedIndex))
+	blobs = nextBlobs.slice(firstRetainedIndex)
+	saveIndex()
+}
+
 export function setBlobDir(directory: string): void {
-	blobDirectory = directory
+	blobDirectory = resolve(directory)
 	blobs = []
 	hasLoaded = false
 }
 
-/** Blobs dans l'ordre d'apparition (le plus récent en dernier). */
 export function recentBlobs(): JsonBlob[] {
 	ensureLoaded()
 	return [...blobs]
 }
 
-/** Blob correspondant au n-ième JSON le plus récent (1 = dernier). */
 export function blobByRecency(recency: number): JsonBlob | undefined {
 	if (recency < 1) return undefined
 	ensureLoaded()
-	return blobs[blobs.length - recency]
+	return blobs.at(-recency)
 }
 
-/** Contenu pretty du blob, relu depuis le fichier persisté. */
 export function readBlob(blob: JsonBlob): string {
 	return readFileSync(blob.path, 'utf8').replace(/\n$/, '')
 }
 
-function fileUrl(path: string): string {
-	return `file://${encodeURI(path)}`
+function persistPrettyJson(pretty: string, hash: string): JsonBlob {
+	mkdirSync(blobDirectory, { recursive: true, mode: STORE.DIRECTORY_MODE })
+	chmodSync(blobDirectory, STORE.DIRECTORY_MODE)
+	const blob = blobFromEntry({ hash, bytes: Buffer.byteLength(pretty) })
+	if (existsSync(blob.path)) chmodSync(blob.path, STORE.FILE_MODE)
+	else privateWrite(blob.path, `${pretty}\n`)
+	return blob
 }
 
-/**
- * Persiste le JSON pretty-printé dans un fichier dérivé de son hash et mémorise le blob.
- * Ne lève jamais : le transformateur est un chemin d'affichage.
- */
-export function persistJson(raw: string, parsed: JsonValue): string | undefined {
-	void raw
+export function persistJson(parsed: JsonValue): string | undefined {
 	ensureLoaded()
 	try {
 		const pretty = prettyJson(parsed)
-		const hash = createHash('sha256').update(pretty).digest('hex').slice(0, 12)
+		const hash = createHash('sha256')
+			.update(pretty)
+			.digest('hex')
+			.slice(0, STORE.HASH_LENGTH)
 		const knownBlob = blobs.find(blob => blob.hash === hash)
-		if (knownBlob) return knownBlob.url
-
-		mkdirSync(blobDirectory, { recursive: true })
-		const path = join(blobDirectory, `${hash}.json`)
-		if (!existsSync(path)) writeFileSync(path, `${pretty}\n`, 'utf8')
-		const blob: JsonBlob = {
-			hash,
-			path,
-			url: fileUrl(path),
-			bytes: Buffer.byteLength(pretty),
-		}
-		blobs.push(blob)
-		if (blobs.length > MAX_BLOBS) blobs.shift()
-		saveIndex()
+		if (knownBlob && existsSync(knownBlob.path)) return knownBlob.url
+		const blob = persistPrettyJson(pretty, hash)
+		if (!knownBlob) rememberBlob(blob)
 		return blob.url
 	} catch {
 		return undefined

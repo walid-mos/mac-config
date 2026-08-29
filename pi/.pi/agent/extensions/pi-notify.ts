@@ -77,7 +77,7 @@ function showNotification(title: string, message: string): void {
       .unref?.();
     spawn(
       "/usr/bin/open",
-      ["-n", "/Applications/Pi.app", "--args", ...common, "-pane", PANE_ID!, "-socket", SOCKET!, "-timeout", "90"],
+      ["-n", "/Applications/Pi.app", "--args", ...common, "-pane", PANE_ID!, "-socket", SOCKET!],
       { detached: true, stdio: "ignore" },
     ).unref?.();
     return;

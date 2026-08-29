@@ -12,8 +12,8 @@
 // - avoir un cycle de vie NSApplication complet (`app.run()`) : sans ça,
 //   l'app n'est jamais « active », pas de bannière (willPresent ignoré) et la
 //   notification tombe directement dans la liste du centre ;
-// - rester résident jusqu'au clic : c'est lui qui exécute l'action, plus de
-//   loterie de relaunch.
+// - rester résident jusqu'au clic ou à la fermeture explicite : c'est lui qui
+//   exécute l'action, sans expiration qui casserait les clics tardifs.
 //
 // Au clic : activation de Ghostty puis
 //   HERDR_SOCKET_PATH=<socket> herdr pane focus --direction up --pane <pane>
@@ -21,7 +21,7 @@
 // herdr et le CLI chercherait son socket dans $TMPDIR/herdr).
 //
 // Usage : open -a Pi --args -title T [-subtitle S] [-message M]
-//                -pane ID -socket PATH [-timeout S]
+//                -pane ID -socket PATH
 // Erreurs : exit 1-3, silencieuses (best-effort par contrat).
 
 import AppKit
@@ -31,7 +31,6 @@ final class Handler: NSObject, NSApplicationDelegate, UNUserNotificationCenterDe
     var pane = ""
     var socket = ""
     var handled = false
-    var timeoutTimer: Timer?
     var debugEnabled = false
 
     func debug(_ message: String) {
@@ -56,7 +55,6 @@ final class Handler: NSObject, NSApplicationDelegate, UNUserNotificationCenterDe
         }
         self.pane = pane
         self.socket = socket
-        let timeout = TimeInterval(arg("-timeout") ?? "90") ?? 90
         let title = arg("-title") ?? "Pi"
         let subtitle = arg("-subtitle")
         let message = arg("-message") ?? ""
@@ -68,6 +66,7 @@ final class Handler: NSObject, NSApplicationDelegate, UNUserNotificationCenterDe
         }
         content.body = message
         content.threadIdentifier = "pi-\(pane)"
+        content.categoryIdentifier = "pi-notification"
         // Volontairement SILENCIEUX : le son est joué par herdr ([ui.sound])
         // pour le même événement, partout et exactement une fois — remettre un
         // son ici recréerait la double sonnerie hors de Ghostty.
@@ -78,6 +77,14 @@ final class Handler: NSObject, NSApplicationDelegate, UNUserNotificationCenterDe
 
         let center = UNUserNotificationCenter.current()
         center.delegate = self
+        center.setNotificationCategories([
+            UNNotificationCategory(
+                identifier: "pi-notification",
+                actions: [],
+                intentIdentifiers: [],
+                options: [.customDismissAction]
+            )
+        ])
         center.requestAuthorization(options: [.alert]) { [weak self] granted, error in
             self?.debug("requestAuthorization granted=\(granted) error=\(String(describing: error))")
             guard granted else {
@@ -88,17 +95,11 @@ final class Handler: NSObject, NSApplicationDelegate, UNUserNotificationCenterDe
                 self?.debug("add() error=\(String(describing: addError))")
             }
         }
-
-        // Résident jusqu'au clic (action) ou jusqu'à expiration (la
-        // notification est considérée vue, cf. toast in-app herdr).
-        timeoutTimer = Timer.scheduledTimer(withTimeInterval: timeout, repeats: false) {
-            [weak self] _ in self?.debug("timeout expiré (\(String(describing: self?.timeoutTimer)))"); self?.finish()
-        }
     }
 
     func finish() {
         guard !handled else { return }
-        debug("finish (timeout ou refus)")
+        debug("finish (refus ou fermeture)")
         handled = true
         NSApp.terminate(nil)
     }
@@ -120,8 +121,13 @@ final class Handler: NSObject, NSApplicationDelegate, UNUserNotificationCenterDe
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         debug("didReceive action=\(response.actionIdentifier)")
-        guard !handled, response.actionIdentifier == UNNotificationDefaultActionIdentifier else {
+        guard !handled else {
             completionHandler()
+            return
+        }
+        guard response.actionIdentifier == UNNotificationDefaultActionIdentifier else {
+            completionHandler()
+            DispatchQueue.main.async { [weak self] in self?.finish() }
             return
         }
         handled = true

@@ -68,10 +68,9 @@ final class Handler: NSObject, NSApplicationDelegate, UNUserNotificationCenterDe
         }
         content.body = message
         content.threadIdentifier = "pi-\(pane)"
-        // Son : c'est la notification desktop qui porte l'alerte quand
-        // l'utilisateur est hors de Ghostty (le son herdr est coupé, cf.
-        // herdr/.config/herdr/config.toml [ui.sound]).
-        content.sound = UNNotificationSound.default
+        // Volontairement SILENCIEUX : le son est joué par herdr ([ui.sound])
+        // pour le même événement, partout et exactement une fois — remettre un
+        // son ici recréerait la double sonnerie hors de Ghostty.
 
         // Identifiant stable par pane : une nouvelle notification remplace la
         // précédente (équivalent de -group chez terminal-notifier).

@@ -3,12 +3,18 @@ onboarding = false
 [ui.toast]
 # herdr = toasts in-app uniquement (surviennent par-dessus n'importe quel
 # workspace). Les notifications desktop du pane pi sont émises par
-# l'extension pi ~/.pi/agent/extensions/pi-notify.ts via terminal-notifier :
-# clic → activation de Ghostty + focus direct de la bonne pane herdr.
+# l'extension pi ~/.pi/agent/extensions/pi-notify.ts via le poster
+# /Applications/Pi.app : clic → activation de Ghostty + focus direct de la
+# bonne pane herdr.
 # "system" resterait possible (le PATH Ghostty fournit terminal-notifier,
 # voir ghostty/globals.conf) mais le clic ne fait qu'activer Ghostty, sans
 # cibler la pane — d'où la délégation à pi-notify.
 delivery = "herdr"
+
+# Toasts en haut à droite : plus visibles qu'en bas-droite (hors du coin du
+# prompt).
+[ui.toast.herdr]
+position = "top-right"
 
 [theme]
 name = "catppuccin-latte"
@@ -101,8 +107,9 @@ key = "alt+l"
 type = "plugin_action"
 command = "herdr-nvim-nav.right"
 
-# Son : porté par la notification desktop de pi-notify (UNNotificationSound),
-# émise précisément quand l'utilisateur est hors de Ghostty. Couper ici évite
-# la double sonnerie (herdr + notification) au même instant.
+# Son : joué par herdr pour tout changement d'état d'un workspace arrière
+# (unseen). La notification desktop de pi-notify est volontairement SILENCIEUSE
+# : c'est le son herdr ci-dessous qui porte l'alerte, partout, exactement une
+# fois (sinon double sonnerie décalée quand l'utilisateur est hors de Ghostty).
 [ui.sound]
-enabled = false
+enabled = true

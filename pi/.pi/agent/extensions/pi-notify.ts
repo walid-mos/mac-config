@@ -71,15 +71,21 @@ function showNotification(title: string, message: string): void {
     // route la réponse du clic vers l'instance résidente) — un exec direct du
     // binaire ne suffit pas. -n force une nouvelle instance : sans lui, une
     // registration LS fantôme (après kill d'une instance) ferait échouer le
-    // open silencieusement. Le pkill préalable évite le cumul d'instances
-    // résidentes du même pane.
-    spawn("pkill", ["-f", `MacOS/pi-notify .*-pane ${PANE_ID}( |$)`], { stdio: "ignore" })
-      .unref?.();
-    spawn(
-      "/usr/bin/open",
-      ["-n", "/Applications/Pi.app", "--args", ...common, "-pane", PANE_ID!, "-socket", SOCKET!],
-      { detached: true, stdio: "ignore" },
-    ).unref?.();
+    // open silencieusement. On attend la fin du pkill avant le lancement : en
+    // parallèle, il pouvait tuer par course la nouvelle instance. La prochaine
+    // notification de la pane remplace ainsi proprement la précédente.
+    execFile(
+      "/usr/bin/pkill",
+      ["-f", `MacOS/pi-notify .*-pane ${PANE_ID}( |$)`],
+      { timeout: 750 },
+      () => {
+        spawn(
+          "/usr/bin/open",
+          ["-n", "/Applications/Pi.app", "--args", ...common, "-pane", PANE_ID!, "-socket", SOCKET!],
+          { detached: true, stdio: "ignore" },
+        ).unref?.();
+      },
+    );
     return;
   }
   spawn(

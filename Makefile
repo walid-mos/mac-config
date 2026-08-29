@@ -30,7 +30,7 @@ NOFOLD := colima docker gh git herdr hermes homebrew languages rclone rtk
 
 # Hooks post-install chaînés par `make install` (cible <nom>-post ; rust et 
 # n'ont pas de package Stow — rustup gère ~/.rustup/~/.cargo).
-POSTS :=  dev-dirs gh herdr hermes nvim pi rtk rust
+POSTS :=  dev-dirs gh herdr hermes nvim pi rtk rust notifier
 
 
 # Obsidian : le vault vit dans iCloud, seule la config .obsidian est stowée
@@ -41,7 +41,7 @@ POSTS :=  dev-dirs gh herdr hermes nvim pi rtk rust
 OBSIDIAN_VAULT_DIR := $(HOME)/Library/Mobile Documents/iCloud~md~obsidian/Documents/Brain
 OBSIDIAN_VAULT := $(OBSIDIAN_VAULT_DIR)/.obsidian
 
-.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs pi-update pi-test  herdr-pi-smoke hermes-dirs hermes-gemma obsidian obsidian-save proxy-reset dev-dirs git-filters
+.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs pi-update pi-test  notifier-app herdr-pi-smoke hermes-dirs hermes-gemma obsidian obsidian-save proxy-reset dev-dirs git-filters
 
 help:
 	@echo "Targets:"
@@ -138,6 +138,29 @@ gh-post:
 # dans config.toml : sans lui, alt+hjkl n'a aucun effet côté herdr. Le pendant
 # nvim du plugin est géré par lazy (lua/plugins/herdr-nav.lua), installé au 1er
 # lancement de nvim — rien à faire ici pour ce versant.
+# Notifications desktop de pi-notify : macOS n'affiche une bannière que pour
+# un .app registré — le binaire nu de la formula brew est livré mais avalé.
+# On copie donc le bundle terminal-notifier.app vers /Applications/Pi.app
+# (nom « Pi », icône Ghostty, bundle id app.pi.notifier) et on le registre
+# dans LaunchServices. Idempotent : reconstruit seulement si absent.
+notifier-app:
+	@if [ -x "/opt/homebrew/opt/terminal-notifier/terminal-notifier.app/Contents/MacOS/terminal-notifier" ]; then \
+		if [ ! -x /Applications/Pi.app/Contents/MacOS/terminal-notifier ]; then \
+			rm -rf /Applications/Pi.app; \
+			cp -R "/opt/homebrew/opt/terminal-notifier/terminal-notifier.app" /Applications/Pi.app; \
+			if [ -f /Applications/Ghostty.app/Contents/Resources/Ghostty.icns ]; then \
+				cp /Applications/Ghostty.app/Contents/Resources/Ghostty.icns /Applications/Pi.app/Contents/Resources/Pi.icns; \
+				/usr/libexec/PlistBuddy -c "Set :CFBundleIconFile Pi" /Applications/Pi.app/Contents/Info.plist; \
+			fi; \
+			/usr/libexec/PlistBuddy -c "Set :CFBundleName Pi" \
+				-c "Set :CFBundleIdentifier app.pi.notifier" /Applications/Pi.app/Contents/Info.plist; \
+			plutil -insert CFBundleDisplayName -string "Pi" /Applications/Pi.app/Contents/Info.plist 2>/dev/null \
+				|| /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Pi" /Applications/Pi.app/Contents/Info.plist; \
+			/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f /Applications/Pi.app; \
+			echo "Pi.app prête : /Applications/Pi.app (active Bannières dans Réglages › Notifications si besoin)"; \
+		fi; \
+	else echo "terminal-notifier absent (brew bundle) — Pi.app non construite"; fi
+
 herdr-post:
 	@if ! command -v herdr >/dev/null; then \
 		if command -v brew >/dev/null; then brew install herdr; \

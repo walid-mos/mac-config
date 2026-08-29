@@ -18,14 +18,22 @@
 // Best-effort absolu : aucune erreur ne doit remonter dans le cycle de Pi.
 
 import { execFile, spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import path from "node:path";
 
-const NOTIFIER = "/opt/homebrew/bin/terminal-notifier";
+// Notificateur prioritaire : bundle /Applications/Pi.app (copie signée par la
+// cible Makefile `notifier-app` du bundle brew terminal-notifier, icône
+// Ghostty, bundle id app.pi.notifier). Un binaire hors bundle est livré mais
+// jamais affiché : macOS exige un .app registré pour lever une bannière.
+const NOTIFIER = [
+  "/Applications/Pi.app/Contents/MacOS/terminal-notifier",
+  "/opt/homebrew/bin/terminal-notifier",
+].find((candidate) => existsSync(candidate));
 const HERDR = "/opt/homebrew/bin/herdr";
 const PANE_ID = process.env.HERDR_PANE_ID;
 
 function enabled(): boolean {
-  return process.env.HERDR_ENV === "1" && !!PANE_ID;
+  return process.env.HERDR_ENV === "1" && !!PANE_ID && !!NOTIFIER;
 }
 
 function ghosttyFrontmost(): Promise<boolean> {

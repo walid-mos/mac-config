@@ -1,7 +1,14 @@
 onboarding = false
 
 [ui.toast]
-delivery = "system"
+# herdr = toasts in-app uniquement (surviennent par-dessus n'importe quel
+# workspace). Les notifications desktop du pane pi sont émises par
+# l'extension pi ~/.pi/agent/extensions/pi-notify.ts via terminal-notifier :
+# clic → activation de Ghostty + focus direct de la bonne pane herdr.
+# "system" resterait possible (le PATH Ghostty fournit terminal-notifier,
+# voir ghostty/globals.conf) mais le clic ne fait qu'activer Ghostty, sans
+# cibler la pane — d'où la délégation à pi-notify.
+delivery = "herdr"
 
 [theme]
 name = "catppuccin-latte"

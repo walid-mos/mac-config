@@ -68,3 +68,15 @@ et successeurs) : `compact-tools`, `edit-view`, `background`, `ui/frame`, `foote
   `tests/working-loader.test.ts`.
 - Tests : node --test working-loader 12/12 ; esbuild index.
 - Suite : —
+
+### 2026-08-30 — incident : /reload pendant une fenêtre d'édition incohérente
+- Fait : diagnostic du « loader crashé » chez l'utilisateur — en réalité, le
+  /reload est tombé sur `words.ts` pendant qu'il contenait un double import
+  (fenêtre de quelques minutes entre deux edits, corrigée juste après) ;
+  l'extension échouait au chargement, d'où loader et marqueur absents.
+- Fichiers : sans changement de code — repro avec le vrai thème pi
+  (`initTheme` + surfaceRegistry) : `✻ mot...` + `✽ raisonnement` rendus à
+  toutes les largeurs.
+- Tests : repro node (wl-real3) au vert ; suite working-loader 12/12.
+- Suite : leçon — ne jamais /reload pendant une série d'edits en cours ;
+  attendre le vert de la gate.

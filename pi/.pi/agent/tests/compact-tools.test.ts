@@ -203,6 +203,20 @@ test("renderResult collapsé met à jour l'état et n'affiche rien", () => {
 	assert.equal(line, "✗ read · x · 2 lignes");
 });
 
+test("renderResult prend l'état d'erreur depuis le contexte Pi", () => {
+	const [definition] = createCompactOverrides({ createBuiltin: fakeNative });
+	const context = fakeContext({ args: { path: "x" }, isError: true });
+	definition.renderCall!({ path: "x" }, theme, context);
+	definition.renderResult!(
+		{ content: [{ type: "text", text: "lecture impossible" }] },
+		{ expanded: false },
+		theme,
+		context,
+	);
+	assert.equal(context.state.status, "error");
+	assert.equal(context.state.summary, "1 lignes");
+});
+
 test("renderResult étendu délègue au renderer natif", () => {
 	const [definition] = createCompactOverrides({ createBuiltin: fakeNative });
 	const context = fakeContext({ args: { command: "ls" }, cwd: "/proj", expanded: true });

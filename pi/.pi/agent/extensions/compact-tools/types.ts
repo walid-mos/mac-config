@@ -47,6 +47,7 @@ export interface CompactRenderContext {
 	cwd?: string;
 	executionStarted?: boolean;
 	expanded?: boolean;
+	isError?: boolean;
 	lastComponent?: CompactComponent | undefined;
 }
 

@@ -147,3 +147,12 @@ et successeurs) : `compact-tools`, `edit-view`, `background`, `ui/frame`, `foote
 - Fichiers : hors extensions (`Makefile`), `JOURNAL.md`.
 - Tests : `make pi-ui-test` au vert, 58/58.
 - Suite : validation visuelle dans un vrai transcript Pi.
+
+### 2026-08-30 — erreurs de tool lues depuis le contexte renderer
+- Fait : le renderer compact normalise `context.isError`, source réellement
+  fournie par `ToolExecutionComponent`, dans le résultat avant de choisir
+  glyphe, résumé et corps ; edit/write n’affichent donc jamais un cadre de
+  succès lorsqu’une exécution a échoué.
+- Fichiers : `compact-tools/{renderer,types}.ts`, test compact-tools.
+- Tests : renderers compact/edit/write 43/43, esbuild compact-tools/write-view.
+- Suite : validation visuelle dans un vrai transcript Pi.

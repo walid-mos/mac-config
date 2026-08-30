@@ -125,14 +125,16 @@ export function createCompactRenderers(
 		},
 		renderResult(result, options, theme, context) {
 			const state = context.state;
-			state.status = result.isError ? "error" : "ok";
+			const normalizedResult =
+				context.isError === undefined ? result : { ...result, isError: context.isError };
+			state.status = normalizedResult.isError ? "error" : "ok";
 			if (state.startedAt !== undefined && !options.isPartial && state.endedAt === undefined) {
 				state.endedAt = Date.now();
 			}
-			state.summary = summarizeResult(tool, context.args as Record<string, unknown>, result);
+			state.summary = summarizeResult(tool, context.args as Record<string, unknown>, normalizedResult);
 			if (!options.expanded) {
 				return rendererOptions.collapsedBody
-					? rendererOptions.collapsedBody(result, options, theme, context)
+					? rendererOptions.collapsedBody(normalizedResult, options, theme, context)
 					: emptyComponent();
 			}
 			const native = resolveNative?.(context.cwd);

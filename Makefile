@@ -311,9 +311,6 @@ pi-post:
 		pi update --all; \
 		echo "pi prêt et à jour — package web-access — \`pi\` puis /login pour l'auth"; \
 	else echo "pi non installé — étape ignorée"; fi
-	@python3 scripts/pi-patch-tool-execution.py
-	@python3 scripts/pi-patch-assistant-thinking.py
-	@python3 scripts/pi-patch-prompt-history.py
 
 pi-update:  pi-post
 

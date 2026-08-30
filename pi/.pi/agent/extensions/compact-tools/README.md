@@ -11,11 +11,9 @@ son propre cadre (extension edit-view).
   moment de l'appel via `ctx.cwd`.
 - La définition enregistrée étale la définition native : schéma, label,
   `promptSnippet` et `promptGuidelines` sont conservés (non hérités par pi).
-- `renderShell: "self"` : la Box par défaut (fond/padding) ne s'applique pas ;
-  le patch `scripts/pi-patch-tool-execution.py` laisse les tools self-rendered
-  posséder leur propre espacement (aucun spacer imposé), et
-  `scripts/pi-patch-assistant-thinking.py` ajoute la ligne vide entre le texte
-  de l'assistant et les tool rows qui suivent.
+- `renderShell: "self"` : la Box par défaut (fond/padding) ne s'applique pas.
+  L'extension ne modifie aucun artefact généré du runtime Pi ; Pi reste
+  responsable de l'espacement externe de chaque composant de tool.
 - Option `hideRowOnSuccess` : masque la row une fois le succès établi quand le
   corps du résultat parle de lui-même (utilisé par edit-view) ; option
   `collapsedBody` : corps collapsé riche (le cadre de diff d'edit-view).

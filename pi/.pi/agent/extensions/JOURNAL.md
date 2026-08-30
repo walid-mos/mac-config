@@ -99,3 +99,13 @@ et successeurs) : `compact-tools`, `edit-view`, `background`, `ui/frame`, `foote
   (shots 012–021 et 035–043), loader absent uniquement lorsque l'agent est
   idle ; `make pi-test` complet au vert.
 - Suite : —
+
+### 2026-08-30 — retrait des patchers d’artefacts générés
+- Fait : suppression des trois patchers qui réécrivaient les distributions
+  installées de Pi (`tool-execution`, thinking assistant, historique prompt),
+  de leurs tests et de leur exécution automatique par `pi-post` ; les commits
+  de branche dédiés à ces patchers ont été retirés de l’historique.
+- Fichiers : hors extensions (`scripts/pi-patch-*.py`, tests associés, `Makefile`).
+- Tests : `make pi-test` complet au vert.
+- Suite : remplacer l’espacement compact par une composition d’extension et
+  harmoniser le rendu de `write` avec `edit`.

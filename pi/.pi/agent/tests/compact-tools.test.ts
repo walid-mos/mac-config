@@ -3,6 +3,7 @@ import test from "node:test";
 import { compactRowLine } from "../extensions/compact-tools/line.ts";
 import { createCompactOverrides } from "../extensions/compact-tools/overrides.ts";
 import { createCompactRenderers } from "../extensions/compact-tools/renderer.ts";
+import { CompactRowStack, compactRowStack } from "../extensions/compact-tools/stack.ts";
 import { COMPACT_TOOLS, baseName, countTextLines, subjectFor, summarizeResult, toSingleLine } from "../extensions/compact-tools/summary.ts";
 import type {
 	CompactComponent,
@@ -267,4 +268,86 @@ test("createCompactOverrides ignore les tools natifs inconnus", () => {
 		tools: ["bash", "nope"],
 	});
 	assert.equal(overrides.length, 0);
+});
+
+test("CompactRowStack regroupe les calls compacts consécutifs sans spacer intermédiaire", () => {
+	const stack = new CompactRowStack();
+	stack.rebuild([
+		{ role: "user", content: "test" },
+		{ role: "assistant", content: [{ type: "toolCall", id: "r1", name: "read" }] },
+		{ role: "toolResult" },
+		{ role: "assistant", content: [{ type: "toolCall", id: "r2", name: "read" }] },
+		{ role: "assistant", content: [{ type: "toolCall", id: "r3", name: "grep" }] },
+	]);
+	const view = (tool: string, subject: string) => ({
+		tool,
+		subject,
+		state: { status: "ok" as const },
+		theme,
+	});
+	stack.attach("r1", view("read", "a.ts"), () => {});
+	stack.attach("r2", view("read", "b.ts"), () => {});
+	stack.attach("r3", view("grep", '"needle"'), () => {});
+	assert.deepEqual(stack.render("r1", view("read", "a.ts"), 80), []);
+	assert.deepEqual(stack.render("r2", view("read", "b.ts"), 80), []);
+	assert.deepEqual(stack.render("r3", view("grep", '"needle"'), 80), [
+		"  ✓ read · a.ts",
+		" ✓ read · b.ts",
+		'✓ grep · "needle"',
+	]);
+});
+
+test("CompactRowStack coupe la pile sur texte visible, user et tool riche", () => {
+	const stack = new CompactRowStack();
+	stack.rebuild([
+		{ role: "assistant", content: [{ type: "toolCall", id: "r1", name: "read" }] },
+		{ role: "assistant", content: [{ type: "text", text: "progression" }, { type: "toolCall", id: "r2", name: "read" }] },
+		{ role: "assistant", content: [{ type: "toolCall", id: "w1", name: "write" }] },
+		{ role: "assistant", content: [{ type: "toolCall", id: "r3", name: "read" }] },
+		{ role: "user", content: "suite" },
+		{ role: "assistant", content: [{ type: "toolCall", id: "r4", name: "read" }] },
+	]);
+	assert.deepEqual(stack.groups(), [["r1"], ["r2"], ["r3"], ["r4"]]);
+});
+
+test("CompactRowStack déduplique les message_update streamés", () => {
+	const stack = new CompactRowStack();
+	stack.beginMessage({ role: "assistant", content: [{ type: "text", text: "go" }] });
+	stack.updateMessage({
+		role: "assistant",
+		content: [{ type: "text", text: "go" }, { type: "toolCall", id: "r1", name: "read" }],
+	});
+	stack.updateMessage({
+		role: "assistant",
+		content: [
+			{ type: "text", text: "go" },
+			{ type: "toolCall", id: "r1", name: "read" },
+			{ type: "toolCall", id: "r2", name: "read" },
+		],
+	});
+	stack.endMessage({
+		role: "assistant",
+		content: [
+			{ type: "text", text: "go" },
+			{ type: "toolCall", id: "r1", name: "read" },
+			{ type: "toolCall", id: "r2", name: "read" },
+		],
+	});
+	assert.deepEqual(stack.groups(), [["r1", "r2"]]);
+});
+
+test("les renderers délèguent la pile au dernier composant", () => {
+	compactRowStack.reset();
+	compactRowStack.rebuild([
+		{ role: "assistant", content: [{ type: "toolCall", id: "r1", name: "read" }] },
+		{ role: "assistant", content: [{ type: "toolCall", id: "r2", name: "read" }] },
+	]);
+	const [definition] = createCompactOverrides({ createBuiltin: fakeNative });
+	const firstContext = fakeContext({ toolCallId: "r1", args: { path: "/a.ts" } });
+	const secondContext = fakeContext({ toolCallId: "r2", args: { path: "/b.ts" } });
+	const first = definition.renderCall!({ path: "/a.ts" }, theme, firstContext);
+	const second = definition.renderCall!({ path: "/b.ts" }, theme, secondContext);
+	assert.deepEqual(first.render(80), []);
+	assert.deepEqual(second.render(80), [" ● read · a.ts", "● read · b.ts"]);
+	compactRowStack.reset();
 });

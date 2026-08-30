@@ -109,3 +109,14 @@ et successeurs) : `compact-tools`, `edit-view`, `background`, `ui/frame`, `foote
 - Tests : `make pi-test` complet au vert.
 - Suite : remplacer l’espacement compact par une composition d’extension et
   harmoniser le rendu de `write` avec `edit`.
+
+### 2026-08-30 — pile compacte sans modification du runtime Pi
+- Fait : les calls consécutifs `read`/`grep`/`find`/`ls`/`bash`/`background`
+  partagent désormais un composant visible unique ; les composants précédents
+  rendent zéro ligne, la dernière row compose la pile avec retrait et fondu
+  `dim`/`muted`, supprimant les spacers intermédiaires imposés par Pi.
+- Fichiers : `compact-tools/{stack,lifecycle,line,renderer,types}.ts`,
+  `compact-tools.ts`, `compact-tools/README.md`, test compact-tools.
+- Tests : compact-tools 25/25, esbuild de l’entrypoint, `make pi-test` complet
+  au vert.
+- Suite : harmoniser le rendu de `write` avec `edit`.

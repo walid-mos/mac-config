@@ -42,6 +42,8 @@ export interface CompactToolResult {
 export interface CompactRenderContext {
 	args?: unknown;
 	state: CompactRowState & Record<string, unknown>;
+	toolCallId?: string;
+	invalidate?: () => void;
 	cwd?: string;
 	executionStarted?: boolean;
 	expanded?: boolean;

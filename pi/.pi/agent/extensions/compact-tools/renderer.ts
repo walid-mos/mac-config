@@ -5,6 +5,7 @@
  */
 
 import { compactRowLine, type CompactRowView } from "./line.ts";
+import { compactRowStack } from "./stack.ts";
 import { subjectFor, summarizeResult } from "./summary.ts";
 import type {
 	CompactComponent,
@@ -34,6 +35,7 @@ export interface CompactRenderers {
 interface RowComponent extends CompactComponent {
 	view: CompactRowView | null;
 	hideOnSuccess: boolean;
+	toolCallId?: string;
 }
 
 function makeRowComponent(hideOnSuccess: boolean): RowComponent {
@@ -45,7 +47,9 @@ function makeRowComponent(hideOnSuccess: boolean): RowComponent {
 			// Tools whose success carries a richer body (edit-view frame) hide
 			// their row once settled, unless the native expanded view is shown.
 			if (this.hideOnSuccess && this.view.state.status === "ok" && !this.view.expanded) return [];
-			return [compactRowLine(this.view, width, this.view.theme)];
+			return this.toolCallId
+				? compactRowStack.render(this.toolCallId, this.view, width)
+				: [compactRowLine(this.view, width, this.view.theme)];
 		},
 		invalidate(): void {},
 	};
@@ -91,6 +95,10 @@ export function createCompactRenderers(
 				theme,
 				expanded: context.expanded === true,
 			};
+			if (context.toolCallId) {
+				component.toolCallId = context.toolCallId;
+				compactRowStack.attach(context.toolCallId, component.view, context.invalidate ?? (() => {}));
+			}
 			return component;
 		},
 		renderResult(result, options, theme, context) {

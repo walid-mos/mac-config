@@ -120,3 +120,12 @@ et successeurs) : `compact-tools`, `edit-view`, `background`, `ui/frame`, `foote
 - Tests : compact-tools 25/25, esbuild de l’entrypoint, `make pi-test` complet
   au vert.
 - Suite : harmoniser le rendu de `write` avec `edit`.
+
+### 2026-08-30 — extraction du cadre de mutation partagé
+- Fait : la composition visuelle du cadre `edit` (titre, rows de diff,
+  plafonnement, fondu et pied) devient une primitive `mutation-view` neutre,
+  sans changement de rendu, afin d’accueillir `write` sans duplication.
+- Fichiers : `mutation-view/frame.ts`, `edit-view/frame.ts`,
+  `edit-view/README.md`.
+- Tests : edit-view 10/10, esbuild de l’entrypoint edit-view.
+- Suite : brancher le renderer `write` sur cette primitive.

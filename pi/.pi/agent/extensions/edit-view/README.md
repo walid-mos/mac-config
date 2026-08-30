@@ -36,6 +36,8 @@ au lieu du diff natif pleine-page sur tout le fichier.
 - `body.ts` : corps collapsé (cadre ou vide sur erreur) — module sans import pi.
 - `component.ts` : composant du cadre, diffs calculés une fois puis assemblés
   par largeur de rendu.
-- `frame.ts` : parsing des args, composition pure des rows (titre, diffs,
+- `frame.ts` : parsing des args edit et adaptation vers le cadre de mutation
+  partagé `../mutation-view/frame.ts`.
+- `mutation-view/frame.ts` : composition pure partagée des rows (titre, diffs,
   séparateurs, plafond/fondu, pied).
 - `diff.ts` : diff ligne à ligne pur (LCS), aucun IO ni thème.

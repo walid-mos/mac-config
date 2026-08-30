@@ -1,4 +1,4 @@
-export const DEFAULT_ROTATION_INTERVAL_MS = 3000;
+export const DEFAULT_ROTATION_INTERVAL_MS = 4000;
 
 export type IntervalHandle = {
 	clear: () => void;

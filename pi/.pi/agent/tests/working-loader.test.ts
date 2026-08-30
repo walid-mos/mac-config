@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createWordRotation, type IntervalScheduler } from "../extensions/working-loader/rotation.ts";
+import {
+	createWordRotation,
+	DEFAULT_ROTATION_INTERVAL_MS,
+	type IntervalScheduler,
+} from "../extensions/working-loader/rotation.ts";
 import { createShuffleBag, type NonEmptyArray } from "../extensions/working-loader/shuffle-bag.ts";
 import { WORKING_WORDS } from "../extensions/working-loader/words.ts";
 import { surfaceRegistry, subscribeSurfaceChanges } from "../extensions/ui/surface.ts";
@@ -75,7 +79,6 @@ test("rotation fires immediately, then per tick, and start is idempotent", () =>
 	let ticks = 0;
 	const rotation = createWordRotation({
 		scheduler,
-		intervalMs: 3000,
 		nextWord: () => {
 			ticks += 1;
 		},
@@ -88,7 +91,8 @@ test("rotation fires immediately, then per tick, and start is idempotent", () =>
 
 	fireAll();
 	assert.equal(ticks, 2);
-	assert.equal(timers[0]?.delayMs, 3000);
+	assert.equal(DEFAULT_ROTATION_INTERVAL_MS, 4000);
+	assert.equal(timers[0]?.delayMs, DEFAULT_ROTATION_INTERVAL_MS);
 
 	rotation.stop();
 	assert.equal(timers[0]?.cleared, true);

@@ -11,7 +11,6 @@ import { createShuffleBag } from "./shuffle-bag.ts";
 import { WORKING_WORDS } from "./words.ts";
 
 const SURFACE_ID = "working-loader";
-const ROTATION_INTERVAL_MS = 3000;
 
 export default function workingLoader(pi: ExtensionAPI): void {
 	const bag = createShuffleBag(WORKING_WORDS);
@@ -36,7 +35,6 @@ export default function workingLoader(pi: ExtensionAPI): void {
 
 	const rotation = createWordRotation({
 		scheduler: defaultIntervalScheduler,
-		intervalMs: ROTATION_INTERVAL_MS,
 		nextWord: () => {
 			word = bag.next();
 			// Re-registering the same id overwrites the entry and notifies the

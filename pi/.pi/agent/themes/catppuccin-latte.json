@@ -28,7 +28,6 @@
 		"base": "#eff1f5",
 		"mantle": "#e6e9ef",
 		"crust": "#dce0e8",
-		"successBg": "#dfe9da",
 		"errorBg": "#f2d5dc"
 	},
 	"colors": {
@@ -51,7 +50,7 @@
 		"customMessageText": "",
 		"customMessageLabel": "mauve",
 		"toolPendingBg": "mantle",
-		"toolSuccessBg": "successBg",
+		"toolSuccessBg": "mantle",
 		"toolErrorBg": "errorBg",
 		"toolTitle": "text",
 		"toolOutput": "subtext1",

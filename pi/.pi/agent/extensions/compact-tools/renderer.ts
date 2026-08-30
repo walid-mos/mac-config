@@ -46,7 +46,7 @@ function makeRowComponent(hideOnSuccess: boolean): RowComponent {
 		hideOnSuccess,
 		render(width: number): string[] {
 			if (!this.view) return [];
-			// Tools whose success carries a richer body (edit-view frame) hide
+			// Tools whose success carries a richer body (mutation-view frame) hide
 			// their row once settled, unless the native expanded view is shown.
 			if (this.hideOnSuccess && this.view.state.status === "ok" && !this.view.expanded) return [];
 			return this.toolCallId
@@ -66,7 +66,7 @@ export interface CompactRendererOptions {
 	 * itself (collapsed view only; expanded keeps the row above the body). */
 	hideRowOnSuccess?: boolean;
 	/** Collapsed result body for tools whose success carries a richer view
-	 * (edit-view frame). Undefined keeps the bare row. */
+	 * (mutation-view frame). Undefined keeps the bare row. */
 	collapsedBody?: (
 		result: CompactToolResult,
 		options: { expanded?: boolean; isPartial?: boolean },

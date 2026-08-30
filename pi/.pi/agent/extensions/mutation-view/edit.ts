@@ -1,11 +1,14 @@
-import { mutationFrameRows, type FrameTheme, type MutationFrameComponent } from "../mutation-view/frame.ts";
-import type { DiffLine } from "./diff.ts";
+import type {
+	CompactComponent,
+	CompactRenderContext,
+	CompactTheme,
+	CompactToolResult,
+} from "../compact-tools/types.ts";
+import { diffLines, type DiffLine } from "./diff.ts";
+import { mutationFrameRows, type FrameTheme, type MutationFrameComponent } from "./frame.ts";
 
-export type { FrameTheme };
 export type EditFrameComponent = MutationFrameComponent;
 
-/** Accepts the native arg shapes: edits[] (possibly a JSON string) or the
- * legacy single oldText/newText pair. Undefined when nothing is parseable. */
 export function parseEditArgs(
 	args: Record<string, unknown> | undefined,
 ): { path: string; edits: Array<{ oldText: string; newText: string }> } | undefined {
@@ -60,4 +63,31 @@ export function editFrameRows(
 		width,
 		theme,
 	);
+}
+
+export function createEditFrameComponent(
+	path: string,
+	edits: ReadonlyArray<{ oldText: string; newText: string }>,
+	theme: FrameTheme,
+): EditFrameComponent {
+	let diffs: DiffLine[][] | undefined;
+	const compute = (): DiffLine[][] =>
+		(diffs ??= edits.map((edit) => diffLines(edit.oldText, edit.newText)));
+	return {
+		render(width: number): string[] {
+			return editFrameRows(path, edits, compute(), width, theme);
+		},
+		invalidate(): void {},
+	};
+}
+
+export function editCollapsedBody(
+	result: CompactToolResult,
+	_options: { expanded?: boolean; isPartial?: boolean },
+	theme: CompactTheme,
+	context: CompactRenderContext,
+): CompactComponent {
+	const parsed = parseEditArgs(context.args as Record<string, unknown> | undefined);
+	if (!parsed || result.isError) return { render: () => [], invalidate: () => {} };
+	return createEditFrameComponent(parsed.path, parsed.edits, theme);
 }

@@ -13,7 +13,7 @@ import {
 } from "../ui/frame.ts";
 import { terminalLineWidth, truncateTerminalLine } from "../ui/terminal-text.ts";
 import { JSON_COLOR } from "../json-view/json-colors.ts";
-import type { DiffLine } from "../edit-view/diff.ts";
+import type { DiffLine } from "./diff.ts";
 
 const PALETTE: FramePalette = {
 	border: JSON_COLOR.BORDER,

@@ -1,7 +1,7 @@
 /**
  * Shared rounded-frame primitives: labelled edges, padded rows, and the
  * cap + fade scaffolding for tall content. json-view (JSON blocks) and
- * edit-view (diff frames) build on them so every block shares the same
+ * mutation-view (file changes) build on them so every block shares the same
  * Catppuccin geometry. Colors are raw hex rendered with truecolor escapes.
  */
 

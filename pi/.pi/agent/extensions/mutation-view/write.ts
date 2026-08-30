@@ -1,7 +1,12 @@
-import { mutationFrameRows, type FrameTheme, type MutationFrameComponent } from "../mutation-view/frame.ts";
-import type { DiffLine } from "../edit-view/diff.ts";
+import type {
+	CompactComponent,
+	CompactRenderContext,
+	CompactTheme,
+	CompactToolResult,
+} from "../compact-tools/types.ts";
+import type { DiffLine } from "./diff.ts";
+import { mutationFrameRows, type FrameTheme, type MutationFrameComponent } from "./frame.ts";
 
-export type { FrameTheme };
 export type WriteFrameComponent = MutationFrameComponent;
 
 export interface ParsedWriteArgs {
@@ -37,4 +42,28 @@ export function writeFrameRows(path: string, content: string, width: number, the
 		width,
 		theme,
 	);
+}
+
+export function createWriteFrameComponent(
+	path: string,
+	content: string,
+	theme: FrameTheme,
+): WriteFrameComponent {
+	return {
+		render(width: number): string[] {
+			return writeFrameRows(path, content, width, theme);
+		},
+		invalidate(): void {},
+	};
+}
+
+export function writeCollapsedBody(
+	result: CompactToolResult,
+	_options: { expanded?: boolean; isPartial?: boolean },
+	theme: CompactTheme,
+	context: CompactRenderContext,
+): CompactComponent {
+	const parsed = parseWriteArgs(context.args as Record<string, unknown> | undefined);
+	if (!parsed || result.isError) return { render: () => [], invalidate: () => {} };
+	return createWriteFrameComponent(parsed.path, parsed.content, theme);
 }

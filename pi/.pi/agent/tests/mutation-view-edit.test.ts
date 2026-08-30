@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { diffLines } from "../extensions/edit-view/diff.ts";
-import { createEditFrameComponent } from "../extensions/edit-view/component.ts";
-import { editFrameRows, parseEditArgs } from "../extensions/edit-view/frame.ts";
 import { createCompactRenderers } from "../extensions/compact-tools/renderer.ts";
-import { editCollapsedBody } from "../extensions/edit-view/body.ts";
+import { diffLines } from "../extensions/mutation-view/diff.ts";
+import {
+	createEditFrameComponent,
+	editCollapsedBody,
+	editFrameRows,
+	parseEditArgs,
+} from "../extensions/mutation-view/edit.ts";
 import type {
 	CompactRenderContext,
 	CompactToolDefinition,
@@ -138,6 +141,7 @@ function editRenderers(): ReturnType<typeof createCompactRenderers> {
 	return createCompactRenderers("edit", () => fakeNativeEdit(), {
 		hideRowOnSuccess: true,
 		collapsedBody: editCollapsedBody,
+		stackRows: false,
 	});
 }
 

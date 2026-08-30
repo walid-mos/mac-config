@@ -1,13 +1,12 @@
 /**
- * Compact tools: one line per built-in tool call (read, grep, find, ls).
+ * Compact tools: one line per built-in tool call (read, grep, find, ls, bash).
  * Execution is delegated untouched to the real built-in definitions; only the
  * rendering is replaced. ctrl+o expands back to the full native output.
- * "bash" belongs to the pi-background extension, which reuses the shared
- * renderers (compact-tools/renderer.ts) for its supervised bash tool.
- * `edit` and `write` use their dedicated mutation-frame extensions.
+ * `edit` and `write` share the dedicated mutation-view extension.
  */
 
 import {
+	createBashToolDefinition,
 	createFindToolDefinition,
 	createGrepToolDefinition,
 	createLsToolDefinition,

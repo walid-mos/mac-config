@@ -4,7 +4,7 @@ Remplace le rendu des tools built-in `read`, `grep`, `find`, `ls` par une ligne
 unique d'information. Les calls compacts consécutifs sont composés dans une
 seule pile : Pi n'ajoute ainsi qu'un spacer externe pour tout le groupe, et les
 anciennes rows s'estompent derrière la plus récente. `write` et `edit`
-possèdent leurs cadres cohérents (`write-view` et `edit-view`).
+partagent leur renderer riche dans l'extension `mutation-view`.
 
 - `ctrl+o` délègue au `renderResult` natif : sortie complète, images, elapsed
   time bash (l'état `startedAt`/`endedAt` est seedé comme le renderer natif).
@@ -18,8 +18,8 @@ possèdent leurs cadres cohérents (`write-view` et `edit-view`).
   précédents rendent zéro ligne et le plus récent compose toute la pile, donc
   Pi ne place qu'un spacer externe avant le groupe.
 - Option `hideRowOnSuccess` : masque la row une fois le succès établi quand le
-  corps du résultat parle de lui-même (utilisé par edit-view) ; option
-  `collapsedBody` : corps collapsé riche (le cadre de diff d'edit-view).
+  corps du résultat parle de lui-même (utilisé par mutation-view) ; option
+  `collapsedBody` : corps collapsé riche du renderer de mutation.
 - Troncature ANSI-safe via `../ui/terminal-text.ts` (source de vérité partagée
   avec le footer et json-view).
 

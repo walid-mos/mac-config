@@ -1,7 +1,7 @@
 # Journal — extensions TUI
 
 Journal de développement des extensions Pi de ce dépôt (branche `feat/tui-nice-to-haves`
-et successeurs) : `compact-tools`, `edit-view`, `background`, `ui/frame`, `footer`,
+et successeurs) : `compact-tools`, `mutation-view`, `background`, `ui/frame`, `footer`,
 `working-loader`, `json-view`, `double-escape`, `session-shortcuts`, `pi-notify`.
 
 ## Règles du journal
@@ -18,6 +18,7 @@ et successeurs) : `compact-tools`, `edit-view`, `background`, `ui/frame`, `foote
 
 ```markdown
 ### AAAA-MM-JJ — sujet court
+
 - Fait : ce qui a été livré ou décidé.
 - Fichiers : chemins touchés (relatifs à `extensions/`).
 - Tests : ce qui a été exécuté et le résultat (`make pi-test`, esbuild, …).
@@ -27,6 +28,7 @@ et successeurs) : `compact-tools`, `edit-view`, `background`, `ui/frame`, `foote
 ## Entrées
 
 ### 2026-08-30 — initialisation du journal
+
 - Fait : création de ce journal + `AGENTS.md` de développement ; état de la branche consigné.
 - Fichiers : `JOURNAL.md`, `AGENTS.md`.
 - Tests : sans objet (documentation).
@@ -37,6 +39,7 @@ et successeurs) : `compact-tools`, `edit-view`, `background`, `ui/frame`, `foote
   (14074adf), transcript compact pour tools self-rendered (2b0e1b3a).
 
 ### 2026-08-30 — indicateur de raisonnement dans le working-loader
+
 - Fait : le loader bascule entre `✻ <mot>...` (travail, dim) et `✽ <mot>...`
   (raisonnement, accent) piloté par les events `message_update`
   (`thinking_start/delta` ↔ `text_start/toolcall_start`, reset sur
@@ -48,6 +51,7 @@ et successeurs) : `compact-tools`, `edit-view`, `background`, `ui/frame`, `foote
 - Suite : —
 
 ### 2026-08-30 — déploiement Stow basculé sur le worktree
+
 - Fait : `~/.pi/agent` pointait sur `~/.stow_repository` (checkout principal) —
   edit-view, thème mantle et compact-tools absents du déploiement ; anciens
   symlinks retirés puis `make pi` rejoué depuis le worktree ; `settings.json`
@@ -59,6 +63,7 @@ et successeurs) : `compact-tools`, `edit-view`, `background`, `ui/frame`, `foote
   fin de vie de la branche.
 
 ### 2026-08-30 — marqueur de raisonnement à droite du loader (retour utilisateur)
+
 - Fait : le basculement de glyph/couleur/vocabulaire du loader est reverté au
   profit d'un marqueur `✽ raisonnement` (accent) aligné à l'extrême droite de
   la ligne du loader pendant le streaming de thinking ; à gauche, les mots de
@@ -70,6 +75,7 @@ et successeurs) : `compact-tools`, `edit-view`, `background`, `ui/frame`, `foote
 - Suite : —
 
 ### 2026-08-30 — incident : /reload pendant une fenêtre d'édition incohérente
+
 - Fait : diagnostic du « loader crashé » chez l'utilisateur — en réalité, le
   /reload est tombé sur `words.ts` pendant qu'il contenait un double import
   (fenêtre de quelques minutes entre deux edits, corrigée juste après) ;
@@ -82,9 +88,10 @@ et successeurs) : `compact-tools`, `edit-view`, `background`, `ui/frame`, `foote
   attendre le vert de la gate.
 
 ### 2026-08-30 — fix : registre surface réellement global entre extensions
+
 - Fait : diagnostic du pop/dépop du loader pendant les runs avec jobs
   background — pi charge chaque extension via un jiti frais (`moduleCache:
-  false`), donc le singleton de module `surfaceRegistry` était dupliqué ; les
+false`), donc le singleton de module `surfaceRegistry` était dupliqué ; les
   registres isolés montaient le même host `ordered-above-editor` et
   s'évinçaient, d'où l'alternance loader ↔ `◆ BACKGROUND` capturée sous tmux.
   Fix définitif : registre et bindings du host stockés sur `globalThis` via des
@@ -101,6 +108,7 @@ et successeurs) : `compact-tools`, `edit-view`, `background`, `ui/frame`, `foote
 - Suite : —
 
 ### 2026-08-30 — retrait des patchers d’artefacts générés
+
 - Fait : suppression des trois patchers qui réécrivaient les distributions
   installées de Pi (`tool-execution`, thinking assistant, historique prompt),
   de leurs tests et de leur exécution automatique par `pi-post` ; les commits
@@ -111,6 +119,7 @@ et successeurs) : `compact-tools`, `edit-view`, `background`, `ui/frame`, `foote
   harmoniser le rendu de `write` avec `edit`.
 
 ### 2026-08-30 — pile compacte sans modification du runtime Pi
+
 - Fait : les calls consécutifs `read`/`grep`/`find`/`ls`/`bash`/`background`
   partagent désormais un composant visible unique ; les composants précédents
   rendent zéro ligne, la dernière row compose la pile avec retrait et fondu
@@ -122,6 +131,7 @@ et successeurs) : `compact-tools`, `edit-view`, `background`, `ui/frame`, `foote
 - Suite : harmoniser le rendu de `write` avec `edit`.
 
 ### 2026-08-30 — extraction du cadre de mutation partagé
+
 - Fait : la composition visuelle du cadre `edit` (titre, rows de diff,
   plafonnement, fondu et pied) devient une primitive `mutation-view` neutre,
   sans changement de rendu, afin d’accueillir `write` sans duplication.
@@ -131,6 +141,7 @@ et successeurs) : `compact-tools`, `edit-view`, `background`, `ui/frame`, `foote
 - Suite : brancher le renderer `write` sur cette primitive.
 
 ### 2026-08-30 — write et edit partagent le même langage visuel
+
 - Fait : `write` possède désormais une row compacte pending/erreur puis un
   cadre de création au succès, identique au cadre `edit` ; les lignes sont des
   ajouts, plafonnées et estompées, tandis que `ctrl+o` restaure le `renderCall`
@@ -142,6 +153,7 @@ et successeurs) : `compact-tools`, `edit-view`, `background`, `ui/frame`, `foote
 - Suite : ajouter ces suites de rendu à la gate `pi-ui-test`.
 
 ### 2026-08-30 — gate UI couvre les renderers de tools
+
 - Fait : `pi-ui-test` exécute maintenant systématiquement les suites
   compact-tools, edit-view et write-view avec les autres surfaces TUI.
 - Fichiers : hors extensions (`Makefile`), `JOURNAL.md`.
@@ -149,6 +161,7 @@ et successeurs) : `compact-tools`, `edit-view`, `background`, `ui/frame`, `foote
 - Suite : validation visuelle dans un vrai transcript Pi.
 
 ### 2026-08-30 — erreurs de tool lues depuis le contexte renderer
+
 - Fait : le renderer compact normalise `context.isError`, source réellement
   fournie par `ToolExecutionComponent`, dans le résultat avant de choisir
   glyphe, résumé et corps ; edit/write n’affichent donc jamais un cadre de
@@ -158,6 +171,7 @@ et successeurs) : `compact-tools`, `edit-view`, `background`, `ui/frame`, `foote
 - Suite : validation visuelle dans un vrai transcript Pi.
 
 ### 2026-08-30 — inscription dynamique des tools empilables
+
 - Fait : suppression de l’allowlist de noms dans la pile compacte ; tout tool
   utilisant `createCompactRenderers()` s’inscrit automatiquement, tandis que
   les vues riches déclarent `stackRows: false`. Un tool inconnu/non enregistré
@@ -166,3 +180,14 @@ et successeurs) : `compact-tools`, `edit-view`, `background`, `ui/frame`, `foote
   options edit/write.
 - Tests : renderers compact/edit/write 44/44, esbuild des trois entrypoints.
 - Suite : regrouper edit/write dans une seule extension mutation-view.
+
+### 2026-08-30 — extension unique mutation-view
+
+- Fait : fusion des anciennes extensions edit-view et write-view dans un seul
+  entrypoint `mutation-view`, propriétaire des deux overrides et de leur design
+  commun ; les variantes edit/write restent séparées en modules métier pour
+  permettre un futur remplacement visuel sans réorganiser le chargement.
+- Fichiers : `mutation-view/{index,frame,diff,edit,write}.ts`, README ; retrait
+  des dossiers edit-view/write-view ; renommage des deux suites et gate.
+- Tests : renderers 44/44, esbuild mutation-view/compact-tools, `make pi-test`
+  complet au vert (pi-ui 60/60).

@@ -2,9 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createCompactRenderers } from "../extensions/compact-tools/renderer.ts";
 import type { CompactRenderContext, CompactToolDefinition } from "../extensions/compact-tools/types.ts";
-import { writeCollapsedBody } from "../extensions/write-view/body.ts";
-import { createWriteFrameComponent } from "../extensions/write-view/component.ts";
-import { parseWriteArgs, writeDiffLines, writeFrameRows } from "../extensions/write-view/frame.ts";
+import {
+	createWriteFrameComponent,
+	parseWriteArgs,
+	writeCollapsedBody,
+	writeDiffLines,
+	writeFrameRows,
+} from "../extensions/mutation-view/write.ts";
 
 const theme = {
 	fg: (_role: string, text: string) => text,
@@ -97,6 +101,7 @@ test("write expand utilise le renderCall natif sans perdre la row collapse", () 
 	const renderers = createCompactRenderers("write", () => native, {
 		hideRowOnSuccess: true,
 		collapsedBody: writeCollapsedBody,
+		stackRows: false,
 		nativeCallWhenExpanded: true,
 	});
 	const ctx = context({ args: { path: "/a/f.ts", content: "a" } });

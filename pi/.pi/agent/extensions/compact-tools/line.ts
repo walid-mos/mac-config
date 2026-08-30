@@ -18,6 +18,8 @@ export interface CompactRowView {
 	subject: string;
 	state: CompactRowState;
 	theme: CompactTheme;
+	/** Expansion flag at last rebuild, so hideOnSuccess rows stay visible. */
+	expanded?: boolean;
 }
 
 /** Compose the row line for the given terminal width. Already ≤ width. */

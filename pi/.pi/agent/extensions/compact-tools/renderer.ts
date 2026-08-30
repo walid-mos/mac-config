@@ -33,13 +33,19 @@ export interface CompactRenderers {
  */
 interface RowComponent extends CompactComponent {
 	view: CompactRowView | null;
+	hideOnSuccess: boolean;
 }
 
-function makeRowComponent(): RowComponent {
+function makeRowComponent(hideOnSuccess: boolean): RowComponent {
 	return {
 		view: null,
+		hideOnSuccess,
 		render(width: number): string[] {
-			return this.view ? [compactRowLine(this.view, width, this.view.theme)] : [];
+			if (!this.view) return [];
+			// Tools whose success carries a richer body (edit-view frame) hide
+			// their row once settled, unless the native expanded view is shown.
+			if (this.hideOnSuccess && this.view.state.status === "ok" && !this.view.expanded) return [];
+			return [compactRowLine(this.view, width, this.view.theme)];
 		},
 		invalidate(): void {},
 	};
@@ -49,7 +55,26 @@ function emptyComponent(): CompactComponent {
 	return { render: () => [], invalidate: () => {} };
 }
 
-export function createCompactRenderers(tool: string, resolveNative?: NativeRendererResolver): CompactRenderers {
+export interface CompactRendererOptions {
+	/** Hide the row line once the tool succeeds and the result body speaks for
+	 * itself (collapsed view only; expanded keeps the row above the body). */
+	hideRowOnSuccess?: boolean;
+	/** Collapsed result body for tools whose success carries a richer view
+	 * (edit-view frame). Undefined keeps the bare row. */
+	collapsedBody?: (
+		result: CompactToolResult,
+		options: { expanded?: boolean; isPartial?: boolean },
+		theme: CompactTheme,
+		context: CompactRenderContext,
+	) => CompactComponent;
+}
+
+export function createCompactRenderers(
+	tool: string,
+	resolveNative?: NativeRendererResolver,
+	rendererOptions: CompactRendererOptions = {},
+): CompactRenderers {
+	const hideOnSuccess = rendererOptions.hideRowOnSuccess === true;
 	return {
 		renderCall(args, theme, context) {
 			const state = context.state;
@@ -58,12 +83,13 @@ export function createCompactRenderers(tool: string, resolveNative?: NativeRende
 				state.endedAt = undefined;
 			}
 			if (state.status === undefined) state.status = "pending";
-			const component = (context.lastComponent as RowComponent | undefined) ?? makeRowComponent();
+			const component = (context.lastComponent as RowComponent | undefined) ?? makeRowComponent(hideOnSuccess);
 			component.view = {
 				tool,
 				subject: subjectFor(tool, args),
 				state,
 				theme,
+				expanded: context.expanded === true,
 			};
 			return component;
 		},
@@ -74,7 +100,11 @@ export function createCompactRenderers(tool: string, resolveNative?: NativeRende
 				state.endedAt = Date.now();
 			}
 			state.summary = summarizeResult(tool, context.args as Record<string, unknown>, result);
-			if (!options.expanded) return emptyComponent();
+			if (!options.expanded) {
+				return rendererOptions.collapsedBody
+					? rendererOptions.collapsedBody(result, options, theme, context)
+					: emptyComponent();
+			}
 			const native = resolveNative?.(context.cwd);
 			return native?.renderResult ? native.renderResult(result, options, theme, context) : emptyComponent();
 		},

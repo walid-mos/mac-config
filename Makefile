@@ -327,9 +327,12 @@ pi-notify-test:
 
 pi-ui-test:
 	@node --test \
+		pi/.pi/agent/tests/compact-tools.test.ts \
+		pi/.pi/agent/tests/edit-view.test.ts \
 		pi/.pi/agent/tests/ordered-widget-stack.test.ts \
 		pi/.pi/agent/tests/ui-registry-policy.test.ts \
-		pi/.pi/agent/tests/working-loader.test.ts
+		pi/.pi/agent/tests/working-loader.test.ts \
+		pi/.pi/agent/tests/write-view.test.ts
 
 herdr-pi-smoke: herdr
 	@python3 scripts/test-herdr-pi-startup.py

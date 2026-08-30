@@ -140,3 +140,10 @@ et successeurs) : `compact-tools`, `edit-view`, `background`, `ui/frame`, `foote
 - Tests : write-view 7/7, compact-tools + edit-view 35/35, esbuild write-view,
   `make pi-test` complet au vert.
 - Suite : ajouter ces suites de rendu à la gate `pi-ui-test`.
+
+### 2026-08-30 — gate UI couvre les renderers de tools
+- Fait : `pi-ui-test` exécute maintenant systématiquement les suites
+  compact-tools, edit-view et write-view avec les autres surfaces TUI.
+- Fichiers : hors extensions (`Makefile`), `JOURNAL.md`.
+- Tests : `make pi-ui-test` au vert, 58/58.
+- Suite : validation visuelle dans un vrai transcript Pi.

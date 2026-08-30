@@ -5,8 +5,9 @@
 
 import type { CompactToolResult } from "./types.ts";
 
-/** Tools rendered as a single compact line by this extension. "bash" is
- * owned by the pi-background extension, which applies the same renderers. */
+/** Tools rendered as a single compact line by this extension. "bash" and
+ * "background" are owned by the pi-background extension, which applies the
+ * same renderers. */
 export const COMPACT_TOOLS = ["read", "grep", "find", "ls"] as const;
 export type CompactToolName = (typeof COMPACT_TOOLS)[number];
 
@@ -38,6 +39,13 @@ export function subjectFor(tool: string, args: Record<string, unknown> | undefin
 			return `"${toSingleLine(String(a.pattern ?? ""))}"`;
 		case "ls":
 			return baseName(String(a.path ?? "."));
+		case "edit":
+			return baseName(String(a.path ?? ""));
+		case "background": {
+			const action = toSingleLine(String(a.action ?? ""));
+			const target = toSingleLine(String(a.job ?? a.source ?? ""));
+			return target ? `${action} · ${target}` : action;
+		}
 		default:
 			return "";
 	}
@@ -103,7 +111,18 @@ export function summarizeResult(
 			return limitSummary(details, "resultLimitReached", "résultats") ?? `${countTextLines(firstText(result))} lignes`;
 		case "ls":
 			return limitSummary(details, "entryLimitReached", "entrées") ?? `${countTextLines(firstText(result))} lignes`;
+		case "edit":
+			// Success is carried entirely by the edit-view frame; errors fit a line.
+			return result.isError ? firstLine(firstText(result)) : "";
+		case "background":
+			return firstLine(firstText(result));
 		default:
 			return "";
 	}
+}
+
+/** First line of a payload, as a stable one-line summary. */
+function firstLine(text: string): string {
+	const index = text.indexOf("\n");
+	return (index === -1 ? text : text.slice(0, index)).trim();
 }

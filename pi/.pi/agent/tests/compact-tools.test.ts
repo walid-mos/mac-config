@@ -106,6 +106,27 @@ test("summarizeResult grep/find/ls signalent les limites atteintes", () => {
 	assert.equal(summarizeResult("ls", {}, ls), "2 lignes");
 });
 
+test("subjectFor background cible l'action et le job ou la source", () => {
+	assert.equal(subjectFor("background", { action: "start", source: "demo-counter" }), "start · demo-counter");
+	assert.equal(subjectFor("background", { action: "read", job: "bg_1" }), "read · bg_1");
+	assert.equal(subjectFor("background", { action: "list" }), "list");
+});
+
+test("summarizeResult background résume la première ligne de sortie", () => {
+	const result: CompactToolResult = { content: [{ type: "text", text: "tick 1\ntick 2" }] };
+	assert.equal(summarizeResult("background", {}, result), "tick 1");
+});
+
+test("summarizeResult edit résume la première ligne d'erreur seulement", () => {
+	const ok: CompactToolResult = { content: [{ type: "text", text: "ok" }], isError: false };
+	assert.equal(summarizeResult("edit", {}, ok), "");
+	const fail: CompactToolResult = {
+		content: [{ type: "text", text: "oldText introuvable\ndétails" }],
+		isError: true,
+	};
+	assert.equal(summarizeResult("edit", {}, fail), "oldText introuvable");
+});
+
 test("compactRowLine compose glyphe, label, sujet et résumé", () => {
 	const line = compactRowLine(
 		{ tool: "bash", subject: "pnpm test", state: { status: "error", summary: "exit 1" }, theme },

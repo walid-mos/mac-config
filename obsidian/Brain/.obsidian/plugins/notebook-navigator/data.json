@@ -5,7 +5,10 @@
       "name": "Par défaut",
       "fileVisibility": "supported",
       "propertyKeys": [],
-      "hiddenFolders": [],
+      "hiddenFolders": [
+        "/_Attachments",
+        "/_Meta"
+      ],
       "descendantExcludedFolders": [],
       "hiddenTags": [],
       "hiddenFileNames": [],
@@ -153,6 +156,7 @@
   "deleteAttachments": "ask",
   "moveFileConflicts": "ask",
   "externalIconProviders": {},
+  "showReleaseNotes": true,
   "checkForUpdatesOnStart": true,
   "pinNavigationBanner": true,
   "showNoteCount": true,
@@ -181,7 +185,7 @@
   "pinRecentNotesWithShortcuts": false,
   "recentNotesCount": 5,
   "showFolderIcons": true,
-  "showRootFolder": true,
+  "showRootFolder": false,
   "inheritFolderColors": true,
   "folderSortOrder": "alpha-asc",
   "enableFolderNotes": true,
@@ -552,7 +556,7 @@
     "#404040",
     "#404040"
   ],
-  "lastShownVersion": "3.3.4",
+  "lastShownVersion": "3.3.5",
   "rootFolderOrder": [],
   "rootTagOrder": [],
   "rootPropertyOrder": []

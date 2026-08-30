@@ -71,10 +71,15 @@ is_current() {
   plist_equals CFBundleName "Pi Notifications" \
     && plist_equals CFBundleDisplayName "Pi Notifications" \
     && plist_equals CFBundleExecutable pi-notify \
-    && plist_equals CFBundleIdentifier app.pi.notifier
+    && plist_equals CFBundleIdentifier app.pi.notifier \
+    && plist_equals CFBundleVersion "$BUNDLE_VERSION"
 }
 
 EXPECTED_HASH=$(input_hash)
+# Version de bundle dérivée du contenu : un rebuild force LaunchServices et le
+# Centre de notifications à rafraîchir l'icône et le nom qu'ils ont mis en cache
+# pour app.pi.notifier (une version figée laisse l'ancienne icône affichée).
+BUNDLE_VERSION="2.0.$((16#$(printf '%s' "$EXPECTED_HASH" | cut -c1-8) % 100000))"
 if is_current "$EXPECTED_HASH"; then
   echo "Pi Notifications.app déjà conforme : $DEST_APP"
   exit 0
@@ -101,6 +106,8 @@ rm -f "$TEMP_APP/Contents/MacOS/terminal-notifier"
   -c "Set :CFBundleName Pi Notifications" \
   -c "Set :CFBundleExecutable pi-notify" \
   -c "Set :CFBundleIdentifier app.pi.notifier" "$TEMP_APP/Contents/Info.plist"
+"$PLUTIL" -replace CFBundleDisplayName -string "Pi Notifications" "$TEMP_APP/Contents/Info.plist"
+"$PLUTIL" -replace CFBundleVersion -string "$BUNDLE_VERSION" "$TEMP_APP/Contents/Info.plist"
 "$PLUTIL" -replace CFBundleDisplayName -string "Pi Notifications" "$TEMP_APP/Contents/Info.plist"
 printf '%s\n' "$EXPECTED_HASH" > "$TEMP_APP/$STAMP_RELATIVE"
 "$CODESIGN" --force --sign - "$TEMP_APP"

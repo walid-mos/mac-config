@@ -2,15 +2,22 @@
 
 from __future__ import annotations
 
+import fcntl
+import hashlib
 import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from collections.abc import Iterable
 from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 NODE_MODULES = REPOSITORY_ROOT / "node_modules"
+LOCK_PATH = Path(tempfile.gettempdir()) / (
+    "pi-node-tests-"
+    f"{hashlib.sha256(str(REPOSITORY_ROOT).encode()).hexdigest()[:16]}.lock"
+)
 SHIM_TARGET = re.compile(r"^# cmd-shim-target=(.+)$", re.MULTILINE)
 REQUIRED_PACKAGES = (
     "@earendil-works/pi-ai",
@@ -65,26 +72,30 @@ def matching_tests(patterns: Iterable[str]) -> list[str]:
 
 
 def run_node_tests(suite: str, patterns: Iterable[str]) -> int:
-    if NODE_MODULES.exists() or NODE_MODULES.is_symlink():
-        print(
-            f"refusing to replace existing test path: {NODE_MODULES}",
-            file=sys.stderr,
-        )
-        return 1
-    tests = matching_tests(patterns)
-    if not tests:
-        print(f"{suite} tests failed: no tests matched", file=sys.stderr)
-        return 1
-    try:
-        NODE_MODULES.symlink_to(installed_pi_node_modules(), target_is_directory=True)
-        return subprocess.run(
-            ["node", "--test", *tests],
-            cwd=REPOSITORY_ROOT,
-            check=False,
-        ).returncode
-    except (OSError, RuntimeError) as error:
-        print(f"{suite} tests failed: {error}", file=sys.stderr)
-        return 1
-    finally:
-        if NODE_MODULES.is_symlink():
-            NODE_MODULES.unlink()
+    with LOCK_PATH.open("w", encoding="utf-8") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if NODE_MODULES.exists() or NODE_MODULES.is_symlink():
+            print(
+                f"refusing to replace existing test path: {NODE_MODULES}",
+                file=sys.stderr,
+            )
+            return 1
+        tests = matching_tests(patterns)
+        if not tests:
+            print(f"{suite} tests failed: no tests matched", file=sys.stderr)
+            return 1
+        try:
+            NODE_MODULES.symlink_to(
+                installed_pi_node_modules(), target_is_directory=True
+            )
+            return subprocess.run(
+                ["node", "--test", *tests],
+                cwd=REPOSITORY_ROOT,
+                check=False,
+            ).returncode
+        except (OSError, RuntimeError) as error:
+            print(f"{suite} tests failed: {error}", file=sys.stderr)
+            return 1
+        finally:
+            if NODE_MODULES.is_symlink():
+                NODE_MODULES.unlink()

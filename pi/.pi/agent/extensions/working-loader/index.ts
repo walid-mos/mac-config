@@ -1,6 +1,6 @@
 /**
  * Working loader: hides the persistent "Thinking..." transcript label and
- * rotates a shuffle-bag word line above the editor while the agent is busy.
+ * animates a sand spinner beside a shuffle-bag word line while the agent is busy.
  * The line renders through the shared surface registry (ui/surface.ts), so it
  * stacks with the other above-editor surfaces instead of owning a slot.
  *
@@ -11,12 +11,16 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { ABOVE_EDITOR_PRIORITY, setOrderedAboveEditorWidget } from "../ui/ordered-widget-stack.ts";
 import { terminalLineWidth } from "../ui/terminal-text.ts";
-import { createWordRotation, defaultIntervalScheduler } from "./rotation.ts";
+import {
+	createRotation,
+	defaultIntervalScheduler,
+	WORD_ROTATION_INTERVAL_MS,
+} from "./rotation.ts";
 import { createShuffleBag } from "./shuffle-bag.ts";
+import { createSpinnerRotation, SAND_SPINNER } from "./spinner.ts";
 import { WORKING_WORDS } from "./words.ts";
 
 const SURFACE_ID = "working-loader";
-const WORKING_GLYPH = "✻";
 const THINKING_MARKER = "✽ raisonnement";
 const MIN_GAP = 2;
 
@@ -42,6 +46,7 @@ export default function workingLoader(pi: ExtensionAPI): void {
 	let mode: LoaderMode = "working";
 	let ui: ExtensionContext["ui"] | undefined;
 	let painted = false;
+	let spinnerFrame = SAND_SPINNER.frames[0];
 	let word = "";
 
 	function paint(): void {
@@ -49,7 +54,7 @@ export default function workingLoader(pi: ExtensionAPI): void {
 		setOrderedAboveEditorWidget(ui, SURFACE_ID, {
 			priority: ABOVE_EDITOR_PRIORITY.working,
 			render: (width, theme) => {
-				const left = theme.fg("dim", `${WORKING_GLYPH} ${word}...`);
+				const left = theme.fg("dim", `${spinnerFrame} ${word}...`);
 				if (mode !== "thinking") return [left];
 				const right = theme.fg("accent", THINKING_MARKER);
 				const gap = width - terminalLineWidth(left) - terminalLineWidth(right);
@@ -66,12 +71,21 @@ export default function workingLoader(pi: ExtensionAPI): void {
 		painted = false;
 	}
 
-	const rotation = createWordRotation({
+	const wordRotation = createRotation({
 		scheduler: defaultIntervalScheduler,
-		nextWord: () => {
+		intervalMs: WORD_ROTATION_INTERVAL_MS,
+		advance: () => {
 			word = bag.next();
 			// Re-registering the same id overwrites the entry and notifies the
 			// registry, which asks the mounted host for a single re-render.
+			paint();
+		},
+	});
+	const spinnerRotation = createSpinnerRotation({
+		scheduler: defaultIntervalScheduler,
+		spinner: SAND_SPINNER,
+		onFrame: (frame) => {
+			spinnerFrame = frame;
 			paint();
 		},
 	});
@@ -87,11 +101,13 @@ export default function workingLoader(pi: ExtensionAPI): void {
 		if (ui === undefined) return;
 		// One loader line: hide the native spinner status while ours is up.
 		ui.setWorkingVisible(false);
-		rotation.start();
+		wordRotation.start();
+		spinnerRotation.start();
 	}
 
 	function hide(): void {
-		rotation.stop();
+		wordRotation.stop();
+		spinnerRotation.stop();
 		unpaint();
 		ui?.setWorkingVisible(true);
 	}

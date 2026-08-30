@@ -245,3 +245,14 @@ false`), donc le singleton de module `surfaceRegistry` était dupliqué ; les
 - Tests : `make pi-test` complet au vert, dont pi-ui 66/66, démarrages offline
   multi-largeurs et filtres Git.
 - Suite : contrôle visuel utilisateur sur les prochains tools.
+
+### 2026-08-31 — spinner sand dans le working-loader
+
+- Fait : le glyphe statique `✻` devient l'animation `sand` canonique de
+  `cli-spinners` (35 frames à 80 ms), sans changer la rotation des mots ni le
+  marqueur de raisonnement aligné à droite.
+- Fichiers : `working-loader/{index,rotation,spinner}.ts`, README working-loader,
+  test working-loader.
+- Tests : working-loader 13/13, esbuild de l'entrypoint et `make pi-test`
+  complet au vert (pi-ui 67/67).
+- Suite : validation visuelle après `/reload`.

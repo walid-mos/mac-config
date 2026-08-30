@@ -1,4 +1,4 @@
-export const DEFAULT_ROTATION_INTERVAL_MS = 4000;
+export const WORD_ROTATION_INTERVAL_MS = 4000;
 
 export type IntervalHandle = {
 	clear: () => void;
@@ -19,30 +19,29 @@ export const defaultIntervalScheduler: IntervalScheduler = {
 	},
 };
 
-export type WordRotation = {
+export type Rotation = {
 	start: () => void;
 	stop: () => void;
 	isRunning: () => boolean;
 };
 
 /**
- * Calls nextWord immediately on start, then on every interval tick until
- * stopped. start() is idempotent: redundant starts keep the running timer
- * instead of churning clear/set cycles.
+ * Advances immediately on start, then on every interval tick until stopped.
+ * start() is idempotent: redundant starts keep the running timer instead of
+ * churning clear/set cycles.
  */
-export function createWordRotation(options: {
+export function createRotation(options: {
 	scheduler: IntervalScheduler;
-	intervalMs?: number;
-	nextWord: () => void;
-}): WordRotation {
-	const intervalMs = options.intervalMs ?? DEFAULT_ROTATION_INTERVAL_MS;
+	intervalMs: number;
+	advance: () => void;
+}): Rotation {
 	let handle: IntervalHandle | undefined;
 
 	return {
 		start() {
 			if (handle !== undefined) return;
-			options.nextWord();
-			handle = options.scheduler.setInterval(options.nextWord, intervalMs);
+			options.advance();
+			handle = options.scheduler.setInterval(options.advance, options.intervalMs);
 		},
 		stop() {
 			handle?.clear();

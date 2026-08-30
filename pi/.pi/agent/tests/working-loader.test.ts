@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-	createWordRotation,
-	DEFAULT_ROTATION_INTERVAL_MS,
+	createRotation,
 	type IntervalScheduler,
+	WORD_ROTATION_INTERVAL_MS,
 } from "../extensions/working-loader/rotation.ts";
 import { createShuffleBag, type NonEmptyArray } from "../extensions/working-loader/shuffle-bag.ts";
+import {
+	createSpinnerRotation,
+	SAND_SPINNER,
+} from "../extensions/working-loader/spinner.ts";
 import { WORKING_WORDS } from "../extensions/working-loader/words.ts";
 import { isThinkingStreamEvent, isWorkingStreamEvent } from "../extensions/working-loader/index.ts";
 import { surfaceRegistry, subscribeSurfaceChanges } from "../extensions/ui/surface.ts";
@@ -37,6 +41,14 @@ const ANSI_PATTERN = /\x1b\[[0-9;]*m/g;
 
 function stripAnsi(text: string): string {
 	return text.replace(ANSI_PATTERN, "");
+}
+
+function assertSandLoaderPrefix(line: string): void {
+	assert.ok(
+		SAND_SPINNER.frames.some((frame) => line.startsWith(`${frame} `)),
+		`expected a sand frame at the start of ${JSON.stringify(line)}`,
+	);
+	assert.match(line, /^. \w+\.\.\./u);
 }
 
 type StreamPayload = { assistantMessageEvent?: { type: string } };
@@ -88,26 +100,49 @@ test("shuffle bag tolerates a single item", () => {
 test("rotation fires immediately, then per tick, and start is idempotent", () => {
 	const { scheduler, timers, fireAll } = fakeScheduler();
 	let ticks = 0;
-	const rotation = createWordRotation({
+	const rotation = createRotation({
 		scheduler,
-		nextWord: () => {
+		intervalMs: WORD_ROTATION_INTERVAL_MS,
+		advance: () => {
 			ticks += 1;
 		},
 	});
 
 	rotation.start();
-	assert.equal(ticks, 1, "immediate first word");
+	assert.equal(ticks, 1, "immediate first tick");
 	rotation.start();
 	assert.equal(timers.length, 1, "no duplicate timer on redundant start");
 
 	fireAll();
 	assert.equal(ticks, 2);
-	assert.equal(DEFAULT_ROTATION_INTERVAL_MS, 4000);
-	assert.equal(timers[0]?.delayMs, DEFAULT_ROTATION_INTERVAL_MS);
+	assert.equal(WORD_ROTATION_INTERVAL_MS, 4000);
+	assert.equal(timers[0]?.delayMs, WORD_ROTATION_INTERVAL_MS);
 
 	rotation.stop();
 	assert.equal(timers[0]?.cleared, true);
 	assert.equal(rotation.isRunning(), false);
+});
+
+test("sand spinner emits its canonical frames at 80ms and loops", () => {
+	const { scheduler, timers, fireAll } = fakeScheduler();
+	const frames: string[] = [];
+	const rotation = createSpinnerRotation({
+		scheduler,
+		spinner: SAND_SPINNER,
+		onFrame: (frame) => frames.push(frame),
+	});
+
+	rotation.start();
+	assert.deepEqual(frames, [SAND_SPINNER.frames[0]]);
+	assert.equal(timers[0]?.delayMs, 80);
+
+	for (let index = 1; index < SAND_SPINNER.frames.length; index += 1) fireAll();
+	assert.deepEqual(frames, SAND_SPINNER.frames);
+	fireAll();
+	assert.equal(frames.at(-1), SAND_SPINNER.frames[0], "loops to the first frame");
+
+	rotation.stop();
+	assert.equal(timers[0]?.cleared, true);
 });
 
 test("shows a rotating word above the editor while the agent works", () => {
@@ -120,7 +155,7 @@ test("shows a rotating word above the editor while the agent works", () => {
 		assert.equal(surfaceRegistry.hasEntries("aboveEditor"), true);
 		const rendered = surfaceRegistry.render("aboveEditor", 80, fakeTheme());
 		assert.equal(rendered.length, 1);
-		assert.match(rendered[0] ?? "", /✻ \w+\.\.\./u);
+		assertSandLoaderPrefix(stripAnsi(rendered[0] ?? ""));
 
 		emit("agent_end");
 		assert.equal(surfaceRegistry.hasEntries("aboveEditor"), false);
@@ -211,7 +246,7 @@ test("thinking streams append the ✽ marker at the far right of the loader line
 		const width = 80;
 		const rendered = surfaceRegistry.render("aboveEditor", width, fakeTheme());
 		const line = stripAnsi(rendered[0] ?? "");
-		assert.match(line, /^✻ \w+\.\.\./u, "les mots de travail continuent à gauche");
+		assertSandLoaderPrefix(line);
 		assert.match(line, /✽ raisonnement$/u, "marqueur à l'extrême droite");
 		assert.equal(line.length, width, "la ligne occupe exactement la largeur");
 
@@ -250,7 +285,8 @@ test("the marker is dropped on narrow widths instead of breaking the line", () =
 		emit("message_update", undefined, { assistantMessageEvent: { type: "thinking_start" } });
 
 		const line = stripAnsi(surfaceRegistry.render("aboveEditor", 24, fakeTheme())[0] ?? "");
-		assert.match(line, /^✻ \w+\.\.\.$/u, "seul le mot de travail reste");
+		assertSandLoaderPrefix(line);
+		assert.doesNotMatch(line, /✽/u, "seul le mot de travail reste");
 		emit("agent_end");
 	} finally {
 		surfaceRegistry.clear();

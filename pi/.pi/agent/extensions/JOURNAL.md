@@ -256,3 +256,44 @@ false`), donc le singleton de module `surfaceRegistry` était dupliqué ; les
 - Tests : working-loader 13/13, esbuild de l'entrypoint et `make pi-test`
   complet au vert (pi-ui 67/67).
 - Suite : validation visuelle après `/reload`.
+
+### 2026-08-31 — alignement du loader avec les jobs Background
+
+- Fait : après capture du pane Herdr réel, la row du working-loader reçoit le
+  même retrait de deux colonnes que les rows de jobs Background ; le spinner
+  et son libellé partagent désormais leur axe visuel avec les autres statuts.
+- Fichiers : `working-loader/{index.ts,README.md}`, test working-loader.
+- Tests : working-loader 13/13, esbuild de l'entrypoint et `make pi-test`
+  complet au vert (pi-ui 67/67).
+- Suite : contrôle visuel après `/reload`.
+
+### 2026-08-31 — retour des widgets de premier niveau en colonne 0
+
+- Fait : retour utilisateur sur le retrait précédent — le working-loader est
+  un pair de l'en-tête Background, pas une row enfant ; les deux commencent
+  donc en colonne 0, tandis que seuls les jobs Background restent indentés.
+- Fichiers : `working-loader/{index.ts,README.md}`, test working-loader.
+- Tests : working-loader 13/13, esbuild de l'entrypoint et `make pi-test`
+  complet au vert (pi-ui 67/67).
+- Suite : `/reload`, puis test visuel.
+
+### 2026-08-31 — spinners working et Background sur le même axe
+
+- Fait : clarification après capture Herdr — « les deux loaders » désignait le
+  spinner `sand` et le spinner animé de la row de job Background ; retrait des
+  deux espaces devant les jobs principaux, enfants de groupe ramenés de six à
+  quatre espaces pour conserver leur profondeur relative.
+- Fichiers : `background/display.ts`, README working-loader, tests background.
+- Tests : suites background-display + working-loader 19/19, esbuild des deux
+  entrypoints et `make pi-test` complet au vert (pi-ui 67/67).
+- Suite : `/reload`, puis vérification dans le pane réel.
+
+### 2026-08-31 — libellés des deux loaders en colonne 2
+
+- Fait : suppression du second espace entre le spinner d'un job Background et
+  son libellé ; working-loader, en-tête Background et jobs Background suivent
+  désormais tous le rythme « glyphe colonne 0, libellé colonne 2 ».
+- Fichiers : `background/display.ts`, README working-loader, test background.
+- Tests : suites background-display + working-loader 19/19, esbuild Background
+  et `make pi-test` complet au vert (pi-ui 67/67).
+- Suite : `/reload`, puis vérification dans le pane réel.

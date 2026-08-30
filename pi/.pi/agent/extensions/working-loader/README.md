@@ -15,6 +15,9 @@ absurdes) toutes les 4 secondes tant que l'agent travaille :
 
 - La ligne est rendue **via le registre surface** (`../ui/surface.ts`) avec la
   priorité `ABOVE_EDITOR_PRIORITY.working` (50, donc collée au prompt).
+- Le spinner `sand` et les spinners des jobs Background commencent tous en
+  colonne 0, avec leur libellé en colonne 2 ; seuls les enfants d'un groupe
+  Background restent indentés.
 - Chaque frame ou changement de mot ré-enregistre la même entrée
   (`working-loader`) : overwrite + notification → un seul re-render par tick.
 - Pendant que la ligne est affichée, le spinner natif est masqué

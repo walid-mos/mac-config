@@ -1,10 +1,21 @@
 # compact-tools — 1 ligne = 1 tool call
 
-Remplace le rendu des tools built-in `read`, `grep`, `find`, `ls` par une ligne
-unique d'information. Les calls compacts consécutifs sont composés dans une
-seule pile : Pi n'ajoute ainsi qu'un spacer externe pour tout le groupe, et les
-anciennes rows s'estompent derrière la plus récente. `write` et `edit`
-partagent leur renderer riche dans l'extension `mutation-view`.
+Remplace le rendu des tools built-in `read`, `grep`, `find`, `ls`, `bash` par une ligne
+unique d'information. Les calls compacts consécutifs deviennent une timeline
+stable : Pi n'ajoute qu'un spacer externe, le call courant reste net et
+l'historique garde un contraste lisible. Au-delà de six calls, les étapes
+anciennes se replient dans un compteur qui conserve le nombre d'erreurs.
+`write` et `edit` partagent leur renderer riche dans `mutation-view`.
+
+```
+├─ ✓ read · agent.ts · 120 lignes
+├─ ✓ grep · "registerTool" · 8 correspondances
+╰─ ● bash · pnpm test
+
+│  ⋯ 12 étapes précédentes · 1 erreur
+├─ ✓ read · tui.md · 943 lignes
+╰─ ✗ bash · pnpm test · exit 1
+```
 
 - `ctrl+o` délègue au `renderResult` natif : sortie complète, images, elapsed
   time bash (l'état `startedAt`/`endedAt` est seedé comme le renderer natif).
@@ -30,8 +41,10 @@ partagent leur renderer riche dans l'extension `mutation-view`.
   résoudre les packages pi) ; gère délégation d'exécution et cache par cwd.
 - `renderer.ts` : renderers partagés (call compact / résultat collapsé ou
   natif étendu), réutilisables par toute extension possédant un tool.
-- `stack.ts` : registre process-global des rows, groupes de calls consécutifs,
-  composition estompée portée par le dernier composant. Aucun nom de tool
+- `stack.ts` : état brut process-global partagé entre les graphes d'extensions,
+  mais implémentation recréée à chaque chargement ; `/reload` prend donc toujours
+  le code courant sans clé de cache versionnée. Il groupe les calls consécutifs
+  et porte la timeline plafonnée sur le dernier composant. Aucun nom de tool
   n'est hardcodé : chaque `createCompactRenderers()` s'enregistre par défaut ;
   les renderers à corps riche opt-out avec `stackRows: false`.
 - `lifecycle.ts` : reconstruit les groupes depuis la session et suit les

@@ -191,3 +191,57 @@ false`), donc le singleton de module `surfaceRegistry` était dupliqué ; les
   des dossiers edit-view/write-view ; renommage des deux suites et gate.
 - Tests : renderers 44/44, esbuild mutation-view/compact-tools, `make pi-test`
   complet au vert (pi-ui 60/60).
+
+### 2026-08-30 — fix du reload après évolution de la pile compacte
+
+- Fait : le contrat process-global de `CompactRowStack` passe de `v1` à `v2` ;
+  un `/reload` ne réutilise plus l'ancien singleton dépourvu de `registerTool`,
+  qui faisait échouer le chargement de mutation-view.
+- Fichiers : `compact-tools/stack.ts`, test compact-tools.
+- Tests : repro stale-v1 corrigée, compact-tools 28/28, esbuild
+  mutation-view/compact-tools et `make pi-test` complet au vert (pi-ui 61/61).
+- Suite : —
+
+### 2026-08-30 — hiérarchie visuelle du transcript et des réponses
+
+- Fait : les tools compacts forment une timeline lisible `├─` / `╰─`, stable
+  à six calls visibles ; l'historique excédentaire est replié avec conservation
+  du nombre d'erreurs, sans l'ancien escalier de rows presque invisibles.
+- Fait : nouvelle extension `response-view` — séparateurs thémés `réponse`,
+  ouverts pendant le streaming puis fermés au settle, plafonnés à 88 colonnes
+  sur les écrans ultra-larges et strictement display-only.
+- Fichiers : `compact-tools/{line,stack}.ts`, README compact ;
+  `response-view/{index,frame}.ts`, README ; tests compact/response et Makefile.
+- Tests : suites ciblées 33/33, esbuild des deux entrypoints, `make pi-ui-test`
+  66/66 puis `make pi-test` complet au vert.
+- Suite : validation visuelle après `/reload`.
+
+### 2026-08-30 — fix : timeline réellement renouvelée au reload
+
+- Fait : retour visuel utilisateur — les rows restaient dans l'ancien escalier
+  après `/reload`, car le singleton `v2` avait déjà été créé avant la refonte ;
+  la nouvelle timeline réutilisait donc l'ancienne méthode `render`.
+- Fichiers : `compact-tools/stack.ts`, test compact-tools.
+- Tests : protocole process-global passé à `v3`, repro stale-v2 couvert ; suites
+  ciblées 33/33 et esbuild compact-tools/response-view au vert.
+- Suite : `/reload`, puis contrôle sur le prochain groupe de tools.
+
+### 2026-08-30 — suppression du versionnement manuel du reload
+
+- Fait : remise en cause du contournement `row-stack.vN` après retour utilisateur ;
+  seule la donnée inerte de la pile est désormais partagée dans `globalThis`,
+  tandis que chaque graphe d'extension construit l'implémentation courante.
+- Résultat : `/reload` prend automatiquement les nouvelles méthodes, sans bump,
+  migration ni ancienne instance de classe conservée.
+- Fichiers : `compact-tools/{stack.ts,README.md}`, test compact-tools.
+- Tests : état partagé entre deux imports et instances d'implémentation distinctes,
+  suites ciblées 33/33, absence de clé `row-stack.vN`, esbuild au vert.
+- Suite : double `/reload` puis gate complet.
+
+### 2026-08-30 — validation du reload sans version
+
+- Fait : deux `/reload` consécutifs dans un vrai PTY Pi terminent proprement,
+  sans erreur d'extension ni marqueur de largeur.
+- Tests : `make pi-test` complet au vert, dont pi-ui 66/66, démarrages offline
+  multi-largeurs et filtres Git.
+- Suite : contrôle visuel utilisateur sur les prochains tools.

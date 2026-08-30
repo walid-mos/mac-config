@@ -7,8 +7,11 @@ import fcntl
 import os
 import pty
 import select
+import shutil
 import signal
 import struct
+import subprocess
+import tempfile
 import termios
 import time
 from pathlib import Path
@@ -24,7 +27,7 @@ FAILURE_MARKERS = (
     b"does not export a valid extension factory",
     b"[Extension issues]",
 )
-CRASH_LOG = Path.home() / ".pi" / "agent" / "pi-crash.log"
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 
 
 def drain(fd: int, output: bytearray) -> None:
@@ -38,33 +41,48 @@ def drain(fd: int, output: bytearray) -> None:
             return
 
 
-def run_case(width: int, delay: float) -> tuple[str, bytes]:
+def run_case(width: int, delay: float, home: Path) -> tuple[str, bytes]:
     pid, fd = pty.fork()
     if pid == 0:
         fcntl.ioctl(0, termios.TIOCSWINSZ, struct.pack("HHHH", 24, width, 0, 0))
+        os.environ["HOME"] = str(home)
         os.environ["PI_OFFLINE"] = "1"
-        os.execvp("pi", ["pi"])
+        os.chdir(REPOSITORY_ROOT)
+        os.execvp("pi", ["pi", "--approve"])
 
     fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 24, width, 0, 0))
     time.sleep(delay)
     os.write(fd, b"x")
     output = bytearray()
-    deadline = time.monotonic() + 1.5
+    deadline = time.monotonic() + 5.0
+    terminal_ready = False
 
     while time.monotonic() < deadline:
         select.select([fd], [], [], 0.03)
         drain(fd, output)
         waited, status = os.waitpid(pid, os.WNOHANG | os.WUNTRACED)
-        if not waited:
-            continue
-        if os.WIFSTOPPED(status):
-            os.kill(pid, signal.SIGCONT)
-            os.kill(pid, signal.SIGTERM)
-            os.waitpid(pid, 0)
+        if waited:
+            if os.WIFSTOPPED(status):
+                os.kill(pid, signal.SIGCONT)
+                os.kill(pid, signal.SIGTERM)
+                os.waitpid(pid, 0)
+                os.close(fd)
+                return "stopped", bytes(output)
             os.close(fd)
-            return "stopped", bytes(output)
+            return f"early-exit:{os.waitstatus_to_exitcode(status)}", bytes(output)
+        try:
+            terminal_ready = not bool(termios.tcgetattr(fd)[3] & termios.ICANON)
+        except termios.error:
+            terminal_ready = False
+        if terminal_ready:
+            break
+
+    if not terminal_ready:
+        os.kill(pid, signal.SIGTERM)
+        _, status = os.waitpid(pid, 0)
+        drain(fd, output)
         os.close(fd)
-        return f"early-exit:{os.waitstatus_to_exitcode(status)}", bytes(output)
+        return f"startup-timeout:{os.waitstatus_to_exitcode(status)}", bytes(output)
 
     # Clear the injected text, then use Pi's normal empty-editor exit path.
     os.write(fd, b"\x03")
@@ -94,22 +112,33 @@ def run_case(width: int, delay: float) -> tuple[str, bytes]:
 
 
 def main() -> int:
-    crash_log_before = CRASH_LOG.stat().st_mtime_ns if CRASH_LOG.exists() else None
-    failed = False
-    for width, delay in CASES:
-        status, output = run_case(width, delay)
-        has_failure_marker = any(marker in output for marker in FAILURE_MARKERS)
-        case_failed = status != "shutdown:0" or has_failure_marker
-        failed = failed or case_failed
-        print(f"width={width} delay={delay:.2f} status={status} failure={has_failure_marker}")
-        if case_failed:
-            print(output.decode("utf-8", errors="replace")[-2_000:])
+    stow = shutil.which("stow")
+    if stow is None:
+        print("stow is required for Pi startup tests")
+        return 1
+    with tempfile.TemporaryDirectory(prefix="pi-startup-test-") as temporary_directory:
+        home = Path(temporary_directory) / "home"
+        home.mkdir()
+        (home / ".pi" / "agent" / "sessions").mkdir(parents=True)
+        subprocess.run(
+            [stow, "-d", str(REPOSITORY_ROOT), "-t", str(home), "--no-folding", "-R", "pi"],
+            check=True,
+        )
+        crash_log = home / ".pi" / "agent" / "pi-crash.log"
+        failed = False
+        for width, delay in CASES:
+            status, output = run_case(width, delay, home)
+            has_failure_marker = any(marker in output for marker in FAILURE_MARKERS)
+            case_failed = status != "shutdown:0" or has_failure_marker
+            failed = failed or case_failed
+            print(f"width={width} delay={delay:.2f} status={status} failure={has_failure_marker}")
+            if case_failed:
+                print(output.decode("utf-8", errors="replace")[-2_000:])
 
-    crash_log_after = CRASH_LOG.stat().st_mtime_ns if CRASH_LOG.exists() else None
-    if crash_log_after != crash_log_before:
-        print(f"Pi wrote a new crash log: {CRASH_LOG}")
-        failed = True
-    return 1 if failed else 0
+        if crash_log.exists():
+            print(f"Pi wrote a crash log: {crash_log}")
+            failed = True
+        return 1 if failed else 0
 
 
 if __name__ == "__main__":

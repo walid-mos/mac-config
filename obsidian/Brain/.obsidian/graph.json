@@ -1,6 +1,6 @@
 {
   "collapse-filter": true,
-  "search": "",
+  "search": "-path:\"1. Flux\"",
   "showTags": false,
   "showAttachments": false,
   "hideUnresolved": false,

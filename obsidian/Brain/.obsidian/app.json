@@ -10,5 +10,6 @@
   "useMarkdownLinks": false,
   "newFileLocation": "folder",
   "newFileFolderPath": "0. Inbox",
-  "showUnsupportedFiles": false
+  "showUnsupportedFiles": false,
+  "attachmentFolderPath": "_Attachments"
 }

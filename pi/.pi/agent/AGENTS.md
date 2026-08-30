@@ -19,7 +19,7 @@
 ## Maintenance du harness
 
 - TOUJOURS charger le skill `harness-tuning` avant de créer/modifier un skill, une extension Pi ou l'AGENTS.md.
-- Ne jamais modifier directement une installation locale, une dépendance sous `node_modules` ou un artefact généré, sauf demande explicite ou test temporaire. Modifier la source versionnée ou une configuration officiellement supportée ; après un test temporaire, restaurer immédiatement l’installation.
+- Ne jamais modifier directement une installation locale, une dépendance sous `node_modules`, un dossier `dist`/`build` ou tout autre artefact généré ou compilé, quel que soit le projet, sauf demande explicite de l’utilisateur. Modifier la source versionnée ou une configuration officiellement supportée.
 
 ## Git
 

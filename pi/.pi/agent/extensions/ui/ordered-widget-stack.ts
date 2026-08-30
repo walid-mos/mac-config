@@ -8,6 +8,7 @@ const HOST_WIDGET_IDS: Record<SurfacePlacement, string> = {
 };
 
 export const ABOVE_EDITOR_PRIORITY = {
+	working: 50,
 	goal: 100,
 	backgroundTasks: 200,
 	activity: 300,

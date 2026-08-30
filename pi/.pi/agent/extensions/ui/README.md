@@ -41,6 +41,7 @@ Deux emplacements existent, portés par pi et centralisés ici :
 
 | Clé | Valeur | Occuper par |
 |---|---:|---|
+| `working` | 50 | loader de travail (mots rotatifs) |
 | `goal` | 100 | boucle /goal |
 | `backgroundTasks` | 200 | tâches async |
 | `activity` | 300 | bandeau d'activité |

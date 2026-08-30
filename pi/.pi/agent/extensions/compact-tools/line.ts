@@ -1,13 +1,20 @@
 /**
- * Pure composition of the single themed line for a compact tool row:
- * `✓ bash · pnpm test · exit 0`. Truncation goes through the shared
- * ui/terminal-text primitives so ANSI styling is width-safe.
+ * Pure composition of a compact activity row. A grouped row receives a quiet
+ * timeline connector (`├─` / `╰─`); a standalone call remains chrome-free.
+ * Truncation goes through the shared ANSI-safe terminal primitives.
  */
 
 import { truncateTerminalLine } from "../ui/terminal-text.ts";
 import type { CompactRowState, CompactTheme } from "./types.ts";
 
 export type CompactRowTone = "normal" | "muted" | "dim";
+export type CompactRowConnector = "middle" | "last";
+
+export interface CompactRowLayout {
+	tone?: CompactRowTone;
+	connector?: CompactRowConnector;
+	toolWidth?: number;
+}
 
 const GLYPHS = {
 	pending: { glyph: "●", role: "accent" },
@@ -24,25 +31,33 @@ export interface CompactRowView {
 	expanded?: boolean;
 }
 
-/** Compose the row line for the given terminal width. Already ≤ width. */
+function connectorPrefix(connector: CompactRowConnector | undefined, theme: CompactTheme): string {
+	if (connector === "middle") return `${theme.fg("muted", "├─")} `;
+	if (connector === "last") return `${theme.fg("muted", "╰─")} `;
+	return "";
+}
+
+/** Compose one responsive activity row, already truncated to `width`. */
 export function compactRowLine(
 	view: CompactRowView,
 	width: number,
 	theme: CompactTheme,
-	tone: CompactRowTone = "normal",
-	depth = 0,
+	layout: CompactRowLayout = {},
 ): string {
+	const tone = layout.tone ?? "normal";
 	const { glyph, role } = GLYPHS[view.state.status ?? "pending"];
-	const indent = " ".repeat(Math.max(0, depth));
+	const toolWidth = Math.max(view.tool.length, layout.toolWidth ?? view.tool.length);
+	const paddedTool = view.tool.padEnd(toolWidth);
+	const historical = tone !== "normal";
+	const tool = historical
+		? theme.fg(tone, paddedTool)
+		: theme.fg("accent", theme.bold(paddedTool));
+	const subject = historical ? theme.fg(tone, view.subject) : theme.fg("text", view.subject);
 	const summary = view.state.summary;
-	if (tone !== "normal") {
-		let plain = `${indent}${glyph} ${view.tool}`;
-		if (view.subject.length > 0) plain += ` · ${view.subject}`;
-		if (summary && summary.length > 0) plain += ` · ${summary}`;
-		return truncateTerminalLine(theme.fg(tone, plain), width, "…");
-	}
-	let line = `${indent}${theme.fg(role, glyph)} ${theme.fg("accent", theme.bold(view.tool))}`;
-	if (view.subject.length > 0) line += theme.fg("text", ` · ${view.subject}`);
+
+	let line = connectorPrefix(layout.connector, theme);
+	line += `${theme.fg(role, glyph)} ${tool}`;
+	if (view.subject.length > 0) line += ` · ${subject}`;
 	if (summary && summary.length > 0) line += theme.fg("dim", ` · ${summary}`);
 	return truncateTerminalLine(line, width, "…");
 }

@@ -4,9 +4,9 @@
  * The line renders through the shared surface registry (ui/surface.ts), so it
  * stacks with the other above-editor surfaces instead of owning a slot.
  *
- * While thinking blocks stream, a `✽ raisonnement` marker is appended at the
- * far right of the same line: the working words keep rotating on the left,
- * the right edge says what the model is doing.
+ * While thinking blocks stream, a Nerd Font brain and a bounded rolling
+ * excerpt are appended at the far right: working words keep rotating on the
+ * left while the current reasoning remains visible but ephemeral.
  */
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { ABOVE_EDITOR_PRIORITY, setOrderedAboveEditorWidget } from "../ui/ordered-widget-stack.ts";
@@ -18,10 +18,16 @@ import {
 } from "./rotation.ts";
 import { createShuffleBag } from "./shuffle-bag.ts";
 import { createSpinnerRotation, SAND_SPINNER } from "./spinner.ts";
+import {
+	appendThinkingDelta,
+	MAX_THINKING_PREVIEW_COLUMNS,
+	rollingThinkingPreview,
+	THINKING_FALLBACK_LABEL,
+	THINKING_ICON,
+} from "./thinking-preview.ts";
 import { WORKING_WORDS } from "./words.ts";
 
 const SURFACE_ID = "working-loader";
-const THINKING_MARKER = "✽ raisonnement";
 const MIN_GAP = 2;
 
 type LoaderMode = "working" | "thinking";
@@ -47,6 +53,7 @@ export default function workingLoader(pi: ExtensionAPI): void {
 	let ui: ExtensionContext["ui"] | undefined;
 	let painted = false;
 	let spinnerFrame = SAND_SPINNER.frames[0];
+	let thinkingBuffer = "";
 	let word = "";
 
 	function paint(): void {
@@ -56,9 +63,17 @@ export default function workingLoader(pi: ExtensionAPI): void {
 			render: (width, theme) => {
 				const left = theme.fg("dim", `${spinnerFrame} ${word}...`);
 				if (mode !== "thinking") return [left];
-				const right = theme.fg("accent", THINKING_MARKER);
+
+				const rightBudget = width - terminalLineWidth(left) - MIN_GAP;
+				const fallbackWidth = terminalLineWidth(`${THINKING_ICON} ${THINKING_FALLBACK_LABEL}`);
+				if (rightBudget < fallbackWidth) return [left];
+				const previewWidth = Math.min(
+					MAX_THINKING_PREVIEW_COLUMNS,
+					rightBudget - terminalLineWidth(THINKING_ICON) - 1,
+				);
+				const preview = rollingThinkingPreview(thinkingBuffer, previewWidth) || THINKING_FALLBACK_LABEL;
+				const right = `${theme.fg("accent", THINKING_ICON)} ${theme.fg("muted", preview)}`;
 				const gap = width - terminalLineWidth(left) - terminalLineWidth(right);
-				if (gap < MIN_GAP) return [left];
 				return [`${left}${" ".repeat(gap)}${right}`];
 			},
 		});
@@ -124,6 +139,7 @@ export default function workingLoader(pi: ExtensionAPI): void {
 	pi.on("agent_start", async (_event, ctx) => {
 		bindUi(ctx);
 		mode = "working";
+		thinkingBuffer = "";
 		show();
 	});
 
@@ -132,17 +148,26 @@ export default function workingLoader(pi: ExtensionAPI): void {
 		hide();
 	});
 
-	// Thinking blocks stream through message_update: show or hide the right
-	// marker as the assistant message progresses.
+	// Thinking deltas update the rolling buffer. The 80ms sand tick repaints it,
+	// naturally capping preview refreshes without another timer.
 	pi.on("message_update", async (event, ctx) => {
 		bindUi(ctx);
-		const eventType = event.assistantMessageEvent?.type;
-		if (isThinkingStreamEvent(eventType)) setMode("thinking");
-		else if (isWorkingStreamEvent(eventType)) setMode("working");
+		const assistantEvent = event.assistantMessageEvent;
+		if (assistantEvent?.type === "thinking_start") {
+			thinkingBuffer = "";
+			setMode("thinking");
+		} else if (assistantEvent?.type === "thinking_delta") {
+			thinkingBuffer = appendThinkingDelta(thinkingBuffer, assistantEvent.delta);
+			setMode("thinking");
+		} else if (isWorkingStreamEvent(assistantEvent?.type)) {
+			thinkingBuffer = "";
+			setMode("working");
+		}
 	});
 
 	pi.on("message_end", async (_event, ctx) => {
 		bindUi(ctx);
+		thinkingBuffer = "";
 		setMode("working");
 	});
 

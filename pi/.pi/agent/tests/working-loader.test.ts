@@ -10,10 +10,18 @@ import {
 	createSpinnerRotation,
 	SAND_SPINNER,
 } from "../extensions/working-loader/spinner.ts";
+import {
+	appendThinkingDelta,
+	MAX_THINKING_BUFFER_LENGTH,
+	normalizeThinkingText,
+	rollingThinkingPreview,
+	THINKING_ICON,
+} from "../extensions/working-loader/thinking-preview.ts";
 import { WORKING_WORDS } from "../extensions/working-loader/words.ts";
 import { isThinkingStreamEvent, isWorkingStreamEvent } from "../extensions/working-loader/index.ts";
 import { surfaceRegistry, subscribeSurfaceChanges } from "../extensions/ui/surface.ts";
 import { ABOVE_EDITOR_PRIORITY } from "../extensions/ui/ordered-widget-stack.ts";
+import { terminalLineWidth } from "../extensions/ui/terminal-text.ts";
 import workingLoader from "../extensions/working-loader/index.ts";
 
 type Fn = (...args: never[]) => unknown;
@@ -51,7 +59,7 @@ function assertSandLoaderPrefix(line: string): void {
 	assert.match(line, /^. \w+\.\.\./u);
 }
 
-type StreamPayload = { assistantMessageEvent?: { type: string } };
+type StreamPayload = { assistantMessageEvent?: { type: string; delta?: string } };
 type Handler = (
 	event: { toolName?: string } & StreamPayload,
 	ctx: { ui: unknown },
@@ -145,6 +153,20 @@ test("sand spinner emits its canonical frames at 80ms and loops", () => {
 	assert.equal(timers[0]?.cleared, true);
 });
 
+test("thinking preview is safe, bounded, and keeps a rolling tail", () => {
+	const source = "\x1b[31m## Checking **widget alignment**\n- while reasoning streams\x1b[0m";
+	assert.equal(normalizeThinkingText(source), "Checking widget alignment while reasoning streams");
+	const preview = rollingThinkingPreview(source, 24);
+	assert.equal(terminalLineWidth(preview), 24);
+	assert.match(preview, /^…/u);
+	assert.match(preview, /reasoning streams$/u);
+	assert.equal(terminalLineWidth(THINKING_ICON), 1, "Nerd Font brain occupies one terminal cell");
+
+	const bounded = appendThinkingDelta("x".repeat(MAX_THINKING_BUFFER_LENGTH), "tail");
+	assert.equal(bounded.length, MAX_THINKING_BUFFER_LENGTH);
+	assert.match(bounded, /tail$/u);
+});
+
 test("shows a rotating word above the editor while the agent works", () => {
 	surfaceRegistry.clear();
 	const { emit } = harness();
@@ -235,7 +257,7 @@ test("stream helpers classify assistant events", () => {
 	assert.equal(isWorkingStreamEvent("thinking_delta"), false);
 });
 
-test("thinking streams append the ✽ marker at the far right of the loader line", () => {
+test("thinking streams show a brain and rolling excerpt at the far right", () => {
 	surfaceRegistry.clear();
 	const { emit } = harness();
 	try {
@@ -244,15 +266,24 @@ test("thinking streams append the ✽ marker at the far right of the loader line
 		emit("message_update", undefined, { assistantMessageEvent: { type: "thinking_start" } });
 
 		const width = 80;
-		const rendered = surfaceRegistry.render("aboveEditor", width, fakeTheme());
-		const line = stripAnsi(rendered[0] ?? "");
-		assertSandLoaderPrefix(line);
-		assert.match(line, /✽ raisonnement$/u, "marqueur à l'extrême droite");
-		assert.equal(line.length, width, "la ligne occupe exactement la largeur");
+		const fallback = stripAnsi(surfaceRegistry.render("aboveEditor", width, fakeTheme())[0] ?? "");
+		assertSandLoaderPrefix(fallback);
+		assert.match(fallback, new RegExp(`${THINKING_ICON} raisonnement$`, "u"));
+		assert.equal(terminalLineWidth(fallback), width, "la ligne occupe exactement la largeur");
+
+		emit("message_update", undefined, {
+			assistantMessageEvent: {
+				type: "thinking_delta",
+				delta: "Inspecting the shared widget alignment and current reasoning stream.",
+			},
+		});
+		const rolling = stripAnsi(surfaceRegistry.render("aboveEditor", width, fakeTheme())[0] ?? "");
+		assert.match(rolling, new RegExp(`${THINKING_ICON} ….*current reasoning stream\\.$`, "u"));
+		assert.equal(terminalLineWidth(rolling), width);
 
 		emit("message_update", undefined, { assistantMessageEvent: { type: "text_start" } });
 		const backToWork = stripAnsi(surfaceRegistry.render("aboveEditor", width, fakeTheme())[0] ?? "");
-		assert.doesNotMatch(backToWork, /✽/u, "marqueur retiré hors raisonnement");
+		assert.doesNotMatch(backToWork, new RegExp(THINKING_ICON, "u"), "aperçu retiré hors raisonnement");
 		emit("agent_end");
 	} finally {
 		surfaceRegistry.clear();
@@ -265,10 +296,12 @@ test("mode flips repaint immediately, not on the next rotation tick", () => {
 	try {
 		emit("session_start");
 		emit("agent_start");
-		emit("message_update", undefined, { assistantMessageEvent: { type: "thinking_delta" } });
+		emit("message_update", undefined, {
+			assistantMessageEvent: { type: "thinking_delta", delta: "Checking repaint behavior" },
+		});
 		assert.match(
 			stripAnsi(surfaceRegistry.render("aboveEditor", 80, fakeTheme())[0] ?? ""),
-			/✽ raisonnement$/u,
+			new RegExp(`${THINKING_ICON} Checking repaint behavior$`, "u"),
 		);
 		emit("agent_end");
 	} finally {
@@ -286,7 +319,7 @@ test("the marker is dropped on narrow widths instead of breaking the line", () =
 
 		const line = stripAnsi(surfaceRegistry.render("aboveEditor", 24, fakeTheme())[0] ?? "");
 		assertSandLoaderPrefix(line);
-		assert.doesNotMatch(line, /✽/u, "seul le mot de travail reste");
+		assert.doesNotMatch(line, new RegExp(THINKING_ICON, "u"), "seul le mot de travail reste");
 		emit("agent_end");
 	} finally {
 		surfaceRegistry.clear();
@@ -303,7 +336,7 @@ test("message_end returns the loader to working mode", () => {
 		emit("message_end");
 		assert.doesNotMatch(
 			stripAnsi(surfaceRegistry.render("aboveEditor", 80, fakeTheme())[0] ?? ""),
-			/✽/u,
+			new RegExp(THINKING_ICON, "u"),
 		);
 		emit("agent_end");
 	} finally {

@@ -297,3 +297,17 @@ false`), donc le singleton de module `surfaceRegistry` était dupliqué ; les
 - Tests : suites background-display + working-loader 19/19, esbuild Background
   et `make pi-test` complet au vert (pi-ui 67/67).
 - Suite : `/reload`, puis vérification dans le pane réel.
+
+### 2026-08-31 — aperçu roulant du reasoning
+
+- Fait : le marqueur statique `✽ raisonnement` devient `nf-md-brain` suivi d'un
+  extrait roulant des `thinking_delta`, aligné à droite et plafonné à 48
+  colonnes ; fallback `raisonnement` avant le premier delta, suppression sur
+  largeur étroite et hors reasoning.
+- Sécurité/perf : buffer éphémère borné à 8 192 caractères, contrôles terminal
+  et décoration Markdown retirés ; le tick `sand` à 80 ms cadence les repaints,
+  sans timer ni appel modèle supplémentaire.
+- Fichiers : `working-loader/{index,thinking-preview}.ts`, README et test.
+- Tests : working-loader 14/14, esbuild de l'entrypoint et `make pi-test`
+  complet au vert (pi-ui 68/68).
+- Suite : `/reload`, puis validation du glyph et du rolling dans le pane réel.

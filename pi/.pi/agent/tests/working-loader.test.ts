@@ -6,7 +6,8 @@ import {
 	type IntervalScheduler,
 } from "../extensions/working-loader/rotation.ts";
 import { createShuffleBag, type NonEmptyArray } from "../extensions/working-loader/shuffle-bag.ts";
-import { WORKING_WORDS } from "../extensions/working-loader/words.ts";
+import { THINKING_WORDS, WORKING_WORDS } from "../extensions/working-loader/words.ts";
+import { isThinkingStreamEvent, isWorkingStreamEvent } from "../extensions/working-loader/index.ts";
 import { surfaceRegistry, subscribeSurfaceChanges } from "../extensions/ui/surface.ts";
 import { ABOVE_EDITOR_PRIORITY } from "../extensions/ui/ordered-widget-stack.ts";
 import workingLoader from "../extensions/working-loader/index.ts";
@@ -32,7 +33,11 @@ function fakeTheme() {
 	return { fg: (_role: string, text: string) => text };
 }
 
-type Handler = (event: { toolName?: string }, ctx: { ui: unknown }) => Promise<void> | void;
+type StreamPayload = { assistantMessageEvent?: { type: string } };
+type Handler = (
+	event: { toolName?: string } & StreamPayload,
+	ctx: { ui: unknown },
+) => Promise<void> | void;
 
 function harness(uiOverrides: Partial<Record<string, Fn>> = {}) {
 	const handlers = new Map<string, Handler>();
@@ -51,8 +56,8 @@ function harness(uiOverrides: Partial<Record<string, Fn>> = {}) {
 		on: (event: string, handler: Handler) => handlers.set(event, handler),
 	};
 	(workingLoader as unknown as (api: unknown) => void)(pi);
-	const emit = (event: string, toolName?: string) =>
-		handlers.get(event)?.({ toolName }, { ui });
+	const emit = (event: string, toolName?: string, payload?: StreamPayload) =>
+		handlers.get(event)?.({ toolName, ...payload }, { ui });
 	return { emit, calls, ui };
 }
 
@@ -177,4 +182,68 @@ test("declares the working priority in the shared constant", () => {
 	assert.equal(ABOVE_EDITOR_PRIORITY.working, 50);
 	const removeListener = subscribeSurfaceChanges(() => {});
 	removeListener();
+});
+
+test("stream helpers classify assistant events", () => {
+	assert.equal(isThinkingStreamEvent("thinking_start"), true);
+	assert.equal(isThinkingStreamEvent("thinking_delta"), true);
+	assert.equal(isThinkingStreamEvent("text_delta"), false);
+	assert.equal(isWorkingStreamEvent("text_start"), true);
+	assert.equal(isWorkingStreamEvent("toolcall_start"), true);
+	assert.equal(isWorkingStreamEvent("thinking_end"), true);
+	assert.equal(isWorkingStreamEvent("thinking_delta"), false);
+});
+
+test("thinking streams flip the loader to ✽ with the reasoning vocabulary", () => {
+	surfaceRegistry.clear();
+	const { emit } = harness();
+	try {
+		emit("session_start");
+		emit("agent_start");
+		emit("message_update", undefined, { assistantMessageEvent: { type: "thinking_start" } });
+
+		const rendered = surfaceRegistry.render("aboveEditor", 80, fakeTheme());
+		assert.match(rendered[0] ?? "", /^✽ \w+\.\.\.$/u);
+		const word = (rendered[0] ?? "").replace(/^✽ /u, "").replace(/\.\.\.$/u, "");
+		assert.ok((THINKING_WORDS as readonly string[]).includes(word), `« ${word} » hors vocabulaire de raisonnement`);
+
+		emit("message_update", undefined, { assistantMessageEvent: { type: "text_start" } });
+		const backToWork = surfaceRegistry.render("aboveEditor", 80, fakeTheme());
+		assert.match(backToWork[0] ?? "", /^✻ /u);
+		emit("agent_end");
+	} finally {
+		surfaceRegistry.clear();
+	}
+});
+
+test("mode flips repaint immediately, not on the next rotation tick", () => {
+	surfaceRegistry.clear();
+	const { emit } = harness();
+	try {
+		emit("session_start");
+		emit("agent_start");
+		const before = surfaceRegistry.render("aboveEditor", 80, fakeTheme())[0];
+		emit("message_update", undefined, { assistantMessageEvent: { type: "thinking_delta" } });
+		const after = surfaceRegistry.render("aboveEditor", 80, fakeTheme())[0];
+		assert.match(after ?? "", /^✽ /u);
+		assert.notEqual(before, after);
+		emit("agent_end");
+	} finally {
+		surfaceRegistry.clear();
+	}
+});
+
+test("message_end returns the loader to working mode", () => {
+	surfaceRegistry.clear();
+	const { emit } = harness();
+	try {
+		emit("session_start");
+		emit("agent_start");
+		emit("message_update", undefined, { assistantMessageEvent: { type: "thinking_start" } });
+		emit("message_end");
+		assert.match(surfaceRegistry.render("aboveEditor", 80, fakeTheme())[0] ?? "", /^✻ /u);
+		emit("agent_end");
+	} finally {
+		surfaceRegistry.clear();
+	}
 });

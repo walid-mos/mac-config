@@ -80,3 +80,22 @@ et successeurs) : `compact-tools`, `edit-view`, `background`, `ui/frame`, `foote
 - Tests : repro node (wl-real3) au vert ; suite working-loader 12/12.
 - Suite : leçon — ne jamais /reload pendant une série d'edits en cours ;
   attendre le vert de la gate.
+
+### 2026-08-30 — fix : registre surface réellement global entre extensions
+- Fait : diagnostic du pop/dépop du loader pendant les runs avec jobs
+  background — pi charge chaque extension via un jiti frais (`moduleCache:
+  false`), donc le singleton de module `surfaceRegistry` était dupliqué ; les
+  registres isolés montaient le même host `ordered-above-editor` et
+  s'évinçaient, d'où l'alternance loader ↔ `◆ BACKGROUND` capturée sous tmux.
+  Fix définitif : registre et bindings du host stockés sur `globalThis` via des
+  `Symbol.for(...)` process-globaux ; toutes les extensions partagent le même
+  registre, le même host et l'ordre global des priorités.
+- Fichiers : `ui/surface.ts`, `ui/ordered-widget-stack.ts`, `ui/README.md`,
+  `AGENTS.md`, `tests/ordered-widget-stack.test.ts`,
+  `tests/ui-registry-policy.test.ts`.
+- Tests : deux imports isolés partagent le même objet registre et montent un
+  seul host ; politique `setWidget`/`setFooter` ; `make pi-ui-test` 16/16 ;
+  repro tmux réel — loader + background simultanés pendant les deux runs
+  (shots 012–021 et 035–043), loader absent uniquement lorsque l'agent est
+  idle ; `make pi-test` complet au vert.
+- Suite : —

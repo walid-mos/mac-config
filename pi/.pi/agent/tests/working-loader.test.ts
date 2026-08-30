@@ -218,6 +218,7 @@ test("thinking streams append the ✽ marker at the far right of the loader line
 		emit("message_update", undefined, { assistantMessageEvent: { type: "text_start" } });
 		const backToWork = stripAnsi(surfaceRegistry.render("aboveEditor", width, fakeTheme())[0] ?? "");
 		assert.doesNotMatch(backToWork, /✽/u, "marqueur retiré hors raisonnement");
+		emit("agent_end");
 	} finally {
 		surfaceRegistry.clear();
 	}

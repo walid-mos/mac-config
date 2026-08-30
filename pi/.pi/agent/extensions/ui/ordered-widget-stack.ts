@@ -2,7 +2,7 @@ import type { ExtensionUIContext, Theme } from "@earendil-works/pi-coding-agent"
 import type { TUI } from "@earendil-works/pi-tui";
 import { subscribeSurfaceChanges, surfaceRegistry, type SurfacePlacement } from "./surface.ts";
 
-const HOST_WIDGET_IDS: Record<SurfacePlacement, string> = {
+export const HOST_WIDGET_IDS: Readonly<Record<SurfacePlacement, string>> = {
 	aboveEditor: "ordered-above-editor",
 	belowEditor: "ordered-below-editor",
 };
@@ -26,9 +26,34 @@ type WidgetPlacement = SurfacePlacement;
  * currently mounted for each placement. Entry bookkeeping lives in the
  * surface registry; this map only tracks the mounted pi widget per placement.
  */
-type PlacementBinding = { host?: OrderedWidgetHost };
+type OrderedWidgetHostBinding = {
+	dispose: () => void;
+};
 
-const bindingsByPlacement = new Map<WidgetPlacement, PlacementBinding>();
+type PlacementBinding = { host?: OrderedWidgetHostBinding };
+
+type GlobalWidgetStackState = {
+	version: 1;
+	bindingsByPlacement: Map<WidgetPlacement, PlacementBinding>;
+};
+
+const GLOBAL_WIDGET_STACK_STATE = Symbol.for("stow.pi.ui.ordered-widget-stack.v1");
+
+/** Share the mounted-host bindings across pi's isolated jiti module graphs. */
+function getGlobalWidgetStackState(): GlobalWidgetStackState {
+	const store = globalThis as unknown as Record<PropertyKey, unknown>;
+	const current = store[GLOBAL_WIDGET_STACK_STATE] as GlobalWidgetStackState | undefined;
+	if (current?.version === 1) return current;
+
+	const state: GlobalWidgetStackState = {
+		version: 1,
+		bindingsByPlacement: new Map(),
+	};
+	store[GLOBAL_WIDGET_STACK_STATE] = state;
+	return state;
+}
+
+const { bindingsByPlacement } = getGlobalWidgetStackState();
 
 class OrderedWidgetHost {
 	private readonly unsubscribe: () => void;

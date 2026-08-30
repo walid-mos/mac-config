@@ -83,7 +83,31 @@ export function createSurfaceRegistry(): SurfaceRegistry {
 	return { register, unregister, clear, hasEntries, render, subscribe };
 }
 
-export const surfaceRegistry = createSurfaceRegistry();
+const GLOBAL_SURFACE_STATE = Symbol.for("stow.pi.ui.surface-registry.v1");
+
+type GlobalSurfaceState = {
+	version: 1;
+	registry: SurfaceRegistry;
+};
+
+/**
+ * pi evaluates every extension through a fresh jiti instance with module
+ * caching disabled. A module-level singleton would therefore exist once per
+ * extension and would not be global at all. Store the registry on globalThis
+ * under a process-wide symbol so every isolated extension module graph gets
+ * the exact same registry object.
+ */
+function getGlobalSurfaceRegistry(): SurfaceRegistry {
+	const store = globalThis as unknown as Record<PropertyKey, unknown>;
+	const current = store[GLOBAL_SURFACE_STATE] as GlobalSurfaceState | undefined;
+	if (current?.version === 1) return current.registry;
+
+	const registry = createSurfaceRegistry();
+	store[GLOBAL_SURFACE_STATE] = { version: 1, registry } satisfies GlobalSurfaceState;
+	return registry;
+}
+
+export const surfaceRegistry = getGlobalSurfaceRegistry();
 
 export function subscribeSurfaceChanges(listener: () => void): () => void {
 	return surfaceRegistry.subscribe(listener);

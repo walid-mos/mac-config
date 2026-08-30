@@ -129,3 +129,14 @@ et successeurs) : `compact-tools`, `edit-view`, `background`, `ui/frame`, `foote
   `edit-view/README.md`.
 - Tests : edit-view 10/10, esbuild de l’entrypoint edit-view.
 - Suite : brancher le renderer `write` sur cette primitive.
+
+### 2026-08-30 — write et edit partagent le même langage visuel
+- Fait : `write` possède désormais une row compacte pending/erreur puis un
+  cadre de création au succès, identique au cadre `edit` ; les lignes sont des
+  ajouts, plafonnées et estompées, tandis que `ctrl+o` restaure le `renderCall`
+  natif et sa coloration syntaxique sans perdre le composant compact.
+- Fichiers : `write-view/{index,body,component,frame}.ts`, README write-view,
+  `compact-tools/{renderer,summary}.ts`, tests write/compact et docs compact.
+- Tests : write-view 7/7, compact-tools + edit-view 35/35, esbuild write-view,
+  `make pi-test` complet au vert.
+- Suite : ajouter ces suites de rendu à la gate `pi-ui-test`.

@@ -40,6 +40,7 @@ export function subjectFor(tool: string, args: Record<string, unknown> | undefin
 		case "ls":
 			return baseName(String(a.path ?? "."));
 		case "edit":
+		case "write":
 			return baseName(String(a.path ?? ""));
 		case "background": {
 			const action = toSingleLine(String(a.action ?? ""));
@@ -112,7 +113,8 @@ export function summarizeResult(
 		case "ls":
 			return limitSummary(details, "entryLimitReached", "entrées") ?? `${countTextLines(firstText(result))} lignes`;
 		case "edit":
-			// Success is carried entirely by the edit-view frame; errors fit a line.
+		case "write":
+			// Success is carried entirely by the mutation frame; errors fit a line.
 			return result.isError ? firstLine(firstText(result)) : "";
 		case "background":
 			return firstLine(firstText(result));

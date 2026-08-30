@@ -67,6 +67,7 @@ test("subjectFor extrait le sujet par tool", () => {
 	assert.equal(subjectFor("read", { path: "/a/b/agent.ts", offset: 5 }), "agent.ts dès la ligne 5");
 	assert.equal(subjectFor("grep", { pattern: "foo.*bar" }), '"foo.*bar"');
 	assert.equal(subjectFor("ls", { path: "/a/b/c" }), "c");
+	assert.equal(subjectFor("write", { path: "/a/b/new.ts" }), "new.ts");
 });
 
 test("countTextLines compte les lignes non vides", () => {
@@ -118,7 +119,7 @@ test("summarizeResult background résume la première ligne de sortie", () => {
 	assert.equal(summarizeResult("background", {}, result), "tick 1");
 });
 
-test("summarizeResult edit résume la première ligne d'erreur seulement", () => {
+test("summarizeResult edit/write résume la première ligne d'erreur seulement", () => {
 	const ok: CompactToolResult = { content: [{ type: "text", text: "ok" }], isError: false };
 	assert.equal(summarizeResult("edit", {}, ok), "");
 	const fail: CompactToolResult = {
@@ -126,6 +127,7 @@ test("summarizeResult edit résume la première ligne d'erreur seulement", () =>
 		isError: true,
 	};
 	assert.equal(summarizeResult("edit", {}, fail), "oldText introuvable");
+	assert.equal(summarizeResult("write", {}, fail), "oldText introuvable");
 });
 
 test("compactRowLine compose glyphe, label, sujet et résumé", () => {

@@ -33,6 +33,7 @@ export interface CompactRenderers {
  * status glyph and summary follow the shared state updated by renderResult.
  */
 interface RowComponent extends CompactComponent {
+	readonly compactRow: true;
 	view: CompactRowView | null;
 	hideOnSuccess: boolean;
 	toolCallId?: string;
@@ -40,6 +41,7 @@ interface RowComponent extends CompactComponent {
 
 function makeRowComponent(hideOnSuccess: boolean): RowComponent {
 	return {
+		compactRow: true,
 		view: null,
 		hideOnSuccess,
 		render(width: number): string[] {
@@ -71,6 +73,9 @@ export interface CompactRendererOptions {
 		theme: CompactTheme,
 		context: CompactRenderContext,
 	) => CompactComponent;
+	/** Use the built-in call renderer in expanded mode (write carries its
+	 * complete preview in renderCall rather than renderResult). */
+	nativeCallWhenExpanded?: boolean;
 }
 
 export function createCompactRenderers(
@@ -82,12 +87,29 @@ export function createCompactRenderers(
 	return {
 		renderCall(args, theme, context) {
 			const state = context.state;
+			if (rendererOptions.nativeCallWhenExpanded && context.expanded) {
+				const native = resolveNative?.(context.cwd);
+				if (native?.renderCall) {
+					const lastComponent = state.compactNativeCallComponent as CompactComponent | undefined;
+					const component = native.renderCall(args, theme, { ...context, lastComponent });
+					state.compactNativeCallComponent = component;
+					return component;
+				}
+			}
 			if (context.executionStarted && state.startedAt === undefined) {
 				state.startedAt = Date.now();
 				state.endedAt = undefined;
 			}
 			if (state.status === undefined) state.status = "pending";
-			const component = (context.lastComponent as RowComponent | undefined) ?? makeRowComponent(hideOnSuccess);
+			const lastComponent = context.lastComponent as RowComponent | undefined;
+			const storedComponent = state.compactRowComponent as RowComponent | undefined;
+			const component =
+				lastComponent?.compactRow === true
+					? lastComponent
+					: storedComponent?.compactRow === true
+					? storedComponent
+					: makeRowComponent(hideOnSuccess);
+			state.compactRowComponent = component;
 			component.view = {
 				tool,
 				subject: subjectFor(tool, args),

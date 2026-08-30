@@ -4,7 +4,7 @@
  * rendering is replaced. ctrl+o expands back to the full native output.
  * "bash" belongs to the pi-background extension, which reuses the shared
  * renderers (compact-tools/renderer.ts) for its supervised bash tool.
- * `edit` and `write` keep their complete native rendering (diffs matter).
+ * `edit` and `write` use their dedicated mutation-frame extensions.
  */
 
 import {

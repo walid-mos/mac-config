@@ -3,8 +3,8 @@
 Remplace le rendu des tools built-in `read`, `grep`, `find`, `ls` par une ligne
 unique d'information. Les calls compacts consécutifs sont composés dans une
 seule pile : Pi n'ajoute ainsi qu'un spacer externe pour tout le groupe, et les
-anciennes rows s'estompent derrière la plus récente. `write` garde son rendu
-natif complet ; `edit` possède son propre cadre (extension edit-view).
+anciennes rows s'estompent derrière la plus récente. `write` et `edit`
+possèdent leurs cadres cohérents (`write-view` et `edit-view`).
 
 - `ctrl+o` délègue au `renderResult` natif : sortie complète, images, elapsed
   time bash (l'état `startedAt`/`endedAt` est seedé comme le renderer natif).

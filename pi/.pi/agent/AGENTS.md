@@ -24,7 +24,7 @@
 ## Git
 
 - Par défaut, créer une branche dédiée avant le premier commit. Si l’utilisateur demande explicitement de travailler sur la branche principale, y committer directement.
-- Toujours fusionner une branche avec `git merge --no-ff` afin de conserver un merge commit visible. Ne jamais fast-forward une fusion.
+- Par défaut, fusionner avec `git merge --no-ff` pour conserver un merge commit visible. Si l’utilisateur demande explicitement un fast-forward, utiliser `git merge --ff-only`, notamment pour une branche créée impromptument.
 - Ne pas pousser systématiquement.
 - Ne jamais signaler comme modification un fichier présent dans `git status` mais absent de `git diff` et `git diff --cached` ; c’est un effet de filtre Git sans changement à committer (notamment `pi/.pi/agent/settings.json`).
 - **Commit atomique — définition unique** : un commit est atomique si et seulement si les 4 critères sont réunis :

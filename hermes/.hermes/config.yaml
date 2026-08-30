@@ -5,6 +5,9 @@ model:
 agent:
   disabled_toolsets:
     - kanban
+browser:
+  cdp_url: http://127.0.0.1:9223
+  use_real_profile: false
 skills:
   disabled:
     - apple-notes
@@ -126,6 +129,12 @@ known_plugin_toolsets:
     - a2a
   cron:
     - a2a
+plugins:
+  enabled: []
+  disabled:
+    - browser/browser_use
+    - browser/browserbase
+    - browser/firecrawl
 
 # ── Security ──────────────────────────────────────────────────────────
 # Secret redaction is ON by default — strings that look like API keys,

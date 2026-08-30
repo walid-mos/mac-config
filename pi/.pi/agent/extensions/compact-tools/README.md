@@ -31,7 +31,9 @@ possèdent leurs cadres cohérents (`write-view` et `edit-view`).
 - `renderer.ts` : renderers partagés (call compact / résultat collapsé ou
   natif étendu), réutilisables par toute extension possédant un tool.
 - `stack.ts` : registre process-global des rows, groupes de calls consécutifs,
-  composition estompée portée par le dernier composant.
+  composition estompée portée par le dernier composant. Aucun nom de tool
+  n'est hardcodé : chaque `createCompactRenderers()` s'enregistre par défaut ;
+  les renderers à corps riche opt-out avec `stackRows: false`.
 - `lifecycle.ts` : reconstruit les groupes depuis la session et suit les
   messages streamés sans dupliquer les tool calls.
 - `line.ts` : composition pure de la ligne thémée + troncature.

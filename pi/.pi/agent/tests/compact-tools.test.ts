@@ -48,6 +48,12 @@ function renderOne(component: CompactComponent, width = 80): string {
 	return lines[0];
 }
 
+function stackWithTools(...tools: string[]): CompactRowStack {
+	const stack = new CompactRowStack();
+	for (const tool of tools) stack.registerTool(tool, true);
+	return stack;
+}
+
 test("COMPACT_TOOLS couvre exactement les tools collapsés (bash appartient à pi-background)", () => {
 	assert.deepEqual([...COMPACT_TOOLS], ["read", "grep", "find", "ls"]);
 });
@@ -287,7 +293,7 @@ test("createCompactOverrides ignore les tools natifs inconnus", () => {
 });
 
 test("CompactRowStack regroupe les calls compacts consécutifs sans spacer intermédiaire", () => {
-	const stack = new CompactRowStack();
+	const stack = stackWithTools("read", "grep");
 	stack.rebuild([
 		{ role: "user", content: "test" },
 		{ role: "assistant", content: [{ type: "toolCall", id: "r1", name: "read" }] },
@@ -313,8 +319,8 @@ test("CompactRowStack regroupe les calls compacts consécutifs sans spacer inter
 	]);
 });
 
-test("CompactRowStack coupe la pile sur texte visible, user et tool riche", () => {
-	const stack = new CompactRowStack();
+test("CompactRowStack coupe la pile sur texte visible, user et tool non enregistré", () => {
+	const stack = stackWithTools("read");
 	stack.rebuild([
 		{ role: "assistant", content: [{ type: "toolCall", id: "r1", name: "read" }] },
 		{ role: "assistant", content: [{ type: "text", text: "progression" }, { type: "toolCall", id: "r2", name: "read" }] },
@@ -327,7 +333,7 @@ test("CompactRowStack coupe la pile sur texte visible, user et tool riche", () =
 });
 
 test("CompactRowStack déduplique les message_update streamés", () => {
-	const stack = new CompactRowStack();
+	const stack = stackWithTools("read");
 	stack.beginMessage({ role: "assistant", content: [{ type: "text", text: "go" }] });
 	stack.updateMessage({
 		role: "assistant",
@@ -352,13 +358,23 @@ test("CompactRowStack déduplique les message_update streamés", () => {
 	assert.deepEqual(stack.groups(), [["r1", "r2"]]);
 });
 
+test("tout renderer compact s'enregistre automatiquement dans la pile", () => {
+	const stack = new CompactRowStack();
+	stack.registerTool("custom_search", true);
+	stack.rebuild([
+		{ role: "assistant", content: [{ type: "toolCall", id: "c1", name: "custom_search" }] },
+		{ role: "assistant", content: [{ type: "toolCall", id: "c2", name: "custom_search" }] },
+	]);
+	assert.deepEqual(stack.groups(), [["c1", "c2"]]);
+});
+
 test("les renderers délèguent la pile au dernier composant", () => {
 	compactRowStack.reset();
+	const [definition] = createCompactOverrides({ createBuiltin: fakeNative });
 	compactRowStack.rebuild([
 		{ role: "assistant", content: [{ type: "toolCall", id: "r1", name: "read" }] },
 		{ role: "assistant", content: [{ type: "toolCall", id: "r2", name: "read" }] },
 	]);
-	const [definition] = createCompactOverrides({ createBuiltin: fakeNative });
 	const firstContext = fakeContext({ toolCallId: "r1", args: { path: "/a.ts" } });
 	const secondContext = fakeContext({ toolCallId: "r2", args: { path: "/b.ts" } });
 	const first = definition.renderCall!({ path: "/a.ts" }, theme, firstContext);

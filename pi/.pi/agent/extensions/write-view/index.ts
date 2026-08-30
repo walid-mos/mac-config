@@ -19,6 +19,7 @@ export default function writeView(pi: ExtensionAPI): void {
 	const renderers = createCompactRenderers("write", (cwd) => (cwd ? nativeFor(cwd) : undefined), {
 		hideRowOnSuccess: true,
 		collapsedBody: writeCollapsedBody,
+		stackRows: false,
 		nativeCallWhenExpanded: true,
 	});
 

@@ -1,6 +1,5 @@
 import { compactRowLine, type CompactRowTone, type CompactRowView } from "./line.ts";
 
-const STACK_TOOLS = new Set(["read", "grep", "find", "ls", "bash", "background"]);
 const STACK_SYMBOL = Symbol.for("pi.compact-tools.row-stack.v1");
 
 interface StackEntry {
@@ -34,10 +33,20 @@ export interface StackMessage {
 export class CompactRowStack {
 	private readonly entries = new Map<string, StackEntry>();
 	private readonly groupById = new Map<string, string[]>();
+	private readonly stackableTools = new Set<string>();
 	private activeGroup: string[] | undefined;
 	private readonly seenCallIds = new Set<string>();
 	private liveAssistant = false;
 	private liveTextBoundaryApplied = false;
+
+	registerTool(tool: string, stackable: boolean): void {
+		if (stackable) this.stackableTools.add(tool);
+		else this.stackableTools.delete(tool);
+	}
+
+	clearRegisteredTools(): void {
+		this.stackableTools.clear();
+	}
 
 	reset(): void {
 		this.entries.clear();
@@ -147,7 +156,7 @@ export class CompactRowStack {
 	private consumeToolBlock(block: MessageBlock): void {
 		if (!isToolCall(block) || this.seenCallIds.has(block.id)) return;
 		this.seenCallIds.add(block.id);
-		if (!STACK_TOOLS.has(block.name)) {
+		if (!this.stackableTools.has(block.name)) {
 			this.breakGroup();
 			return;
 		}

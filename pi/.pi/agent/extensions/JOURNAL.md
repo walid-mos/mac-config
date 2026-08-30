@@ -156,3 +156,13 @@ et successeurs) : `compact-tools`, `edit-view`, `background`, `ui/frame`, `foote
 - Fichiers : `compact-tools/{renderer,types}.ts`, test compact-tools.
 - Tests : renderers compact/edit/write 43/43, esbuild compact-tools/write-view.
 - Suite : validation visuelle dans un vrai transcript Pi.
+
+### 2026-08-30 — inscription dynamique des tools empilables
+- Fait : suppression de l’allowlist de noms dans la pile compacte ; tout tool
+  utilisant `createCompactRenderers()` s’inscrit automatiquement, tandis que
+  les vues riches déclarent `stackRows: false`. Un tool inconnu/non enregistré
+  reste une frontière et conserve son renderer propre, sans fusion incorrecte.
+- Fichiers : `compact-tools/{stack,renderer,lifecycle}.ts`, README et tests ;
+  options edit/write.
+- Tests : renderers compact/edit/write 44/44, esbuild des trois entrypoints.
+- Suite : regrouper edit/write dans une seule extension mutation-view.

@@ -34,6 +34,7 @@ export default function editView(pi: ExtensionAPI): void {
 		{
 			hideRowOnSuccess: true,
 			collapsedBody: editCollapsedBody,
+			stackRows: false,
 		},
 	);
 

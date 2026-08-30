@@ -73,6 +73,9 @@ export interface CompactRendererOptions {
 		theme: CompactTheme,
 		context: CompactRenderContext,
 	) => CompactComponent;
+	/** Whether this renderer participates in consecutive compact-row stacks.
+	 * Rich mutation bodies opt out; ordinary one-line renderers opt in. */
+	stackRows?: boolean;
 	/** Use the built-in call renderer in expanded mode (write carries its
 	 * complete preview in renderCall rather than renderResult). */
 	nativeCallWhenExpanded?: boolean;
@@ -84,6 +87,7 @@ export function createCompactRenderers(
 	rendererOptions: CompactRendererOptions = {},
 ): CompactRenderers {
 	const hideOnSuccess = rendererOptions.hideRowOnSuccess === true;
+	compactRowStack.registerTool(tool, rendererOptions.stackRows !== false);
 	return {
 		renderCall(args, theme, context) {
 			const state = context.state;

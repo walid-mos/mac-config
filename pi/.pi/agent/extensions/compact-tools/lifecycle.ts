@@ -31,5 +31,6 @@ export function registerCompactStackLifecycle(pi: ExtensionAPI): void {
 	});
 	pi.on("session_shutdown", () => {
 		compactRowStack.reset();
+		compactRowStack.clearRegisteredTools();
 	});
 }

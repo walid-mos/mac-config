@@ -330,6 +330,7 @@ pi-ui-test:
 		pi/.pi/agent/tests/compact-tools.test.ts \
 		pi/.pi/agent/tests/mutation-view-edit.test.ts \
 		pi/.pi/agent/tests/ordered-widget-stack.test.ts \
+		pi/.pi/agent/tests/response-view.test.ts \
 		pi/.pi/agent/tests/ui-registry-policy.test.ts \
 		pi/.pi/agent/tests/working-loader.test.ts \
 		pi/.pi/agent/tests/mutation-view-write.test.ts

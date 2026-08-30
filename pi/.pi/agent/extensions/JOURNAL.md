@@ -57,3 +57,14 @@ et successeurs) : `compact-tools`, `edit-view`, `background`, `ui/frame`, `foote
 - Tests : `scripts/test-pi-startup.py` au vert après déploiement.
 - Suite : ne pas oublier de rebasculer le stow sur le checkout principal en
   fin de vie de la branche.
+
+### 2026-08-30 — marqueur de raisonnement à droite du loader (retour utilisateur)
+- Fait : le basculement de glyph/couleur/vocabulaire du loader est reverté au
+  profit d'un marqueur `✽ raisonnement` (accent) aligné à l'extrême droite de
+  la ligne du loader pendant le streaming de thinking ; à gauche, les mots de
+  travail `✻` tournent inchangés ; marqueur retiré hors raisonnement et tombé
+  sur largeur insuffisante ; `THINKING_WORDS` supprimé (inutilisé).
+- Fichiers : `working-loader/index.ts`, `working-loader/words.ts`,
+  `tests/working-loader.test.ts`.
+- Tests : node --test working-loader 12/12 ; esbuild index.
+- Suite : —

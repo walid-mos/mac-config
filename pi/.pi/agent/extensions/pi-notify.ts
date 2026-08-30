@@ -28,6 +28,10 @@ export type ChildProcessLike = {
     event: "close",
     listener: (code: number | null, signal: NodeJS.Signals | null) => void,
   ): ChildProcessLike;
+  stdout?: {
+    on(event: "data", listener: (chunk: Buffer | string) => void): unknown;
+  };
+  kill?(): boolean;
   unref?(): void;
 };
 
@@ -93,6 +97,70 @@ function runBestEffort(
 
 function detachedOptions(): SpawnOptions {
   return { detached: true, stdio: "ignore" };
+}
+
+/**
+ * Sonde best-effort de l'état de focalisation Herdr : `true` (pane focalisée,
+ * l'utilisateur la regarde déjà), `false` (pane en arrière-plan) ou
+ * `undefined` (sonde indisponible — échec, sortie illisible, timeout).
+ * `undefined` laisse passer la notification : rater une fin de tâche est pire
+ * qu'un doublon rare.
+ */
+export function createFocusProbe(
+  operations: NotificationOperations,
+  timeoutMs = 1_500,
+): (socket: string, pane: string) => Promise<boolean | undefined> {
+  return async function probe(socket: string, pane: string): Promise<boolean | undefined> {
+    const stdout = await runCollecting(
+      operations,
+      HERDR,
+      ["agent", "get", pane],
+      { env: { ...process.env, HERDR_SOCKET_PATH: socket }, timeout: timeoutMs },
+      timeoutMs,
+    );
+    try {
+      const parsed = JSON.parse(stdout ?? "") as {
+        result?: { agent?: { focused?: unknown } };
+      };
+      const focused = parsed.result?.agent?.focused;
+      return typeof focused === "boolean" ? focused : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+}
+
+function runCollecting(
+  operations: NotificationOperations,
+  command: string,
+  args: readonly string[],
+  options: SpawnOptions,
+  timeoutMs: number,
+): Promise<string | undefined> {
+  return new Promise(function collectProcess(resolve) {
+    let settled = false;
+    let stdout = "";
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve(stdout);
+    };
+
+    try {
+      const child = operations.spawn(command, args, options);
+      child.on("error", () => finish());
+      child.stdout?.on("data", (chunk: Buffer | string) => {
+        stdout += typeof chunk === "string" ? chunk : chunk.toString("utf8");
+      });
+      child.once("close", () => finish());
+      setTimeout(() => {
+        child.kill?.();
+        finish();
+      }, timeoutMs).unref?.();
+    } catch {
+      finish();
+    }
+  });
 }
 
 function shellQuote(value: string): string {
@@ -235,6 +303,7 @@ type ExtensionDependencies = {
   environment: NotificationEnvironment;
   operations: NotificationOperations;
   poster: NotificationPoster;
+  paneFocused(socket: string, pane: string): Promise<boolean | undefined>;
   processCwd(): string;
 };
 
@@ -244,6 +313,7 @@ export function createPiNotifyExtension(
   const operations = overrides.operations ?? defaultOperations;
   const environment = overrides.environment ?? process.env;
   const poster = overrides.poster ?? new NotificationPoster(operations);
+  const paneFocused = overrides.paneFocused ?? createFocusProbe(operations);
   const processCwd = overrides.processCwd ?? process.cwd;
 
   return function registerPiNotify(pi: any) {
@@ -265,6 +335,16 @@ export function createPiNotifyExtension(
         // Best-effort : silencieux, y compris pour une opération injectée défaillante.
       }
     };
+    // Pas de notification quand l'utilisateur regarde déjà cette pane : une
+    // sonde échouée (undefined) laisse passer, par contrat best-effort.
+    const notifyIfPaneInBackground = (title: string, message: string): void => {
+      void paneFocused(socket, pane)
+        .catch(() => undefined)
+        .then((focused) => {
+          if (focused === true) return;
+          notify(title, message);
+        });
+    };
 
     pi.on("message_end", function onMessageEnd(event: any) {
       const snippet = extractFinalSnippet(event?.message);
@@ -280,12 +360,12 @@ export function createPiNotifyExtension(
     pi.on("agent_settled", function onAgentSettled(_event: any, ctx: any) {
       if (ctx?.mode !== "tui" || ctx?.isIdle?.() !== true || !running) return;
       running = false;
-      notify(`Pi · ${cwdName(ctx)} — terminé`, lastSnippet || "Prêt pour la suite");
+      notifyIfPaneInBackground(`Pi · ${cwdName(ctx)} — terminé`, lastSnippet || "Prêt pour la suite");
     });
 
     pi.on("tool_execution_start", function onToolExecutionStart(event: any, ctx: any) {
       if (ctx?.mode !== "tui" || event?.toolName !== "ask_user_question") return;
-      notify(`Pi · ${cwdName(ctx)} — décision requise`, "Une question attend ton choix");
+      notifyIfPaneInBackground(`Pi · ${cwdName(ctx)} — décision requise`, "Une question attend ton choix");
     });
   };
 }

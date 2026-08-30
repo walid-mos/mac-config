@@ -3,6 +3,7 @@ import { EventEmitter } from "node:events";
 import test from "node:test";
 import {
   NotificationPoster,
+  createFocusProbe,
   createPiNotifyExtension,
   extractFinalSnippet,
   notificationEnabled,
@@ -13,6 +14,7 @@ import {
 
 const HELPER = "/Applications/Pi Notifications.app/Contents/MacOS/pi-notify";
 const NOTIFIER = "/opt/homebrew/bin/terminal-notifier";
+const HERDR = "/opt/homebrew/bin/herdr";
 const OPEN = "/usr/bin/open";
 const PKILL = "/usr/bin/pkill";
 const ENVIRONMENT: NotificationEnvironment = {
@@ -29,6 +31,7 @@ type SpawnCall = {
 };
 
 class FakeChild extends EventEmitter {
+  readonly stdout = new EventEmitter();
   unrefCalled = false;
 
   unref(): void {
@@ -238,7 +241,10 @@ function requiredHandler(handlers: Map<string, Handler>, name: string): Handler 
   return handler;
 }
 
-function loadExtension(environment = ENVIRONMENT) {
+function loadExtension(
+  environment = ENVIRONMENT,
+  paneFocused: (socket: string, pane: string) => Promise<boolean | undefined> = async () => false,
+) {
   const operations = new FakeOperations();
   operations.available.add(HELPER);
   const notifications: Array<{ pane: string; socket: string; title: string; message: string }> = [];
@@ -250,6 +256,7 @@ function loadExtension(environment = ENVIRONMENT) {
     environment,
     operations,
     poster: poster as unknown as NotificationPoster,
+    paneFocused,
     processCwd: () => "/fallback/project",
   })(pi);
   return { handlers, notifications, operations };
@@ -261,7 +268,7 @@ test("disabled extension registers no handlers", () => {
   assert.equal(handlers.size, 0);
 });
 
-test("agent completion notifies exactly once with the final snippet", () => {
+test("agent completion notifies exactly once with the final snippet", async () => {
   const { handlers, notifications } = loadExtension();
   requiredHandler(handlers, "agent_start")({}, { mode: "tui" });
   requiredHandler(handlers, "message_end")({
@@ -271,6 +278,7 @@ test("agent completion notifies exactly once with the final snippet", () => {
   const settled = requiredHandler(handlers, "agent_settled");
   settled({}, context);
   settled({}, context);
+  await flush();
 
   assert.deepEqual(notifications, [{
     pane: "pane-1",
@@ -280,12 +288,33 @@ test("agent completion notifies exactly once with the final snippet", () => {
   }]);
 });
 
-test("ask_user_question emits the decision notification", () => {
+test("completion stays silent when the pane is already focused", async () => {
+  const { handlers, notifications } = loadExtension(ENVIRONMENT, async () => true);
+  requiredHandler(handlers, "agent_start")({}, { mode: "tui" });
+  const context = { mode: "tui", cwd: "/work/repository", isIdle: () => true };
+  requiredHandler(handlers, "agent_settled")({}, context);
+  await flush();
+
+  assert.deepEqual(notifications, []);
+});
+
+test("a failed focus probe still notifies", async () => {
+  const { handlers, notifications } = loadExtension(ENVIRONMENT, async () => undefined);
+  requiredHandler(handlers, "agent_start")({}, { mode: "tui" });
+  const context = { mode: "tui", cwd: "/work/repository", isIdle: () => true };
+  requiredHandler(handlers, "agent_settled")({}, context);
+  await flush();
+
+  assert.equal(notifications.length, 1);
+});
+
+test("ask_user_question emits the decision notification", async () => {
   const { handlers, notifications } = loadExtension();
   requiredHandler(handlers, "tool_execution_start")(
     { toolName: "ask_user_question" },
     { mode: "tui", cwd: "/work/repository" },
   );
+  await flush();
   assert.equal(notifications.length, 1);
   const notification = notifications[0];
   assert.ok(notification);
@@ -293,7 +322,60 @@ test("ask_user_question emits the decision notification", () => {
   assert.equal(notification.message, "Une question attend ton choix");
 });
 
-test("all notification hooks are guarded by TUI mode", () => {
+test("ask_user_question stays silent when the pane is focused", async () => {
+  const { handlers, notifications } = loadExtension(ENVIRONMENT, async () => true);
+  requiredHandler(handlers, "tool_execution_start")(
+    { toolName: "ask_user_question" },
+    { mode: "tui", cwd: "/work/repository" },
+  );
+  await flush();
+
+  assert.deepEqual(notifications, []);
+});
+
+test("default focus probe reads Herdr and lets the caller decide", async () => {
+  const operations = new FakeOperations();
+  operations.available.add(HELPER);
+  const probe = createFocusProbe(operations, 1_000);
+
+  const focused = probe("/tmp/herdr.sock", "pane-1");
+  await flush();
+  const probeCall = operations.calls.find((call) => call.command === HERDR);
+  assert.ok(probe, "the probe must spawn the herdr CLI");
+  assert.equal(probeCall?.args.join(" "), "agent get pane-1");
+  assert.equal(
+    (probeCall?.options.env as Record<string, string>).HERDR_SOCKET_PATH,
+    "/tmp/herdr.sock",
+  );
+  probeCall?.child.stdout?.emit("data", JSON.stringify({
+    result: { agent: { focused: true, pane_id: "pane-1" } },
+  }));
+  close(probeCall);
+  assert.equal(await focused, true);
+
+  const unfocused = probe("/tmp/herdr.sock", "pane-2");
+  await flush();
+  const second = operations.calls.at(-1)!;
+  second.child.stdout?.emit("data", JSON.stringify({
+    result: { agent: { focused: false } },
+  }));
+  close(second);
+  assert.equal(await unfocused, false);
+
+  const broken = probe("/tmp/herdr.sock", "pane-3");
+  await flush();
+  close(operations.calls.at(-1)!);
+  assert.equal(await broken, undefined, "malformed output must read as undefined");
+});
+
+test("default focus probe survives a spawn failure", async () => {
+  const operations = new FakeOperations();
+  operations.throwOnSpawn = true;
+  const probe = createFocusProbe(operations);
+  assert.equal(await probe("/tmp/herdr.sock", "pane-1"), undefined);
+});
+
+test("all notification hooks are guarded by TUI mode", async () => {
   const { handlers, notifications } = loadExtension();
   requiredHandler(handlers, "agent_start")({}, { mode: "rpc" });
   requiredHandler(handlers, "agent_settled")({}, { mode: "rpc", isIdle: () => true });
@@ -301,6 +383,7 @@ test("all notification hooks are guarded by TUI mode", () => {
     { toolName: "ask_user_question" },
     { mode: "json" },
   );
+  await flush();
   assert.deepEqual(notifications, []);
 });
 

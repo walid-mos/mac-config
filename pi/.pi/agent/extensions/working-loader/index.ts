@@ -1,6 +1,6 @@
 /**
- * Working loader: hides the persistent "Thinking..." transcript label and
- * animates a sand spinner beside a shuffle-bag word line while the agent is busy.
+ * Working loader: animates a sand spinner beside a shuffle-bag word line while
+ * the agent is busy, without taking ownership of Pi's transcript rendering.
  * The line renders through the shared surface registry (ui/surface.ts), so it
  * stacks with the other above-editor surfaces instead of owning a slot.
  *
@@ -19,18 +19,16 @@ import {
 import { createShuffleBag } from "./shuffle-bag.ts";
 import { createSpinnerRotation, SAND_SPINNER } from "./spinner.ts";
 import {
-	appendThinkingDelta,
-	MAX_THINKING_PREVIEW_COLUMNS,
+	createThinkingPreviewTimeline,
 	rollingThinkingPreview,
-	THINKING_FALLBACK_LABEL,
+	thinkingRegionWidth,
 	THINKING_ICON,
 } from "./thinking-preview.ts";
 import { WORKING_WORDS } from "./words.ts";
 
 const SURFACE_ID = "working-loader";
 const MIN_GAP = 2;
-
-type LoaderMode = "working" | "thinking";
+const THINKING_ICON_GAP = 1;
 
 /** Whether an assistant stream event flips the loader into thinking mode. */
 export function isThinkingStreamEvent(eventType: string | undefined): boolean {
@@ -49,11 +47,10 @@ export function isWorkingStreamEvent(eventType: string | undefined): boolean {
 
 export default function workingLoader(pi: ExtensionAPI): void {
 	const bag = createShuffleBag(WORKING_WORDS);
-	let mode: LoaderMode = "working";
+	const thinkingTimeline = createThinkingPreviewTimeline();
 	let ui: ExtensionContext["ui"] | undefined;
 	let painted = false;
 	let spinnerFrame = SAND_SPINNER.frames[0];
-	let thinkingBuffer = "";
 	let word = "";
 
 	function paint(): void {
@@ -62,16 +59,17 @@ export default function workingLoader(pi: ExtensionAPI): void {
 			priority: ABOVE_EDITOR_PRIORITY.working,
 			render: (width, theme) => {
 				const left = theme.fg("dim", `${spinnerFrame} ${word}...`);
-				if (mode !== "thinking") return [left];
+				if (!thinkingTimeline.isVisible()) return [left];
+				const visibleThinking = thinkingTimeline.visibleBuffer();
+				if (visibleThinking === "") return [left];
 
 				const rightBudget = width - terminalLineWidth(left) - MIN_GAP;
-				const fallbackWidth = terminalLineWidth(`${THINKING_ICON} ${THINKING_FALLBACK_LABEL}`);
-				if (rightBudget < fallbackWidth) return [left];
-				const previewWidth = Math.min(
-					MAX_THINKING_PREVIEW_COLUMNS,
-					rightBudget - terminalLineWidth(THINKING_ICON) - 1,
-				);
-				const preview = rollingThinkingPreview(thinkingBuffer, previewWidth) || THINKING_FALLBACK_LABEL;
+				const regionWidth = thinkingRegionWidth(width, rightBudget);
+				if (regionWidth === 0) return [left];
+				const previewWidth =
+					regionWidth - terminalLineWidth(THINKING_ICON) - THINKING_ICON_GAP;
+				const preview = rollingThinkingPreview(visibleThinking, previewWidth);
+				if (preview === "") return [left];
 				const right = `${theme.fg("accent", THINKING_ICON)} ${theme.fg("muted", preview)}`;
 				const gap = width - terminalLineWidth(left) - terminalLineWidth(right);
 				return [`${left}${" ".repeat(gap)}${right}`];
@@ -101,16 +99,10 @@ export default function workingLoader(pi: ExtensionAPI): void {
 		spinner: SAND_SPINNER,
 		onFrame: (frame) => {
 			spinnerFrame = frame;
+			thinkingTimeline.tick(Date.now());
 			paint();
 		},
 	});
-
-	/** Flips the thinking marker; a running line repaints immediately. */
-	function setMode(next: LoaderMode): void {
-		if (mode === next) return;
-		mode = next;
-		if (painted) paint();
-	}
 
 	function show(): void {
 		if (ui === undefined) return;
@@ -131,15 +123,9 @@ export default function workingLoader(pi: ExtensionAPI): void {
 		ui = ctx.ui;
 	}
 
-	pi.on("session_start", async (_event, ctx) => {
-		bindUi(ctx);
-		ctx.ui.setHiddenThinkingLabel("");
-	});
-
 	pi.on("agent_start", async (_event, ctx) => {
 		bindUi(ctx);
-		mode = "working";
-		thinkingBuffer = "";
+		thinkingTimeline.reset();
 		show();
 	});
 
@@ -148,27 +134,26 @@ export default function workingLoader(pi: ExtensionAPI): void {
 		hide();
 	});
 
-	// Thinking deltas update the rolling buffer. The 80ms sand tick repaints it,
-	// naturally capping preview refreshes without another timer.
+	// Deltas accumulate continuously, but the timeline only publishes a stable
+	// snapshot every 2.5s. Its deferred exit absorbs short think/work/think gaps.
 	pi.on("message_update", async (event, ctx) => {
 		bindUi(ctx);
 		const assistantEvent = event.assistantMessageEvent;
+		const now = Date.now();
+		let changed = false;
 		if (assistantEvent?.type === "thinking_start") {
-			thinkingBuffer = "";
-			setMode("thinking");
+			changed = thinkingTimeline.enter(now);
 		} else if (assistantEvent?.type === "thinking_delta") {
-			thinkingBuffer = appendThinkingDelta(thinkingBuffer, assistantEvent.delta);
-			setMode("thinking");
+			changed = thinkingTimeline.append(assistantEvent.delta, now);
 		} else if (isWorkingStreamEvent(assistantEvent?.type)) {
-			thinkingBuffer = "";
-			setMode("working");
+			changed = thinkingTimeline.requestExit(now);
 		}
+		if (changed && painted) paint();
 	});
 
 	pi.on("message_end", async (_event, ctx) => {
 		bindUi(ctx);
-		thinkingBuffer = "";
-		setMode("working");
+		if (thinkingTimeline.requestExit(Date.now()) && painted) paint();
 	});
 
 	// The questionnaire replaces the editor and waits for the user: a rotating
@@ -188,6 +173,5 @@ export default function workingLoader(pi: ExtensionAPI): void {
 	pi.on("session_shutdown", async (_event, ctx) => {
 		bindUi(ctx);
 		hide();
-		ctx.ui.setHiddenThinkingLabel();
 	});
 }

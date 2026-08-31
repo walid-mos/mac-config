@@ -12,10 +12,16 @@ import {
 } from "../extensions/working-loader/spinner.ts";
 import {
 	appendThinkingDelta,
+	createThinkingPreviewTimeline,
 	MAX_THINKING_BUFFER_LENGTH,
+	MIN_THINKING_REGION_COLUMNS,
 	normalizeThinkingText,
 	rollingThinkingPreview,
+	thinkingRegionWidth,
+	THINKING_EXIT_GRACE_MS,
 	THINKING_ICON,
+	THINKING_INITIAL_PREVIEW_DELAY_MS,
+	THINKING_PREVIEW_INTERVAL_MS,
 } from "../extensions/working-loader/thinking-preview.ts";
 import { WORKING_WORDS } from "../extensions/working-loader/words.ts";
 import { isThinkingStreamEvent, isWorkingStreamEvent } from "../extensions/working-loader/index.ts";
@@ -160,11 +166,59 @@ test("thinking preview is safe, bounded, and keeps a rolling tail", () => {
 	assert.equal(terminalLineWidth(preview), 24);
 	assert.match(preview, /^…/u);
 	assert.match(preview, /reasoning streams$/u);
+	assert.equal(
+		rollingThinkingPreview("**First summary**\n\n**Current summary**", 40),
+		"Current summary",
+		"rolls to the latest summary instead of growing across summaries",
+	);
 	assert.equal(terminalLineWidth(THINKING_ICON), 1, "Nerd Font brain occupies one terminal cell");
 
 	const bounded = appendThinkingDelta("x".repeat(MAX_THINKING_BUFFER_LENGTH), "tail");
 	assert.equal(bounded.length, MAX_THINKING_BUFFER_LENGTH);
 	assert.match(bounded, /tail$/u);
+});
+
+test("thinking region uses the right half with a hard readability minimum", () => {
+	assert.equal(thinkingRegionWidth(80, 60), 40);
+	assert.equal(thinkingRegionWidth(120, 100), 60);
+	assert.equal(thinkingRegionWidth(60, 40), MIN_THINKING_REGION_COLUMNS);
+	assert.equal(thinkingRegionWidth(80, MIN_THINKING_REGION_COLUMNS - 1), 0);
+});
+
+test("thinking snapshots keep their minimum dwell time through exit", () => {
+	const timeline = createThinkingPreviewTimeline();
+	assert.equal(timeline.enter(0), true);
+	assert.equal(timeline.isVisible(), true);
+	assert.equal(timeline.visibleBuffer(), "", "nothing is shown while the first phrase accumulates");
+
+	assert.equal(timeline.append("Inspecting the stream", 100), false);
+	assert.equal(timeline.tick(100 + THINKING_INITIAL_PREVIEW_DELAY_MS - 1), false);
+	assert.equal(timeline.tick(100 + THINKING_INITIAL_PREVIEW_DELAY_MS), true);
+	assert.equal(timeline.visibleBuffer(), "Inspecting the stream");
+
+	timeline.append(" and event ordering", 1000);
+	assert.equal(timeline.requestExit(1200), false, "exit does not replace a fresh snapshot");
+	assert.equal(timeline.tick(1000 + THINKING_PREVIEW_INTERVAL_MS - 1), false);
+	assert.equal(timeline.visibleBuffer(), "Inspecting the stream");
+	assert.equal(timeline.tick(1000 + THINKING_PREVIEW_INTERVAL_MS), true);
+	assert.equal(timeline.visibleBuffer(), "Inspecting the stream and event ordering");
+	assert.equal(timeline.tick(1000 + 2 * THINKING_PREVIEW_INTERVAL_MS - 1), false);
+	assert.equal(timeline.tick(1000 + 2 * THINKING_PREVIEW_INTERVAL_MS), true);
+	assert.equal(timeline.isVisible(), false);
+});
+
+test("thinking resumed during exit grace never blinks", () => {
+	const timeline = createThinkingPreviewTimeline();
+	timeline.append("Short completed thought", 0);
+	assert.equal(timeline.requestExit(100), true);
+	assert.equal(timeline.enter(500), false);
+	assert.equal(timeline.tick(2600), false);
+	assert.equal(timeline.isVisible(), true);
+
+	timeline.requestExit(2700);
+	assert.equal(timeline.tick(2700 + THINKING_EXIT_GRACE_MS - 1), false);
+	assert.equal(timeline.tick(2700 + THINKING_EXIT_GRACE_MS), true);
+	assert.equal(timeline.isVisible(), false);
 });
 
 test("shows a rotating word above the editor while the agent works", () => {
@@ -195,13 +249,13 @@ test("uses the working priority and pauses during ask_user_question", () => {
 
 		const entries = surfaceRegistry.render("aboveEditor", 80, fakeTheme());
 		assert.equal(entries.length, 1, "registered while working");
-		assert.deepEqual(calls, ["thinkingLabel:", "workingVisible:false"], "native spinner hidden while loader is up");
+		assert.deepEqual(calls, ["workingVisible:false"], "native spinner hidden while loader is up");
 
 		emit("tool_execution_start", "ask_user_question");
 		assert.equal(surfaceRegistry.hasEntries("aboveEditor"), false);
 		assert.deepEqual(
 			calls,
-			["thinkingLabel:", "workingVisible:false", "workingVisible:true"],
+			["workingVisible:false", "workingVisible:true"],
 			"restored during questionnaire",
 		);
 
@@ -211,7 +265,6 @@ test("uses the working priority and pauses during ask_user_question", () => {
 		emit("agent_end");
 		assert.equal(surfaceRegistry.hasEntries("aboveEditor"), false);
 		assert.deepEqual(calls, [
-			"thinkingLabel:",
 			"workingVisible:false",
 			"workingVisible:true",
 			"workingVisible:false",
@@ -222,20 +275,18 @@ test("uses the working priority and pauses during ask_user_question", () => {
 	}
 });
 
-test("ignores unrelated tools and restores defaults on shutdown", () => {
+test("ignores unrelated tools and leaves native thinking rendering untouched", () => {
 	surfaceRegistry.clear();
 	const { emit, calls } = harness();
 	try {
 		emit("session_start");
-		assert.equal(calls[0], "thinkingLabel:", "thinking label hidden at session start");
-
 		emit("tool_execution_start", "read");
 		assert.equal(surfaceRegistry.hasEntries("aboveEditor"), false, "unrelated tools never toggle the loader");
 
 		emit("agent_start");
 		emit("session_shutdown");
 		assert.equal(surfaceRegistry.hasEntries("aboveEditor"), false);
-		assert.ok(calls.includes("thinkingLabel:undefined"), "thinking label restored on shutdown");
+		assert.doesNotMatch(calls.join("\n"), /thinkingLabel/u);
 	} finally {
 		surfaceRegistry.clear();
 	}
@@ -266,10 +317,9 @@ test("thinking streams show a brain and rolling excerpt at the far right", () =>
 		emit("message_update", undefined, { assistantMessageEvent: { type: "thinking_start" } });
 
 		const width = 80;
-		const fallback = stripAnsi(surfaceRegistry.render("aboveEditor", width, fakeTheme())[0] ?? "");
-		assertSandLoaderPrefix(fallback);
-		assert.match(fallback, new RegExp(`${THINKING_ICON} raisonnement$`, "u"));
-		assert.equal(terminalLineWidth(fallback), width, "la ligne occupe exactement la largeur");
+		const initial = stripAnsi(surfaceRegistry.render("aboveEditor", width, fakeTheme())[0] ?? "");
+		assertSandLoaderPrefix(initial);
+		assert.doesNotMatch(initial, new RegExp(THINKING_ICON, "u"), "aucun placeholder vide");
 
 		emit("message_update", undefined, {
 			assistantMessageEvent: {
@@ -277,20 +327,20 @@ test("thinking streams show a brain and rolling excerpt at the far right", () =>
 				delta: "Inspecting the shared widget alignment and current reasoning stream.",
 			},
 		});
+		const stable = stripAnsi(surfaceRegistry.render("aboveEditor", width, fakeTheme())[0] ?? "");
+		assert.doesNotMatch(stable, new RegExp(THINKING_ICON, "u"));
+
+		emit("message_update", undefined, { assistantMessageEvent: { type: "text_start" } });
 		const rolling = stripAnsi(surfaceRegistry.render("aboveEditor", width, fakeTheme())[0] ?? "");
 		assert.match(rolling, new RegExp(`${THINKING_ICON} ….*current reasoning stream\\.$`, "u"));
 		assert.equal(terminalLineWidth(rolling), width);
-
-		emit("message_update", undefined, { assistantMessageEvent: { type: "text_start" } });
-		const backToWork = stripAnsi(surfaceRegistry.render("aboveEditor", width, fakeTheme())[0] ?? "");
-		assert.doesNotMatch(backToWork, new RegExp(THINKING_ICON, "u"), "aperçu retiré hors raisonnement");
 		emit("agent_end");
 	} finally {
 		surfaceRegistry.clear();
 	}
 });
 
-test("mode flips repaint immediately, not on the next rotation tick", () => {
+test("thinking mode stays quiet until a useful snapshot exists", () => {
 	surfaceRegistry.clear();
 	const { emit } = harness();
 	try {
@@ -299,9 +349,9 @@ test("mode flips repaint immediately, not on the next rotation tick", () => {
 		emit("message_update", undefined, {
 			assistantMessageEvent: { type: "thinking_delta", delta: "Checking repaint behavior" },
 		});
-		assert.match(
+		assert.doesNotMatch(
 			stripAnsi(surfaceRegistry.render("aboveEditor", 80, fakeTheme())[0] ?? ""),
-			new RegExp(`${THINKING_ICON} Checking repaint behavior$`, "u"),
+			new RegExp(THINKING_ICON, "u"),
 		);
 		emit("agent_end");
 	} finally {
@@ -326,17 +376,19 @@ test("the marker is dropped on narrow widths instead of breaking the line", () =
 	}
 });
 
-test("message_end returns the loader to working mode", () => {
+test("message_end publishes useful thinking and defers its exit", () => {
 	surfaceRegistry.clear();
 	const { emit } = harness();
 	try {
 		emit("session_start");
 		emit("agent_start");
-		emit("message_update", undefined, { assistantMessageEvent: { type: "thinking_start" } });
+		emit("message_update", undefined, {
+			assistantMessageEvent: { type: "thinking_delta", delta: "Final useful thought" },
+		});
 		emit("message_end");
-		assert.doesNotMatch(
+		assert.match(
 			stripAnsi(surfaceRegistry.render("aboveEditor", 80, fakeTheme())[0] ?? ""),
-			new RegExp(THINKING_ICON, "u"),
+			new RegExp(`${THINKING_ICON} Final useful thought$`, "u"),
 		);
 		emit("agent_end");
 	} finally {

@@ -311,3 +311,19 @@ false`), donc le singleton de module `surfaceRegistry` était dupliqué ; les
 - Tests : working-loader 14/14, esbuild de l'entrypoint et `make pi-test`
   complet au vert (pi-ui 68/68).
 - Suite : `/reload`, puis validation du glyph et du rolling dans le pane réel.
+
+### 2026-08-31 — aperçu reasoning stable et adaptatif
+
+- Fait : remplacement du plafond fixe de 48 colonnes par une région ancrée à
+  droite visant la moitié du terminal, avec un minimum lisible de 32 colonnes
+  sous lequel l'aperçu disparaît.
+- Stabilité : les deltas restent accumulés en continu ; le placeholder
+  `raisonnement` est supprimé au profit d'un premier extrait utile après 800 ms,
+  puis de snapshots espacés de 2,5 s et garantis visibles pendant cet intervalle.
+  L'aperçu roule sur le dernier bloc sans additionner les summaries antérieurs.
+  La sortie différée conserve le dernier extrait et absorbe les transitions
+  reasoning/non-reasoning brèves sans effet de clignotement.
+- Transcript : working-loader ne touche plus au label natif ; `Ctrl+\`` reste
+  exclusivement piloté par Pi.
+- Fichiers : `working-loader/{index,thinking-preview}.ts`, README et tests.
+- Tests : working-loader 17/17 et pi-ui 71/71.

@@ -327,3 +327,13 @@ false`), donc le singleton de module `surfaceRegistry` était dupliqué ; les
   exclusivement piloté par Pi.
 - Fichiers : `working-loader/{index,thinking-preview}.ts`, README et tests.
 - Tests : working-loader 17/17 et pi-ui 71/71.
+
+### 2026-08-31 — thinking natif compact et discret
+
+- Fait : response-view retire le gras, groupe les summaries Codex par trois
+  lignes et ne reformate pas la prose complète. Pi conserve l'italique natif,
+  avec `thinkingText` à `surface2`.
+- Fichiers : `response-view/`, thème Catppuccin Latte, README et tests.
+- Tests : response-view 5/5, esbuild et pi-ui 72/72 ; `make pi-test` complet au
+  vert.
+- Suite : `/reload`, puis validation visuelle dans le pane réel.

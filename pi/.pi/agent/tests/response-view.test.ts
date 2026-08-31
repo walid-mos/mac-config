@@ -7,6 +7,7 @@ import {
 	responseTopRule,
 	type ResponseTheme,
 } from "../extensions/response-view/frame.ts";
+import { softenThinkingMarkdown } from "../extensions/response-view/thinking.ts";
 
 const theme: ResponseTheme = {
 	fg: (_role, text) => text,
@@ -49,5 +50,19 @@ test("reste sûr sur les largeurs étroites et les messages vides", () => {
 	assert.equal(
 		frameAssistantMarkdown("   ", { width: 80, isStreaming: false, theme }),
 		"   ",
+	);
+});
+
+test("regroupe les summaries Codex par trois sans reformater la prose", () => {
+	assert.equal(
+		softenThinkingMarkdown(
+			"**Planning configuration**\n\n**Assessing tests**\n\n**Checking output**\n\n**Reviewing diff**\n\n**Finishing scripts**",
+		),
+		"Planning configuration\nAssessing tests\nChecking output\n\nReviewing diff\nFinishing scripts",
+	);
+
+	assert.equal(
+		softenThinkingMarkdown("Inspecting **important code**.\n\n- Keeping the original structure."),
+		"Inspecting important code.\n\n- Keeping the original structure.",
 	);
 });

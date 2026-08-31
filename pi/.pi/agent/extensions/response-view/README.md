@@ -20,4 +20,9 @@ La réponse importante reste immédiatement identifiable dans le transcript.
 - la règle est plafonnée à 88 colonnes pour garder une mesure élégante sur les
   terminaux ultra-larges et se réduit sur les petits écrans ;
 - couleurs et emphase viennent du thème Pi actif, sans palette codée en dur ;
-- les messages utilisateur et les blocs de raisonnement ne sont jamais décorés.
+- les summaries Codex restent chacun sur leur ligne, regroupés par trois avec
+  une seule ligne vide entre les groupes ;
+- la prose complète conserve strictement sa mise en page ; dans les deux cas,
+  seul le gras disparaît. Pi garde l'italique natif et `thinkingText: surface2` ;
+- la transformation reste visuelle : contenu de session et messages utilisateur
+  restent inchangés.

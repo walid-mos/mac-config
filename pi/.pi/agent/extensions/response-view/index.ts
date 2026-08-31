@@ -1,5 +1,6 @@
 import type { ExtensionAPI, ExtensionUIContext } from "@earendil-works/pi-coding-agent";
 import { frameAssistantMarkdown, type ResponseTheme } from "./frame.ts";
+import { softenThinkingMarkdown } from "./thinking.ts";
 
 const PLAIN_THEME: ResponseTheme = {
 	fg: (_role, text) => text,
@@ -19,6 +20,9 @@ export default function responseView(pi: ExtensionAPI): void {
 	});
 
 	pi.registerMarkdownTransformer((markdown, context) => {
+		if (context.messageType === "assistant-thinking") {
+			return softenThinkingMarkdown(markdown);
+		}
 		if (context.messageType !== "assistant") return markdown;
 		return frameAssistantMarkdown(markdown, {
 			width: context.availableWidth,

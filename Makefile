@@ -347,7 +347,10 @@ pi-quality-test:
 		--base "$${FALLOW_BASE_REF:-$(PI_QUALITY_BASE)}"
 
 pi-notify-test:
-	@node --test pi/.pi/agent/tests/pi-notify.test.ts
+	@node --test \
+		pi/.pi/agent/tests/pi-notify-extension.test.ts \
+		pi/.pi/agent/tests/pi-notify-focus.test.ts \
+		pi/.pi/agent/tests/pi-notify-poster.test.ts
 
 pi-ui-test:
 	@node --test \

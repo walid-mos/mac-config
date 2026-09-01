@@ -869,3 +869,11 @@ le hint `ctrl+o` ne pouvait donc pas agir.
   connaître scrollbar/sanitization et le chrome seul à gérer pages/footers.
 - Tests : 70 tests background, intégration process et Oxlint ciblé au vert.
 - Suite : découper les suites de tests monolithiques par contrat public.
+
+### 2026-09-01 — tests pi-notify par unité
+
+- Tests : l’ancienne suite unique est séparée entre poster/queues, sonde Herdr
+  et hooks Pi, avec un harness de processus partagé.
+- Gate : `pi-notify-test` énumère explicitement les trois contrats ; les 20
+  scénarios et Oxlint restent au vert.
+- Suite : séparer les tests compact-tools et working-loader par responsabilité.

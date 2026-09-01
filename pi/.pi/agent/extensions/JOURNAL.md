@@ -805,3 +805,15 @@ le hint `ctrl+o` ne pouvait donc pas agir.
 - Qualité : zéro complexité ou duplication introduite selon Fallow ; 70 tests
   background et Oxlint ciblé au vert.
 - Suite : rendre la gate de qualité reproductible depuis le Makefile.
+
+### 2026-09-01 — gate qualité Pi versionnée
+
+- Tooling : configurations locales Oxfmt 0.65.0, Oxlint 1.80.0 et Fallow
+  3.21.0 ; `pi-quality-test` les exécute avant la gate fonctionnelle avec une
+  base surchargeable par `FALLOW_BASE_REF`.
+- Politique : cyclomatique/cognitive restent bornées à 15 ; CRAP est neutralisé
+  faute de couverture instrumentée. Les findings hérités restent visibles mais
+  seuls les écarts introduits bloquent.
+- Qualité : zéro dead code, complexité ou duplication introduite ; suppression
+  d’une directive Fallow devenue obsolète.
+- Suite : corriger la course des notifications de fin concurrentes.

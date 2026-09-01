@@ -1,0 +1,52 @@
+{
+	"$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/npm/oxfmt/configuration_schema.json",
+	"useTabs": true,
+	"tabWidth": 4,
+	"printWidth": 80,
+	"endOfLine": "lf",
+	"trailingComma": "all",
+	"semi": false,
+	"arrowParens": "avoid",
+	"bracketSpacing": true,
+	"singleQuote": true,
+	"jsxSingleQuote": false,
+	"bracketSameLine": false,
+	"sortImports": {
+		"customGroups": [
+			{
+				"groupName": "framework",
+				"elementNamePattern": ["@earendil-works/**"],
+				"selector": "external",
+				"modifiers": ["value"]
+			}
+		],
+		"groups": [
+			["builtin", "framework"],
+			{ "newlinesBetween": true },
+			"external",
+			{ "newlinesBetween": true },
+			["internal", "subpath"],
+			{ "newlinesBetween": true },
+			"parent",
+			{ "newlinesBetween": true },
+			"sibling",
+			{ "newlinesBetween": true },
+			"index",
+			{ "newlinesBetween": true },
+			[
+				"type-builtin",
+				"type-external",
+				"type-internal",
+				"type-parent",
+				"type-sibling",
+				"type-index"
+			]
+		],
+		"newlinesBetween": false
+	},
+	"ignorePatterns": [
+		"package.json",
+		"agent/archived/**",
+		"agent/npm-patches/**"
+	]
+}

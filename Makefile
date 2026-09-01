@@ -247,6 +247,10 @@ nvim-post:
 # lien Stow provenant d'un autre worktree. Les autres descendants (auth.json,
 # models-store.json, npm/, sessions/, external/, etc.) restent locaux hors repo.
 PI_MANAGED := AGENTS.md archived background.json extensions keybindings.json npm-patches prompts settings.json skills tests themes
+PI_OXFMT_VERSION := 0.65.0
+PI_OXLINT_VERSION := 1.80.0
+PI_FALLOW_VERSION := 3.21.0
+PI_QUALITY_BASE ?= develop-pi
 
 pi: | pi-dirs
 	@$(STOW) --no-folding -D pi
@@ -326,10 +330,21 @@ pi-update:  pi-post
 # Gate unique du harness : suites des extensions Pi contre les dépendances installées,
 # validation isolée du déploiement Stow puis stress-test d'un vrai Pi. Aucun restow
 # du HOME réel, aucune réinstallation de Pi et aucun symlink manuel.
-pi-test:  pi-notify-test pi-ui-test
+pi-test: pi-quality-test  pi-notify-test pi-ui-test
 	@python3 scripts/test-pi-config.py
 	@python3 scripts/test-pi-startup.py
 	@python3 scripts/test-git-filters.py
+
+pi-quality-test:
+	@{ printf '%s\0' pi/.pi/.fallowrc.json pi/.pi/.oxfmtrc.json pi/.pi/.oxlintrc.json; \
+		find pi/.pi/agent/extensions pi/.pi/agent/tests -type f -name '*.ts' -print0; \
+	} | xargs -0 pnpm dlx oxfmt@$(PI_OXFMT_VERSION) \
+			--config pi/.pi/.oxfmtrc.json --check
+	@cd pi/.pi && pnpm dlx oxlint@$(PI_OXLINT_VERSION) \
+		--config .oxlintrc.json agent/extensions agent/tests
+	@cd pi/.pi && pnpm dlx fallow@$(PI_FALLOW_VERSION) audit \
+		--config .fallowrc.json \
+		--base "$${FALLOW_BASE_REF:-$(PI_QUALITY_BASE)}"
 
 pi-notify-test:
 	@node --test pi/.pi/agent/tests/pi-notify.test.ts

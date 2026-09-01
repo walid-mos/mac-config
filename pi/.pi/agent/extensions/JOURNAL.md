@@ -817,3 +817,12 @@ le hint `ctrl+o` ne pouvait donc pas agir.
 - Qualité : zéro dead code, complexité ou duplication introduite ; suppression
   d’une directive Fallow devenue obsolète.
 - Suite : corriger la course des notifications de fin concurrentes.
+
+### 2026-09-01 — notifications obsolètes annulées
+
+- Correctif : chaque sonde de focus porte une génération ; un nouveau run ou
+  une notification plus récente invalide la résolution asynchrone précédente,
+  qui ne peut plus remplacer le toast courant.
+- Tests : une fin lente suivie d’un nouveau run reste silencieuse, puis la fin
+  courante est bien livrée ; 20 tests pi-notify et Oxlint au vert.
+- Suite : retirer les derniers aliases d’arguments historiques des mutations.

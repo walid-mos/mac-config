@@ -356,6 +356,31 @@ test('agent completion notifies exactly once with the final snippet', async () =
 	])
 })
 
+test('a new run invalidates an older completion probe', async () => {
+	const probes: Array<(focused: boolean | undefined) => void> = []
+	const { handlers, notifications } = loadExtension(
+		ENVIRONMENT,
+		() => new Promise(resolve => probes.push(resolve)),
+	)
+	const start = requiredHandler(handlers, 'agent_start')
+	const settled = requiredHandler(handlers, 'agent_settled')
+	const context = { mode: 'tui', cwd: '/work/repository', isIdle: () => true }
+
+	start({}, context)
+	settled({}, context)
+	assert.equal(probes.length, 1)
+	start({}, context)
+	probes[0]?.(false)
+	await flush()
+	assert.deepEqual(notifications, [])
+
+	settled({}, context)
+	assert.equal(probes.length, 2)
+	probes[1]?.(false)
+	await flush()
+	assert.equal(notifications.length, 1)
+})
+
 test('completion stays silent when the pane is already focused', async () => {
 	const { handlers, notifications } = loadExtension(
 		ENVIRONMENT,

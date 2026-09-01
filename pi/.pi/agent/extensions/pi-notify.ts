@@ -353,6 +353,7 @@ export function createPiNotifyExtension(
 		const socket = environment.HERDR_SOCKET_PATH!
 		let running = false
 		let lastSnippet = ''
+		let notificationGeneration = 0
 
 		const cwdName = (ctx: ExtensionContext): string => {
 			const cwd =
@@ -372,12 +373,20 @@ export function createPiNotifyExtension(
 			title: string,
 			message: string,
 		): void => {
-			void paneFocused(socket, pane)
-				.catch(() => undefined)
-				.then(focused => {
-					if (focused === true) return
-					notify(title, message)
-				})
+			const generation = ++notificationGeneration
+			void notifyAfterFocusProbe(generation, title, message)
+		}
+		const notifyAfterFocusProbe = async (
+			generation: number,
+			title: string,
+			message: string,
+		): Promise<void> => {
+			const focused = await paneFocused(socket, pane).catch(
+				() => undefined,
+			)
+			if (generation !== notificationGeneration || focused === true)
+				return
+			notify(title, message)
 		}
 
 		pi.on('message_end', function onMessageEnd(event) {
@@ -387,6 +396,7 @@ export function createPiNotifyExtension(
 
 		pi.on('agent_start', function onAgentStart(_event, ctx) {
 			if (ctx?.mode !== 'tui') return
+			notificationGeneration += 1
 			running = true
 			lastSnippet = ''
 		})

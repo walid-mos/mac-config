@@ -246,7 +246,7 @@ nvim-post:
 # avant le restow : le package courant gagne aussi face à un fichier réel ou à un
 # lien Stow provenant d'un autre worktree. Les autres descendants (auth.json,
 # models-store.json, npm/, sessions/, external/, etc.) restent locaux hors repo.
-PI_MANAGED := AGENTS.md archived background.json extensions keybindings.json prompts settings.json skills tests themes
+PI_MANAGED := AGENTS.md archived background.json extensions keybindings.json npm-patches prompts settings.json skills tests themes
 
 pi: | pi-dirs
 	@$(STOW) --no-folding -D pi
@@ -277,6 +277,12 @@ pi-dirs:
 # les scripts de @google/genai et protobufjs ne sont pas nécessaires ici. Le fichier
 # est donc écrit de façon déterministe AVANT les pi install/update : toute nouvelle
 # dépendance avec un build échouera explicitement jusqu'à examen de cette politique.
+# patchedDependencies applique le patch de rendu compact de pi-web-access
+# (npm-patches/pi-web-access.patch, versionné et déployé via Stow) : rows compactes
+# pour web_search/fetch_content. Un bump du package qui casse le patch échoue
+# bruyamment ici → régénérer avec `pnpm patch pi-web-access` + `pnpm patch-commit`,
+# recopier patches/pi-web-access.patch vers npm-patches/ et relancer pi-post
+# (patch-commit réécrit le chemin vers patches/ dans pnpm-workspace.yaml).
 pi-post: export FNM_DIR := $(HOME)/.local/share/fnm
 pi-post: export PNPM_HOME := $(HOME)/.local/share/pnpm
 pi-post: export PATH := $(HOME)/.local/share/pnpm/bin:$(HOME)/.local/share/pnpm:$(PATH)
@@ -297,6 +303,8 @@ pi-post:
 		"  '@google/genai': false" \
 		'  node-pty: true' \
 		'  protobufjs: false' \
+		'patchedDependencies:' \
+		'  pi-web-access: ../npm-patches/pi-web-access.patch' \
 		> "$(HOME)/.pi/agent/npm/pnpm-workspace.yaml"
 	@echo "→ pnpm-workspace.yaml: node-pty approuvé ; builds @google/genai/protobufjs refusés"
 	@if command -v pi >/dev/null; then \

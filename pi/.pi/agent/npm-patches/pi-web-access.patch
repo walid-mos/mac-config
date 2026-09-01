@@ -1,0 +1,326 @@
+diff --git a/index.ts b/index.ts
+index 4f8c24484cdd91533d45feb97800355803ffddbd..7f8eda67f044d8ff9c0044aab9ec41fb63cddc4a 100644
+--- a/index.ts
++++ b/index.ts
+@@ -1417,7 +1417,15 @@ export default function (pi: ExtensionAPI) {
+ 						sources: r.results.map(s => ({ title: s.title, url: s.url })),
+ 						error: r.error,
+ 					})),
+-				} : {}),
++				} : {
++					queryDetails: opts.results.map(r => ({
++						query: r.query,
++						provider: r.provider || null,
++						answer: r.answer || null,
++						sources: r.results.map(s => ({ title: s.title, url: s.url })),
++						error: r.error,
++					})),
++				}),
+ 				...((opts.workflow && hasApprovedSummary)
+ 					? {
+ 						summary: {
+@@ -1749,6 +1757,7 @@ export default function (pi: ExtensionAPI) {
+ 	if (webSearchEnabled) pi.registerTool({
+ 		name: toolNames.webSearch,
+ 		label: "Web Search",
++		renderShell: "self",
+ 		description:
+ 			`Search the web using OpenAI, Brave, Parallel, Parallel MCP, TinyFish, Search1API, Searchinfinity, Querit, Tavily, Firecrawl, Jina, SERPdive, Kagi, Bocha, Ollama, SearXNG, DuckDuckGo, Exa, Perplexity, Gemini, Kimi, AnySearch, XCrawl, Valyu, xAI, Bright Data, SerpBase, or Serper. Pass a provider array to search only those providers simultaneously, or use provider "all" to search every eligible provider except Parallel MCP, DuckDuckGo, Kimi, AnySearch, XCrawl, Valyu, xAI, Bright Data, SerpBase, and Serper. Returns an AI-synthesized answer with source citations. OpenAI search uses a Codex subscription or OpenAI API key; Kimi search uses a Kimi Code Plan authenticated through /login kimi-coding; xAI search uses a SuperGrok/X Premium subscription or xAI API key. Parallel MCP, DuckDuckGo, Kimi, AnySearch, XCrawl, Valyu, xAI, Bright Data, SerpBase, and Serper are available only when explicitly selected. For comprehensive research, prefer queries (plural) with 2-4 varied angles over a single query — each query gets its own synthesized answer, so varying phrasing and scope gives much broader coverage. When includeContent is true, full page content is fetched in the background. Searches auto-open the interactive browser curator and stream results live; set workflow to "none" to skip curation or "auto-summary" for a model-generated summary without the browser curator. The configured provider is used when provider is omitted or set to auto; omit provider unless explicitly overriding it. Without a configured provider, SearXNG is preferred first for local/private search. When the active Pi model is openai-codex, Codex-backed OpenAI search is preferred next. Otherwise Exa is preferred before OpenAI, then Brave, Parallel, TinyFish, Search1API, Searchinfinity, Querit, Tavily, Firecrawl, Jina, SERPdive, Kagi, Bocha, Ollama, Perplexity, Gemini API, or Gemini Web.`,
+ 		promptSnippet:
+@@ -2069,32 +2078,31 @@ export default function (pi: ExtensionAPI) {
+ 			});
+ 		},
+ 
+-		renderCall(args, theme) {
++		renderCall(args, theme, context) {
++			const state = context.state as { status?: "pending" | "ok" | "error"; summary?: string };
++			if (state.status === undefined) state.status = "pending";
+ 			const input = args as { query?: unknown; queries?: unknown };
+ 			const rawQueryList: unknown[] = Array.isArray(input.queries)
+ 				? input.queries
+ 				: (input.query !== undefined ? expandQueryString(input.query) : []);
+ 			const queryList = normalizeQueryList(rawQueryList);
+-			if (queryList.length === 0) {
+-				return new Text(theme.fg("toolTitle", theme.bold("search ")) + theme.fg("error", "(no query)"), 0, 0);
+-			}
+-			if (queryList.length === 1) {
+-				const q = queryList[0];
+-				const display = q.length > 60 ? q.slice(0, 57) + "..." : q;
+-				return new Text(theme.fg("toolTitle", theme.bold("search ")) + theme.fg("accent", `"${display}"`), 0, 0);
+-			}
+-			const lines = [theme.fg("toolTitle", theme.bold("search ")) + theme.fg("accent", `${queryList.length} queries`)];
+-			for (const q of queryList.slice(0, 5)) {
+-				const display = q.length > 50 ? q.slice(0, 47) + "..." : q;
+-				lines.push(theme.fg("muted", `  "${display}"`));
+-			}
+-			if (queryList.length > 5) {
+-				lines.push(theme.fg("muted", `  ... and ${queryList.length - 5} more`));
+-			}
+-			return new Text(lines.join("\n"), 0, 0);
++			const subject = queryList.length === 1 ? `"${queryList[0]}"`
++				: queryList.length > 1 ? `${queryList.length} requêtes`
++				: "";
++			return {
++				render(width: number) {
++					const glyph = state.status === "ok" ? "✓" : state.status === "error" ? "✗" : "●";
++					const role = state.status === "ok" ? "success" : state.status === "error" ? "error" : "accent";
++					let line = `${theme.fg(role, glyph)} ${theme.fg("accent", theme.bold("search"))}`;
++					if (subject) line += theme.fg("text", ` · ${subject}`);
++					if (state.summary) line += theme.fg("dim", ` · ${state.summary}`);
++					return [truncateToWidth(line, width, "…")];
++				},
++				invalidate() {},
++			};
+ 		},
+ 
+-		renderResult(result, { expanded, isPartial }, theme) {
++		renderResult(result, { expanded, isPartial }, theme, context) {
+ 			type QueryDetail = {
+ 				query: string;
+ 				provider: string | null;
+@@ -2102,6 +2110,7 @@ export default function (pi: ExtensionAPI) {
+ 				sources: Array<{ title: string; url: string }>;
+ 				error: string | null;
+ 			};
++			const rowState = context.state as { status?: "pending" | "ok" | "error"; summary?: string };
+ 			const details = result.details as {
+ 				queryCount?: number;
+ 				successfulQueries?: number;
+@@ -2120,6 +2129,7 @@ export default function (pi: ExtensionAPI) {
+ 				browserConnected?: boolean;
+ 				lastHeartbeatAgeMs?: number | null;
+ 				cancelledQueries?: import("./render-search-error.ts").CancelledQueryDetail[];
++				queryDetails?: QueryDetail[];
+ 				curatorUrl?: string;
+ 				browserOpenError?: string;
+ 				timeoutSeconds?: number;
+@@ -2179,6 +2189,9 @@ export default function (pi: ExtensionAPI) {
+ 			}
+ 
+ 			if (details?.error) {
++				rowState.status = "error";
++				rowState.summary = details.error.split("\n")[0];
++				if (!expanded) return { render: () => [], invalidate: () => {} };
+ 				// Expandable Ctrl+O diagnostics: which queries completed, per-query errors,
+ 				// browser connection state, cancel reason. See render-search-error.ts.
+ 				const plan = buildSearchErrorPlan(details as SearchErrorDetails);
+@@ -2186,6 +2199,10 @@ export default function (pi: ExtensionAPI) {
+ 				return new Text(theme.fg("error", `Error: ${details.error}`), 0, 0);
+ 			}
+ 
++			rowState.status = "ok";
++			const partial = details?.queryCount !== undefined && details?.queryCount > 1 && details?.successfulQueries !== details?.queryCount;
++			rowState.summary = (partial ? `${details?.successfulQueries}/${details?.queryCount} OK · ` : "") + `${details?.totalResults ?? 0} sources`;
++
+ 			let statusLine: string;
+ 			const queryInfo = details?.queryCount === 1 ? "" : `${details?.successfulQueries}/${details?.queryCount} queries, `;
+ 			statusLine = theme.fg("success", `${queryInfo}${details?.totalResults ?? 0} sources`);
+@@ -2254,6 +2271,22 @@ export default function (pi: ExtensionAPI) {
+ 					}
+ 				}
+ 				lines.push("");
++			} else if (details?.queryDetails?.length) {
++				for (const qd of details.queryDetails) {
++					lines.push("");
++					const dq = qd.query.length > 65 ? qd.query.slice(0, 62) + "..." : qd.query;
++					const providerLabel = qd.provider ? ` (${qd.provider})` : "";
++					lines.push(theme.fg("accent", `  "${dq}"${providerLabel}`));
++					if (qd.error) {
++						lines.push(theme.fg("error", `  ${qd.error}`));
++					} else {
++						for (const s of qd.sources) {
++							const domain = s.url.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
++							const title = s.title.length > 50 ? s.title.slice(0, 47) + "..." : s.title;
++							lines.push(theme.fg("muted", `  ▸ ${title}`) + theme.fg("dim", ` · ${domain}`));
++						}
++					}
++				}
+ 			} else {
+ 				const textContent = result.content.find((c) => c.type === "text")?.text || "";
+ 				const preview = textContent.length > 500 ? textContent.slice(0, 500) + "..." : textContent;
+@@ -2277,49 +2310,7 @@ export default function (pi: ExtensionAPI) {
+ 				}
+ 			}
+ 
+-			const totalLines = lines.length;
+-
+-			if (!expanded) {
+-				const box = new Box(1, 0);
+-				box.addChild(new Text(statusLine, 0, 0));
+-
+-				let collapsedLines = 1; // statusLine
+-				const summaryPreview = details?.summary?.text?.trim() || "";
+-				if (summaryPreview) {
+-					const preview = summaryPreview.length > 120 ? summaryPreview.slice(0, 117) + "..." : summaryPreview;
+-					box.addChild(new Text(theme.fg("dim", preview), 0, 0));
+-					collapsedLines++;
+-				} else if (details?.curatedQueries?.length) {
+-					for (const cq of details.curatedQueries.slice(0, 3)) {
+-						const dq = cq.query.length > 55 ? cq.query.slice(0, 52) + "..." : cq.query;
+-						const srcCount = cq.sources?.length ?? 0;
+-						const suffix = cq.error ? theme.fg("error", " (error)") : theme.fg("dim", ` · ${srcCount} sources`);
+-						box.addChild(new Text(theme.fg("accent", `  "${dq}"`) + suffix, 0, 0));
+-						collapsedLines++;
+-					}
+-					if (details.curatedQueries.length > 3) {
+-						box.addChild(new Text(theme.fg("dim", `  ... and ${details.curatedQueries.length - 3} more`), 0, 0));
+-						collapsedLines++;
+-					}
+-				} else {
+-					const textContent = result.content.find((c) => c.type === "text")?.text || "";
+-					const firstContentLine = textContent.split("\n").find(l => {
+-						const t = l.trim();
+-						return t && !t.startsWith("[") && !t.startsWith("#") && !t.startsWith("---");
+-					});
+-					const fallbackLine = (firstContentLine?.trim() || "").replace(/\*\*/g, "");
+-					if (fallbackLine) {
+-						const preview = fallbackLine.length > 120 ? fallbackLine.slice(0, 117) + "..." : fallbackLine;
+-						box.addChild(new Text(theme.fg("dim", preview), 0, 0));
+-						collapsedLines++;
+-					}
+-				}
+-				const moreLines = Math.max(0, totalLines - collapsedLines);
+-				if (moreLines > 0) {
+-					box.addChild(new Text(theme.fg("muted", `\n... (${moreLines} more lines, ${totalLines} total, ctrl+o to expand)`), 0, 0));
+-				}
+-				return box;
+-			}
++			if (!expanded) return { render: () => [], invalidate: () => {} };
+ 
+ 			return new Text(lines.join("\n"), 0, 0);
+ 		},
+@@ -2427,6 +2418,7 @@ export default function (pi: ExtensionAPI) {
+ 	if (fetchContentEnabled) pi.registerTool({
+ 		name: toolNames.fetchContent,
+ 		label: "Fetch Content",
++		renderShell: "self",
+ 		description: `Fetch URL(s) and extract readable content as markdown. Use mode "raw" for exact textual HTTP response bodies or mode "answer" with prompt to answer using only fetched content. Direct image URLs return resized image content. Supports YouTube transcripts, GitHub repositories, PDFs, and local videos. ${fetchContentStorageNote}`,
+ 		promptSnippet:
+ 			"Use to fetch readable or raw URL content, direct images, GitHub repos, and videos. Mode answer answers a prompt using only the fetched source.",
+@@ -2633,52 +2625,40 @@ export default function (pi: ExtensionAPI) {
+ 			});
+ 		},
+ 
+-		renderCall(args, theme) {
++		renderCall(args, theme, context) {
++			const state = context.state as { status?: "pending" | "ok" | "error"; summary?: string };
++			if (state.status === undefined) state.status = "pending";
+ 			const { urlList, options } = normalizeFetchContentParams(args);
+ 			const { prompt, timestamp, frames, model, mode, answerModel, auth } = options;
+-			if (urlList.length === 0) {
+-				return new Text(theme.fg("toolTitle", theme.bold("fetch ")) + theme.fg("error", "(no URL)"), 0, 0);
+-			}
+-			const lines: string[] = [];
++			const parts: string[] = [];
+ 			if (urlList.length === 1) {
+-				const display = urlList[0].length > 60 ? urlList[0].slice(0, 57) + "..." : urlList[0];
+-				lines.push(theme.fg("toolTitle", theme.bold("fetch ")) + theme.fg("accent", display));
+-			} else {
+-				lines.push(theme.fg("toolTitle", theme.bold("fetch ")) + theme.fg("accent", `${urlList.length} URLs`));
+-				for (const u of urlList.slice(0, 5)) {
+-					const display = u.length > 60 ? u.slice(0, 57) + "..." : u;
+-					lines.push(theme.fg("muted", "  " + display));
+-				}
+-				if (urlList.length > 5) {
+-					lines.push(theme.fg("muted", `  ... and ${urlList.length - 5} more`));
+-				}
+-			}
+-			if (mode && mode !== "readable") {
+-				lines.push(theme.fg("dim", "  mode: ") + theme.fg("warning", mode));
+-			}
+-			if (timestamp) {
+-				lines.push(theme.fg("dim", "  timestamp: ") + theme.fg("warning", timestamp));
+-			}
+-			if (typeof frames === "number") {
+-				lines.push(theme.fg("dim", "  frames: ") + theme.fg("warning", String(frames)));
+-			}
+-			if (prompt) {
+-				const display = prompt.length > 250 ? prompt.slice(0, 247) + "..." : prompt;
+-				lines.push(theme.fg("dim", "  prompt: ") + theme.fg("muted", `"${display}"`));
+-			}
+-			if (model) {
+-				lines.push(theme.fg("dim", "  model: ") + theme.fg("warning", model));
+-			}
+-			if (answerModel) {
+-				lines.push(theme.fg("dim", "  answer model: ") + theme.fg("warning", answerModel));
+-			}
+-			if (auth !== undefined) {
+-				lines.push(theme.fg("dim", "  auth: ") + theme.fg("warning", auth === true ? "true" : auth));
+-			}
+-			return new Text(lines.join("\n"), 0, 0);
++				parts.push(urlList[0]);
++			} else if (urlList.length > 1) {
++				parts.push(`${urlList.length} URLs`);
++			}
++			if (mode && mode !== "readable") parts.push(mode);
++			if (timestamp) parts.push(timestamp);
++			if (typeof frames === "number") parts.push(`${frames} frames`);
++			if (prompt) parts.push(`"${prompt.length > 60 ? prompt.slice(0, 57) + "…" : prompt}"`);
++			if (model) parts.push(model);
++			if (answerModel) parts.push(answerModel);
++			if (auth !== undefined) parts.push(`auth:${auth === true ? "true" : auth}`);
++			const subject = parts.join(" · ");
++			return {
++				render(width: number) {
++					const glyph = state.status === "ok" ? "✓" : state.status === "error" ? "✗" : "●";
++					const role = state.status === "ok" ? "success" : state.status === "error" ? "error" : "accent";
++					let line = `${theme.fg(role, glyph)} ${theme.fg("accent", theme.bold("fetch"))}`;
++					if (subject) line += theme.fg("text", ` · ${subject}`);
++					if (state.summary) line += theme.fg("dim", ` · ${state.summary}`);
++					return [truncateToWidth(line, width, "…")];
++				},
++				invalidate() {},
++			};
+ 		},
+ 
+-		renderResult(result, { expanded, isPartial }, theme) {
++		renderResult(result, { expanded, isPartial }, theme, context) {
++			const rowState = context.state as { status?: "pending" | "ok" | "error"; summary?: string };
+ 			const details = result.details as {
+ 				urlCount?: number;
+ 				successful?: number;
+@@ -2704,6 +2684,9 @@ export default function (pi: ExtensionAPI) {
+ 			}
+ 
+ 			if (details?.error) {
++				rowState.status = "error";
++				rowState.summary = details.error.split("\n")[0];
++				if (!expanded) return { render: () => [], invalidate: () => {} };
+ 				const fd = details as typeof details & { urls?: string[] };
+ 				const extras: string[] = [];
+ 				if (typeof fd.urlCount === "number" || typeof fd.successful === "number") {
+@@ -2719,6 +2702,11 @@ export default function (pi: ExtensionAPI) {
+ 				return new Text(theme.fg("error", `Error: ${details.error}`), 0, 0);
+ 			}
+ 
++			rowState.status = "ok";
++			rowState.summary = details?.urlCount === 1
++				? `${details?.totalChars ?? 0} car.${details?.truncated ? " · tronqué" : ""}`
++				: (details?.successful !== details?.urlCount ? `${details?.successful ?? 0}/${details?.urlCount ?? 0} OK · ` : "") + `${details?.totalChars ?? 0} car.`;
++
+ 			if (details?.urlCount === 1) {
+ 				const title = details?.title || "Untitled";
+ 				const imgCount = details?.imageCount ?? (details?.hasImage ? 1 : 0);
+@@ -2735,10 +2723,7 @@ export default function (pi: ExtensionAPI) {
+ 					statusLine += theme.fg("muted", ` | ${formatSeconds(Math.floor(details.duration))} total`);
+ 				}
+ 				const textContent = result.content.find((c) => c.type === "text")?.text || "";
+-				if (!expanded) {
+-					const brief = textContent.length > 200 ? textContent.slice(0, 200) + "..." : textContent;
+-					return new Text(statusLine + "\n" + theme.fg("dim", brief), 0, 0);
+-				}
++				if (!expanded) return { render: () => [], invalidate: () => {} };
+ 				const lines = [statusLine];
+ 				if (details?.prompt) {
+ 					const display = details.prompt.length > 250 ? details.prompt.slice(0, 247) + "..." : details.prompt;
+@@ -2757,9 +2742,7 @@ export default function (pi: ExtensionAPI) {
+ 
+ 			const countColor = (details?.successful ?? 0) > 0 ? "success" : "error";
+ 			const statusLine = theme.fg(countColor, `${details?.successful}/${details?.urlCount} URLs`) + theme.fg("muted", getSearchContentEnabled ? " (content stored)" : " (content fetched)");
+-			if (!expanded) {
+-				return new Text(statusLine, 0, 0);
+-			}
++			if (!expanded) return { render: () => [], invalidate: () => {} };
+ 			const textContent = result.content.find((c) => c.type === "text")?.text || "";
+ 			const preview = textContent.length > 500 ? textContent.slice(0, 500) + "..." : textContent;
+ 			return new Text(statusLine + "\n" + theme.fg("dim", preview), 0, 0);

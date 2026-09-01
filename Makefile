@@ -247,7 +247,11 @@ nvim-post:
 # avant le restow : le package courant gagne aussi face à un fichier réel ou à un
 # lien Stow provenant d'un autre worktree. Les autres descendants (auth.json,
 # models-store.json, npm/, sessions/, external/, etc.) restent locaux hors repo.
+# Les configs qualité versionnées à la racine de ~/.pi (PI_DOT_CONFIGS) suivent
+# la même règle : un lien resté pointé vers un autre worktree est supprimé
+# avant le restow.
 PI_MANAGED := AGENTS.md archived background.json extensions keybindings.json npm-patches prompts settings.json skills tests themes
+PI_DOT_CONFIGS := .fallowrc.json .oxfmtrc.json .oxlintrc.json
 PI_OXFMT_VERSION := 0.65.0
 PI_OXLINT_VERSION := 1.80.0
 PI_FALLOW_VERSION := 3.21.0
@@ -256,10 +260,17 @@ PI_QUALITY_BASE ?= develop-pi
 pi: | pi-dirs
 	@$(STOW) --no-folding -D pi
 	@for path in $(PI_MANAGED); do rm -rf -- "$(HOME)/.pi/agent/$$path"; done
+	@for path in $(PI_DOT_CONFIGS); do rm -f -- "$(HOME)/.pi/$$path"; done
 	@$(STOW) -R pi
 	@for path in $(PI_MANAGED); do \
 		[ -L "$(HOME)/.pi/agent/$$path" ] || { \
 			echo "déploiement Pi incomplet: ~/.pi/agent/$$path n'est pas géré par Stow" >&2; \
+			exit 1; \
+		}; \
+	done
+	@for path in $(PI_DOT_CONFIGS); do \
+		[ -L "$(HOME)/.pi/$$path" ] || { \
+			echo "déploiement Pi incomplet: ~/.pi/$$path n'est pas géré par Stow" >&2; \
 			exit 1; \
 		}; \
 	done

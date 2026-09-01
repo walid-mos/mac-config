@@ -279,7 +279,8 @@ pi-dirs:
 # dépendance avec un build échouera explicitement jusqu'à examen de cette politique.
 # patchedDependencies applique le patch de rendu compact de pi-web-access
 # (npm-patches/pi-web-access.patch, versionné et déployé via Stow) : rows compactes
-# pour web_search/fetch_content. Un bump du package qui casse le patch échoue
+# pour les quatre tools web et leurs notifications/résultats asynchrones. Un bump
+# du package qui casse le patch échoue
 # bruyamment ici → régénérer avec `pnpm patch pi-web-access` + `pnpm patch-commit`,
 # recopier patches/pi-web-access.patch vers npm-patches/ et relancer pi-post
 # (patch-commit réécrit le chemin vers patches/ dans pnpm-workspace.yaml).
@@ -339,6 +340,7 @@ pi-ui-test:
 		pi/.pi/agent/tests/double-escape-pacer.test.ts \
 		pi/.pi/agent/tests/mutation-view-edit.test.ts \
 		pi/.pi/agent/tests/ordered-widget-stack.test.ts \
+		pi/.pi/agent/tests/pi-web-render.test.ts \
 		pi/.pi/agent/tests/response-view.test.ts \
 		pi/.pi/agent/tests/ui-registry-policy.test.ts \
 		pi/.pi/agent/tests/working-loader.test.ts \

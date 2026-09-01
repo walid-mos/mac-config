@@ -6,6 +6,10 @@
 # changements de config. Valeurs canoniques : scripts/git-filter-pi-settings-clean.sh
 pi/.pi/agent/settings.json filter=pi-settings
 
+# Les patches pnpm sont des diffs unifiés : leurs lignes de contexte commencent
+# nécessairement par un espace avant l'indentation originale, souvent une tab.
+pi/.pi/agent/npm-patches/*.patch -whitespace
+
 # Hermes réécrit les trois clés de modèle actif à chaque changement de modèle.
 # Le filtre les normalise sans masquer les autres changements de config.
 # Valeurs canoniques : scripts/git-filter-hermes-config-clean.sh

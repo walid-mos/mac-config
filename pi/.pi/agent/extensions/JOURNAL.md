@@ -672,6 +672,23 @@ le hint `ctrl+o` ne pouvait donc pas agir.
 - Tests : compact-tools 31/31 et Oxfmt au vert ; alertes Oxlint ciblées supprimées.
 - Suite : —
 
+### 2026-09-01 — langage compact exhaustif pour l’accès web
+
+- Fait : `web_search`, `source_check`, `fetch_content` et `get_search_content`
+  partagent désormais une row mono-ligne pending/succès/erreur ; les messages
+  asynchrones content-ready, erreur de fetch et résultats curator suivent le
+  même langage, avec contenu riche conservé en expansion.
+- Architecture : helper de rendu unique ajouté au patch pnpm de
+  `pi-web-access` ; statut, troncature et shell ne sont plus dupliqués entre
+  les tools web. Les patches unifiés sont exclus du contrôle whitespace Git.
+- Fichiers : hors extensions (`npm-patches/pi-web-access.patch`, test
+  pi-web-render, `Makefile`, `.gitattributes`).
+- Tests : pi-web-render 3/3 et esbuild des deux entrypoints au vert ; pi-ui et
+  startup bloqués par le refactor concurrent footer/design-system incomplet
+  (`LATTE`/palette absents), hors périmètre web ; Fallow indisponible dans le
+  PATH de ce worktree.
+- Suite : `/reload` après stabilisation du refactor footer concurrent.
+
 ### 2026-09-01 — format NextNode remis à niveau après la branche web
 
 - Maintenance : Oxfmt 0.65.0 a normalisé les sources et tests modifiés avec le

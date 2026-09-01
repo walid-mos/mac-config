@@ -24,6 +24,7 @@ import {
 	thinkingRegionWidth,
 	THINKING_ICON,
 } from "./thinking-preview.ts";
+import type { ThinkingPreviewTimeline } from "./thinking-preview.ts";
 import { WORKING_WORDS } from "./words.ts";
 
 const SURFACE_ID = "working-loader";
@@ -43,6 +44,22 @@ export function isWorkingStreamEvent(eventType: string | undefined): boolean {
 		eventType === "thinking_end" ||
 		eventType === "toolcall_start"
 	);
+}
+
+function advanceThinkingTimeline(
+	timeline: ThinkingPreviewTimeline,
+	eventType: string,
+	delta: string,
+	now: number,
+): boolean {
+	switch (eventType) {
+		case "thinking_start":
+			return timeline.enter(now);
+		case "thinking_delta":
+			return timeline.append(delta, now);
+		default:
+			return isWorkingStreamEvent(eventType) ? timeline.requestExit(now) : false;
+	}
 }
 
 export default function workingLoader(pi: ExtensionAPI): void {
@@ -123,6 +140,16 @@ export default function workingLoader(pi: ExtensionAPI): void {
 		ui = ctx.ui;
 	}
 
+	function updateThinking(event: { type: string; delta?: string } | undefined): boolean {
+		if (!event) return false;
+		const delta = typeof event.delta === "string" ? event.delta : "";
+		return advanceThinkingTimeline(thinkingTimeline, event.type, delta, Date.now());
+	}
+
+	function repaintThinking(changed: boolean): void {
+		if (changed && painted) paint();
+	}
+
 	pi.on("agent_start", async (_event, ctx) => {
 		bindUi(ctx);
 		thinkingTimeline.reset();
@@ -138,17 +165,7 @@ export default function workingLoader(pi: ExtensionAPI): void {
 	// snapshot every 2.5s. Its deferred exit absorbs short think/work/think gaps.
 	pi.on("message_update", async (event, ctx) => {
 		bindUi(ctx);
-		const assistantEvent = event.assistantMessageEvent;
-		const now = Date.now();
-		let changed = false;
-		if (assistantEvent?.type === "thinking_start") {
-			changed = thinkingTimeline.enter(now);
-		} else if (assistantEvent?.type === "thinking_delta") {
-			changed = thinkingTimeline.append(assistantEvent.delta, now);
-		} else if (isWorkingStreamEvent(assistantEvent?.type)) {
-			changed = thinkingTimeline.requestExit(now);
-		}
-		if (changed && painted) paint();
+		repaintThinking(updateThinking(event.assistantMessageEvent));
 	});
 
 	pi.on("message_end", async (_event, ctx) => {

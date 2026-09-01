@@ -34,6 +34,8 @@ export function appendThinkingDelta(buffer: string, delta: string): string {
 		: combined.slice(-MAX_THINKING_BUFFER_LENGTH);
 }
 
+type ExitRequestPhase = "publish" | "wait" | "schedule";
+
 export type ThinkingPreviewTimeline = {
 	enter: (now: number) => boolean;
 	append: (delta: string, now: number) => boolean;
@@ -49,6 +51,25 @@ export type ThinkingPreviewTimeline = {
  * stable for a minimum interval, and brief non-thinking spans get a grace
  * period so adjacent reasoning blocks do not blink on and off.
  */
+function exitRequestPhase(
+	displayed: string,
+	buffer: string,
+	now: number,
+	nextSnapshotAt: number,
+): ExitRequestPhase {
+	if (!displayed && buffer) return "publish";
+	if (buffer === displayed) return "schedule";
+	return now < nextSnapshotAt ? "wait" : "publish";
+}
+
+function shouldExitTimeline(exitAt: number | undefined, now: number): boolean {
+	return typeof exitAt === "number" ? now >= exitAt : false;
+}
+
+function shouldScheduleExit(exiting: boolean, changed: boolean): boolean {
+	return exiting ? changed : false;
+}
+
 export function createThinkingPreviewTimeline(): ThinkingPreviewTimeline {
 	let buffer = "";
 	let displayed = "";
@@ -103,16 +124,12 @@ export function createThinkingPreviewTimeline(): ThinkingPreviewTimeline {
 		requestExit(now) {
 			if (!visible) return false;
 			exiting = true;
-			if (displayed === "" && buffer !== "") {
-				const changed = publish(now);
-				exitAt = nextSnapshotAt;
-				return changed;
-			}
-			if (buffer === displayed) {
+			const phase = exitRequestPhase(displayed, buffer, now, nextSnapshotAt);
+			if (phase === "schedule") {
 				exitAt ??= Math.max(now + THINKING_EXIT_GRACE_MS, nextSnapshotAt);
 				return false;
 			}
-			if (now < nextSnapshotAt) {
+			if (phase === "wait") {
 				exitAt = undefined;
 				return false;
 			}
@@ -122,13 +139,13 @@ export function createThinkingPreviewTimeline(): ThinkingPreviewTimeline {
 		},
 		tick(now) {
 			if (!visible) return false;
-			if (exitAt !== undefined && now >= exitAt) {
+			if (shouldExitTimeline(exitAt, now)) {
 				reset();
 				return true;
 			}
 			if (now < nextSnapshotAt) return false;
 			const changed = publish(now);
-			if (exiting && changed) exitAt = nextSnapshotAt;
+			if (shouldScheduleExit(exiting, changed)) exitAt = nextSnapshotAt;
 			return changed;
 		},
 		reset,
@@ -141,26 +158,37 @@ export function createThinkingPreviewTimeline(): ThinkingPreviewTimeline {
  * Converts streamed reasoning into a safe single-line tail window. This is an
  * ephemeral excerpt, not a second-model semantic summary.
  */
-export function rollingThinkingPreview(buffer: string, width: number): string {
-	const safeWidth = Number.isFinite(width) ? Math.max(0, Math.floor(width)) : 0;
-	if (safeWidth === 0) return "";
-	const latestBlock = buffer.trim().split(/\n{2,}/u).at(-1) ?? "";
-	const normalized = normalizeThinkingText(latestBlock);
-	if (normalized === "") return "";
-	if (terminalLineWidth(normalized) <= safeWidth) return normalized;
-	if (safeWidth === 1) return "…";
+function normalizedPreviewWidth(width: number): number {
+	return Number.isFinite(width) ? Math.max(0, Math.floor(width)) : 0;
+}
 
+function latestThinkingBlock(buffer: string): string {
+	const blocks = buffer.trim().split(/\n{2,}/u);
+	return blocks.at(-1) ?? "";
+}
+
+function thinkingTail(normalized: string, width: number): string {
 	const marker = "…";
-	const budget = safeWidth - terminalLineWidth(marker);
+	const budget = width - terminalLineWidth(marker);
 	const reversed: string[] = [];
-	let used = 0;
+	let usedWidth = 0;
 	for (const character of Array.from(normalized).reverse()) {
 		const characterWidth = terminalLineWidth(character);
-		if (used + characterWidth > budget) break;
+		if (usedWidth + characterWidth > budget) break;
 		reversed.push(character);
-		used += characterWidth;
+		usedWidth += characterWidth;
 	}
 	return `${marker}${reversed.reverse().join("").trimStart()}`;
+}
+
+export function rollingThinkingPreview(buffer: string, width: number): string {
+	const safeWidth = normalizedPreviewWidth(width);
+	if (!safeWidth) return "";
+	const normalized = normalizeThinkingText(latestThinkingBlock(buffer));
+	if (!normalized) return "";
+	if (terminalLineWidth(normalized) <= safeWidth) return normalized;
+	if (safeWidth === 1) return "…";
+	return thinkingTail(normalized, safeWidth);
 }
 
 export function normalizeThinkingText(buffer: string): string {

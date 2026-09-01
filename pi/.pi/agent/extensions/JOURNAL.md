@@ -646,3 +646,11 @@ le hint `ctrl+o` ne pouvait donc pas agir.
 - Fichier : `compact-tools/stack.ts`.
 - Tests : compact-tools 31/31, esbuild et Fallow avec couverture au vert.
 - Suite : —
+
+### 2026-09-01 — transitions thinking simplifiées
+
+- Refactor : les décisions de sortie, de tick, de clipping et de dispatch du
+  stream sont réparties en helpers testables et à responsabilité unique.
+- Fichiers : `working-loader/{index,thinking-preview}.ts`.
+- Tests : working-loader 18/18, esbuild et Fallow avec couverture au vert.
+- Suite : —

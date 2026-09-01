@@ -459,3 +459,158 @@ le hint `ctrl+o` ne pouvait donc pas agir.
   et la conservation de la DA en expansion custom.
 - Le gate Fallow structurel est désormais explicitement requis après toute
   modification de l'architecture des tool views.
+
+### 2026-08-31 — barre de lecture forte pour les réponses
+
+- Fait : la réponse assistant s'ouvre par une barre Catppuccin contrastée avec
+  diamant accentué, label `RÉPONSE` et fermeture discrète ; le Markdown reste
+  intact, le streaming reste ouvert et les faibles largeurs passent en compact.
+- Fichiers : `response-view/{frame,index}.ts`, README et test response-view.
+- Tests : response-view 6/6, esbuild et `make pi-ui-test` 85/85 au vert ; contrôle
+  ANSI avec le vrai thème Latte à 88/52/12 colonnes. Gate complète bloquée par
+  le timeout de shutdown Background déjà consigné ; fixture `sleep 120` supprimée.
+- Suite : `/reload`, puis validation dans le transcript réel.
+
+### 2026-08-31 — réponse Powerline asymétrique (retour utilisateur)
+
+- Direction : abandon du cadre teinté, jugé trop proche du modèle précédent, au
+  profit d'un cartouche Powerline inversé et d'une fermeture déportée à droite.
+- Fait : diamant + capsule concentrent l'accent, la trace chaud→muted donne le
+  mouvement et l'espace négatif délimite le Markdown sans fond ni rails.
+- Fichiers : `response-view/{frame,index}.ts`, README et test response-view.
+- Tests : response-view 6/6, esbuild, contrôle Latte à 88/52/16/12 colonnes et
+  `make pi-ui-test` 85/85 au vert.
+- Suite : `/reload`, puis validation dans le transcript réel.
+
+### 2026-09-01 — trace Powerline atténuée et réponses sans fences text
+
+- Retour capture : la transition violette vers muted ressemblait à une progress
+  bar abrupte ; la capsule conserve seule l'accent, suivie d'une trace courte
+  entièrement muted `╺━━┅┄╴` et d'un sign-off allégé `╶┄ ◇`.
+- Harness : règle globale ajoutée pour réserver les blocs fenced au contenu dont
+  la mise en forme littérale est nécessaire, jamais à la prose ou aux mockups TUI.
+- Fichiers : `response-view/frame.ts`, README, `../AGENTS.md` et test response-view.
+- Tests : response-view 6/6, esbuild, config Pi, contrôle Latte réel et
+  `make pi-ui-test` 85/85 au vert ; gate complète bloquée par le timeout de
+  shutdown Background connu après 70/70 tests, fixtures absentes.
+- Suite : `/reload` pour l'extension ; nouvelle session pour la règle AGENTS.
+
+### 2026-09-01 — trait restauré, pill Powerline supprimé
+
+- Clarification utilisateur : le trait pleine largeur était la partie réussie ;
+  le cartouche inversé ` RÉPONSE ` portait l'excès de contraste.
+- Fait : retour du trait accent→muted intégral, précédé d'un diamant et d'un label
+  texte simples ; fermeture légère `╶┄ ◇` conservée.
+- Fichiers : `response-view/{frame,index}.ts`, README et test response-view.
+- Tests : response-view 6/6, esbuild, contrôle Latte réel et `make pi-ui-test`
+  85/85 au vert ; gate complète bloquée par le timeout Background connu après
+  70/70 tests, fixtures absentes.
+- Suite : `/reload`, puis validation visuelle.
+
+### 2026-09-01 — gradient continu et fermeture renforcée
+
+- Fait : remplacement de la marche accent/muted par une interpolation smoothstep
+  sur 18 cellules, dérivée des couleurs du thème actif sans palette dupliquée.
+- Terminal : rendu truecolor natif, quantification ANSI 256 et fallback sémantique
+  lorsque le thème n'expose pas ses séquences ; largeur visible inchangée.
+- Fermeture : diamant creux `◇` conservé, rail muted renforcé en `╶━━━━━━`.
+- Fichiers : `response-view/frame.ts`, README et test response-view.
+- Tests : response-view 8/8, esbuild, contrôle Latte réel et `make pi-ui-test`
+  87/87 au vert ; gate complète bloquée par le timeout Background connu après
+  70/70 tests, fixtures absentes.
+- Suite : `/reload`, puis validation visuelle.
+
+### 2026-09-01 — onde fade-in / fade-out ample
+
+- Retour : le simple accent→muted restait trop timide malgré l'interpolation.
+- Fait : onde smoothstep étendue à 52 cellules — départ muted, montée mauve,
+  plateau saturé de 16 % de la courbe, puis extinction longue vers muted.
+- Fallback : même hiérarchie muted/accent/muted sans dépendre du truecolor.
+- Fichiers : `response-view/frame.ts`, README et test response-view.
+- Tests : response-view 8/8, esbuild, contrôle Latte réel et `make pi-ui-test`
+  87/87 au vert ; gate complète bloquée par le timeout Background connu après
+  70/70 tests, fixtures absentes.
+- Suite : `/reload`, puis validation visuelle.
+
+### 2026-09-01 — fades géométriques aux extrémités, sans fallback
+
+- Correction du retour précédent : fade-out demandé à l'extrémité droite du
+  trait supérieur, fade-in au départ gauche du rail de fermeture — pas une onde
+  chromatique au milieu.
+- Fait : couleur supérieure accent→muted sur 24 cellules puis matière
+  `━→┅→┄→╴` ; fermeture `╶→┄→┅→━` suivie d'un rail lourd et du `◇`.
+- Contrat : suppression du thème partiel et du fallback muted/accent/muted ; le
+  renderer exige `getFgAnsi()` et `getColorMode()` du thème Pi actif.
+- Fichiers : `response-view/{frame,index}.ts`, README et test response-view.
+- Tests : response-view 8/8, esbuild, contrôle Latte réel et `make pi-ui-test`
+  87/87 au vert ; gate complète bloquée par le timeout Background connu après
+  70/70 tests, fixtures absentes.
+- Suite : `/reload`, puis validation visuelle.
+
+### 2026-09-01 — opacité chromatique, ponctuation minimale
+
+- Retour : la succession de glyphes donnait encore un effet coupé au hachoir ;
+  conserver quelques points, mais porter le fade par couleur et opacité.
+- Fait : 16 cellules smoothstep `muted→dim` sur le trait lourd, terminées par
+  `┈┈·` puis une cellule invisible ; fermeture symétrique `dim→muted`.
+- Le rendu n'alterne plus entre traits lourds, légers et hachés : les points ne
+  sont qu'une ponctuation finale, l'extinction est chromatique.
+- Fichiers : `response-view/frame.ts`, README et test response-view.
+- Tests : response-view 8/8, esbuild, contrôle Latte réel et `make pi-ui-test`
+  87/87 au vert ; gate complète bloquée par le timeout Background connu après
+  70/70 tests, fixtures absentes.
+- Suite : `/reload`, puis validation visuelle.
+
+### 2026-09-01 — fade jusqu'au canvas réellement visible
+
+- Diagnostic : `muted→dim` ne variait que de 16 niveaux RGB sur Latte ; le code
+  interpolait, mais l'amplitude était trop faible pour produire une opacité
+  perceptible.
+- Fait : cible remplacée par `userMessageBg`, teinte de fond proche du canvas ;
+  Latte couvre désormais `#8c8fa1→#e6e9ef` sur 16 tons smoothstep.
+- Fermeture : courbe exactement inverse depuis le fond vers `muted` ; `┈┈·`
+  reste la seule ponctuation de densité.
+- Contrat : ajout de `getBgAnsi()` au thème requis, toujours sans fallback.
+- Fichiers : `response-view/frame.ts`, README et test response-view.
+- Tests : response-view 8/8, esbuild, contrôle Latte réel et `make pi-ui-test`
+  87/87 au vert.
+- Suite : `/reload`, puis validation visuelle.
+
+### 2026-09-01 — largeur mutation et fade proportionnel heavy
+
+- Retour : les points fins rompaient la graisse du rail ; les traits réponse
+  devaient rejoindre la même gouttière droite que les surfaces edit/write.
+- Fait : suppression du plafond 88, largeur `terminal−8`, fades dimensionnés à
+  34 % du trait avec minimum 16 cellules sur ouverture et fermeture.
+- Typographie : remplacement de `┈┈·` par `┉┉`, pointillés heavy assortis à `━` ;
+  aucune alternance d'épaisseur, disparition finale portée par la couleur.
+- Fichiers : `response-view/frame.ts`, README et test response-view.
+- Tests : response-view 8/8, esbuild, contrôle 120 colonnes et
+  `make pi-ui-test` 87/87 au vert.
+- Suite : `/reload`, puis validation visuelle.
+
+### 2026-09-01 — rails light homogènes
+
+- Retour : la graisse heavy uniforme restait trop invasive sur les nouvelles
+  règles presque pleine largeur.
+- Fait : bascule atomique du jeu heavy `╺━┉` vers le jeu light `╶─┈`, sur
+  l'ouverture comme la fermeture ; aucune épaisseur mixte.
+- Inchangés : largeur `terminal−8`, fade 34 %, interpolation vers le canvas,
+  diamant et comportement streaming.
+- Fichiers : `response-view/frame.ts`, README et test response-view.
+- Tests : response-view 8/8, esbuild, contrôle 120 colonnes et
+  `make pi-ui-test` 87/87 au vert.
+- Suite : `/reload`, puis validation visuelle.
+
+### 2026-09-01 — filigrane unique, fermeture supprimée
+
+- Retour : déplacer le diamant creux en ouverture et retirer complètement le
+  trait inférieur pour alléger la surface.
+- Fait : `◆` devient `◇` en tête ; suppression du rail final, de son fade-in,
+  de `responseBottomRule()` et de la branche streaming/final devenue inutile.
+- Inchangés : rail supérieur light, largeur `terminal−8`, fade 34 % vers le
+  canvas, label simple et contenu Markdown intact.
+- Fichiers : `response-view/{frame,index}.ts`, README et test response-view.
+- Tests : response-view 8/8, esbuild, contrôle Latte 120 colonnes et
+  `make pi-ui-test` 87/87 au vert.
+- Suite : `/reload`, puis validation visuelle.

@@ -10,6 +10,10 @@
 
 - Toujours traiter le code comme greenfield : ne jamais ajouter de rétrocompatibilité, migration, shim, fallback ou support d’un état historique, sauf demande explicite de l’utilisateur.
 
+## Réponses
+
+- Ne jamais placer prose ou maquette TUI dans un bloc fenced `text` ; réserver les blocs de code au contenu dont la mise en forme littérale est nécessaire.
+
 ## Questions à l'utilisateur
 
 - TOUJOURS `ask_user_question` — jamais de question en texte libre.

@@ -1,24 +1,27 @@
 # response-view — hiérarchie visuelle des réponses
 
-Ajoute un séparateur fin et labellisé autour du Markdown produit par
-l'assistant. La transformation est strictement visuelle : le message stocké en
-session et envoyé au modèle reste inchangé.
+Donne au Markdown produit par l'assistant une surface de lecture immédiatement
+repérable sans l'enfermer dans une carte. Un diamant creux en filigrane ouvre
+la réponse et lance un trait accentué ; aucun rail inférieur ne referme le
+contenu. Le corps reste intact et prioritaire. La transformation est strictement visuelle :
+le message stocké en session et envoyé au modèle reste inchangé.
 
-```text
-╭─ réponse ─────────────────────────────────────────────────
-
-La réponse importante reste immédiatement identifiable dans le transcript.
-
-╰───────────────────────────────────────────────────────────
-```
+> ◇  RÉPONSE  ╶────────────────────────────────────┈┈
+>
+> La réponse importante reste immédiatement identifiable dans le transcript.
 
 ## Comportement
 
-- pendant le streaming, seul le bord supérieur est visible : la surface reste
-  ouverte tant que la réponse grandit ;
-- à la fin du message, un bord inférieur discret ferme la réponse ;
-- la règle est plafonnée à 88 colonnes pour garder une mesure élégante sur les
-  terminaux ultra-larges et se réduit sur les petits écrans ;
+- un unique diamant creux et le label simple identifient la réponse sans
+  capsule, fond, fermeture ou rails autour du texte ;
+- le trait rejoint la même gouttière droite de 8 colonnes que les surfaces
+  edit/write, sans plafond artificiel sur les terminaux larges ;
+- sa couleur fond d'`accent` vers `muted`, puis son opacité est simulée en
+  mélangeant le trait vers le fond thématique sur 34 % de sa longueur ;
+- le trait conserve partout la même graisse light : seuls deux pointillés
+  light `┈┈` ponctuent sa disparition ; aucune alternance d'épaisseur ;
+- l'interpolation fonctionne en truecolor ou ANSI 256, sans fallback visuel ;
+- sur les petits écrans, la composition devient un simple signal ;
 - couleurs et emphase viennent du thème Pi actif, sans palette codée en dur ;
 - les summaries Codex restent chacun sur leur ligne, regroupés par trois avec
   une seule ligne vide entre les groupes ;

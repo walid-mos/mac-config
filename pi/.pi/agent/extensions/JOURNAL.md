@@ -842,3 +842,12 @@ le hint `ctrl+o` ne pouvait donc pas agir.
   exports publics et le comportement restent identiques.
 - Tests : 20 tests notifications et Oxlint ciblé au vert.
 - Suite : séparer l’état, l’analyse de transcript et le rendu compact stack.
+
+### 2026-09-01 — compact stack composée
+
+- Refactor : `CompactRowStack` devient un coordinateur fin ; état process-global,
+  transitions de transcript et rendu des lignes vivent dans trois modules dédiés.
+- Architecture : aucune logique de parsing ou de présentation ne reste dans la
+  façade publique, et l’état partagé demeure inerte à travers les reloads jiti.
+- Tests : 32 tests compact-tools et Oxlint ciblé au vert.
+- Suite : dissocier layout, contenu diff et chrome du cadre mutation.

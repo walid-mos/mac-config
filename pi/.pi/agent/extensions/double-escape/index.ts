@@ -8,30 +8,17 @@
 
 import {
 	CustomEditor,
-	type EditorFactory,
 	type ExtensionAPI,
 } from '@earendil-works/pi-coding-agent'
 
+import { registerEditorDecorator } from '../ui/editor-decorator.ts'
+
 import { DoubleEscapeEditor } from './editor.ts'
 
-/**
- * Factories installed by this extension, guarded against re-installation:
- * session_start fires on new/resume/fork too, and the editor component
- * survives session replacement while extensions are re-instantiated.
- */
-const installedFactories = new WeakSet<object>()
-
 export default function doubleEscapeClear(pi: ExtensionAPI): void {
-	pi.on('session_start', (_event, ctx) => {
-		const previous = ctx.ui.getEditorComponent()
-		if (previous && installedFactories.has(previous)) return
-		const factory: EditorFactory = (tui, theme, keybindings) => {
-			const base =
-				previous?.(tui, theme, keybindings) ??
-				new CustomEditor(tui, theme, keybindings)
-			return new DoubleEscapeEditor(base, keybindings)
-		}
-		installedFactories.add(factory)
-		ctx.ui.setEditorComponent(factory)
-	})
+	registerEditorDecorator(
+		pi,
+		(tui, theme, keybindings) => new CustomEditor(tui, theme, keybindings),
+		(base, keybindings) => new DoubleEscapeEditor(base, keybindings),
+	)
 }

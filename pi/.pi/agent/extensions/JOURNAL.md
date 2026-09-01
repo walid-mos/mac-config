@@ -745,3 +745,12 @@ le hint `ctrl+o` ne pouvait donc pas agir.
 - Qualité : le dernier finding de complexité introduit disparaît de Fallow ;
   14 tests mutation ciblés et lint source au vert.
 - Suite : éliminer la duplication structurelle des décorateurs d’éditeur.
+
+### 2026-09-01 — composition des décorateurs d’éditeur
+
+- Architecture : l’installation idempotente des décorateurs vit dans
+  `ui/editor-decorator.ts` ; des métadonnées suivent toute la chaîne de
+  factories afin d’éviter un nouvel emballage à chaque `session_start`.
+- Qualité : les trois clones Fallow disparaissent sans modifier ni absorber le
+  décorateur `top-line` local ; 169 tests UI au vert.
+- Suite : borner le marqueur de troncature des surfaces étroites.

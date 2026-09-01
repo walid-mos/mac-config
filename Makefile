@@ -339,6 +339,7 @@ pi-ui-test:
 		pi/.pi/agent/tests/compact-tools.test.ts \
 		pi/.pi/agent/tests/design-system.test.ts \
 		pi/.pi/agent/tests/double-escape-pacer.test.ts \
+		pi/.pi/agent/tests/editor-decorator.test.ts \
 		pi/.pi/agent/tests/footer.test.ts \
 		pi/.pi/agent/tests/json-view-blob-store.test.ts \
 		pi/.pi/agent/tests/json-view-command.test.ts \

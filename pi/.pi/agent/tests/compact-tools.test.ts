@@ -267,6 +267,34 @@ test("renderCall seed startedAt au démarrage d'exécution", () => {
 	assert.ok(typeof context.state.startedAt === 'number')
 })
 
+test('renderResult partiel ne publie pas un succès prématuré', () => {
+	const [definition] = createCompactOverrides({ createBuiltin: fakeNative })
+	const context = fakeContext({
+		args: { path: '/a/b/agent.ts' },
+		executionStarted: true,
+	})
+	const row = definition.renderCall!(context.args, theme, context)
+	definition.renderResult!(
+		{ content: [{ type: 'text', text: 'ligne partielle' }] },
+		{ expanded: false, isPartial: true },
+		theme,
+		context,
+	)
+	assert.equal(context.state.status, 'pending')
+	assert.equal(context.state.endedAt, undefined)
+	assert.equal(renderOne(row), '● read · agent.ts · 1 lignes')
+
+	definition.renderResult!(
+		{ content: [{ type: 'text', text: 'résultat final' }] },
+		{ expanded: false, isPartial: false },
+		theme,
+		context,
+	)
+	assert.equal(context.state.status, 'ok')
+	assert.ok(typeof context.state.endedAt === 'number')
+	assert.equal(renderOne(row), '✓ read · agent.ts · 1 lignes')
+})
+
 test("renderResult collapsé met à jour l'état et n'affiche rien", () => {
 	const [definition] = createCompactOverrides({ createBuiltin: fakeNative })
 	const context = fakeContext({ args: { command: 'false' } })

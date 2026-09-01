@@ -132,7 +132,11 @@ export function createCompactRenderers(
 				context.isError === undefined
 					? result
 					: { ...result, isError: context.isError }
-			state.status = normalizedResult.isError ? 'error' : 'ok'
+			state.status = normalizedResult.isError
+				? 'error'
+				: options.isPartial
+					? 'pending'
+					: 'ok'
 			if (
 				state.startedAt !== undefined &&
 				!options.isPartial &&

@@ -719,3 +719,11 @@ le hint `ctrl+o` ne pouvait donc pas agir.
   régression couvre explicitement réponse + source. Application directe et
   inverse du patch vérifiées, 167 tests UI au vert.
 - Suite : harmoniser l’état partiel des rows compactes avant la review finale.
+
+### 2026-09-01 — statut compact partiel fiable
+
+- Correctif : un `renderResult` partiel conserve désormais la row en état
+  pending ; seul le résultat terminal publie le succès et fige `endedAt`.
+- Tests : cycle partiel puis final verrouillé dans la suite compact-tools ;
+  Oxfmt, Oxlint strict et 32 tests ciblés au vert.
+- Suite : réduire la complexité des extracteurs de sujets et résumés.

@@ -1,15 +1,17 @@
 /**
- * Shared compact renderers for a tool row: one line while collapsed, native
- * output when expanded. Used both by the override factory (built-in tools)
- * and by extensions that own a tool registration (pi-background owns "bash").
+ * Shared compact renderers for a tool row. Rich tools may keep their custom
+ * result body in both collapsed and expanded modes; ordinary tools delegate
+ * expanded output to Pi's native renderer.
  */
 
 import { compactRowLine, type CompactRowView } from "./line.ts";
+import { validateRendererOptions } from "./registry.ts";
 import { compactRowStack } from "./stack.ts";
 import { subjectFor, summarizeResult } from "./summary.ts";
 import type {
 	CompactComponent,
 	CompactRenderContext,
+	CompactResultBodyRenderer,
 	CompactTheme,
 	CompactToolDefinition,
 	CompactToolResult,
@@ -62,23 +64,8 @@ function emptyComponent(): CompactComponent {
 }
 
 export interface CompactRendererOptions {
-	/** Hide the row line once the tool succeeds and the result body speaks for
-	 * itself (collapsed view only; expanded keeps the row above the body). */
-	hideRowOnSuccess?: boolean;
-	/** Collapsed result body for tools whose success carries a richer view
-	 * (mutation-view frame). Undefined keeps the bare row. */
-	collapsedBody?: (
-		result: CompactToolResult,
-		options: { expanded?: boolean; isPartial?: boolean },
-		theme: CompactTheme,
-		context: CompactRenderContext,
-	) => CompactComponent;
-	/** Whether this renderer participates in consecutive compact-row stacks.
-	 * Rich mutation bodies opt out; ordinary one-line renderers opt in. */
-	stackRows?: boolean;
-	/** Use the built-in call renderer in expanded mode (write carries its
-	 * complete preview in renderCall rather than renderResult). */
-	nativeCallWhenExpanded?: boolean;
+	/** Rich result body owned by the tool extension and used in both modes. */
+	resultBody?: CompactResultBodyRenderer;
 }
 
 export function createCompactRenderers(
@@ -86,20 +73,12 @@ export function createCompactRenderers(
 	resolveNative?: NativeRendererResolver,
 	rendererOptions: CompactRendererOptions = {},
 ): CompactRenderers {
-	const hideOnSuccess = rendererOptions.hideRowOnSuccess === true;
-	compactRowStack.registerTool(tool, rendererOptions.stackRows !== false);
+	const spec = validateRendererOptions(tool, rendererOptions);
+	const hideOnSuccess = spec.hideRowOnSuccess;
+	compactRowStack.registerTool(tool, spec.stackRows);
 	return {
 		renderCall(args, theme, context) {
 			const state = context.state;
-			if (rendererOptions.nativeCallWhenExpanded && context.expanded) {
-				const native = resolveNative?.(context.cwd);
-				if (native?.renderCall) {
-					const lastComponent = state.compactNativeCallComponent as CompactComponent | undefined;
-					const component = native.renderCall(args, theme, { ...context, lastComponent });
-					state.compactNativeCallComponent = component;
-					return component;
-				}
-			}
 			if (context.executionStarted && state.startedAt === undefined) {
 				state.startedAt = Date.now();
 				state.endedAt = undefined;
@@ -136,11 +115,10 @@ export function createCompactRenderers(
 				state.endedAt = Date.now();
 			}
 			state.summary = summarizeResult(tool, context.args as Record<string, unknown>, normalizedResult);
-			if (!options.expanded) {
-				return rendererOptions.collapsedBody
-					? rendererOptions.collapsedBody(normalizedResult, options, theme, context)
-					: emptyComponent();
+			if (rendererOptions.resultBody) {
+				return rendererOptions.resultBody(normalizedResult, options, theme, context);
 			}
+			if (!options.expanded) return emptyComponent();
 			const native = resolveNative?.(context.cwd);
 			return native?.renderResult ? native.renderResult(result, options, theme, context) : emptyComponent();
 		},

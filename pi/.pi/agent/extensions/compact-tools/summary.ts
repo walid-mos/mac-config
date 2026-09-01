@@ -3,13 +3,11 @@
  * No IO, no theme, no pi imports.
  */
 
+import type { ToolViewName } from "./registry.ts";
 import type { CompactToolResult } from "./types.ts";
 
-/** Tools rendered as a single compact line by this extension. "bash" and
- * "background" are owned by the pi-background extension, which applies the
- * same renderers. */
-export const COMPACT_TOOLS = ["read", "grep", "find", "ls"] as const;
-export type CompactToolName = (typeof COMPACT_TOOLS)[number];
+export { COMPACT_TOOLS } from "./registry.ts";
+export type CompactToolName = Extract<ToolViewName, "read" | "grep" | "find" | "ls">;
 
 /** Collapse any string to a single displayable line. */
 export function toSingleLine(text: string): string {

@@ -52,6 +52,13 @@ export interface CompactRenderContext {
 }
 
 /** Minimal tool definition shape (subset of ToolDefinition). */
+export type CompactResultBodyRenderer = (
+	result: CompactToolResult,
+	options: { expanded?: boolean; isPartial?: boolean },
+	theme: CompactTheme,
+	context: CompactRenderContext,
+) => CompactComponent;
+
 export interface CompactToolDefinition {
 	name: string;
 	label?: string;

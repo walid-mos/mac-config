@@ -28,9 +28,10 @@ anciennes se replient dans un compteur qui conserve le nombre d'erreurs.
   L'extension ne modifie aucun artefact généré du runtime Pi : les composants
   précédents rendent zéro ligne et le plus récent compose toute la pile, donc
   Pi ne place qu'un spacer externe avant le groupe.
-- Option `hideRowOnSuccess` : masque la row une fois le succès établi quand le
-  corps du résultat parle de lui-même (utilisé par mutation-view) ; option
-  `collapsedBody` : corps collapsé riche du renderer de mutation.
+- `registry.ts` centralise propriétaire, participation à la stack, masquage de
+  la row et stratégie d'expansion de chaque tool. Les extensions propriétaires
+  ne répètent plus ces options ; elles injectent uniquement leur éventuel
+  `resultBody` riche.
 - Troncature ANSI-safe via `../ui/terminal-text.ts` (source de vérité partagée
   avec le footer et json-view).
 
@@ -39,16 +40,20 @@ anciennes se replient dans un compteur qui conserve le nombre d'erreurs.
 - `compact-tools.ts` : point d'entrée ; map tool → factory native et register.
 - `overrides.ts` : factory d'overrides, `createBuiltin` injecté (testable sans
   résoudre les packages pi) ; gère délégation d'exécution et cache par cwd.
-- `renderer.ts` : renderers partagés (call compact / résultat collapsé ou
-  natif étendu), réutilisables par toute extension possédant un tool.
+- `registry.ts` : registre exhaustif de politique visuelle pour `read`, `grep`,
+  `find`, `ls`, `bash`, `background`, `edit` et `write`.
+- `renderer.ts` : renderers partagés (call compact / résultat riche ou natif
+  étendu), validés contre le registre et réutilisables par chaque propriétaire.
 - `stack.ts` : état brut process-global partagé entre les graphes d'extensions,
   mais implémentation recréée à chaque chargement ; `/reload` prend donc toujours
   le code courant sans clé de cache versionnée. Il groupe les calls consécutifs
   et porte la timeline plafonnée sur le dernier composant. Aucun nom de tool
-  n'est hardcodé : chaque `createCompactRenderers()` s'enregistre par défaut ;
-  les renderers à corps riche opt-out avec `stackRows: false`.
+  n'est hardcodé : chaque `createCompactRenderers()` applique la politique du
+  registre ; les renderers à corps riche y sont explicitement hors stack.
 - `lifecycle.ts` : reconstruit les groupes depuis la session et suit les
   messages streamés sans dupliquer les tool calls.
+- `summary.ts` : extraction pure du sujet (args) et du résumé (résultat) par
+  tool ; `COMPACT_TOOLS` est dérivé du propriétaire déclaré dans le registre.
 - `line.ts` : composition pure de la ligne thémée + troncature.
 - `types.ts` : types structurels minimaux (aucun import runtime pi).
 

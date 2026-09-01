@@ -8,6 +8,7 @@ export type DiffLineKind = "removed" | "added" | "context";
 export interface DiffLine {
 	kind: DiffLineKind;
 	text: string;
+	lineNumber?: number;
 }
 
 /** Upper bound on LCS table cells before falling back to a raw replace-all. */

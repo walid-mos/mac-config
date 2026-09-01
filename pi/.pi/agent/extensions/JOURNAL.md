@@ -337,3 +337,125 @@ false`), donc le singleton de module `surfaceRegistry` était dupliqué ; les
 - Tests : response-view 5/5, esbuild et pi-ui 72/72 ; `make pi-test` complet au
   vert.
 - Suite : `/reload`, puis validation visuelle dans le pane réel.
+
+### 2026-08-31 — mutation-view en onglet de fichier ouvert
+
+- Fait : remplacement du cadre fermé edit/write par un en-tête `┌ tool ─ chemin`
+  plafonné à 88 colonnes, un rail gauche ouvert et une affordance `ctrl+o` sans
+  bordure basse ; edit expose `−n +n`, write `+n lignes` et les éditions
+  multiples portent un repère explicite.
+- Responsive : chemin complet quand il tient, basename puis retrait des stats
+  sur largeur étroite ; contenu toujours borné à 18 lignes avec fin atténuée et
+  compteur des lignes masquées.
+- Fichiers : `mutation-view/{frame,edit,write}.ts`, README et tests edit/write.
+- Tests : suites mutation 17/17, esbuild, `make pi-ui-test` 72/72 et
+  `make pi-test` complet au vert.
+- Suite : `/reload`, puis retour visuel dans un transcript réel.
+
+### 2026-08-31 — fonds pastel sur le diff edit
+
+- Fait : les suppressions et ajouts edit reçoivent sur toute la largeur du rail
+  un fond rouge/vert Catppuccin mélangé à 15 % avec la base Latte ; le contexte
+  et write restent sans fond.
+- Atténuation : les trois dernières lignes d'un aperçu plafonné diminuent aussi
+  le fond (10 %, 6 %, 3 %) ; rendu truecolor et conversion ANSI 256 couleurs.
+- Fichiers : `mutation-view/{frame,edit}.ts`, README et test edit.
+- Tests : suites mutation 18/18, esbuild et `make pi-test` complet au vert
+  (pi-ui 73/73).
+- Suite : `/reload`, puis validation de l'intensité dans le transcript réel.
+
+### 2026-08-31 — mutation-view alignée sur la largeur du transcript
+
+- Fait : retour capture utilisateur — suppression du plafond arbitraire de 88
+  colonnes ; en-tête, rail et fonds edit/write consomment désormais toute la
+  largeur réellement fournie au renderer, comme le texte normal d'un output.
+- Fichiers : `mutation-view/frame.ts`, README et tests edit/write.
+- Suite : `/reload`, puis validation de l'alignement sur le même terminal.
+
+### 2026-08-31 — largeur naturelle, numéros de ligne et wrap
+
+- Fait : correction du plein écran jugé trop large — mesure adaptative entre 56
+  et 112 colonnes selon le contenu ; edit consomme le diff natif numéroté de Pi
+  et write numérote ses lignes dès 1.
+- Wrap : les lignes longues sont découpées sans ellipsis, avec gouttière vide
+  sur les continuations et fond pastel répété sur chaque segment visuel.
+- Fichiers : `mutation-view/{frame,diff,edit,write}.ts`, README et tests.
+- Tests : suites mutation 20/20, esbuild et `make pi-ui-test` 82/82 au vert ;
+  gate complète toujours bloquée uniquement par le timeout de shutdown
+  Background déjà consigné, fixture `sleep 120` supprimée.
+- Suite : `/reload`, puis validation visuelle de la mesure et du wrap.
+
+### 2026-08-31 — pleine largeur avec marge de gouttière
+
+- Fait : retour capture utilisateur — abandon de la largeur naturelle ; le bloc
+  prend la largeur du transcript moins une marge droite égale à `signe + numéro
+    - séparateur`, tout en conservant numéros et wrap.
+- Fix : le fond pastel en escalier venait du trim des espaces terminaux par Pi ;
+  le padding coloré emploie désormais des espaces insécables, garantissant un
+  rectangle stable jusqu'à la marge.
+- Fichiers : `mutation-view/frame.ts`, README et tests edit/write.
+- Tests : suites mutation 20/20, esbuild et `make pi-ui-test` 82/82 au vert ;
+  gate complète toujours bloquée par le timeout de shutdown Background hors
+  périmètre, fixture `sleep 120` supprimée.
+- Suite : `/reload`, puis contrôle visuel du bord droit des fonds.
+
+### 2026-08-31 — ctrl+o rétabli pour edit
+
+- Diagnostic : `ctrl+o` est le toggle global `app.tools.expand`, pas une action
+  propre à mutation-view. Le natif Pi affiche le diff edit principalement dans
+  `renderCall`, alors que l'override ne lui rendait que `renderResult`.
+- Fix : edit délègue maintenant aussi son call natif en vue étendue, comme write.
+- Fichiers : `mutation-view/index.ts`, README et test edit.
+- Tests : suites mutation 20/20 et esbuild au vert.
+
+### 2026-08-31 — raccourci global d'expansion remis sur ctrl+o
+
+- Diagnostic : le code edit/write était correct après le fix précédent, mais la
+  configuration active surchargeait `app.tools.expand` avec `ctrl+shift+\`` ;
+le hint `ctrl+o` ne pouvait donc pas agir.
+- Fix : `keybindings.json` lie explicitement `app.tools.expand` à `ctrl+o`, qui
+  reste le raccourci global d'expansion des tools.
+- Validation : JSON de configuration parsé avec succès ; `/reload` requis.
+
+### 2026-08-31 — actions clavier préservées par double-escape
+
+- Diagnostic final : le décorateur d'éditeur `double-escape` masquait la surface
+  `actionHandlers` de `CustomEditor`. Pi ne pouvait donc pas lui injecter les
+  actions applicatives (`app.tools.expand`, modèles, thinking, etc.), quel que
+  soit le raccourci configuré.
+- Fix : le wrapper expose et relaie les handlers/callbacks du CustomEditor sous-
+  jacent, mais n'interprète lui-même que `app.interrupt` pour le double Escape.
+  Un éditeur incompatible échoue explicitement au lieu de dupliquer tout le
+  routage clavier de Pi.
+- Tests : double-escape 9/9 et esbuild au vert, dont régression ctrl+o via la
+  surface CustomEditor et refus explicite d'une base incompatible.
+
+### 2026-08-31 — expansion mutation sans rupture visuelle
+
+- Retour : la vue native activée par `ctrl+o` supprimait toute la DA propre des
+  blocs `edit`/`write`.
+- Fix : la vue étendue conserve le renderer mutation et révèle toutes les lignes
+  au lieu de déléguer `renderCall`/`renderResult` au renderer natif.
+- Le mode replié garde sa limite de 18 lignes ; le footer étendu indique
+  `ctrl+o · replier`.
+
+### 2026-08-31 — registre unique des tool views
+
+- Ajout de `compact-tools/registry.ts`, source de vérité exhaustive pour le
+  propriétaire, la stack, le masquage après succès et la stratégie d'expansion
+  de chaque tool utilisant la row partagée.
+- `createCompactRenderers()` applique et valide cette politique ; les extensions
+  propriétaires ne passent plus de flags parallèles susceptibles de diverger.
+- `edit` et `write` sont enregistrés par une factory mutation commune au lieu de
+  deux branches quasi identiques.
+- Fallow : `audit --base 78ea48f` au vert et aucun clone proche sur le diff
+  (`dupes --near --changed-since`) ; avertissement attendu sur l'absence de
+  `node_modules` à la racine de ce dépôt de dotfiles.
+
+### 2026-08-31 — invariants tool views persistés pour les agents
+
+- Ajout dans `extensions/AGENTS.md` des règles imposant le registre unique,
+  l'absence de listes/flags parallèles, la factory commune pour tools homologues
+  et la conservation de la DA en expansion custom.
+- Le gate Fallow structurel est désormais explicitement requis après toute
+  modification de l'architecture des tool views.

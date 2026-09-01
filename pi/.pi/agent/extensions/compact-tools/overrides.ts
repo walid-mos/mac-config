@@ -6,10 +6,10 @@
  */
 
 import { createCompactRenderers, type NativeRendererResolver } from "./renderer.ts";
-import { COMPACT_TOOLS } from "./summary.ts";
+import { COMPACT_TOOLS } from "./registry.ts";
 import type { CompactToolDefinition } from "./types.ts";
 
-export { COMPACT_TOOLS } from "./summary.ts";
+export { COMPACT_TOOLS } from "./registry.ts";
 
 /** Creates the real built-in definition for a tool in a working directory. */
 export type BuiltinDefinitionFactory = (

@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createCompactRenderers } from "../extensions/compact-tools/renderer.ts";
+import { terminalLineWidth } from "../extensions/ui/terminal-text.ts";
 import { diffLines } from "../extensions/mutation-view/diff.ts";
 import {
 	createEditFrameComponent,
 	editCollapsedBody,
 	editFrameRows,
 	parseEditArgs,
+	parseNativeEditDiff,
 } from "../extensions/mutation-view/edit.ts";
 import type {
 	CompactRenderContext,
@@ -75,21 +77,49 @@ test("parseEditArgs accepte edits[], edits en JSON string et la paire legacy", (
 	assert.equal(parseEditArgs(undefined), undefined);
 });
 
-test("editFrameRows encadre les diffs dans un cadre titré", () => {
+test("parseNativeEditDiff récupère type, numéro réel et indentation", () => {
+	assert.deepEqual(parseNativeEditDiff("  9 context\n-10   old\n+10   new\n     ..."), [
+		{ kind: "context", lineNumber: 9, text: "context" },
+		{ kind: "removed", lineNumber: 10, text: "  old" },
+		{ kind: "added", lineNumber: 10, text: "  new" },
+		{ kind: "context", text: "..." },
+	]);
+});
+
+test("editFrameRows rend une mutation ouverte avec stats et chemin", () => {
 	const edits = [{ oldText: "a\nb\nc", newText: "a\nB\nc" }];
 	const diffs = edits.map((edit) => diffLines(edit.oldText, edit.newText));
 	const rows = editFrameRows("/a/f.ts", edits, diffs, 80, theme);
-	assert.equal(rows.length, 6); // titre + 4 lignes de diff + pied
+	assert.equal(rows.length, 8); // titre + respiration + 4 lignes + respiration + pied
 	const plain = rows.map(stripAnsi);
-	assert.match(plain[0], /^╭─ edit · f\.ts · 1 édition ─+╮$/);
-	assert.match(plain[1], /^\│ {3}a.*│$/);
-	assert.match(plain[2], /^\│ - b.*│$/);
-	assert.match(plain[3], /^\│ \+ B.*│$/);
-	assert.match(plain[4], /^\│ {3}c.*│$/);
-	assert.match(plain[5], /^╰─ ctrl\+o · diff natif ─+╯$/);
+	assert.match(plain[0], /^┌ edit ─ \/a\/f\.ts ─+ −1 \+1 · 1 édition$/);
+	assert.equal(plain[1], "│ ");
+	assert.match(plain[2], /^│ {3}a$/);
+	assert.match(plain[3], /^│ - b$/);
+	assert.match(plain[4], /^│ \+ B$/);
+	assert.match(plain[5], /^│ {3}c$/);
+	assert.equal(plain[6], "│ ");
+	assert.equal(plain[7], "  ctrl+o · diff complet");
 });
 
-test("editFrameRows sépare plusieurs éditions par une ligne vide", () => {
+test("editFrameRows surligne suppressions et ajouts sur toute la ligne", () => {
+	const edits = [{ oldText: "before", newText: "after" }];
+	const diffs = edits.map((edit) => diffLines(edit.oldText, edit.newText));
+	const rows = editFrameRows("src/f.ts", edits, diffs, 40, {
+		...theme,
+		getColorMode: () => "truecolor",
+	});
+	assert.match(rows[2], /\x1b\[48;2;235;207;217m/);
+	assert.match(rows[3], /\x1b\[48;2;213;229;215m/);
+	assert.ok(rows[2].endsWith("\x1b[49m"));
+	assert.ok(rows[3].endsWith("\x1b[49m"));
+	assert.match(rows[2], /\u00a0+\x1b\[49m$/);
+	assert.match(rows[3], /\u00a0+\x1b\[49m$/);
+	assert.equal(stripAnsi(rows[2]).length, 35);
+	assert.equal(stripAnsi(rows[3]).length, 35);
+});
+
+test("editFrameRows sépare plusieurs éditions par un repère", () => {
 	const edits = [
 		{ oldText: "a", newText: "A" },
 		{ oldText: "b", newText: "B" },
@@ -97,11 +127,11 @@ test("editFrameRows sépare plusieurs éditions par une ligne vide", () => {
 	const diffs = edits.map((edit) => diffLines(edit.oldText, edit.newText));
 	const rows = editFrameRows("/a/f.ts", edits, diffs, 80, theme);
 	const plain = rows.map(stripAnsi);
-	assert.match(plain[0], /2 éditions/);
-	assert.match(plain[1], /^\│ - a/);
-	assert.match(plain[2], /^\│ \+ A/);
-	assert.match(plain[3], /^│ +│$/);
-	assert.match(plain[4], /^\│ - b/);
+	assert.match(plain[0], /−2 \+2 · 2 éditions/);
+	assert.match(plain[2], /^│ - a/);
+	assert.match(plain[3], /^│ \+ A/);
+	assert.equal(plain[4], "│ ··· édition 2/2");
+	assert.match(plain[5], /^│ - b/);
 });
 
 test("editFrameRows plafonne à 18 lignes avec fondu et compteur", () => {
@@ -111,20 +141,55 @@ test("editFrameRows plafonne à 18 lignes avec fondu et compteur", () => {
 	const diffs = edits.map((edit) => diffLines(edit.oldText, edit.newText));
 	const rows = editFrameRows("/a/f.ts", edits, diffs, 80, theme);
 	const plain = rows.map(stripAnsi);
-	// titre + 18 lignes + rangée de points + pied
-	assert.equal(rows.length, 21);
-	assert.match(plain[rows.length - 2], /^│\s+·\s+·\s+·\s*│$/);
-	assert.match(plain[rows.length - 1], /⤢ \+13 lignes · ctrl\+o/);
+	// titre + respiration + 18 lignes + points + respiration + pied
+	assert.equal(rows.length, 23);
+	assert.equal(plain[rows.length - 3], "│ · · ·");
+	assert.equal(plain[rows.length - 2], "│ ");
+	assert.match(plain[rows.length - 1], /\+13 lignes masquées · ctrl\+o/);
 });
 
-test("createEditFrameComponent rend à chaque largeur avec diffs en cache", () => {
+test("createEditFrameComponent garde une marge de gouttière à droite", () => {
 	const edits = [{ oldText: "a", newText: "A" }];
-	const component = createEditFrameComponent("/a/f.ts", edits, theme);
-	const narrow = component.render(40);
-	const wide = component.render(80);
-	assert.ok(narrow.every((row) => stripAnsi(row).length <= 40));
-	assert.ok(wide.every((row) => stripAnsi(row).length <= 80));
-	assert.match(stripAnsi(wide[0]), /^╭─/);
+	const component = createEditFrameComponent("/a/chemin/tres-long/f.ts", edits, theme);
+	const narrow = component.render(24).map(stripAnsi);
+	const regular = component.render(80).map(stripAnsi);
+	const wide = component.render(160).map(stripAnsi);
+	assert.ok(narrow.every((row) => row.length <= 24));
+	assert.ok(regular.every((row) => row.length <= 80));
+	assert.ok(wide.every((row) => row.length <= 155));
+	assert.equal(wide[0].length, 155);
+	assert.match(narrow[0], /^┌ edit ─ f\.ts/);
+	assert.doesNotMatch(narrow[0], /édition/);
+	assert.match(regular[0], /^┌ edit ─/);
+});
+
+test("editFrameRows borne aussi les glyphes plus larges que la colonne disponible", () => {
+	const rows = editFrameRows(
+		"f.ts",
+		[{ oldText: "a", newText: "界" }],
+		[[{ kind: "added", lineNumber: 1, text: "界" }]],
+		10,
+		theme,
+	);
+	assert.ok(rows.every((row) => terminalLineWidth(row) <= 10));
+});
+
+test("editFrameRows wrappe le code long sans ellipsis et répète le fond", () => {
+	const longText = "const value = " + "x".repeat(240);
+	const rows = editFrameRows(
+		"src/long.ts",
+		[{ oldText: "old", newText: longText }],
+		[[{ kind: "added", lineNumber: 128, text: longText }]],
+		180,
+		{ ...theme, getColorMode: () => "truecolor" },
+	);
+	const codeRows = rows.slice(2, -2);
+	assert.equal(stripAnsi(rows[0]).length, 172);
+	assert.equal(codeRows.length, 2);
+	assert.ok(codeRows.every((row) => row.includes("\x1b[48;2;213;229;215m")));
+	assert.doesNotMatch(codeRows.map(stripAnsi).join(""), /…/);
+	assert.match(stripAnsi(codeRows[0]), /^│ \+ 128 │ const value/);
+	assert.match(stripAnsi(codeRows[1]), /^│ {7}│ x/);
 });
 
 function fakeNativeEdit(): CompactToolDefinition {
@@ -133,15 +198,14 @@ function fakeNativeEdit(): CompactToolDefinition {
 		label: "edit",
 		parameters: {},
 		execute: async () => ({ content: [{ type: "text", text: "ok" }], details: {} }),
+		renderCall: () => ({ render: () => ["NATIVE_EDIT_CALL"], invalidate() {} }),
 		renderResult: () => ({ render: () => ["NATIVE_FULL_DIFF"], invalidate() {} }),
 	};
 }
 
 function editRenderers(): ReturnType<typeof createCompactRenderers> {
 	return createCompactRenderers("edit", () => fakeNativeEdit(), {
-		hideRowOnSuccess: true,
-		collapsedBody: editCollapsedBody,
-		stackRows: false,
+		resultBody: editCollapsedBody,
 	});
 }
 
@@ -167,17 +231,21 @@ test("les renderers edit masquent la row une fois le succès établi (collapsé)
 	assert.match(row.render(80)[0], /^● edit · f\.ts$/);
 
 	const body = renderers.renderResult!(
-		{ content: [{ type: "text", text: "ok" }], isError: false },
+		{
+			content: [{ type: "text", text: "ok" }],
+			details: { diff: "-1 x\n+1 y" },
+			isError: false,
+		},
 		{ expanded: false },
 		theme,
 		context,
 	);
-	assert.match(stripAnsi(body.render(80)[0]), /^╭─/);
+	assert.match(stripAnsi(body.render(80)[0]), /^┌ edit ─/);
 	assert.equal(context.state.status, "ok");
 	assert.deepEqual(row.render(80), [], "la row réussie ne s'affiche plus");
 });
 
-test("les renderers edit gardent la row sur erreur et en vue étendue", () => {
+test("les renderers edit gardent la DA mutation en vue étendue", () => {
 	const renderers = editRenderers();
 	const context = fakeContext({ args: { path: "/a/f.ts" } });
 	const row = renderers.renderCall({ path: "/a/f.ts" }, theme, context);
@@ -191,20 +259,25 @@ test("les renderers edit gardent la row sur erreur et en vue étendue", () => {
 	assert.equal(context.state.summary, "oldText introuvable");
 	assert.match(row.render(80)[0], /^✗ edit · f\.ts · oldText introuvable$/);
 
-	const expandedContext = fakeContext({ args: { path: "/a/f.ts" }, expanded: true });
+	const expandedContext = fakeContext({
+		args: { path: "/a/f.ts", oldText: "ancienne", newText: "nouvelle" },
+		expanded: true,
+	});
 	const expandedRow = renderers.renderCall({ path: "/a/f.ts" }, theme, expandedContext);
-	renderers.renderResult!(
-		{ content: [{ type: "text", text: "ok" }], isError: false },
-		{ expanded: true },
-		theme,
-		expandedContext,
-	);
-	assert.equal(expandedRow.render(80).length, 1, "la row reste visible au-dessus du diff natif");
 	const expandedBody = renderers.renderResult!(
-		{ content: [{ type: "text", text: "ok" }], isError: false },
+		{
+			content: [{ type: "text", text: "ok" }],
+			details: { diff: Array.from({ length: 24 }, (_, index) => `+${index + 1} ligne ${index + 1}`).join("\n") },
+			isError: false,
+		},
 		{ expanded: true },
 		theme,
 		expandedContext,
 	);
-	assert.deepEqual(expandedBody.render(80), ["NATIVE_FULL_DIFF"]);
+	assert.deepEqual(expandedRow.render(80), ["✓ edit · f.ts"]);
+	const rows = expandedBody.render(80).map(stripAnsi);
+	assert.match(rows[0], /^┌ edit ─/);
+	assert.ok(rows.some((line) => line.includes("ligne 24")));
+	assert.ok(rows.some((line) => line.includes("ctrl+o · replier")));
+	assert.ok(rows.every((line) => !line.includes("NATIVE")));
 });

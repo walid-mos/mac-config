@@ -328,6 +328,7 @@ pi-notify-test:
 pi-ui-test:
 	@node --test \
 		pi/.pi/agent/tests/compact-tools.test.ts \
+		pi/.pi/agent/tests/double-escape-pacer.test.ts \
 		pi/.pi/agent/tests/mutation-view-edit.test.ts \
 		pi/.pi/agent/tests/ordered-widget-stack.test.ts \
 		pi/.pi/agent/tests/response-view.test.ts \

@@ -1,24 +1,9 @@
-import { fgHex } from "../footer/style.ts";
+import { LATTE } from "../footer/style.ts";
 import {
-	blendHex,
-	frameContentWidth,
-	frameDotsRow,
-	frameEdge,
-	frameRow,
-	frameRowFadeRatio,
-	frameWidth,
-	FRAME_FADE_ROWS,
-	FRAME_MAX_LINES,
-	type FramePalette,
-} from "../ui/frame.ts";
-import { terminalLineWidth, truncateTerminalLine } from "../ui/terminal-text.ts";
-import { JSON_COLOR } from "../json-view/json-colors.ts";
+	terminalLineWidth,
+	truncateTerminalLine,
+} from "../ui/terminal-text.ts";
 import type { DiffLine } from "./diff.ts";
-
-const PALETTE: FramePalette = {
-	border: JSON_COLOR.BORDER,
-	base: JSON_COLOR.BASE,
-};
 
 const STYLE = {
 	BOLD: "\x1b[1m",
@@ -31,8 +16,36 @@ const DIFF_PREFIX = {
 	context: " ",
 } as const;
 
+const MUTATION_MAX_LINES = 18;
+const MUTATION_FADE_ROWS = 3;
+const HEADER_CHROME_WIDTH = 6;
+const ROW_CHROME_WIDTH = 2;
+const NUMBER_GUTTER_CHROME_WIDTH = 5;
+const DIFF_BG_OPACITY = 0.15;
+const DIFF_BG_FADE_OPACITY = [0.1, 0.06, 0.03] as const;
+const DIFF_BG_BASE = "#eff1f5";
+const ANSI_BG_RESET = "\x1b[49m";
+
 export interface FrameTheme {
 	fg(role: string, text: string): string;
+	getColorMode?(): "truecolor" | "256color";
+}
+
+interface DiffBackgrounds {
+	added: string;
+	removed: string;
+	base: string;
+	mode: "truecolor" | "256color";
+}
+
+interface LogicalEntry {
+	line?: DiffLine;
+	separator?: { index: number; total: number };
+}
+
+interface RenderEntry {
+	line?: { value: DiffLine; text: string; continuation: boolean };
+	separator?: { index: number; total: number };
 }
 
 export interface MutationFrameComponent {
@@ -40,87 +53,254 @@ export interface MutationFrameComponent {
 	invalidate(): void;
 }
 
+export interface MutationFrameStat {
+	text: string;
+	role: string;
+	separator?: " " | " · ";
+}
+
 export interface MutationFrameSpec {
 	tool: "edit" | "write";
 	path: string;
-	meta: string;
+	stats: ReadonlyArray<MutationFrameStat>;
 	nativeLabel: string;
+	highlightChanges?: boolean;
+	expanded?: boolean;
 	diffs: ReadonlyArray<ReadonlyArray<DiffLine>>;
 }
 
-function titleRow(spec: MutationFrameSpec, width: number): string {
-	const base = spec.path.split("/").pop() || spec.path;
-	const plain = ` · ${base} · ${spec.meta}`;
-	const label = `${fgHex(JSON_COLOR.TITLE, `${STYLE.BOLD}${spec.tool}${STYLE.BOLD_OFF}`)}${fgHex(JSON_COLOR.META, plain)}`;
-	return frameEdge({ width, left: "╭", right: "╮", label, ...PALETTE });
+function normalizedWidth(width: number): number {
+	if (!Number.isFinite(width)) return 1;
+	return Math.max(1, Math.floor(width));
 }
 
-function footerRow(hiddenLineCount: number, nativeLabel: string, width: number): string {
-	const text = hiddenLineCount > 0 ? `⤢ +${hiddenLineCount} lignes · ctrl+o` : `ctrl+o · ${nativeLabel}`;
-	const color = hiddenLineCount > 0 ? JSON_COLOR.LINK : JSON_COLOR.META;
-	return frameEdge({
-		width,
-		left: "╰",
-		right: "╯",
-		label: fgHex(color, text),
-		...PALETTE,
-	});
+function statsLabel(stats: ReadonlyArray<MutationFrameStat>, theme: FrameTheme): string {
+	return stats
+		.map((stat, index) => {
+			const separator = index === 0 ? "" : (stat.separator ?? " · ");
+			return `${theme.fg("muted", separator)}${theme.fg(stat.role, stat.text)}`;
+		})
+		.join("");
 }
 
-function diffRow(line: DiffLine, width: number, theme: FrameTheme): string {
-	const role =
-		line.kind === "removed"
+function frameWidth(availableWidth: number, lineNumberWidth: number): number {
+	const available = normalizedWidth(availableWidth);
+	const rightMargin = lineNumberWidth + NUMBER_GUTTER_CHROME_WIDTH;
+	return Math.max(1, available - rightMargin);
+}
+
+function titleRow(spec: MutationFrameSpec, width: number, theme: FrameTheme): string {
+	const fullStats = statsLabel(spec.stats, theme);
+	const prefix = `${theme.fg("accent", "┌")} ${theme.fg("accent", `${STYLE.BOLD}${spec.tool}${STYLE.BOLD_OFF}`)} ${theme.fg("muted", "─")} `;
+	const prefixWidth = terminalLineWidth(prefix);
+	const canShowStats = width - prefixWidth - terminalLineWidth(fullStats) >= 8;
+	const stats = canShowStats ? fullStats : "";
+	const statsWidth = terminalLineWidth(stats);
+	const minimumGap = 1;
+	const pathBudget = Math.max(0, width - prefixWidth - statsWidth - HEADER_CHROME_WIDTH);
+	const basename = spec.path.split("/").pop() || spec.path;
+	const pathSource = pathBudget < 12 ? basename : spec.path;
+	const path = truncateTerminalLine(theme.fg("text", pathSource), pathBudget, "…");
+	const used = prefixWidth + terminalLineWidth(path) + statsWidth + minimumGap;
+	const fill = Math.max(1, width - used - (stats ? 1 : 0));
+	const suffix = stats ? ` ${stats}` : "";
+	const row = `${prefix}${path} ${theme.fg("muted", "─".repeat(fill))}${suffix}`;
+	return truncateTerminalLine(row, width, "…");
+}
+
+function parseHex(hex: string): [number, number, number] | undefined {
+	const match = /^#([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(hex);
+	if (!match) return undefined;
+	return [Number.parseInt(match[1], 16), Number.parseInt(match[2], 16), Number.parseInt(match[3], 16)];
+}
+
+function blendHex(base: string, tint: string, opacity: number): string | undefined {
+	const baseRgb = parseHex(base);
+	const tintRgb = parseHex(tint);
+	if (!baseRgb || !tintRgb) return undefined;
+	const channels = baseRgb.map((channel, index) =>
+		Math.round(channel + (tintRgb[index] - channel) * opacity),
+	);
+	return `#${channels.map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
+}
+
+function diffBackgrounds(theme: FrameTheme): DiffBackgrounds | undefined {
+	if (!theme.getColorMode) return undefined;
+	return {
+		added: LATTE.green,
+		removed: LATTE.red,
+		base: DIFF_BG_BASE,
+		mode: theme.getColorMode(),
+	};
+}
+
+function nearestAnsi256(red: number, green: number, blue: number): number {
+	const levels = [0, 95, 135, 175, 215, 255];
+	const nearest = (value: number): number =>
+		levels.reduce((best, level, index) =>
+			Math.abs(level - value) < Math.abs(levels[best] - value) ? index : best, 0);
+	const cube = 16 + 36 * nearest(red) + 6 * nearest(green) + nearest(blue);
+	const grayIndex = Math.max(0, Math.min(23, Math.round((red + green + blue) / 3 / 10 - 0.8)));
+	const grayValue = 8 + grayIndex * 10;
+	const cubeRed = levels[Math.floor((cube - 16) / 36)];
+	const cubeGreen = levels[Math.floor(((cube - 16) % 36) / 6)];
+	const cubeBlue = levels[(cube - 16) % 6];
+	const cubeDistance = (cubeRed - red) ** 2 + (cubeGreen - green) ** 2 + (cubeBlue - blue) ** 2;
+	const grayDistance = (grayValue - red) ** 2 + (grayValue - green) ** 2 + (grayValue - blue) ** 2;
+	return grayDistance < cubeDistance ? 232 + grayIndex : cube;
+}
+
+function backgroundAnsi(hex: string, mode: DiffBackgrounds["mode"]): string | undefined {
+	const rgb = parseHex(hex);
+	if (!rgb) return undefined;
+	if (mode === "256color") return `\x1b[48;5;${nearestAnsi256(...rgb)}m`;
+	return `\x1b[48;2;${rgb.join(";")}m`;
+}
+
+function railRow(
+	content: string,
+	width: number,
+	theme: FrameTheme,
+	background?: { hex: string; mode: DiffBackgrounds["mode"] },
+): string {
+	if (width <= 1) return theme.fg("muted", "│".slice(0, width));
+	const body = truncateTerminalLine(content, width - ROW_CHROME_WIDTH, "…");
+	const rail = theme.fg("muted", "│");
+	if (!background) return `${rail} ${body}`;
+	const start = backgroundAnsi(background.hex, background.mode);
+	if (!start) return `${rail} ${body}`;
+	// Pi trims ordinary trailing spaces from component rows. Non-breaking spaces
+	// keep the pastel band rectangular while remaining visually blank.
+	const padding = "\u00a0".repeat(Math.max(0, width - ROW_CHROME_WIDTH - terminalLineWidth(body)));
+	return `${rail}${start} ${body}${padding}${ANSI_BG_RESET}`;
+}
+
+function wrapCodeLine(text: string, width: number): string[] {
+	if (width <= 0 || text.length === 0) return [""];
+	const rows: string[] = [];
+	let row = "";
+	let used = 0;
+	for (const char of text) {
+		const charWidth = terminalLineWidth(char);
+		if (charWidth > width) {
+			if (row) rows.push(row);
+			rows.push("…");
+			row = "";
+			used = 0;
+			continue;
+		}
+		if (used > 0 && used + charWidth > width) {
+			rows.push(row);
+			row = "";
+			used = 0;
+		}
+		row += char;
+		used += charWidth;
+	}
+	rows.push(row);
+	return rows;
+}
+
+function expandContent(
+	content: ReadonlyArray<LogicalEntry>,
+	width: number,
+	lineNumberWidth: number,
+): RenderEntry[] {
+	const gutterWidth = lineNumberWidth > 0
+		? lineNumberWidth + NUMBER_GUTTER_CHROME_WIDTH
+		: 2;
+	const codeWidth = Math.max(1, width - ROW_CHROME_WIDTH - gutterWidth);
+	const rows: RenderEntry[] = [];
+	for (const entry of content) {
+		if (entry.separator) {
+			rows.push({ separator: entry.separator });
+			continue;
+		}
+		if (!entry.line) continue;
+		wrapCodeLine(entry.line.text, codeWidth).forEach((text, index) => {
+			rows.push({ line: { value: entry.line!, text, continuation: index > 0 } });
+		});
+	}
+	return rows;
+}
+
+function diffRow(
+	entry: NonNullable<RenderEntry["line"]>,
+	lineNumberWidth: number,
+	width: number,
+	theme: FrameTheme,
+	backgrounds: DiffBackgrounds | undefined,
+	fadeIndex: number,
+): string {
+	const line = entry.value;
+	const role = fadeIndex >= 0
+		? "dim"
+		: line.kind === "removed"
 			? "toolDiffRemoved"
 			: line.kind === "added"
 				? "toolDiffAdded"
 				: "toolDiffContext";
-	const content = theme.fg(role, `${DIFF_PREFIX[line.kind]} ${line.text}`);
-	const truncated = truncateTerminalLine(content, frameContentWidth(width), "…");
-	return frameRow({
-		width,
-		content: truncated,
-		visibleContentWidth: terminalLineWidth(truncated),
-		...PALETTE,
-	});
+	const prefix = entry.continuation ? " " : DIFF_PREFIX[line.kind];
+	const number = entry.continuation || line.lineNumber === undefined
+		? " ".repeat(lineNumberWidth)
+		: String(line.lineNumber).padStart(lineNumberWidth, " ");
+	const gutter = lineNumberWidth > 0
+		? `${theme.fg(role, prefix)} ${theme.fg("dim", number)}${theme.fg("muted", " │ ")}`
+		: `${theme.fg(role, prefix)} `;
+	const tint = line.kind === "context" ? undefined : backgrounds?.[line.kind];
+	const opacity = fadeIndex >= 0
+		? (DIFF_BG_FADE_OPACITY[fadeIndex] ?? 0)
+		: DIFF_BG_OPACITY;
+	const hex = tint && backgrounds ? blendHex(backgrounds.base, tint, opacity) : undefined;
+	const background = hex && backgrounds ? { hex, mode: backgrounds.mode } : undefined;
+	return railRow(`${gutter}${theme.fg(role, entry.text)}`, width, theme, background);
 }
 
-function blankRow(width: number): string {
-	return frameRow({ width, content: "", visibleContentWidth: 0, ...PALETTE });
+function separatorRow(index: number, total: number, width: number, theme: FrameTheme): string {
+	return railRow(theme.fg("dim", `··· édition ${index}/${total}`), width, theme);
+}
+
+function footerRow(
+	hiddenLineCount: number,
+	nativeLabel: string,
+	expanded: boolean,
+	width: number,
+	theme: FrameTheme,
+): string {
+	const text = expanded
+		? "ctrl+o · replier"
+		: hiddenLineCount > 0
+			? `+${hiddenLineCount} lignes masquées · ctrl+o`
+			: `ctrl+o · ${nativeLabel}`;
+	return truncateTerminalLine(`  ${theme.fg("muted", text)}`, width, "…");
 }
 
 export function mutationFrameRows(spec: MutationFrameSpec, width: number, theme: FrameTheme): string[] {
-	const w = frameWidth(width);
-	const rows: string[] = [titleRow(spec, w)];
+	const content: LogicalEntry[] = [];
 	spec.diffs.forEach((diff, index) => {
-		if (index > 0) rows.push(blankRow(w));
-		for (const line of diff) rows.push(diffRow(line, w, theme));
+		if (index > 0) content.push({ separator: { index: index + 1, total: spec.diffs.length } });
+		for (const line of diff) content.push({ line });
 	});
-	const contentRows = rows.length - 1;
-	const isCapped = contentRows > FRAME_MAX_LINES;
-	if (isCapped) {
-		const solidRows = FRAME_MAX_LINES - FRAME_FADE_ROWS;
-		const faded = rows
-			.slice(1, 1 + FRAME_MAX_LINES)
-			.map((row, index) => {
-				const ratio = frameRowFadeRatio(index, solidRows, true);
-				return ratio > 0 ? fadeAnsiRow(row, ratio) : row;
-			});
-		faded.push(frameDotsRow(w, PALETTE));
-		return [rows[0], ...faded, footerRow(contentRows - FRAME_MAX_LINES, spec.nativeLabel, w)];
-	}
-	rows.push(footerRow(0, spec.nativeLabel, w));
-	return rows;
-}
-
-function fadeAnsiRow(row: string, ratio: number): string {
-	return row.replace(
-		/\x1b\[38;2;(\d+);(\d+);(\d+)m/g,
-		(_match, red: string, green: string, blue: string) =>
-			fgHex(blendHex(rgbToHex(red, green, blue), PALETTE.base, ratio), ""),
+	const lineNumberWidth = Math.max(
+		0,
+		...content.map((entry) => entry.line?.lineNumber === undefined ? 0 : String(entry.line.lineNumber).length),
 	);
-}
-
-function rgbToHex(red: string, green: string, blue: string): string {
-	const channel = (value: string) => Number(value).toString(16).padStart(2, "0");
-	return `#${channel(red)}${channel(green)}${channel(blue)}`;
+	const w = frameWidth(width, lineNumberWidth);
+	const contentRows = expandContent(content, w, lineNumberWidth);
+	const isCapped = spec.expanded !== true && contentRows.length > MUTATION_MAX_LINES;
+	const shown = isCapped ? contentRows.slice(0, MUTATION_MAX_LINES) : contentRows;
+	const solidRows = isCapped ? shown.length - MUTATION_FADE_ROWS : shown.length;
+	const backgrounds = spec.highlightChanges ? diffBackgrounds(theme) : undefined;
+	const rows = [titleRow(spec, w, theme), railRow("", w, theme)];
+	shown.forEach((entry, index) => {
+		if (entry.separator) {
+			rows.push(separatorRow(entry.separator.index, entry.separator.total, w, theme));
+		} else if (entry.line) {
+			rows.push(diffRow(entry.line, lineNumberWidth, w, theme, backgrounds, index - solidRows));
+		}
+	});
+	if (isCapped) rows.push(railRow(theme.fg("dim", "· · ·"), w, theme));
+	rows.push(railRow("", w, theme));
+	rows.push(footerRow(contentRows.length - shown.length, spec.nativeLabel, spec.expanded === true, w, theme));
+	return rows;
 }

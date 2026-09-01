@@ -5,61 +5,48 @@ import {
 	type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { createCompactRenderers } from "../compact-tools/renderer.ts";
-import type { CompactToolDefinition } from "../compact-tools/types.ts";
+import type {
+	CompactResultBodyRenderer,
+	CompactToolDefinition,
+} from "../compact-tools/types.ts";
 import { editCollapsedBody } from "./edit.ts";
 import { writeCollapsedBody } from "./write.ts";
 
+interface MutationToolSpec {
+	name: "edit" | "write";
+	create(cwd: string): CompactToolDefinition | undefined;
+	resultBody: CompactResultBodyRenderer;
+}
+
+const MUTATION_TOOLS: readonly MutationToolSpec[] = [
+	{ name: "edit", create: createEditToolDefinition, resultBody: editCollapsedBody },
+	{ name: "write", create: createWriteToolDefinition, resultBody: writeCollapsedBody },
+];
+
 export default function mutationView(pi: ExtensionAPI): void {
-	registerEdit(pi);
-	registerWrite(pi);
+	for (const spec of MUTATION_TOOLS) registerMutationTool(pi, spec);
 }
 
-function registerEdit(pi: ExtensionAPI): void {
-	const base = createEditToolDefinition(process.cwd());
+function registerMutationTool(pi: ExtensionAPI, spec: MutationToolSpec): void {
+	const base = spec.create(process.cwd());
 	if (!base) return;
 	const nativeByCwd = new Map<string, CompactToolDefinition | undefined>();
 	const nativeFor = (cwd: string): CompactToolDefinition | undefined => {
-		if (!nativeByCwd.has(cwd)) nativeByCwd.set(cwd, createEditToolDefinition(cwd));
+		if (!nativeByCwd.has(cwd)) nativeByCwd.set(cwd, spec.create(cwd));
 		return nativeByCwd.get(cwd);
 	};
-	const renderers = createCompactRenderers("edit", (cwd) => (cwd ? nativeFor(cwd) : undefined), {
-		hideRowOnSuccess: true,
-		collapsedBody: editCollapsedBody,
-		stackRows: false,
-	});
+	const renderers = createCompactRenderers(
+		spec.name,
+		(cwd) => (cwd ? nativeFor(cwd) : undefined),
+		{ resultBody: spec.resultBody },
+	);
 	pi.registerTool({
 		...base,
 		renderShell: "self",
 		...renderers,
 		execute(toolCallId, params, signal, onUpdate, ctx) {
 			const native = nativeFor(ctx.cwd);
-			if (!native) throw new Error('mutation-view: no native definition for "edit"');
-			return native.execute(toolCallId, params, signal, onUpdate, ctx);
-		},
-	} as unknown as ToolDefinition<any, any>);
-}
-
-function registerWrite(pi: ExtensionAPI): void {
-	const base = createWriteToolDefinition(process.cwd());
-	if (!base) return;
-	const nativeByCwd = new Map<string, CompactToolDefinition | undefined>();
-	const nativeFor = (cwd: string): CompactToolDefinition | undefined => {
-		if (!nativeByCwd.has(cwd)) nativeByCwd.set(cwd, createWriteToolDefinition(cwd));
-		return nativeByCwd.get(cwd);
-	};
-	const renderers = createCompactRenderers("write", (cwd) => (cwd ? nativeFor(cwd) : undefined), {
-		hideRowOnSuccess: true,
-		collapsedBody: writeCollapsedBody,
-		stackRows: false,
-		nativeCallWhenExpanded: true,
-	});
-	pi.registerTool({
-		...base,
-		renderShell: "self",
-		...renderers,
-		execute(toolCallId, params, signal, onUpdate, ctx) {
-			const native = nativeFor(ctx.cwd);
-			if (!native) throw new Error('mutation-view: no native definition for "write"');
+			if (!native) throw new Error(`mutation-view: no native definition for "${spec.name}"`);
 			return native.execute(toolCallId, params, signal, onUpdate, ctx);
 		},
 	} as unknown as ToolDefinition<any, any>);

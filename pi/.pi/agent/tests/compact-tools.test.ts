@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { compactRowLine } from "../extensions/compact-tools/line.ts";
 import { createCompactOverrides } from "../extensions/compact-tools/overrides.ts";
+import { TOOL_VIEW_REGISTRY } from "../extensions/compact-tools/registry.ts";
 import { createCompactRenderers } from "../extensions/compact-tools/renderer.ts";
 import {
 	MAX_VISIBLE_STACK_CALLS,
@@ -58,8 +59,14 @@ function stackWithTools(...tools: string[]): CompactRowStack {
 	return stack;
 }
 
-test("COMPACT_TOOLS couvre exactement les tools collapsés (bash appartient à pi-background)", () => {
+test("le registre couvre tous les propriétaires de rows sans liste parallèle", () => {
 	assert.deepEqual([...COMPACT_TOOLS], ["read", "grep", "find", "ls"]);
+	assert.deepEqual(Object.keys(TOOL_VIEW_REGISTRY), [
+		"read", "grep", "find", "ls", "bash", "background", "edit", "write",
+	]);
+	assert.equal(TOOL_VIEW_REGISTRY.edit.expandedResult, "custom");
+	assert.equal(TOOL_VIEW_REGISTRY.write.stackRows, false);
+	assert.equal(TOOL_VIEW_REGISTRY.bash.owner, "background");
 });
 
 test("toSingleLine réduit les commandes multilignes", () => {

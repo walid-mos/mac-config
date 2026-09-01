@@ -6,25 +6,12 @@
  * the editor is non-empty, so Escape Esc on an empty editor stays inert.
  */
 
-import { CustomEditor, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { EscapePacer } from "./pacer.ts";
-
-class DoubleEscapeEditor extends CustomEditor {
-	private pacer = new EscapePacer();
-
-	handleInput(data: string): void {
-		if (this.keybindings.matches(data, "app.interrupt") && !this.isShowingAutocomplete()) {
-			if (this.pacer.registerEscape(Date.now()) && this.getText().length > 0) {
-				this.setText("");
-				return;
-			}
-		} else {
-			// Any other key (or closing the autocomplete) breaks the gesture.
-			this.pacer.reset();
-		}
-		super.handleInput(data);
-	}
-}
+import {
+	CustomEditor,
+	type EditorFactory,
+	type ExtensionAPI,
+} from "@earendil-works/pi-coding-agent";
+import { DoubleEscapeEditor } from "./editor.ts";
 
 /**
  * Factories installed by this extension, guarded against re-installation:
@@ -37,8 +24,12 @@ export default function doubleEscapeClear(pi: ExtensionAPI): void {
 	pi.on("session_start", (_event, ctx) => {
 		const previous = ctx.ui.getEditorComponent();
 		if (previous && installedFactories.has(previous)) return;
-		const factory: NonNullable<typeof previous> = (tui, theme, keybindings) =>
-			new DoubleEscapeEditor(tui, theme, keybindings);
+		const factory: EditorFactory = (tui, theme, keybindings) => {
+			const base =
+				previous?.(tui, theme, keybindings) ??
+				new CustomEditor(tui, theme, keybindings);
+			return new DoubleEscapeEditor(base, keybindings);
+		};
 		installedFactories.add(factory);
 		ctx.ui.setEditorComponent(factory);
 	});

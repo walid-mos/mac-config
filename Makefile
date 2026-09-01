@@ -337,14 +337,25 @@ pi-notify-test:
 pi-ui-test:
 	@node --test \
 		pi/.pi/agent/tests/compact-tools.test.ts \
+		pi/.pi/agent/tests/design-system.test.ts \
 		pi/.pi/agent/tests/double-escape-pacer.test.ts \
+		pi/.pi/agent/tests/footer.test.ts \
+		pi/.pi/agent/tests/json-view-blob-store.test.ts \
+		pi/.pi/agent/tests/json-view-command.test.ts \
+		pi/.pi/agent/tests/json-view-detection.test.ts \
+		pi/.pi/agent/tests/json-view-frame.test.ts \
+		pi/.pi/agent/tests/json-view-rendering.test.ts \
 		pi/.pi/agent/tests/mutation-view-edit.test.ts \
+		pi/.pi/agent/tests/mutation-view-write.test.ts \
 		pi/.pi/agent/tests/ordered-widget-stack.test.ts \
 		pi/.pi/agent/tests/pi-web-render.test.ts \
+		pi/.pi/agent/tests/polling-resource.test.ts \
 		pi/.pi/agent/tests/response-view.test.ts \
+		pi/.pi/agent/tests/session-shortcuts.test.ts \
+		pi/.pi/agent/tests/surface.test.ts \
+		pi/.pi/agent/tests/terminal-text.test.ts \
 		pi/.pi/agent/tests/ui-registry-policy.test.ts \
-		pi/.pi/agent/tests/working-loader.test.ts \
-		pi/.pi/agent/tests/mutation-view-write.test.ts
+		pi/.pi/agent/tests/working-loader.test.ts
 
 herdr-pi-smoke: herdr
 	@python3 scripts/test-herdr-pi-startup.py

@@ -893,3 +893,10 @@ le hint `ctrl+o` ne pouvait donc pas agir.
 - Harness : scheduler, thème et API Pi factices sont partagés sans dupliquer les
   scénarios ; les 18 tests et Oxlint restent au vert.
 - Suite : scinder les scénarios mutation edit entre parsing/diff et rendu.
+
+### 2026-09-01 — tests edit par contrat
+
+- Tests : parsing/diff canonique, géométrie du frame et intégration renderer ont
+  désormais leurs suites autonomes et un thème ANSI minimal partagé.
+- Gate : les 14 scénarios edit et Oxlint ciblé passent après découpage.
+- Suite : auditer les derniers modules runtime de plus de 300 lignes hérités.

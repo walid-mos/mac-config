@@ -366,7 +366,9 @@ pi-ui-test:
 		pi/.pi/agent/tests/json-view-detection.test.ts \
 		pi/.pi/agent/tests/json-view-frame.test.ts \
 		pi/.pi/agent/tests/json-view-rendering.test.ts \
-		pi/.pi/agent/tests/mutation-view-edit.test.ts \
+		pi/.pi/agent/tests/mutation-view-edit-frame.test.ts \
+		pi/.pi/agent/tests/mutation-view-edit-parse.test.ts \
+		pi/.pi/agent/tests/mutation-view-edit-renderer.test.ts \
 		pi/.pi/agent/tests/mutation-view-write.test.ts \
 		pi/.pi/agent/tests/ordered-widget-stack.test.ts \
 		pi/.pi/agent/tests/pi-web-render.test.ts \

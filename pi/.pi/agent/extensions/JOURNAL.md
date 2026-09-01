@@ -833,3 +833,12 @@ le hint `ctrl+o` ne pouvait donc pas agir.
   `content` string ; l’alias historique `file_path` et les coercitions sont
   supprimés.
 - Tests : cas invalides explicites, 7 tests write et Oxlint ciblé au vert.
+
+### 2026-09-01 — responsabilités pi-notify séparées
+
+- Refactor : la façade `pi-notify.ts` ne fait plus que composer quatre modules :
+  processus best-effort, sonde Herdr, publication/queues et hooks Pi.
+- Architecture : chaque module a désormais une seule raison de changer ; les
+  exports publics et le comportement restent identiques.
+- Tests : 20 tests notifications et Oxlint ciblé au vert.
+- Suite : séparer l’état, l’analyse de transcript et le rendu compact stack.

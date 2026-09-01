@@ -369,6 +369,23 @@ test("CompactRowStack coupe la pile sur texte visible, user et tool non enregist
 	assert.deepEqual(stack.groups(), [["r1"], ["r2"], ["r3"], ["r4"]]);
 });
 
+test("CompactRowStack coupe chaque groupe séparé par plusieurs blocs de texte", () => {
+	const stack = stackWithTools("read");
+	stack.rebuild([
+		{
+			role: "assistant",
+			content: [
+				{ type: "toolCall", id: "r1", name: "read" },
+				{ type: "text", text: "première transition" },
+				{ type: "toolCall", id: "r2", name: "read" },
+				{ type: "text", text: "seconde transition" },
+				{ type: "toolCall", id: "r3", name: "read" },
+			],
+		},
+	]);
+	assert.deepEqual(stack.groups(), [["r1"], ["r2"], ["r3"]]);
+});
+
 test("CompactRowStack déduplique les message_update streamés", () => {
 	const stack = stackWithTools("read");
 	stack.beginMessage({ role: "assistant", content: [{ type: "text", text: "go" }] });
@@ -393,6 +410,27 @@ test("CompactRowStack déduplique les message_update streamés", () => {
 		],
 	});
 	assert.deepEqual(stack.groups(), [["r1", "r2"]]);
+});
+
+test("CompactRowStack applique une nouvelle frontière textuelle pendant le streaming", () => {
+	const stack = stackWithTools("read");
+	stack.beginMessage({
+		role: "assistant",
+		content: [
+			{ type: "text", text: "intro" },
+			{ type: "toolCall", id: "r1", name: "read" },
+		],
+	});
+	stack.updateMessage({
+		role: "assistant",
+		content: [
+			{ type: "text", text: "intro enrichie" },
+			{ type: "toolCall", id: "r1", name: "read" },
+			{ type: "text", text: "transition" },
+			{ type: "toolCall", id: "r2", name: "read" },
+		],
+	});
+	assert.deepEqual(stack.groups(), [["r1"], ["r2"]]);
 });
 
 test("tout renderer compact s'enregistre automatiquement dans la pile", () => {

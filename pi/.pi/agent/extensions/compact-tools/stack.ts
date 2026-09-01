@@ -17,7 +17,7 @@ interface CompactRowStackState {
 	activeGroup: string[] | undefined;
 	seenCallIds: Set<string>;
 	liveAssistant: boolean;
-	liveTextBoundaryApplied: boolean;
+	liveVisibleTextBlocks: number;
 }
 
 function createCompactRowStackState(): CompactRowStackState {
@@ -28,7 +28,7 @@ function createCompactRowStackState(): CompactRowStackState {
 		activeGroup: undefined,
 		seenCallIds: new Set(),
 		liveAssistant: false,
-		liveTextBoundaryApplied: false,
+		liveVisibleTextBlocks: 0,
 	};
 }
 
@@ -94,12 +94,12 @@ export class CompactRowStack {
 		this.state.liveAssistant = value;
 	}
 
-	private get liveTextBoundaryApplied(): boolean {
-		return this.state.liveTextBoundaryApplied;
+	private get liveVisibleTextBlocks(): number {
+		return this.state.liveVisibleTextBlocks;
 	}
 
-	private set liveTextBoundaryApplied(value: boolean) {
-		this.state.liveTextBoundaryApplied = value;
+	private set liveVisibleTextBlocks(count: number) {
+		this.state.liveVisibleTextBlocks = count;
 	}
 
 	registerTool(tool: string, stackable: boolean): void {
@@ -117,7 +117,7 @@ export class CompactRowStack {
 		this.activeGroup = undefined;
 		this.seenCallIds.clear();
 		this.liveAssistant = false;
-		this.liveTextBoundaryApplied = false;
+		this.liveVisibleTextBlocks = 0;
 	}
 
 	rebuild(messages: ReadonlyArray<StackMessage>): void {
@@ -133,7 +133,7 @@ export class CompactRowStack {
 		}
 		if (message.role !== "assistant") return;
 		this.liveAssistant = true;
-		this.liveTextBoundaryApplied = false;
+		this.liveVisibleTextBlocks = 0;
 		this.consumeLiveAssistant(message);
 	}
 
@@ -141,7 +141,7 @@ export class CompactRowStack {
 		if (message.role !== "assistant") return;
 		if (!this.liveAssistant) {
 			this.liveAssistant = true;
-			this.liveTextBoundaryApplied = false;
+			this.liveVisibleTextBlocks = 0;
 		}
 		this.consumeLiveAssistant(message);
 	}
@@ -207,11 +207,9 @@ export class CompactRowStack {
 			return;
 		}
 		if (message.role !== "assistant") return;
-		let textBoundaryApplied = false;
 		for (const block of contentBlocks(message)) {
 			if (isVisibleText(block)) {
-				if (!textBoundaryApplied) this.breakGroup();
-				textBoundaryApplied = true;
+				this.breakGroup();
 				continue;
 			}
 			this.consumeToolBlock(block);
@@ -219,14 +217,19 @@ export class CompactRowStack {
 	}
 
 	private consumeLiveAssistant(message: StackMessage): void {
+		let visibleTextBlocks = 0;
 		for (const block of contentBlocks(message)) {
 			if (isVisibleText(block)) {
-				if (!this.liveTextBoundaryApplied) this.breakGroup();
-				this.liveTextBoundaryApplied = true;
+				visibleTextBlocks += 1;
+				if (visibleTextBlocks > this.liveVisibleTextBlocks) this.breakGroup();
 				continue;
 			}
 			this.consumeToolBlock(block);
 		}
+		this.liveVisibleTextBlocks = Math.max(
+			this.liveVisibleTextBlocks,
+			visibleTextBlocks,
+		);
 	}
 
 	private consumeToolBlock(block: MessageBlock): void {
@@ -300,7 +303,8 @@ function isCompactRowStackState(value: unknown): value is CompactRowStackState {
 		(state.activeGroup === undefined || Array.isArray(state.activeGroup)) &&
 		state.seenCallIds instanceof Set &&
 		typeof state.liveAssistant === "boolean" &&
-		typeof state.liveTextBoundaryApplied === "boolean"
+		Number.isInteger(state.liveVisibleTextBlocks) &&
+		state.liveVisibleTextBlocks >= 0
 	);
 }
 

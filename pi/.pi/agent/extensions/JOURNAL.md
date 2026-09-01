@@ -614,3 +614,11 @@ le hint `ctrl+o` ne pouvait donc pas agir.
 - Tests : response-view 8/8, esbuild, contrôle Latte 120 colonnes et
   `make pi-ui-test` 87/87 au vert.
 - Suite : `/reload`, puis validation visuelle.
+
+### 2026-09-01 — frontières textuelles multiples dans les tool stacks
+
+- Fix : chaque bloc texte visible coupe maintenant la pile compacte restaurée
+  ou streamée ; le suivi par compteur évite de retraiter les deltas déjà vus.
+- Fichiers : `compact-tools/stack.ts`, test compact-tools.
+- Tests : compact-tools 31/31 et esbuild de l'entrypoint au vert.
+- Suite : —

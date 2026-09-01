@@ -826,3 +826,10 @@ le hint `ctrl+o` ne pouvait donc pas agir.
 - Tests : une fin lente suivie d’un nouveau run reste silencieuse, puis la fin
   courante est bien livrée ; 20 tests pi-notify et Oxlint au vert.
 - Suite : retirer les derniers aliases d’arguments historiques des mutations.
+
+### 2026-09-01 — arguments write canoniques
+
+- Refactor : mutation-view accepte uniquement un `path` non vide et un
+  `content` string ; l’alias historique `file_path` et les coercitions sont
+  supprimés.
+- Tests : cas invalides explicites, 7 tests write et Oxlint ciblé au vert.

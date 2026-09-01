@@ -19,19 +19,16 @@ export interface ParsedWriteArgs {
 	content: string
 }
 
-export function parseWriteArgs(
-	args: Record<string, unknown> | undefined,
-): ParsedWriteArgs | undefined {
+export function parseWriteArgs(args: unknown): ParsedWriteArgs | undefined {
+	if (typeof args !== 'object' || args === null) return undefined
+	const candidate = args as Record<string, unknown>
 	if (
-		typeof args !== 'object' ||
-		args === null ||
-		typeof args.content !== 'string'
+		typeof candidate.path !== 'string' ||
+		candidate.path.length === 0 ||
+		typeof candidate.content !== 'string'
 	)
 		return undefined
-	return {
-		path: String(args.path ?? args.file_path ?? ''),
-		content: args.content,
-	}
+	return { path: candidate.path, content: candidate.content }
 }
 
 export function writeDiffLines(content: string): DiffLine[] {

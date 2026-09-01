@@ -32,17 +32,20 @@ function context(
 	}
 }
 
-test('parseWriteArgs accepte path/file_path et exige un contenu string', () => {
+test('parseWriteArgs valide strictement path et content', () => {
 	assert.deepEqual(parseWriteArgs({ path: '/a/f.ts', content: 'x' }), {
 		path: '/a/f.ts',
 		content: 'x',
 	})
-	assert.deepEqual(parseWriteArgs({ file_path: '/a/f.ts', content: '' }), {
-		path: '/a/f.ts',
-		content: '',
-	})
-	assert.equal(parseWriteArgs({ path: '/a/f.ts' }), undefined)
-	assert.equal(parseWriteArgs({ path: '/a/f.ts', content: 42 }), undefined)
+	for (const invalid of [
+		{ file_path: '/a/f.ts', content: '' },
+		{ path: '', content: '' },
+		{ path: 42, content: '' },
+		{ path: '/a/f.ts' },
+		{ path: '/a/f.ts', content: 42 },
+	]) {
+		assert.equal(parseWriteArgs(invalid), undefined)
+	}
 })
 
 test('writeDiffLines normalise CRLF et retire les fins vides', () => {

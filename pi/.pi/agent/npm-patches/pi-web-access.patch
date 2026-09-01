@@ -1,0 +1,715 @@
+diff --git a/compact-render.ts b/compact-render.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..f879d02bfdecd470cbb73d93c36cb8a87814ff60
+--- /dev/null
++++ b/compact-render.ts
+@@ -0,0 +1,152 @@
++import { truncateToWidth, type Component } from "@earendil-works/pi-tui";
++
++export type CompactStatus = "pending" | "ok" | "error";
++
++export interface CompactState {
++	status?: CompactStatus;
++	summary?: string;
++}
++
++export interface CompactTheme {
++	fg(role: string, text: string): string;
++	bold(text: string): string;
++}
++
++export interface CompactContext {
++	state: CompactState & Record<string, unknown>;
++	lastComponent?: Component;
++	isError?: boolean;
++}
++
++interface CompactRow extends Component {
++	readonly compactWebRow: true;
++	label: string;
++	subject: string;
++	state: CompactState;
++	theme: CompactTheme;
++}
++
++function statusGlyph(status: CompactStatus | undefined): { glyph: string; role: string } {
++	if (status === "ok") return { glyph: "✓", role: "success" };
++	if (status === "error") return { glyph: "✗", role: "error" };
++	return { glyph: "●", role: "accent" };
++}
++
++function compactLine(label: string, subject: string, state: CompactState, theme: CompactTheme): string {
++	const { glyph, role } = statusGlyph(state.status);
++	let line = `${theme.fg(role, glyph)} ${theme.fg("accent", theme.bold(label))}`;
++	if (subject) line += theme.fg("text", ` · ${subject}`);
++	if (state.summary) line += theme.fg("dim", ` · ${state.summary}`);
++	return line;
++}
++
++function createRow(label: string, subject: string, state: CompactState, theme: CompactTheme): CompactRow {
++	return {
++		compactWebRow: true,
++		label,
++		subject,
++		state,
++		theme,
++		render(width: number) {
++			return [truncateToWidth(compactLine(this.label, this.subject, this.state, this.theme), width, "…")];
++		},
++		invalidate() {},
++	};
++}
++
++export function renderCompactCall(label: string, subject: string, theme: CompactTheme, context: CompactContext): Component {
++	if (context.state.status === undefined) context.state.status = "pending";
++	const previous = context.lastComponent as CompactRow | undefined;
++	const row = previous?.compactWebRow === true
++		? previous
++		: createRow(label, subject, context.state, theme);
++	row.label = label;
++	row.subject = subject;
++	row.state = context.state;
++	row.theme = theme;
++	return row;
++}
++
++export function settleCompactResult(
++	result: { details?: unknown },
++	context: CompactContext,
++	summary: string,
++): boolean {
++	const details = typeof result.details === "object" && result.details !== null
++		? result.details as Record<string, unknown>
++		: undefined;
++	const error = typeof details?.error === "string" ? details.error : undefined;
++	const failed = context.isError === true || error !== undefined;
++	context.state.status = failed ? "error" : "ok";
++	context.state.summary = failed ? firstLine(error ?? summary) : summary;
++	return failed;
++}
++
++export function emptyComponent(): Component {
++	return { render: () => [], invalidate() {} };
++}
++
++export function firstText(content: ReadonlyArray<{ type: string; text?: string }>): string {
++	return content.find((entry) => entry.type === "text" && typeof entry.text === "string")?.text ?? "";
++}
++
++export function firstLine(text: string): string {
++	return text.split("\n", 1)[0]?.trim() ?? "";
++}
++
++export interface SearchQueryDetail {
++	query: string;
++	provider: string | null;
++	answer: string | null;
++	sources: Array<{ title: string; url: string }>;
++	error: string | null;
++}
++
++export function renderQueryDetails(
++	details: ReadonlyArray<SearchQueryDetail>,
++	theme: CompactTheme,
++): string[] {
++	const lines: string[] = [];
++	for (const detail of details) {
++		lines.push("");
++		const query = detail.query.length > 65
++			? detail.query.slice(0, 62) + "..."
++			: detail.query;
++		const provider = detail.provider ? ` (${detail.provider})` : "";
++		lines.push(theme.fg("accent", `  "${query}"${provider}`));
++		if (detail.error) {
++			lines.push(theme.fg("error", `  ${detail.error}`));
++		} else if (detail.answer) {
++			lines.push("", ...detail.answer.split("\n").map(line => `  ${line}`));
++		}
++		if (detail.sources.length > 0) {
++			lines.push("");
++			for (const source of detail.sources) {
++				const domain = source.url.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
++				const title = source.title.length > 50
++					? source.title.slice(0, 47) + "..."
++					: source.title;
++				lines.push(theme.fg("muted", `  ▸ ${title}`) + theme.fg("dim", ` · ${domain}`));
++			}
++		}
++	}
++	return lines;
++}
++
++export function renderCompactMessage(
++	label: string,
++	status: Exclude<CompactStatus, "pending">,
++	subject: string,
++	summary: string,
++	theme: CompactTheme,
++	padding = 0,
++): Component {
++	const state = { status, summary } satisfies CompactState;
++	return {
++		render(width: number) {
++			const left = " ".repeat(Math.max(0, padding));
++			return [left + truncateToWidth(compactLine(label, subject, state, theme), Math.max(0, width - left.length), "…")];
++		},
++		invalidate() {},
++	};
++}
+diff --git a/index.ts b/index.ts
+index 4f8c24484cdd91533d45feb97800355803ffddbd..fa65feceb60a75eaa9d8f09d6f1f4c30ab2b35c1 100644
+--- a/index.ts
++++ b/index.ts
+@@ -1,6 +1,14 @@
+ import type { AgentToolResult, ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+ import { Box, Text, truncateToWidth, type KeyId } from "@earendil-works/pi-tui";
+ import { Type } from "typebox";
++import {
++	emptyComponent,
++	firstText,
++	renderCompactCall,
++	renderCompactMessage,
++	renderQueryDetails,
++	settleCompactResult,
++} from "./compact-render.ts";
+ import { StringEnum, type ImageContent, type TextContent } from "@earendil-works/pi-ai/compat";
+ import type { ExtractedContent, ExtractOptions } from "./extract.ts";
+ import { normalizeFetchContentParams } from "./fetch-params.ts";
+@@ -1064,6 +1072,68 @@ export default function (pi: ExtensionAPI) {
+ 	const curateKey = initConfig.shortcuts?.curate || DEFAULT_SHORTCUTS.curate;
+ 	const activityKey = initConfig.shortcuts?.activity || DEFAULT_SHORTCUTS.activity;
+ 
++	pi.registerMessageRenderer("web-search-content-ready", (message, options, theme) => {
++		const details = message.details as {
++			responseId: string;
++			successful: number;
++			total: number;
++			availability: "full" | "partial" | "none";
++		};
++		const availability = details.availability === "full"
++			? "contenu complet"
++			: details.availability === "partial"
++				? "contenu partiel"
++				: "aucun contenu";
++		return renderCompactMessage(
++			"content ready",
++			details.availability === "none" ? "error" : "ok",
++			`${details.successful}/${details.total} URLs`,
++			`${availability} · ${details.responseId}`,
++			theme,
++			options.outputPad,
++		);
++	});
++
++	pi.registerMessageRenderer("web-search-error", (message, options, theme) => {
++		const details = message.details as { responseId: string; error: string };
++		return renderCompactMessage(
++			"content fetch",
++			"error",
++			details.responseId,
++			details.error,
++			theme,
++			options.outputPad,
++		);
++	});
++
++	pi.registerMessageRenderer("web-search-results", (message, options, theme) => {
++		const details = message.details as {
++			error?: string;
++			queryCount?: number;
++			totalResults?: number;
++			responseId?: string;
++		};
++		const failed = typeof details.error === "string";
++		const subject = details.queryCount && details.queryCount > 1
++			? `${details.queryCount} requêtes`
++			: details.responseId ?? "résultats";
++		const summary = failed ? details.error! : `${details.totalResults ?? 0} sources`;
++		if (!options.expanded) {
++			return renderCompactMessage(
++				"search",
++				failed ? "error" : "ok",
++				subject,
++				summary,
++				theme,
++				options.outputPad,
++			);
++		}
++		const content = Array.isArray(message.content)
++			? firstText(message.content as Array<{ type: string; text?: string }>)
++			: String(message.content ?? "");
++		return new Text(content, options.outputPad, 0);
++	});
++
+ 	function startBackgroundFetch(urls: string[], proxy?: string): string | null {
+ 		if (urls.length === 0) return null;
+ 		const fetchId = generateId();
+@@ -1080,9 +1150,14 @@ export default function (pi: ExtensionAPI) {
+ 				} satisfies StoredSearchData & { type: "fetch"; urls: ExtractedContent[] };
+ 				pi.appendEntry("web-search-results", storeFetchedContentResult(fetchId, data));
+ 				const ok = fetched.filter(f => !f.error).length;
+-				const availability = ok === fetched.length
+-					? "Full page content now available."
++				const availabilityKind = ok === fetched.length
++					? "full"
+ 					: ok > 0
++						? "partial"
++						: "none";
++				const availability = availabilityKind === "full"
++					? "Full page content now available."
++					: availabilityKind === "partial"
+ 						? "Partial page content now available."
+ 						: "No page content was fetched. Stored fetch diagnostics are available.";
+ 				pi.sendMessage(
+@@ -1090,6 +1165,12 @@ export default function (pi: ExtensionAPI) {
+ 						customType: "web-search-content-ready",
+ 						content: `Content fetched for ${ok}/${fetched.length} URLs [${fetchId}]. ${availability}`,
+ 						display: true,
++						details: {
++							responseId: fetchId,
++							successful: ok,
++							total: fetched.length,
++							availability: availabilityKind,
++						},
+ 					},
+ 					{ triggerTurn: true },
+ 				);
+@@ -1104,6 +1185,7 @@ export default function (pi: ExtensionAPI) {
+ 							customType: "web-search-error",
+ 							content: `Content fetch failed [${fetchId}]: ${message}`,
+ 							display: true,
++							details: { responseId: fetchId, error: message },
+ 						},
+ 						{ triggerTurn: false },
+ 					);
+@@ -1417,7 +1499,15 @@ export default function (pi: ExtensionAPI) {
+ 						sources: r.results.map(s => ({ title: s.title, url: s.url })),
+ 						error: r.error,
+ 					})),
+-				} : {}),
++				} : {
++					queryDetails: opts.results.map(r => ({
++						query: r.query,
++						provider: r.provider || null,
++						answer: r.answer || null,
++						sources: r.results.map(s => ({ title: s.title, url: s.url })),
++						error: r.error,
++					})),
++				}),
+ 				...((opts.workflow && hasApprovedSummary)
+ 					? {
+ 						summary: {
+@@ -1749,6 +1839,7 @@ export default function (pi: ExtensionAPI) {
+ 	if (webSearchEnabled) pi.registerTool({
+ 		name: toolNames.webSearch,
+ 		label: "Web Search",
++		renderShell: "self",
+ 		description:
+ 			`Search the web using OpenAI, Brave, Parallel, Parallel MCP, TinyFish, Search1API, Searchinfinity, Querit, Tavily, Firecrawl, Jina, SERPdive, Kagi, Bocha, Ollama, SearXNG, DuckDuckGo, Exa, Perplexity, Gemini, Kimi, AnySearch, XCrawl, Valyu, xAI, Bright Data, SerpBase, or Serper. Pass a provider array to search only those providers simultaneously, or use provider "all" to search every eligible provider except Parallel MCP, DuckDuckGo, Kimi, AnySearch, XCrawl, Valyu, xAI, Bright Data, SerpBase, and Serper. Returns an AI-synthesized answer with source citations. OpenAI search uses a Codex subscription or OpenAI API key; Kimi search uses a Kimi Code Plan authenticated through /login kimi-coding; xAI search uses a SuperGrok/X Premium subscription or xAI API key. Parallel MCP, DuckDuckGo, Kimi, AnySearch, XCrawl, Valyu, xAI, Bright Data, SerpBase, and Serper are available only when explicitly selected. For comprehensive research, prefer queries (plural) with 2-4 varied angles over a single query — each query gets its own synthesized answer, so varying phrasing and scope gives much broader coverage. When includeContent is true, full page content is fetched in the background. Searches auto-open the interactive browser curator and stream results live; set workflow to "none" to skip curation or "auto-summary" for a model-generated summary without the browser curator. The configured provider is used when provider is omitted or set to auto; omit provider unless explicitly overriding it. Without a configured provider, SearXNG is preferred first for local/private search. When the active Pi model is openai-codex, Codex-backed OpenAI search is preferred next. Otherwise Exa is preferred before OpenAI, then Brave, Parallel, TinyFish, Search1API, Searchinfinity, Querit, Tavily, Firecrawl, Jina, SERPdive, Kagi, Bocha, Ollama, Perplexity, Gemini API, or Gemini Web.`,
+ 		promptSnippet:
+@@ -2069,32 +2160,19 @@ export default function (pi: ExtensionAPI) {
+ 			});
+ 		},
+ 
+-		renderCall(args, theme) {
++		renderCall(args, theme, context) {
+ 			const input = args as { query?: unknown; queries?: unknown };
+ 			const rawQueryList: unknown[] = Array.isArray(input.queries)
+ 				? input.queries
+ 				: (input.query !== undefined ? expandQueryString(input.query) : []);
+ 			const queryList = normalizeQueryList(rawQueryList);
+-			if (queryList.length === 0) {
+-				return new Text(theme.fg("toolTitle", theme.bold("search ")) + theme.fg("error", "(no query)"), 0, 0);
+-			}
+-			if (queryList.length === 1) {
+-				const q = queryList[0];
+-				const display = q.length > 60 ? q.slice(0, 57) + "..." : q;
+-				return new Text(theme.fg("toolTitle", theme.bold("search ")) + theme.fg("accent", `"${display}"`), 0, 0);
+-			}
+-			const lines = [theme.fg("toolTitle", theme.bold("search ")) + theme.fg("accent", `${queryList.length} queries`)];
+-			for (const q of queryList.slice(0, 5)) {
+-				const display = q.length > 50 ? q.slice(0, 47) + "..." : q;
+-				lines.push(theme.fg("muted", `  "${display}"`));
+-			}
+-			if (queryList.length > 5) {
+-				lines.push(theme.fg("muted", `  ... and ${queryList.length - 5} more`));
+-			}
+-			return new Text(lines.join("\n"), 0, 0);
++			const subject = queryList.length === 1 ? `"${queryList[0]}"`
++				: queryList.length > 1 ? `${queryList.length} requêtes`
++				: "";
++			return renderCompactCall("search", subject, theme, context);
+ 		},
+ 
+-		renderResult(result, { expanded, isPartial }, theme) {
++		renderResult(result, { expanded, isPartial }, theme, context) {
+ 			type QueryDetail = {
+ 				query: string;
+ 				provider: string | null;
+@@ -2120,6 +2198,7 @@ export default function (pi: ExtensionAPI) {
+ 				browserConnected?: boolean;
+ 				lastHeartbeatAgeMs?: number | null;
+ 				cancelledQueries?: import("./render-search-error.ts").CancelledQueryDetail[];
++				queryDetails?: QueryDetail[];
+ 				curatorUrl?: string;
+ 				browserOpenError?: string;
+ 				timeoutSeconds?: number;
+@@ -2179,6 +2258,8 @@ export default function (pi: ExtensionAPI) {
+ 			}
+ 
+ 			if (details?.error) {
++				settleCompactResult(result, context, details.error);
++				if (!expanded) return emptyComponent();
+ 				// Expandable Ctrl+O diagnostics: which queries completed, per-query errors,
+ 				// browser connection state, cancel reason. See render-search-error.ts.
+ 				const plan = buildSearchErrorPlan(details as SearchErrorDetails);
+@@ -2186,6 +2267,13 @@ export default function (pi: ExtensionAPI) {
+ 				return new Text(theme.fg("error", `Error: ${details.error}`), 0, 0);
+ 			}
+ 
++			const partial = details?.queryCount !== undefined && details?.queryCount > 1 && details?.successfulQueries !== details?.queryCount;
++			settleCompactResult(
++				result,
++				context,
++				(partial ? `${details?.successfulQueries}/${details?.queryCount} OK · ` : "") + `${details?.totalResults ?? 0} sources`,
++			);
++
+ 			let statusLine: string;
+ 			const queryInfo = details?.queryCount === 1 ? "" : `${details?.successfulQueries}/${details?.queryCount} queries, `;
+ 			statusLine = theme.fg("success", `${queryInfo}${details?.totalResults ?? 0} sources`);
+@@ -2229,31 +2317,9 @@ export default function (pi: ExtensionAPI) {
+ 				lines.push("");
+ 				lines.push(theme.fg("accent", `\u2500\u2500 Curated Results (${kept} of ${from} queries kept) ` + "\u2500".repeat(24)));
+ 
+-				for (const cq of queryDetails) {
+-					lines.push("");
+-					const dq = cq.query.length > 65 ? cq.query.slice(0, 62) + "..." : cq.query;
+-					const providerLabel = cq.provider ? ` (${cq.provider})` : "";
+-					lines.push(theme.fg("accent", `  "${dq}"${providerLabel}`));
+-
+-					if (cq.error) {
+-						lines.push(theme.fg("error", `  ${cq.error}`));
+-					} else if (cq.answer) {
+-						lines.push("");
+-						for (const line of cq.answer.split("\n")) {
+-							lines.push(`  ${line}`);
+-						}
+-					}
+-
+-					if (cq.sources.length > 0) {
+-						lines.push("");
+-						for (const s of cq.sources) {
+-							const domain = s.url.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+-							const title = s.title.length > 50 ? s.title.slice(0, 47) + "..." : s.title;
+-							lines.push(theme.fg("muted", `  \u25b8 ${title}`) + theme.fg("dim", ` \u00b7 ${domain}`));
+-						}
+-					}
+-				}
+-				lines.push("");
++				lines.push(...renderQueryDetails(queryDetails, theme), "");
++			} else if (details?.queryDetails?.length) {
++				lines.push(...renderQueryDetails(details.queryDetails, theme));
+ 			} else {
+ 				const textContent = result.content.find((c) => c.type === "text")?.text || "";
+ 				const preview = textContent.length > 500 ? textContent.slice(0, 500) + "..." : textContent;
+@@ -2277,49 +2343,7 @@ export default function (pi: ExtensionAPI) {
+ 				}
+ 			}
+ 
+-			const totalLines = lines.length;
+-
+-			if (!expanded) {
+-				const box = new Box(1, 0);
+-				box.addChild(new Text(statusLine, 0, 0));
+-
+-				let collapsedLines = 1; // statusLine
+-				const summaryPreview = details?.summary?.text?.trim() || "";
+-				if (summaryPreview) {
+-					const preview = summaryPreview.length > 120 ? summaryPreview.slice(0, 117) + "..." : summaryPreview;
+-					box.addChild(new Text(theme.fg("dim", preview), 0, 0));
+-					collapsedLines++;
+-				} else if (details?.curatedQueries?.length) {
+-					for (const cq of details.curatedQueries.slice(0, 3)) {
+-						const dq = cq.query.length > 55 ? cq.query.slice(0, 52) + "..." : cq.query;
+-						const srcCount = cq.sources?.length ?? 0;
+-						const suffix = cq.error ? theme.fg("error", " (error)") : theme.fg("dim", ` · ${srcCount} sources`);
+-						box.addChild(new Text(theme.fg("accent", `  "${dq}"`) + suffix, 0, 0));
+-						collapsedLines++;
+-					}
+-					if (details.curatedQueries.length > 3) {
+-						box.addChild(new Text(theme.fg("dim", `  ... and ${details.curatedQueries.length - 3} more`), 0, 0));
+-						collapsedLines++;
+-					}
+-				} else {
+-					const textContent = result.content.find((c) => c.type === "text")?.text || "";
+-					const firstContentLine = textContent.split("\n").find(l => {
+-						const t = l.trim();
+-						return t && !t.startsWith("[") && !t.startsWith("#") && !t.startsWith("---");
+-					});
+-					const fallbackLine = (firstContentLine?.trim() || "").replace(/\*\*/g, "");
+-					if (fallbackLine) {
+-						const preview = fallbackLine.length > 120 ? fallbackLine.slice(0, 117) + "..." : fallbackLine;
+-						box.addChild(new Text(theme.fg("dim", preview), 0, 0));
+-						collapsedLines++;
+-					}
+-				}
+-				const moreLines = Math.max(0, totalLines - collapsedLines);
+-				if (moreLines > 0) {
+-					box.addChild(new Text(theme.fg("muted", `\n... (${moreLines} more lines, ${totalLines} total, ctrl+o to expand)`), 0, 0));
+-				}
+-				return box;
+-			}
++			if (!expanded) return { render: () => [], invalidate: () => {} };
+ 
+ 			return new Text(lines.join("\n"), 0, 0);
+ 		},
+@@ -2328,6 +2352,7 @@ export default function (pi: ExtensionAPI) {
+ 	if (sourceCheckEnabled) pi.registerTool({
+ 		name: toolNames.sourceCheck,
+ 		label: "Source Check",
++		renderShell: "self",
+ 		description: "Check a claim against web sources and return a bounded machine-readable research artifact with exact passage citations.",
+ 		promptSnippet: "Verify a claim with structured source evidence and passage-level citations.",
+ 		parameters: Type.Object({
+@@ -2422,11 +2447,40 @@ export default function (pi: ExtensionAPI) {
+ 				};
+ 			});
+ 		},
++
++		renderCall(args, theme, context) {
++			const { claim, queries } = args as { claim?: string; queries?: string[] };
++			const queryCount = Array.isArray(queries) && queries.length > 1
++				? ` · ${queries.length} requêtes`
++				: "";
++			return renderCompactCall("source check", `${claim ? `"${claim}"` : ""}${queryCount}`, theme, context);
++		},
++
++		renderResult(result, { expanded }, theme, context) {
++			const details = result.details as {
++				error?: string;
++				responseId?: string;
++				sourceCount?: number;
++				passageCount?: number;
++			};
++			const failed = settleCompactResult(
++				result,
++				context,
++				`${details.sourceCount ?? 0} sources · ${details.passageCount ?? 0} passages`,
++			);
++			if (!expanded) return emptyComponent();
++			if (failed && details.error) {
++				const plan = buildSearchErrorPlan({ error: details.error });
++				if (plan) return renderSearchErrorPlan(plan, true, theme);
++			}
++			return new Text(theme.fg(failed ? "error" : "toolOutput", firstText(result.content)), 0, 0);
++		},
+ 	});
+ 
+ 	if (fetchContentEnabled) pi.registerTool({
+ 		name: toolNames.fetchContent,
+ 		label: "Fetch Content",
++		renderShell: "self",
+ 		description: `Fetch URL(s) and extract readable content as markdown. Use mode "raw" for exact textual HTTP response bodies or mode "answer" with prompt to answer using only fetched content. Direct image URLs return resized image content. Supports YouTube transcripts, GitHub repositories, PDFs, and local videos. ${fetchContentStorageNote}`,
+ 		promptSnippet:
+ 			"Use to fetch readable or raw URL content, direct images, GitHub repos, and videos. Mode answer answers a prompt using only the fetched source.",
+@@ -2633,52 +2687,26 @@ export default function (pi: ExtensionAPI) {
+ 			});
+ 		},
+ 
+-		renderCall(args, theme) {
++		renderCall(args, theme, context) {
+ 			const { urlList, options } = normalizeFetchContentParams(args);
+ 			const { prompt, timestamp, frames, model, mode, answerModel, auth } = options;
+-			if (urlList.length === 0) {
+-				return new Text(theme.fg("toolTitle", theme.bold("fetch ")) + theme.fg("error", "(no URL)"), 0, 0);
+-			}
+-			const lines: string[] = [];
++			const parts: string[] = [];
+ 			if (urlList.length === 1) {
+-				const display = urlList[0].length > 60 ? urlList[0].slice(0, 57) + "..." : urlList[0];
+-				lines.push(theme.fg("toolTitle", theme.bold("fetch ")) + theme.fg("accent", display));
+-			} else {
+-				lines.push(theme.fg("toolTitle", theme.bold("fetch ")) + theme.fg("accent", `${urlList.length} URLs`));
+-				for (const u of urlList.slice(0, 5)) {
+-					const display = u.length > 60 ? u.slice(0, 57) + "..." : u;
+-					lines.push(theme.fg("muted", "  " + display));
+-				}
+-				if (urlList.length > 5) {
+-					lines.push(theme.fg("muted", `  ... and ${urlList.length - 5} more`));
+-				}
+-			}
+-			if (mode && mode !== "readable") {
+-				lines.push(theme.fg("dim", "  mode: ") + theme.fg("warning", mode));
+-			}
+-			if (timestamp) {
+-				lines.push(theme.fg("dim", "  timestamp: ") + theme.fg("warning", timestamp));
+-			}
+-			if (typeof frames === "number") {
+-				lines.push(theme.fg("dim", "  frames: ") + theme.fg("warning", String(frames)));
+-			}
+-			if (prompt) {
+-				const display = prompt.length > 250 ? prompt.slice(0, 247) + "..." : prompt;
+-				lines.push(theme.fg("dim", "  prompt: ") + theme.fg("muted", `"${display}"`));
+-			}
+-			if (model) {
+-				lines.push(theme.fg("dim", "  model: ") + theme.fg("warning", model));
+-			}
+-			if (answerModel) {
+-				lines.push(theme.fg("dim", "  answer model: ") + theme.fg("warning", answerModel));
+-			}
+-			if (auth !== undefined) {
+-				lines.push(theme.fg("dim", "  auth: ") + theme.fg("warning", auth === true ? "true" : auth));
+-			}
+-			return new Text(lines.join("\n"), 0, 0);
++				parts.push(urlList[0]);
++			} else if (urlList.length > 1) {
++				parts.push(`${urlList.length} URLs`);
++			}
++			if (mode && mode !== "readable") parts.push(mode);
++			if (timestamp) parts.push(timestamp);
++			if (typeof frames === "number") parts.push(`${frames} frames`);
++			if (prompt) parts.push(`"${prompt.length > 60 ? prompt.slice(0, 57) + "…" : prompt}"`);
++			if (model) parts.push(model);
++			if (answerModel) parts.push(answerModel);
++			if (auth !== undefined) parts.push(`auth:${auth === true ? "true" : auth}`);
++			return renderCompactCall("fetch", parts.join(" · "), theme, context);
+ 		},
+ 
+-		renderResult(result, { expanded, isPartial }, theme) {
++		renderResult(result, { expanded, isPartial }, theme, context) {
+ 			const details = result.details as {
+ 				urlCount?: number;
+ 				successful?: number;
+@@ -2704,6 +2732,8 @@ export default function (pi: ExtensionAPI) {
+ 			}
+ 
+ 			if (details?.error) {
++				settleCompactResult(result, context, details.error);
++				if (!expanded) return emptyComponent();
+ 				const fd = details as typeof details & { urls?: string[] };
+ 				const extras: string[] = [];
+ 				if (typeof fd.urlCount === "number" || typeof fd.successful === "number") {
+@@ -2719,6 +2749,14 @@ export default function (pi: ExtensionAPI) {
+ 				return new Text(theme.fg("error", `Error: ${details.error}`), 0, 0);
+ 			}
+ 
++			settleCompactResult(
++				result,
++				context,
++				details?.urlCount === 1
++					? `${details?.totalChars ?? 0} car.${details?.truncated ? " · tronqué" : ""}`
++					: (details?.successful !== details?.urlCount ? `${details?.successful ?? 0}/${details?.urlCount ?? 0} OK · ` : "") + `${details?.totalChars ?? 0} car.`,
++			);
++
+ 			if (details?.urlCount === 1) {
+ 				const title = details?.title || "Untitled";
+ 				const imgCount = details?.imageCount ?? (details?.hasImage ? 1 : 0);
+@@ -2735,10 +2773,7 @@ export default function (pi: ExtensionAPI) {
+ 					statusLine += theme.fg("muted", ` | ${formatSeconds(Math.floor(details.duration))} total`);
+ 				}
+ 				const textContent = result.content.find((c) => c.type === "text")?.text || "";
+-				if (!expanded) {
+-					const brief = textContent.length > 200 ? textContent.slice(0, 200) + "..." : textContent;
+-					return new Text(statusLine + "\n" + theme.fg("dim", brief), 0, 0);
+-				}
++				if (!expanded) return { render: () => [], invalidate: () => {} };
+ 				const lines = [statusLine];
+ 				if (details?.prompt) {
+ 					const display = details.prompt.length > 250 ? details.prompt.slice(0, 247) + "..." : details.prompt;
+@@ -2757,9 +2792,7 @@ export default function (pi: ExtensionAPI) {
+ 
+ 			const countColor = (details?.successful ?? 0) > 0 ? "success" : "error";
+ 			const statusLine = theme.fg(countColor, `${details?.successful}/${details?.urlCount} URLs`) + theme.fg("muted", getSearchContentEnabled ? " (content stored)" : " (content fetched)");
+-			if (!expanded) {
+-				return new Text(statusLine, 0, 0);
+-			}
++			if (!expanded) return { render: () => [], invalidate: () => {} };
+ 			const textContent = result.content.find((c) => c.type === "text")?.text || "";
+ 			const preview = textContent.length > 500 ? textContent.slice(0, 500) + "..." : textContent;
+ 			return new Text(statusLine + "\n" + theme.fg("dim", preview), 0, 0);
+@@ -2771,6 +2804,7 @@ export default function (pi: ExtensionAPI) {
+ 		pi.registerTool({
+ 		name: toolNames.getSearchContent,
+ 		label: "Get Search Content",
++		renderShell: "self",
+ 		description: `Retrieve bounded content slices or find matching passages in a previous ${storedContentSources} call.`,
+ 		promptSnippet:
+ 			`Use after ${storedContentSources} to retrieve stored content via responseId. Use findText to locate passages without paging through the full content.`,
+@@ -3028,7 +3062,7 @@ export default function (pi: ExtensionAPI) {
+ 			};
+ 		},
+ 
+-		renderCall(args, theme) {
++		renderCall(args, theme, context) {
+ 			const { responseId, query, queryIndex, url, urlIndex, offset, findText } = args as {
+ 				responseId: string;
+ 				query?: string;
+@@ -3038,20 +3072,21 @@ export default function (pi: ExtensionAPI) {
+ 				offset?: number;
+ 				findText?: string | string[];
+ 			};
+-			let target = "";
+-			if (query) target = `query="${query}"`;
+-			else if (queryIndex !== undefined) target = `queryIndex=${queryIndex}`;
+-			else if (url) target = url.length > 30 ? url.slice(0, 27) + "..." : url;
+-			else if (urlIndex !== undefined) target = `urlIndex=${urlIndex}`;
+-			if (offset !== undefined) target += target ? ` @ ${offset}` : `offset=${offset}`;
++			const parts: string[] = [];
++			if (query) parts.push(`query="${query}"`);
++			else if (queryIndex !== undefined) parts.push(`query ${queryIndex}`);
++			else if (url) parts.push(url);
++			else if (urlIndex !== undefined) parts.push(`URL ${urlIndex}`);
++			else parts.push(responseId);
++			if (offset !== undefined) parts.push(`dès ${offset}`);
+ 			if (findText !== undefined) {
+ 				const queries = Array.isArray(findText) ? findText : [findText];
+-				target += `${target ? " · " : ""}find ${queries.length}`;
++				parts.push(`${queries.length} recherche${queries.length > 1 ? "s" : ""}`);
+ 			}
+-			return new Text(theme.fg("toolTitle", theme.bold("get_content ")) + theme.fg("accent", target || responseId.slice(0, 8)), 0, 0);
++			return renderCompactCall("get content", parts.join(" · "), theme, context);
+ 		},
+ 
+-		renderResult(result, { expanded }, theme) {
++		renderResult(result, { expanded }, theme, context) {
+ 			const details = result.details as {
+ 				error?: string;
+ 				query?: string;
+@@ -3067,6 +3102,8 @@ export default function (pi: ExtensionAPI) {
+ 			};
+ 
+ 			if (details?.error) {
++				settleCompactResult(result, context, details.error);
++				if (!expanded) return emptyComponent();
+ 				const extras: string[] = [];
+ 				if (details.query) extras.push(`query: ${details.query}`);
+ 				if (details.url) extras.push(`url: ${details.url}`);
+@@ -3077,9 +3114,12 @@ export default function (pi: ExtensionAPI) {
+ 			}
+ 
+ 			let statusLine: string;
++			let summary: string;
+ 			if (typeof details?.matchCount === "number") {
++				summary = `${details.matchCount} correspondances · ${details.returnedMatches ?? 0} affichées`;
+ 				statusLine = theme.fg("success", details?.title || details?.query || "Content") + theme.fg("muted", ` (${details.matchCount} matches, ${details.returnedMatches ?? 0} shown)`);
+ 			} else if (details?.query) {
++				summary = `${details.resultCount ?? 0} résultats`;
+ 				statusLine = theme.fg("success", `"${details.query}"`) + theme.fg("muted", ` (${details.resultCount} results)`);
+ 			} else {
+ 				const start = details?.offset ?? 0;
+@@ -3088,12 +3128,12 @@ export default function (pi: ExtensionAPI) {
+ 				const slice = details?.nextOffset !== undefined || start > 0
+ 					? `, showing ${start}-${end}`
+ 					: "";
++				summary = `${returned} car.${details?.nextOffset !== undefined || start > 0 ? ` · ${start}-${end}/${details?.contentLength ?? 0}` : ""}`;
+ 				statusLine = theme.fg("success", details?.title || "Content") + theme.fg("muted", ` (${details?.contentLength ?? 0} chars${slice})`);
+ 			}
++			settleCompactResult(result, context, summary);
+ 
+-			if (!expanded) {
+-				return new Text(statusLine, 0, 0);
+-			}
++			if (!expanded) return emptyComponent();
+ 
+ 			const textContent = result.content.find((c) => c.type === "text")?.text || "";
+ 			const preview = textContent.length > 500 ? textContent.slice(0, 500) + "..." : textContent;

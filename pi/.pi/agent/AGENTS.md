@@ -10,6 +10,10 @@
 
 - Toujours traiter le code comme greenfield : ne jamais ajouter de rétrocompatibilité, migration, shim, fallback ou support d’un état historique, sauf demande explicite de l’utilisateur.
 
+## Réponses
+
+- Ne jamais placer prose ou maquette TUI dans un bloc fenced `text` ; réserver les blocs de code au contenu dont la mise en forme littérale est nécessaire.
+
 ## Questions à l'utilisateur
 
 - TOUJOURS `ask_user_question` — jamais de question en texte libre.
@@ -19,12 +23,12 @@
 ## Maintenance du harness
 
 - TOUJOURS charger le skill `harness-tuning` avant de créer/modifier un skill, une extension Pi ou l'AGENTS.md.
-- Ne jamais modifier directement une installation locale, une dépendance sous `node_modules` ou un artefact généré, sauf demande explicite ou test temporaire. Modifier la source versionnée ou une configuration officiellement supportée ; après un test temporaire, restaurer immédiatement l’installation.
+- Ne jamais modifier directement une installation locale, une dépendance sous `node_modules`, un dossier `dist`/`build` ou tout autre artefact généré ou compilé, quel que soit le projet, sauf demande explicite de l’utilisateur. Modifier la source versionnée ou une configuration officiellement supportée.
 
 ## Git
 
 - Par défaut, créer une branche dédiée avant le premier commit. Si l’utilisateur demande explicitement de travailler sur la branche principale, y committer directement.
-- Toujours fusionner une branche avec `git merge --no-ff` afin de conserver un merge commit visible. Ne jamais fast-forward une fusion.
+- Par défaut, fusionner avec `git merge --no-ff` pour conserver un merge commit visible. Si l’utilisateur demande explicitement un fast-forward, utiliser `git merge --ff-only`, notamment pour une branche créée impromptument.
 - Ne pas pousser systématiquement.
 - Ne jamais signaler comme modification un fichier présent dans `git status` mais absent de `git diff` et `git diff --cached` ; c’est un effet de filtre Git sans changement à committer (notamment `pi/.pi/agent/settings.json`).
 - **Commit atomique — définition unique** : un commit est atomique si et seulement si les 4 critères sont réunis :

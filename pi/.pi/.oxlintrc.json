@@ -1,0 +1,44 @@
+{
+	"$schema": "https://unpkg.com/oxlint@1.80.0/configuration_schema.json",
+	"plugins": ["typescript", "unicorn", "oxc"],
+	"categories": {
+		"correctness": "error",
+		"suspicious": "error",
+		"perf": "error"
+	},
+	"rules": {
+		"eslint/no-await-in-loop": "off",
+		"eslint/no-console": "warn",
+		"eslint/no-control-regex": "off",
+		"eslint/no-debugger": "error",
+		"eslint/no-var": "error",
+		"eslint/prefer-const": "error",
+		"typescript/consistent-type-imports": "error",
+		"typescript/no-explicit-any": "error",
+		"typescript/no-inferrable-types": "error",
+		"unicorn/no-array-reverse": "error",
+		"unicorn/no-array-sort": "error",
+		"unicorn/prefer-array-some": "error",
+		"unicorn/prefer-structured-clone": "error"
+	},
+	"overrides": [
+		{
+			"files": ["agent/tests/**/*.ts"],
+			"rules": {
+				"eslint/no-console": "off",
+				"typescript/no-explicit-any": "warn"
+			}
+		}
+	],
+	"env": {
+		"builtin": true,
+		"node": true
+	},
+	"ignorePatterns": [
+		"agent/archived/**",
+		"agent/npm-patches/**",
+		"agent/extensions/herdr-agent-state.ts",
+		"agent/extensions/top-line/**",
+		"agent/tests/top-line.test.ts"
+	]
+}

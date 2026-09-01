@@ -1,0 +1,44 @@
+{
+	"$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+	"entry": [
+		"agent/extensions/*.ts",
+		"agent/extensions/*/index.ts",
+		"agent/tests/*.test.ts"
+	],
+	"ignorePatterns": ["agent/archived/**", "agent/npm-patches/**"],
+	"duplicates": {
+		"enabled": true,
+		"mode": "mild",
+		"near": true,
+		"minTokens": 50,
+		"minLines": 5,
+		"minOccurrences": 2,
+		"threshold": 0,
+		"ignore": ["agent/tests/**"],
+		"ignoreDefaults": true,
+		"skipLocal": false,
+		"crossLanguage": false,
+		"ignoreImports": true,
+		"normalization": {}
+	},
+	"health": {
+		"maxCyclomatic": 15,
+		"maxCognitive": 15,
+		"maxCrap": 10000,
+		"crapRefactorBand": 5,
+		"maxUnitSize": 50,
+		"ignore": ["agent/tests/**"],
+		"ownership": {
+			"botPatterns": [
+				"*\\[bot\\]*",
+				"dependabot*",
+				"renovate*",
+				"github-actions*",
+				"svc-*",
+				"*-service-account*"
+			],
+			"emailMode": "handle"
+		},
+		"suggestInlineSuppression": true
+	}
+}

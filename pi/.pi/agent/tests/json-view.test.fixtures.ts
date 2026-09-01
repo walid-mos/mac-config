@@ -1,5 +1,5 @@
-import { rgb } from '../extensions/footer/style.ts'
 import { tokenizeAnsiText } from '../extensions/json-view/ansi-text.ts'
+import { hexToRgb as rgb } from '../extensions/ui/design-system/terminal-color.ts'
 
 export const SMALL_JSON = JSON.stringify({ a: 1, b: [2, 3] }, null, 2)
 

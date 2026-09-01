@@ -1,26 +1,27 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
-import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+import type { ExtensionAPI } from '@earendil-works/pi-coding-agent'
 
 type InputEvent = {
-	text: string;
-	source: "interactive" | "rpc" | "extension";
-};
+	text: string
+	source: 'interactive' | 'rpc' | 'extension'
+}
 
-export type QuitIntent = "graceful" | "force";
+export type QuitIntent = 'graceful' | 'force'
 
 /** Parse Vim quit aliases only for text entered directly in the TUI. */
 export function quitIntent(event: InputEvent): QuitIntent | undefined {
-	if (event.source !== "interactive") return undefined;
+	if (event.source !== 'interactive') return undefined
 
 	switch (event.text.trim()) {
-		case ":q":
-			return "graceful";
-		case ":q!":
-			return "force";
+		case ':q':
+			return 'graceful'
+		case ':q!':
+			return 'force'
 		default:
-			return undefined;
+			return undefined
 	}
 }
 
@@ -29,14 +30,14 @@ export function quitIntent(event: InputEvent): QuitIntent | undefined {
  * re-created on newSession(), so only serialized data crosses the boundary.
  */
 function handoffFile(): string {
-	return join(tmpdir(), `pi-clear-model-${process.pid}.json`);
+	return join(tmpdir(), `pi-clear-model-${process.pid}.json`)
 }
 
 export default function sessionShortcuts(pi: ExtensionAPI): void {
-	pi.registerCommand("clear", {
-		description: "Start a new session (keeps current model)",
+	pi.registerCommand('clear', {
+		description: 'Start a new session (keeps current model)',
 		handler: async (_args, ctx) => {
-			const model = ctx.model;
+			const model = ctx.model
 			if (model) {
 				// Only plain data survives the session switch (docs: session
 				// replacement lifecycle) - so persist provider/id/thinking.
@@ -48,47 +49,47 @@ export default function sessionShortcuts(pi: ExtensionAPI): void {
 							id: model.id,
 							thinkingLevel: ctx.thinkingLevel,
 						}),
-					);
+					)
 				} catch {
 					// Best effort: fall back to default model on failure.
 				}
 			}
-			await ctx.newSession();
+			await ctx.newSession()
 		},
-	});
+	})
 
-	pi.on("session_start", (event, ctx) => {
-		if (event.reason !== "new") return;
+	pi.on('session_start', (event, ctx) => {
+		if (event.reason !== 'new') return
 		try {
-			const raw = readFileSync(handoffFile(), "utf8");
-			rmSync(handoffFile(), { force: true });
+			const raw = readFileSync(handoffFile(), 'utf8')
+			rmSync(handoffFile(), { force: true })
 			const saved = JSON.parse(raw) as {
-				provider: string;
-				id: string;
-				thinkingLevel?: string;
-			};
-			const model = ctx.modelRegistry.find(saved.provider, saved.id);
-			if (!model) return;
-			void pi.setModel(model).then((ok) => {
+				provider: string
+				id: string
+				thinkingLevel?: string
+			}
+			const model = ctx.modelRegistry.find(saved.provider, saved.id)
+			if (!model) return
+			void pi.setModel(model).then(ok => {
 				if (ok && saved.thinkingLevel) {
 					pi.setThinkingLevel(
 						saved.thinkingLevel as Parameters<
 							typeof pi.setThinkingLevel
 						>[0],
-					);
+					)
 				}
-			});
+			})
 		} catch {
 			// No handoff (or unreadable): keep the default model.
 		}
-	});
+	})
 
-	pi.on("input", (event, ctx) => {
-		const intent = quitIntent(event);
-		if (!intent) return { action: "continue" };
+	pi.on('input', (event, ctx) => {
+		const intent = quitIntent(event)
+		if (!intent) return { action: 'continue' }
 
-		if (intent === "force" && !ctx.isIdle()) ctx.abort();
-		ctx.shutdown();
-		return { action: "handled" };
-	});
+		if (intent === 'force' && !ctx.isIdle()) ctx.abort()
+		ctx.shutdown()
+		return { action: 'handled' }
+	})
 }

@@ -41,7 +41,7 @@ POSTS :=  dev-dirs gh herdr hermes nvim pi rtk rust
 OBSIDIAN_VAULT_DIR := $(HOME)/Library/Mobile Documents/iCloud~md~obsidian/Documents/Brain
 OBSIDIAN_VAULT := $(OBSIDIAN_VAULT_DIR)/.obsidian
 
-.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs pi-update pi-test  pi-notify-test pi-twitter-fetch-test  notifier-app notifier-app-test herdr-pi-smoke hermes-dirs hermes-gemma obsidian obsidian-save proxy-reset dev-dirs git-filters
+.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs pi-update pi-test  pi-notify-test pi-twitter-fetch-test pi-ui-test  notifier-app notifier-app-test herdr-pi-smoke hermes-dirs hermes-gemma obsidian obsidian-save proxy-reset dev-dirs git-filters
 
 help:
 	@echo "Targets:"
@@ -247,7 +247,11 @@ nvim-post:
 # avant le restow : le package courant gagne aussi face à un fichier réel ou à un
 # lien Stow provenant d'un autre worktree. Les autres descendants (auth.json,
 # models-store.json, npm/, sessions/, external/, etc.) restent locaux hors repo.
-PI_MANAGED := AGENTS.md archived background.json extensions keybindings.json prompts settings.json skills tests themes
+PI_MANAGED := AGENTS.md archived background.json extensions keybindings.json npm-patches prompts settings.json skills tests themes
+PI_OXFMT_VERSION := 0.65.0
+PI_OXLINT_VERSION := 1.80.0
+PI_FALLOW_VERSION := 3.21.0
+PI_QUALITY_BASE ?= develop-pi
 
 pi: | pi-dirs
 	@$(STOW) --no-folding -D pi
@@ -278,6 +282,13 @@ pi-dirs:
 # les scripts de @google/genai et protobufjs ne sont pas nécessaires ici. Le fichier
 # est donc écrit de façon déterministe AVANT les pi install/update : toute nouvelle
 # dépendance avec un build échouera explicitement jusqu'à examen de cette politique.
+# patchedDependencies applique le patch de rendu compact de pi-web-access
+# (npm-patches/pi-web-access.patch, versionné et déployé via Stow) : rows compactes
+# pour les quatre tools web et leurs notifications/résultats asynchrones. Un bump
+# du package qui casse le patch échoue
+# bruyamment ici → régénérer avec `pnpm patch pi-web-access` + `pnpm patch-commit`,
+# recopier patches/pi-web-access.patch vers npm-patches/ et relancer pi-post
+# (patch-commit réécrit le chemin vers patches/ dans pnpm-workspace.yaml).
 pi-post: export FNM_DIR := $(HOME)/.local/share/fnm
 pi-post: export PNPM_HOME := $(HOME)/.local/share/pnpm
 pi-post: export PATH := $(HOME)/.local/share/pnpm/bin:$(HOME)/.local/share/pnpm:$(PATH)
@@ -298,6 +309,8 @@ pi-post:
 		"  '@google/genai': false" \
 		'  node-pty: true' \
 		'  protobufjs: false' \
+		'patchedDependencies:' \
+		'  pi-web-access: ../npm-patches/pi-web-access.patch' \
 		> "$(HOME)/.pi/agent/npm/pnpm-workspace.yaml"
 	@echo "→ pnpm-workspace.yaml: node-pty approuvé ; builds @google/genai/protobufjs refusés"
 	@if command -v pi >/dev/null; then \
@@ -312,22 +325,63 @@ pi-post:
 		pi update --all; \
 		echo "pi prêt et à jour — package web-access — \`pi\` puis /login pour l'auth"; \
 	else echo "pi non installé — étape ignorée"; fi
-	@python3 scripts/pi-patch-tool-execution.py
-	@python3 scripts/pi-patch-assistant-thinking.py
-	@python3 scripts/pi-patch-prompt-history.py
 
 pi-update:  pi-post
 
 # Gate unique du harness : suites des extensions Pi contre les dépendances installées,
 # validation isolée du déploiement Stow puis stress-test d'un vrai Pi. Aucun restow
 # du HOME réel, aucune réinstallation de Pi et aucun symlink manuel.
-pi-test:  pi-notify-test pi-twitter-fetch-test
+pi-test: pi-quality-test  pi-notify-test pi-twitter-fetch-test pi-ui-test
 	@python3 scripts/test-pi-config.py
 	@python3 scripts/test-pi-startup.py
 	@python3 scripts/test-git-filters.py
 
+pi-quality-test:
+	@{ printf '%s\0' pi/.pi/.fallowrc.json pi/.pi/.oxfmtrc.json pi/.pi/.oxlintrc.json; \
+		find pi/.pi/agent/extensions pi/.pi/agent/tests -type f -name '*.ts' -print0; \
+	} | xargs -0 pnpm dlx oxfmt@$(PI_OXFMT_VERSION) \
+			--config pi/.pi/.oxfmtrc.json --check
+	@cd pi/.pi && pnpm dlx oxlint@$(PI_OXLINT_VERSION) \
+		--config .oxlintrc.json agent/extensions agent/tests
+	@cd pi/.pi && pnpm dlx fallow@$(PI_FALLOW_VERSION) audit \
+		--config .fallowrc.json \
+		--base "$${FALLOW_BASE_REF:-$(PI_QUALITY_BASE)}"
+
 pi-notify-test:
-	@node --test pi/.pi/agent/tests/pi-notify.test.ts
+	@node --test \
+		pi/.pi/agent/tests/pi-notify-extension.test.ts \
+		pi/.pi/agent/tests/pi-notify-focus.test.ts \
+		pi/.pi/agent/tests/pi-notify-poster.test.ts
+
+pi-ui-test:
+	@node --test \
+		pi/.pi/agent/tests/compact-tools-renderer.test.ts \
+		pi/.pi/agent/tests/compact-tools-stack.test.ts \
+		pi/.pi/agent/tests/compact-tools-summary.test.ts \
+		pi/.pi/agent/tests/design-system.test.ts \
+		pi/.pi/agent/tests/double-escape-pacer.test.ts \
+		pi/.pi/agent/tests/editor-decorator.test.ts \
+		pi/.pi/agent/tests/footer.test.ts \
+		pi/.pi/agent/tests/json-view-blob-store.test.ts \
+		pi/.pi/agent/tests/json-view-command.test.ts \
+		pi/.pi/agent/tests/json-view-detection.test.ts \
+		pi/.pi/agent/tests/json-view-frame.test.ts \
+		pi/.pi/agent/tests/json-view-rendering.test.ts \
+		pi/.pi/agent/tests/mutation-view-edit-frame.test.ts \
+		pi/.pi/agent/tests/mutation-view-edit-parse.test.ts \
+		pi/.pi/agent/tests/mutation-view-edit-renderer.test.ts \
+		pi/.pi/agent/tests/mutation-view-write.test.ts \
+		pi/.pi/agent/tests/ordered-widget-stack.test.ts \
+		pi/.pi/agent/tests/pi-web-render.test.ts \
+		pi/.pi/agent/tests/polling-resource.test.ts \
+		pi/.pi/agent/tests/response-view.test.ts \
+		pi/.pi/agent/tests/session-shortcuts.test.ts \
+		pi/.pi/agent/tests/surface.test.ts \
+		pi/.pi/agent/tests/terminal-text.test.ts \
+		pi/.pi/agent/tests/ui-registry-policy.test.ts \
+		pi/.pi/agent/tests/working-loader-lifecycle.test.ts \
+		pi/.pi/agent/tests/working-loader-primitives.test.ts \
+		pi/.pi/agent/tests/working-loader-stream.test.ts
 
 pi-twitter-fetch-test:
 	@node --test pi/.pi/agent/tests/twitter-fetch.test.ts

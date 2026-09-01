@@ -1,8 +1,9 @@
-import type { QuotaCache } from "./types.ts";
-import { pollKimiQuota } from "./quota/kimi.ts";
-import { pollOpenAIQuota } from "./quota/openai.ts";
-import { pollOpenRouterQuota } from "./quota/openrouter.ts";
-import { pollXaiQuota } from "./quota/xai.ts";
+import { pollKimiQuota } from './quota/kimi.ts'
+import { pollOpenAIQuota } from './quota/openai.ts'
+import { pollOpenRouterQuota } from './quota/openrouter.ts'
+import { pollXaiQuota } from './quota/xai.ts'
+
+import type { QuotaCache } from './types.ts'
 
 /** Poll independent providers concurrently; unavailable providers remain absent. */
 export async function pollQuotas(): Promise<QuotaCache> {
@@ -11,11 +12,11 @@ export async function pollQuotas(): Promise<QuotaCache> {
 		pollOpenRouterQuota(),
 		pollXaiQuota(),
 		pollOpenAIQuota(),
-	]);
+	])
 	return {
 		...(kimi ? { kimi } : {}),
 		...(openrouter ? { openrouter } : {}),
 		...(xai ? { xai } : {}),
 		...(openai ? { openai } : {}),
-	};
+	}
 }

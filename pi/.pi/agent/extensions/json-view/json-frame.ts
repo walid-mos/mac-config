@@ -1,4 +1,15 @@
-import { fgHex } from '../footer/style.ts'
+import { foregroundHex as fgHex } from '../ui/design-system/terminal-color.ts'
+import {
+	frameContentWidth,
+	frameDotsRow,
+	frameEdge,
+	frameRow,
+	frameRowFadeRatio,
+	frameWidth,
+	FRAME_FADE_ROWS,
+	FRAME_MAX_LINES,
+	type FramePalette,
+} from '../ui/frame.ts'
 import {
 	hyperlink,
 	terminalLineWidth,
@@ -6,34 +17,20 @@ import {
 } from '../ui/terminal-text.ts'
 
 import { escapeMarkdownOutsideAnsi, fadeAnsiLine } from './ansi-text.ts'
-import {
-	blendHex,
-	CONTENT_FADE_STEPS,
-	DOT_FADE_STEPS,
-	JSON_COLOR,
-} from './json-colors.ts'
+import { JSON_COLOR } from './json-colors.ts'
 import { highlightJsonLine } from './json-syntax.ts'
 
-export const JSON_MAX_LINES = 18
-
-const BOX = {
-	CONTENT_FADE_ROWS: 3,
-	ROW_CHROME_WIDTH: 4,
-	EDGE_CHROME_WIDTH: 5,
-	DOTS_VISIBLE_WIDTH: 5,
-	MIN_WIDTH: 1,
-	CENTER_DIVISOR: 2,
-} as const
-
-const BYTE = {
-	KIBIBYTE: 1024,
-	MEBIBYTE: 1_048_576,
-} as const
+export const JSON_MAX_LINES = FRAME_MAX_LINES
 
 const STYLE = {
 	BOLD: '\x1b[1m',
 	BOLD_OFF: '\x1b[22m',
 } as const
+
+const PALETTE: FramePalette = {
+	border: JSON_COLOR.BORDER,
+	base: JSON_COLOR.BASE,
+}
 
 export type JsonFrameFooter =
 	| { kind: 'complete'; linkUrl?: string }
@@ -46,18 +43,10 @@ export type JsonFrameOptions = {
 	footer: JsonFrameFooter
 }
 
-type EdgeOptions = {
-	width: number
-	left: string
-	right: string
-	label: string
-}
-
-type RowOptions = {
-	width: number
-	content: string
-	visibleContentWidth: number
-}
+const BYTE = {
+	KIBIBYTE: 1024,
+	MEBIBYTE: 1_048_576,
+} as const
 
 export function formatJsonBytes(bytes: number): string {
 	if (bytes >= BYTE.MEBIBYTE) {
@@ -69,77 +58,18 @@ export function formatJsonBytes(bytes: number): string {
 	return `${bytes.toLocaleString('fr-FR')} o`
 }
 
-function normalizedWidth(width: number): number {
-	if (!Number.isFinite(width)) return BOX.MIN_WIDTH
-	return Math.max(BOX.MIN_WIDTH, Math.floor(width))
-}
-
-function boxEdge(options: EdgeOptions): string {
-	if (options.width < BOX.EDGE_CHROME_WIDTH) {
-		return fgHex(JSON_COLOR.BORDER, '─'.repeat(options.width))
-	}
-	const labelBudget = options.width - BOX.EDGE_CHROME_WIDTH
-	const label = truncateTerminalLine(options.label, labelBudget, '…')
-	const fill =
-		options.width - BOX.EDGE_CHROME_WIDTH - terminalLineWidth(label)
-	return `${fgHex(JSON_COLOR.BORDER, `${options.left}─ `)}${label} ${fgHex(JSON_COLOR.BORDER, `${'─'.repeat(fill)}${options.right}`)}`
-}
-
-function boxRow(options: RowOptions): string {
-	if (options.width < BOX.ROW_CHROME_WIDTH) {
-		return fgHex(JSON_COLOR.BORDER, '│'.repeat(options.width))
-	}
-	const contentWidth = options.width - BOX.ROW_CHROME_WIDTH
-	const padding = Math.max(0, contentWidth - options.visibleContentWidth)
-	return `${fgHex(JSON_COLOR.BORDER, '│')} ${options.content}${' '.repeat(padding)} ${fgHex(JSON_COLOR.BORDER, '│')}`
-}
-
 function contentRow(line: string, width: number, fadeRatio: number): string {
-	const contentWidth = Math.max(0, width - BOX.ROW_CHROME_WIDTH)
-	const truncated = truncateTerminalLine(line, contentWidth, '…')
+	const truncated = truncateTerminalLine(line, frameContentWidth(width), '…')
 	const escaped = escapeMarkdownOutsideAnsi(truncated)
 	const highlighted = highlightJsonLine(escaped)
 	const content =
 		fadeRatio > 0 ? fadeAnsiLine(highlighted, fadeRatio) : highlighted
-	return boxRow({
+	return frameRow({
 		width,
 		content,
 		visibleContentWidth: terminalLineWidth(truncated),
+		...PALETTE,
 	})
-}
-
-function dotsRow(width: number): string {
-	const dots = DOT_FADE_STEPS.map(ratio => fgHex(blendDotColor(ratio), '·'))
-	const contentWidth = Math.max(0, width - BOX.ROW_CHROME_WIDTH)
-	const padding = Math.max(
-		0,
-		Math.floor(
-			(contentWidth - BOX.DOTS_VISIBLE_WIDTH) / BOX.CENTER_DIVISOR,
-		),
-	)
-	const content = truncateTerminalLine(
-		`${' '.repeat(padding)}${dots.join(' ')}`,
-		contentWidth,
-		'',
-	)
-	return boxRow({
-		width,
-		content,
-		visibleContentWidth: terminalLineWidth(content),
-	})
-}
-
-function blendDotColor(ratio: number): string {
-	return blendHex(JSON_COLOR.BORDER, JSON_COLOR.BASE, ratio)
-}
-
-function rowFadeRatio(
-	index: number,
-	solidRows: number,
-	isCapped: boolean,
-): number {
-	if (!isCapped || index < solidRows) return 0
-	return CONTENT_FADE_STEPS[index - solidRows] ?? 0
 }
 
 function contentRows(
@@ -148,13 +78,11 @@ function contentRows(
 	isCapped: boolean,
 ): string[] {
 	const shown = isCapped ? lines.slice(0, JSON_MAX_LINES) : lines
-	const solidRows = isCapped
-		? shown.length - BOX.CONTENT_FADE_ROWS
-		: shown.length
+	const solidRows = isCapped ? shown.length - FRAME_FADE_ROWS : shown.length
 	const rows = shown.map((line, index) =>
-		contentRow(line, width, rowFadeRatio(index, solidRows, isCapped)),
+		contentRow(line, width, frameRowFadeRatio(index, solidRows, isCapped)),
 	)
-	if (isCapped) rows.push(dotsRow(width))
+	if (isCapped) rows.push(frameDotsRow(width, PALETTE))
 	return rows
 }
 
@@ -200,11 +128,12 @@ function renderFooter(
 	let { text } = label
 	if (footer.kind === 'complete' && footer.linkUrl)
 		text = hyperlink(text, footer.linkUrl)
-	return boxEdge({
+	return frameEdge({
 		width,
 		left: '╰',
 		right: '╯',
 		label: fgHex(label.color, text),
+		...PALETTE,
 	})
 }
 
@@ -213,11 +142,19 @@ export function renderJsonFrame(
 	options: JsonFrameOptions,
 ): string {
 	const { footer } = options
-	const width = normalizedWidth(options.width)
+	const width = frameWidth(options.width)
 	const isCapped = !options.isExpanded && lines.length > JSON_MAX_LINES
 	const hiddenLineCount = isCapped ? lines.length - JSON_MAX_LINES : 0
 	const title = titleLabel(options.bytes, lines.length)
-	const rows = [boxEdge({ width, left: '╭', right: '╮', label: title.ansi })]
+	const rows = [
+		frameEdge({
+			width,
+			left: '╭',
+			right: '╮',
+			label: title.ansi,
+			...PALETTE,
+		}),
+	]
 	rows.push(...contentRows(lines, width, isCapped))
 	rows.push(renderFooter(footer, hiddenLineCount, width))
 	return rows.join('\n')

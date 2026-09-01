@@ -37,7 +37,7 @@ travaille, sans modifier le rendu natif du thinking dans le transcript :
 
 ## Modules
 
-- `index.ts` — point d'entrée : événements `agent_start` / `agent_end`,
+- `index.ts` — point d'entrée : événements `agent_start` / `agent_settled`,
   pause pendant `ask_user_question` (le questionnaire attend l'utilisateur,
   un loader rotatif y serait trompeur), nettoyage au `session_shutdown`.
 - `rotation.ts` — timer injectable (testable) ; `start()` idempotent.

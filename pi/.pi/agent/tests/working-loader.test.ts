@@ -233,7 +233,22 @@ test("shows a rotating word above the editor while the agent works", () => {
 		assert.equal(rendered.length, 1);
 		assertSandLoaderPrefix(stripAnsi(rendered[0] ?? ""));
 
+		emit("agent_settled");
+		assert.equal(surfaceRegistry.hasEntries("aboveEditor"), false);
+	} finally {
+		surfaceRegistry.clear();
+	}
+});
+
+test("reste visible entre agent_end et agent_settled pour les retries automatiques", () => {
+	surfaceRegistry.clear();
+	const { emit } = harness();
+	try {
+		emit("session_start");
+		emit("agent_start");
 		emit("agent_end");
+		assert.equal(surfaceRegistry.hasEntries("aboveEditor"), true);
+		emit("agent_settled");
 		assert.equal(surfaceRegistry.hasEntries("aboveEditor"), false);
 	} finally {
 		surfaceRegistry.clear();
@@ -262,7 +277,7 @@ test("uses the working priority and pauses during ask_user_question", () => {
 		emit("tool_execution_end", "ask_user_question");
 		assert.equal(surfaceRegistry.hasEntries("aboveEditor"), true);
 
-		emit("agent_end");
+		emit("agent_settled");
 		assert.equal(surfaceRegistry.hasEntries("aboveEditor"), false);
 		assert.deepEqual(calls, [
 			"workingVisible:false",
@@ -334,7 +349,7 @@ test("thinking streams show a brain and rolling excerpt at the far right", () =>
 		const rolling = stripAnsi(surfaceRegistry.render("aboveEditor", width, fakeTheme())[0] ?? "");
 		assert.match(rolling, new RegExp(`${THINKING_ICON} ….*current reasoning stream\\.$`, "u"));
 		assert.equal(terminalLineWidth(rolling), width);
-		emit("agent_end");
+		emit("agent_settled");
 	} finally {
 		surfaceRegistry.clear();
 	}
@@ -353,7 +368,7 @@ test("thinking mode stays quiet until a useful snapshot exists", () => {
 			stripAnsi(surfaceRegistry.render("aboveEditor", 80, fakeTheme())[0] ?? ""),
 			new RegExp(THINKING_ICON, "u"),
 		);
-		emit("agent_end");
+		emit("agent_settled");
 	} finally {
 		surfaceRegistry.clear();
 	}
@@ -370,7 +385,7 @@ test("the marker is dropped on narrow widths instead of breaking the line", () =
 		const line = stripAnsi(surfaceRegistry.render("aboveEditor", 24, fakeTheme())[0] ?? "");
 		assertSandLoaderPrefix(line);
 		assert.doesNotMatch(line, new RegExp(THINKING_ICON, "u"), "seul le mot de travail reste");
-		emit("agent_end");
+		emit("agent_settled");
 	} finally {
 		surfaceRegistry.clear();
 	}
@@ -390,7 +405,7 @@ test("message_end publishes useful thinking and defers its exit", () => {
 			stripAnsi(surfaceRegistry.render("aboveEditor", 80, fakeTheme())[0] ?? ""),
 			new RegExp(`${THINKING_ICON} Final useful thought$`, "u"),
 		);
-		emit("agent_end");
+		emit("agent_settled");
 	} finally {
 		surfaceRegistry.clear();
 	}

@@ -622,3 +622,11 @@ le hint `ctrl+o` ne pouvait donc pas agir.
 - Fichiers : `compact-tools/stack.ts`, test compact-tools.
 - Tests : compact-tools 31/31 et esbuild de l'entrypoint au vert.
 - Suite : —
+
+### 2026-09-01 — loader continu pendant les retries automatiques
+
+- Fix : le working-loader se retire sur `agent_settled`, pas sur `agent_end`,
+  afin de rester stable pendant retry, compaction automatique et follow-up.
+- Fichiers : `working-loader/{index.ts,README.md}`, test working-loader.
+- Tests : working-loader 18/18 et esbuild de l'entrypoint au vert.
+- Suite : —

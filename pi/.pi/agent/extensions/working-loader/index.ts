@@ -129,7 +129,7 @@ export default function workingLoader(pi: ExtensionAPI): void {
 		show();
 	});
 
-	pi.on("agent_end", async (_event, ctx) => {
+	pi.on("agent_settled", async (_event, ctx) => {
 		bindUi(ctx);
 		hide();
 	});

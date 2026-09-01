@@ -900,3 +900,12 @@ le hint `ctrl+o` ne pouvait donc pas agir.
   désormais leurs suites autonomes et un thème ANSI minimal partagé.
 - Gate : les 14 scénarios edit et Oxlint ciblé passent après découpage.
 - Suite : auditer les derniers modules runtime de plus de 300 lignes hérités.
+
+### 2026-09-01 — audit SRP final
+
+- Décision : les gros runtime hérités restants sont des aggregate roots ou
+  composants stateful uniques (`ActivityPage`, supervisor, stream/Bash runtime)
+  et ne sont pas découpés selon un seuil arbitraire ; Fallow ne relève aucune
+  complexité ni duplication introduite dans les 171 fichiers modifiés.
+- Tests : gate complète au vert — 70 background, 20 notifications, 169 UI,
+  Stow/startup, largeurs et filtres Git.

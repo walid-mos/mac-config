@@ -10,6 +10,11 @@ import { spawn as nodeSpawn, type SpawnOptions } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 
+import type {
+	ExtensionAPI,
+	ExtensionContext,
+} from '@earendil-works/pi-coding-agent'
+
 const HELPER = '/Applications/Pi Notifications.app/Contents/MacOS/pi-notify'
 const NOTIFIER = '/opt/homebrew/bin/terminal-notifier'
 const HERDR = '/opt/homebrew/bin/herdr'
@@ -334,14 +339,14 @@ type ExtensionDependencies = {
 
 export function createPiNotifyExtension(
 	overrides: Partial<ExtensionDependencies> = {},
-): (pi: any) => void {
+): (pi: ExtensionAPI) => void {
 	const operations = overrides.operations ?? defaultOperations
 	const environment = overrides.environment ?? process.env
 	const poster = overrides.poster ?? new NotificationPoster(operations)
 	const paneFocused = overrides.paneFocused ?? createFocusProbe(operations)
 	const processCwd = overrides.processCwd ?? process.cwd
 
-	return function registerPiNotify(pi: any) {
+	return function registerPiNotify(pi: ExtensionAPI) {
 		if (!notificationEnabled(environment, operations)) return
 
 		const pane = environment.HERDR_PANE_ID!
@@ -349,7 +354,7 @@ export function createPiNotifyExtension(
 		let running = false
 		let lastSnippet = ''
 
-		const cwdName = (ctx: any): string => {
+		const cwdName = (ctx: ExtensionContext): string => {
 			const cwd =
 				typeof ctx?.cwd === 'string' && ctx.cwd ? ctx.cwd : processCwd()
 			return path.basename(cwd)
@@ -375,18 +380,18 @@ export function createPiNotifyExtension(
 				})
 		}
 
-		pi.on('message_end', function onMessageEnd(event: any) {
+		pi.on('message_end', function onMessageEnd(event) {
 			const snippet = extractFinalSnippet(event?.message)
 			if (snippet) lastSnippet = snippet
 		})
 
-		pi.on('agent_start', function onAgentStart(_event: any, ctx: any) {
+		pi.on('agent_start', function onAgentStart(_event, ctx) {
 			if (ctx?.mode !== 'tui') return
 			running = true
 			lastSnippet = ''
 		})
 
-		pi.on('agent_settled', function onAgentSettled(_event: any, ctx: any) {
+		pi.on('agent_settled', function onAgentSettled(_event, ctx) {
 			if (ctx?.mode !== 'tui' || ctx?.isIdle?.() !== true || !running)
 				return
 			running = false
@@ -398,7 +403,7 @@ export function createPiNotifyExtension(
 
 		pi.on(
 			'tool_execution_start',
-			function onToolExecutionStart(event: any, ctx: any) {
+			function onToolExecutionStart(event, ctx) {
 				if (
 					ctx?.mode !== 'tui' ||
 					event?.toolName !== 'ask_user_question'

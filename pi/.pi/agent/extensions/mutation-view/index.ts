@@ -63,5 +63,5 @@ function registerMutationTool(pi: ExtensionAPI, spec: MutationToolSpec): void {
 				)
 			return native.execute(toolCallId, params, signal, onUpdate, ctx)
 		},
-	} as unknown as ToolDefinition<any, any>)
+	} as unknown as ToolDefinition)
 }

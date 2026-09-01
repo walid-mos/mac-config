@@ -780,3 +780,12 @@ le hint `ctrl+o` ne pouvait donc pas agir.
   la même manière.
 - Tests : 19 tests working-loader/registre et Oxlint ciblé au vert.
 - Suite : typer les frontières encore exposées en `any`.
+
+### 2026-09-01 — frontières Pi typées
+
+- Refactor : pi-notify reçoit désormais `ExtensionAPI`/`ExtensionContext` et
+  laisse les handlers d’événements inférer leurs payloads ; mutation-view ne
+  force plus de génériques `any` sur sa définition de tool.
+- Tests : harness notification typé, narrowing corrigé sur l’appel Herdr ;
+  40 tests notifications/mutations et Oxlint ciblé au vert.
+- Suite : corriger les derniers diagnostics Oxlint structurels.

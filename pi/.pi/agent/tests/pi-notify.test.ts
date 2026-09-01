@@ -13,6 +13,8 @@ import {
 	type NotificationOperations,
 } from '../extensions/pi-notify.ts'
 
+import type { ExtensionAPI } from '@earendil-works/pi-coding-agent'
+
 const HELPER = '/Applications/Pi Notifications.app/Contents/MacOS/pi-notify'
 const NOTIFIER = '/opt/homebrew/bin/terminal-notifier'
 const HERDR = '/opt/homebrew/bin/herdr'
@@ -272,7 +274,7 @@ test('one pane accepts unlimited successive notifications', async () => {
 	)
 })
 
-type Handler = (event: any, ctx: any) => void
+type Handler = (event: unknown, context: unknown) => void
 
 function requiredHandler(
 	handlers: Map<string, Handler>,
@@ -313,7 +315,7 @@ function loadExtension(
 		poster: poster as unknown as NotificationPoster,
 		paneFocused,
 		processCwd: () => '/fallback/project',
-	})(pi)
+	})(pi as unknown as ExtensionAPI)
 	return { handlers, notifications, operations }
 }
 
@@ -416,13 +418,13 @@ test('default focus probe reads Herdr and lets the caller decide', async () => {
 	const focused = probe('/tmp/herdr.sock', 'pane-1')
 	await flush()
 	const probeCall = operations.calls.find(call => call.command === HERDR)
-	assert.ok(probe, 'the probe must spawn the herdr CLI')
-	assert.equal(probeCall?.args.join(' '), 'agent get pane-1')
+	assert.ok(probeCall, 'the probe must spawn the herdr CLI')
+	assert.equal(probeCall.args.join(' '), 'agent get pane-1')
 	assert.equal(
-		(probeCall?.options.env as Record<string, string>).HERDR_SOCKET_PATH,
+		(probeCall.options.env as Record<string, string>).HERDR_SOCKET_PATH,
 		'/tmp/herdr.sock',
 	)
-	probeCall?.child.stdout?.emit(
+	probeCall.child.stdout?.emit(
 		'data',
 		JSON.stringify({
 			result: { agent: { focused: true, pane_id: 'pane-1' } },

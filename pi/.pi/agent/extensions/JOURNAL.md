@@ -851,3 +851,12 @@ le hint `ctrl+o` ne pouvait donc pas agir.
   façade publique, et l’état partagé demeure inerte à travers les reloads jiti.
 - Tests : 32 tests compact-tools et Oxlint ciblé au vert.
 - Suite : dissocier layout, contenu diff et chrome du cadre mutation.
+
+### 2026-09-01 — cadre mutation décomposé
+
+- Refactor : `frame.ts` orchestre désormais quatre responsabilités isolées :
+  contrats, layout/wrapping, chrome terminal et rendu coloré du diff.
+- Architecture : la géométrie ne connaît plus la palette, et le chrome reçoit
+  seulement une séquence ANSI optionnelle sans calculer la couleur métier.
+- Tests : 21 tests edit/write et Oxlint ciblé au vert.
+- Suite : séparer liste, détail et viewport du renderer Activity.

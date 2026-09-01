@@ -376,7 +376,9 @@ pi-ui-test:
 		pi/.pi/agent/tests/surface.test.ts \
 		pi/.pi/agent/tests/terminal-text.test.ts \
 		pi/.pi/agent/tests/ui-registry-policy.test.ts \
-		pi/.pi/agent/tests/working-loader.test.ts
+		pi/.pi/agent/tests/working-loader-lifecycle.test.ts \
+		pi/.pi/agent/tests/working-loader-primitives.test.ts \
+		pi/.pi/agent/tests/working-loader-stream.test.ts
 
 herdr-pi-smoke: herdr
 	@python3 scripts/test-herdr-pi-startup.py

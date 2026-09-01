@@ -885,3 +885,11 @@ le hint `ctrl+o` ne pouvait donc pas agir.
 - Gate : les 32 scénarios restent explicitement énumérés par `pi-ui-test` et
   passent avec Oxlint strict.
 - Suite : isoler transitions, primitives et intégration dans working-loader.
+
+### 2026-09-01 — tests working-loader par couche
+
+- Tests : la suite de 514 lignes devient trois unités indépendantes pour les
+  primitives temporelles, le lifecycle de surface et le streaming thinking.
+- Harness : scheduler, thème et API Pi factices sont partagés sans dupliquer les
+  scénarios ; les 18 tests et Oxlint restent au vert.
+- Suite : scinder les scénarios mutation edit entre parsing/diff et rendu.

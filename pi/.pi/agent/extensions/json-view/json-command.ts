@@ -1,11 +1,11 @@
 import { blobByRecency, readBlob, recentBlobs } from './blob-store.ts'
 import { formatJsonBytes } from './json-frame.ts'
 
+import type { JsonBlob } from './blob-store.ts'
 import type {
 	ExtensionAPI,
 	ExtensionCommandContext,
 } from '@earendil-works/pi-coding-agent'
-import type { JsonBlob } from './blob-store.ts'
 
 const USAGE =
 	'Usage : /json (plier/déplier) · /json open [n] (n = n-ième JSON le plus récent)'

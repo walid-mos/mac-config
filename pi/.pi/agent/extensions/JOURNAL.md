@@ -763,3 +763,12 @@ le hint `ctrl+o` ne pouvait donc pas agir.
 - Qualité : le tri local utilise `toSorted` ; 8 tests surface et Oxlint strict
   au vert.
 - Suite : versionner les configurations NextNode des trois outils de qualité.
+
+### 2026-09-01 — format NextNode étendu au harness Pi
+
+- Style : Oxfmt couvre désormais les 148 sources et tests TypeScript suivis du
+  harness, y compris background, footer, sessions et leurs suites jusque-là
+  hors de la première passe.
+- Tests : gate Pi complète au vert après normalisation (70 background,
+  19 notifications, 169 UI, Stow/startup, largeurs et filtres Git).
+- Suite : activer les configurations versionnées Oxfmt, Oxlint et Fallow.

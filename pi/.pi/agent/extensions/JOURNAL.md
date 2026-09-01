@@ -797,3 +797,11 @@ le hint `ctrl+o` ne pouvait donc pas agir.
   d’opérations d’artefacts.
 - Tests : 70 tests background, 169 tests UI et analyse Oxlint complète au vert.
 - Suite : extraire la dernière duplication Fallow introduite.
+
+### 2026-09-01 — actions Activity factorisées
+
+- Refactor : les footers liste/détail d’Activity décrivent leurs actions dans
+  une structure commune ; séparateurs, rôles et labels ont un renderer unique.
+- Qualité : zéro complexité ou duplication introduite selon Fallow ; 70 tests
+  background et Oxlint ciblé au vert.
+- Suite : rendre la gate de qualité reproductible depuis le Makefile.

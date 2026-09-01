@@ -860,3 +860,12 @@ le hint `ctrl+o` ne pouvait donc pas agir.
   seulement une séquence ANSI optionnelle sans calculer la couleur métier.
 - Tests : 21 tests edit/write et Oxlint ciblé au vert.
 - Suite : séparer liste, détail et viewport du renderer Activity.
+
+### 2026-09-01 — renderer Activity par surface
+
+- Refactor : l’ancienne unité de 485 lignes devient une façade vers les
+  renderers liste, détail, output et notice, avec chrome et contrats partagés.
+- Architecture : chaque surface évolue indépendamment ; le viewport est seul à
+  connaître scrollbar/sanitization et le chrome seul à gérer pages/footers.
+- Tests : 70 tests background, intégration process et Oxlint ciblé au vert.
+- Suite : découper les suites de tests monolithiques par contrat public.

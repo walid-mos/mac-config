@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createSurfaceRegistry, type SurfaceEntry } from "../extensions/ui/surface.ts";
+import { terminalLineWidth } from "../extensions/ui/terminal-text.ts";
 
 function entry(overrides: Partial<SurfaceEntry> & Pick<SurfaceEntry, "id">): SurfaceEntry {
 	return {
@@ -53,6 +54,10 @@ test("caps entries at maxLines with a truncation marker", () => {
 		"line 10",
 		"… (+3 lines)",
 	]);
+	assert.ok(
+		registry.render("aboveEditor", 6).every(line => terminalLineWidth(line) <= 6),
+	);
+
 });
 
 test("isolates render failures per entry without dropping siblings", () => {

@@ -754,3 +754,12 @@ le hint `ctrl+o` ne pouvait donc pas agir.
 - Qualité : les trois clones Fallow disparaissent sans modifier ni absorber le
   décorateur `top-line` local ; 169 tests UI au vert.
 - Suite : borner le marqueur de troncature des surfaces étroites.
+
+### 2026-09-01 — surfaces étroites bornées
+
+- Correctif : le marqueur ajouté après une surface plafonnée passe par la même
+  troncature ANSI-safe que chaque ligne de contenu ; aucune row ne dépasse plus
+  la largeur annoncée.
+- Qualité : le tri local utilise `toSorted` ; 8 tests surface et Oxlint strict
+  au vert.
+- Suite : versionner les configurations NextNode des trois outils de qualité.

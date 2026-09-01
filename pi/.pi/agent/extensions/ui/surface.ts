@@ -84,7 +84,7 @@ export function createSurfaceRegistry(): SurfaceRegistry {
 		if (safeWidth === 0) return []
 		return [...entries.values()]
 			.filter(entry => entry.placement === placement)
-			.sort(compareSurfaceEntries)
+			.toSorted(compareSurfaceEntries)
 			.flatMap(entry => renderSurfaceEntry(entry, safeWidth, theme))
 	}
 
@@ -150,7 +150,8 @@ function renderSurfaceEntry(
 		.slice(0, maxLines)
 		.map(line => clipSurfaceLine(line, width))
 	if (lines.length <= maxLines) return visible
-	return [...visible, `… (+${String(lines.length - maxLines)} lines)`]
+	const marker = `… (+${String(lines.length - maxLines)} lines)`
+	return [...visible, clipSurfaceLine(marker, width)]
 }
 
 function compareSurfaceEntries(

@@ -293,19 +293,26 @@ function collapsedHistoryLine(
 	return truncateTerminalLine(line, width, "…");
 }
 
+function isOptionalArray(value: unknown): boolean {
+	return value === undefined || Array.isArray(value);
+}
+
+function isNonNegativeInteger(value: unknown): boolean {
+	return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
 function isCompactRowStackState(value: unknown): value is CompactRowStackState {
 	if (typeof value !== "object" || value === null) return false;
 	const state = value as Partial<CompactRowStackState>;
-	return (
-		state.entries instanceof Map &&
-		state.groupById instanceof Map &&
-		state.stackableTools instanceof Set &&
-		(state.activeGroup === undefined || Array.isArray(state.activeGroup)) &&
-		state.seenCallIds instanceof Set &&
-		typeof state.liveAssistant === "boolean" &&
-		Number.isInteger(state.liveVisibleTextBlocks) &&
-		state.liveVisibleTextBlocks >= 0
-	);
+	return [
+		state.entries instanceof Map,
+		state.groupById instanceof Map,
+		state.stackableTools instanceof Set,
+		isOptionalArray(state.activeGroup),
+		state.seenCallIds instanceof Set,
+		typeof state.liveAssistant === "boolean",
+		isNonNegativeInteger(state.liveVisibleTextBlocks),
+	].every(Boolean);
 }
 
 interface GlobalWithCompactStackState {

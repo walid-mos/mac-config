@@ -638,3 +638,11 @@ le hint `ctrl+o` ne pouvait donc pas agir.
 - Fichier : `mutation-view/frame.ts`.
 - Tests : mutation-view 21/21, esbuild et Fallow avec couverture au vert.
 - Suite : —
+
+### 2026-09-01 — validation d'état compact déclarative
+
+- Refactor : la validation du store process-global compose des prédicats ciblés
+  au lieu d'une chaîne booléenne cyclomatique.
+- Fichier : `compact-tools/stack.ts`.
+- Tests : compact-tools 31/31, esbuild et Fallow avec couverture au vert.
+- Suite : —

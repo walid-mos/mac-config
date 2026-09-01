@@ -789,3 +789,11 @@ le hint `ctrl+o` ne pouvait donc pas agir.
 - Tests : harness notification typé, narrowing corrigé sur l’appel Herdr ;
   40 tests notifications/mutations et Oxlint ciblé au vert.
 - Suite : corriger les derniers diagnostics Oxlint structurels.
+
+### 2026-09-01 — diagnostics Oxlint résolus
+
+- Qualité : suppression d’un générique fantôme, conservation de la cause de
+  config invalide, collections immuables explicites et attente directe du Set
+  d’opérations d’artefacts.
+- Tests : 70 tests background, 169 tests UI et analyse Oxlint complète au vert.
+- Suite : extraire la dernière duplication Fallow introduite.

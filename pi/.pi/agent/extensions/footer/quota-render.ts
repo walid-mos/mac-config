@@ -177,7 +177,7 @@ export function providerQuotaParts(
 
 	if (quotas.xai && (showXai || showAll)) {
 		const x = quotas.xai
-		let bits: string[] = []
+		const bits: string[] = []
 		if (x.tier) bits.push(fgHex(LATTE.mauve, x.tier))
 		const xresets: string[] = []
 		if (x.monthly && x.monthly.limit > 0 && x.pool?.label !== 'mois') {

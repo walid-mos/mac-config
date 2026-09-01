@@ -1,4 +1,4 @@
-export type PollingResource<Arguments, Value> = {
+export type PollingResource<Arguments> = {
 	start: (args: Arguments) => void
 	refresh: (args?: Arguments) => Promise<void>
 	stop: () => void
@@ -13,7 +13,7 @@ type PollingResourceOptions<Arguments, Value> = {
 /** Owns one timer and discards stale async results after refreshes or shutdown. */
 export function createPollingResource<Arguments, Value>(
 	options: PollingResourceOptions<Arguments, Value>,
-): PollingResource<Arguments, Value> {
+): PollingResource<Arguments> {
 	let active = false
 	let latestArgs: Arguments
 	let generation = 0

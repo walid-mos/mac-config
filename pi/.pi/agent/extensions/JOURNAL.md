@@ -630,3 +630,11 @@ le hint `ctrl+o` ne pouvait donc pas agir.
 - Fichiers : `working-loader/{index.ts,README.md}`, test working-loader.
 - Tests : working-loader 18/18 et esbuild de l'entrypoint au vert.
 - Suite : —
+
+### 2026-09-01 — complexité mutation répartie par responsabilité
+
+- Refactor : le wrap de glyphes, la gouttière, le rôle et le fond d'une ligne
+  de diff sont isolés ; `diffRow` ne combine plus six décisions hétérogènes.
+- Fichier : `mutation-view/frame.ts`.
+- Tests : mutation-view 21/21, esbuild et Fallow avec couverture au vert.
+- Suite : —

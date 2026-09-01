@@ -48,6 +48,19 @@ interface RenderEntry {
 	separator?: { index: number; total: number };
 }
 
+interface CodeRowState {
+	row: string;
+	usedWidth: number;
+}
+
+interface DiffRowOptions {
+	lineNumberWidth: number;
+	width: number;
+	theme: FrameTheme;
+	backgrounds?: DiffBackgrounds;
+	fadeIndex: number;
+}
+
 export interface MutationFrameComponent {
 	render(width: number): string[];
 	invalidate(): void;
@@ -175,29 +188,36 @@ function railRow(
 	return `${rail}${start} ${body}${padding}${ANSI_BG_RESET}`;
 }
 
-function wrapCodeLine(text: string, width: number): string[] {
-	if (width <= 0 || text.length === 0) return [""];
-	const rows: string[] = [];
-	let row = "";
-	let used = 0;
-	for (const char of text) {
-		const charWidth = terminalLineWidth(char);
-		if (charWidth > width) {
-			if (row) rows.push(row);
-			rows.push("…");
-			row = "";
-			used = 0;
-			continue;
-		}
-		if (used > 0 && used + charWidth > width) {
-			rows.push(row);
-			row = "";
-			used = 0;
-		}
-		row += char;
-		used += charWidth;
+function appendCodeCharacter(
+	rows: string[],
+	state: CodeRowState,
+	character: string,
+	width: number,
+): CodeRowState {
+	const characterWidth = terminalLineWidth(character);
+	if (characterWidth > width) {
+		if (state.row) rows.push(state.row);
+		rows.push("…");
+		return { row: "", usedWidth: 0 };
 	}
-	rows.push(row);
+	if (state.usedWidth > 0 && state.usedWidth + characterWidth > width) {
+		rows.push(state.row);
+		return { row: character, usedWidth: characterWidth };
+	}
+	return {
+		row: state.row + character,
+		usedWidth: state.usedWidth + characterWidth,
+	};
+}
+
+function wrapCodeLine(text: string, width: number): string[] {
+	if (width <= 0 || !text.length) return [""];
+	const rows: string[] = [];
+	let state: CodeRowState = { row: "", usedWidth: 0 };
+	for (const character of text) {
+		state = appendCodeCharacter(rows, state, character, width);
+	}
+	rows.push(state.row);
 	return rows;
 }
 
@@ -224,35 +244,50 @@ function expandContent(
 	return rows;
 }
 
-function diffRow(
+function diffRole(line: DiffLine, fadeIndex: number): string {
+	if (fadeIndex >= 0) return "dim";
+	if (line.kind === "removed") return "toolDiffRemoved";
+	if (line.kind === "added") return "toolDiffAdded";
+	return "toolDiffContext";
+}
+
+function diffGutter(
 	entry: NonNullable<RenderEntry["line"]>,
 	lineNumberWidth: number,
-	width: number,
+	role: string,
 	theme: FrameTheme,
+): string {
+	const prefix = entry.continuation ? " " : DIFF_PREFIX[entry.value.kind];
+	if (lineNumberWidth <= 0) return `${theme.fg(role, prefix)} `;
+	const number = entry.continuation || !Number.isInteger(entry.value.lineNumber)
+		? " ".repeat(lineNumberWidth)
+		: String(entry.value.lineNumber).padStart(lineNumberWidth, " ");
+	return `${theme.fg(role, prefix)} ${theme.fg("dim", number)}${theme.fg("muted", " │ ")}`;
+}
+
+function diffBackground(
+	line: DiffLine,
 	backgrounds: DiffBackgrounds | undefined,
 	fadeIndex: number,
-): string {
-	const line = entry.value;
-	const role = fadeIndex >= 0
-		? "dim"
-		: line.kind === "removed"
-			? "toolDiffRemoved"
-			: line.kind === "added"
-				? "toolDiffAdded"
-				: "toolDiffContext";
-	const prefix = entry.continuation ? " " : DIFF_PREFIX[line.kind];
-	const number = entry.continuation || line.lineNumber === undefined
-		? " ".repeat(lineNumberWidth)
-		: String(line.lineNumber).padStart(lineNumberWidth, " ");
-	const gutter = lineNumberWidth > 0
-		? `${theme.fg(role, prefix)} ${theme.fg("dim", number)}${theme.fg("muted", " │ ")}`
-		: `${theme.fg(role, prefix)} `;
-	const tint = line.kind === "context" ? undefined : backgrounds?.[line.kind];
+): { hex: string; mode: DiffBackgrounds["mode"] } | undefined {
+	if (!backgrounds || line.kind === "context") return undefined;
 	const opacity = fadeIndex >= 0
 		? (DIFF_BG_FADE_OPACITY[fadeIndex] ?? 0)
 		: DIFF_BG_OPACITY;
-	const hex = tint && backgrounds ? blendHex(backgrounds.base, tint, opacity) : undefined;
-	const background = hex && backgrounds ? { hex, mode: backgrounds.mode } : undefined;
+	return {
+		hex: blendHex(backgrounds.base, backgrounds[line.kind], opacity),
+		mode: backgrounds.mode,
+	};
+}
+
+function diffRow(
+	entry: NonNullable<RenderEntry["line"]>,
+	options: DiffRowOptions,
+): string {
+	const { backgrounds, fadeIndex, lineNumberWidth, theme, width } = options;
+	const role = diffRole(entry.value, fadeIndex);
+	const gutter = diffGutter(entry, lineNumberWidth, role, theme);
+	const background = diffBackground(entry.value, backgrounds, fadeIndex);
 	return railRow(`${gutter}${theme.fg(role, entry.text)}`, width, theme, background);
 }
 
@@ -296,7 +331,13 @@ export function mutationFrameRows(spec: MutationFrameSpec, width: number, theme:
 		if (entry.separator) {
 			rows.push(separatorRow(entry.separator.index, entry.separator.total, w, theme));
 		} else if (entry.line) {
-			rows.push(diffRow(entry.line, lineNumberWidth, w, theme, backgrounds, index - solidRows));
+			rows.push(diffRow(entry.line, {
+				lineNumberWidth,
+				width: w,
+				theme,
+				backgrounds,
+				fadeIndex: index - solidRows,
+			}));
 		}
 	});
 	if (isCapped) rows.push(railRow(theme.fg("dim", "· · ·"), w, theme));

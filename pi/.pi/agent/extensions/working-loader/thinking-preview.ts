@@ -186,13 +186,13 @@ function thinkingTail(normalized: string, width: number): string {
 	const budget = width - terminalLineWidth(marker)
 	const reversed: string[] = []
 	let usedWidth = 0
-	for (const character of Array.from(normalized).reverse()) {
+	for (const character of Array.from(normalized).toReversed()) {
 		const characterWidth = terminalLineWidth(character)
 		if (usedWidth + characterWidth > budget) break
 		reversed.push(character)
 		usedWidth += characterWidth
 	}
-	return `${marker}${reversed.reverse().join('').trimStart()}`
+	return `${marker}${reversed.toReversed().join('').trimStart()}`
 }
 
 export function rollingThinkingPreview(buffer: string, width: number): string {

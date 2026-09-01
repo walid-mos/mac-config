@@ -29,7 +29,7 @@ async function filesCalling(
 			matches.push(relative(EXTENSIONS_DIRECTORY, path))
 		}
 	}
-	return matches.sort()
+	return matches.toSorted()
 }
 
 test('widgets and footer can only be mounted by their central hosts', async () => {

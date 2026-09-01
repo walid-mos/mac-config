@@ -772,3 +772,11 @@ le hint `ctrl+o` ne pouvait donc pas agir.
 - Tests : gate Pi complète au vert après normalisation (70 background,
   19 notifications, 169 UI, Stow/startup, largeurs et filtres Git).
 - Suite : activer les configurations versionnées Oxfmt, Oxlint et Fallow.
+
+### 2026-09-01 — transformations de tableaux immuables
+
+- Refactor : le tail de thinking et ses assertions utilisent `toReversed` et
+  `toSorted`, sans mutation intermédiaire ; le contrôle du registre UI trie de
+  la même manière.
+- Tests : 19 tests working-loader/registre et Oxlint ciblé au vert.
+- Suite : typer les frontières encore exposées en `any`.

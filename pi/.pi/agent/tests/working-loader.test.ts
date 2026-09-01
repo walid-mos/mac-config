@@ -116,7 +116,7 @@ test('shuffle bag yields every word once per cycle without immediate repeats', (
 	const firstCycle = Array.from({ length: WORKING_WORDS.length }, () =>
 		bag.next(),
 	)
-	assert.deepEqual([...firstCycle].sort(), [...WORKING_WORDS].sort())
+	assert.deepEqual(firstCycle.toSorted(), WORKING_WORDS.toSorted())
 	const seen = new Set(firstCycle)
 	assert.equal(seen.size, WORKING_WORDS.length, 'no repeats inside a cycle')
 
@@ -128,7 +128,7 @@ test('shuffle bag yields every word once per cycle without immediate repeats', (
 		firstCycle[WORKING_WORDS.length - 1],
 		'no repeat across cycles',
 	)
-	assert.deepEqual([...secondCycle].sort(), [...WORKING_WORDS].sort())
+	assert.deepEqual(secondCycle.toSorted(), WORKING_WORDS.toSorted())
 })
 
 test('shuffle bag tolerates a single item', () => {

@@ -6,10 +6,7 @@
  */
 
 import { COMPACT_TOOLS } from './registry.ts'
-import {
-	createCompactRenderers,
-	type NativeRendererResolver,
-} from './renderer.ts'
+import { createCompactRenderers } from './renderer.ts'
 
 import type { CompactToolDefinition } from './types.ts'
 

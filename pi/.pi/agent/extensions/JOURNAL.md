@@ -663,3 +663,11 @@ le hint `ctrl+o` ne pouvait donc pas agir.
   au dépôt.
 - Tests : contrôle Oxfmt 38/38 et `make pi-ui-test` 92/92 au vert.
 - Suite : —
+
+### 2026-09-01 — copies de groupes compacts sans spread
+
+- Optimisation : les snapshots de groupes utilisent `Array.from` plutôt qu'un
+  spread dans `map`, et l'import de type devenu mort est supprimé.
+- Fichiers : `compact-tools/{stack,overrides}.ts`.
+- Tests : compact-tools 31/31 et Oxfmt au vert ; alertes Oxlint ciblées supprimées.
+- Suite : —

@@ -210,7 +210,7 @@ export class CompactRowStack {
 	}
 
 	groups(): string[][] {
-		return this.uniqueGroups().map(group => [...group])
+		return this.uniqueGroups().map(group => Array.from(group))
 	}
 
 	private consumeRestoredMessage(message: StackMessage): void {

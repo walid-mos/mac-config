@@ -125,19 +125,19 @@ test('summarizeResult bash extrait le code de sortie du message natif', () => {
 		content: [{ type: 'text', text: 'out' }],
 		isError: false,
 	}
-	assert.equal(summarizeResult('bash', {}, ok), '')
+	assert.equal(summarizeResult('bash', ok), '')
 	const fail: CompactToolResult = {
 		content: [{ type: 'text', text: 'boom\nCommand exited with code 2' }],
 		isError: true,
 	}
-	assert.equal(summarizeResult('bash', {}, fail), 'exit 2')
+	assert.equal(summarizeResult('bash', fail), 'exit 2')
 	const timeout: CompactToolResult = {
 		content: [
 			{ type: 'text', text: 'err: Command timed out after 30 seconds' },
 		],
 		isError: true,
 	}
-	assert.equal(summarizeResult('bash', {}, timeout), 'timeout 30s')
+	assert.equal(summarizeResult('bash', timeout), 'timeout 30s')
 })
 
 test('summarizeResult read utilise totalLines et marque la troncature', () => {
@@ -145,7 +145,7 @@ test('summarizeResult read utilise totalLines et marque la troncature', () => {
 		content: [{ type: 'text', text: 'ligne\nligne' }],
 		details: { truncation: { truncated: true, totalLines: 250 } },
 	}
-	assert.equal(summarizeResult('read', {}, result), '250 lignes · tronqué')
+	assert.equal(summarizeResult('read', result), '250 lignes · tronqué')
 })
 
 test('summarizeResult grep/find/ls signalent les limites atteintes', () => {
@@ -153,17 +153,17 @@ test('summarizeResult grep/find/ls signalent les limites atteintes', () => {
 		content: [],
 		details: { matchLimitReached: 200 },
 	}
-	assert.equal(summarizeResult('grep', {}, grep), '200+ correspondances')
+	assert.equal(summarizeResult('grep', grep), '200+ correspondances')
 	const find: CompactToolResult = {
 		content: [],
 		details: { resultLimitReached: 50 },
 	}
-	assert.equal(summarizeResult('find', {}, find), '50+ résultats')
+	assert.equal(summarizeResult('find', find), '50+ résultats')
 	const ls: CompactToolResult = {
 		content: [{ type: 'text', text: 'a\nb' }],
 		details: {},
 	}
-	assert.equal(summarizeResult('ls', {}, ls), '2 lignes')
+	assert.equal(summarizeResult('ls', ls), '2 lignes')
 })
 
 test("subjectFor background cible l'action et le job ou la source", () => {
@@ -182,7 +182,7 @@ test('summarizeResult background résume la première ligne de sortie', () => {
 	const result: CompactToolResult = {
 		content: [{ type: 'text', text: 'tick 1\ntick 2' }],
 	}
-	assert.equal(summarizeResult('background', {}, result), 'tick 1')
+	assert.equal(summarizeResult('background', result), 'tick 1')
 })
 
 test("summarizeResult edit/write résume la première ligne d'erreur seulement", () => {
@@ -190,13 +190,13 @@ test("summarizeResult edit/write résume la première ligne d'erreur seulement",
 		content: [{ type: 'text', text: 'ok' }],
 		isError: false,
 	}
-	assert.equal(summarizeResult('edit', {}, ok), '')
+	assert.equal(summarizeResult('edit', ok), '')
 	const fail: CompactToolResult = {
 		content: [{ type: 'text', text: 'oldText introuvable\ndétails' }],
 		isError: true,
 	}
-	assert.equal(summarizeResult('edit', {}, fail), 'oldText introuvable')
-	assert.equal(summarizeResult('write', {}, fail), 'oldText introuvable')
+	assert.equal(summarizeResult('edit', fail), 'oldText introuvable')
+	assert.equal(summarizeResult('write', fail), 'oldText introuvable')
 })
 
 test('compactRowLine compose glyphe, label, sujet et résumé', () => {

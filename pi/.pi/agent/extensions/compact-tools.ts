@@ -23,7 +23,7 @@ import {
 
 const NATIVE_FACTORIES: Record<
 	string,
-	((cwd: string) => ToolDefinition<any, any>) | undefined
+	((cwd: string) => ToolDefinition) | undefined
 > = {
 	read: createReadToolDefinition,
 	grep: createGrepToolDefinition,
@@ -39,6 +39,6 @@ export default function compactTools(pi: ExtensionAPI): void {
 		tools: COMPACT_TOOLS,
 	})
 	for (const definition of overrides) {
-		pi.registerTool(definition as ToolDefinition<any, any>)
+		pi.registerTool(definition as ToolDefinition)
 	}
 }

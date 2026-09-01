@@ -727,3 +727,12 @@ le hint `ctrl+o` ne pouvait donc pas agir.
 - Tests : cycle partiel puis final verrouillé dans la suite compact-tools ;
   Oxfmt, Oxlint strict et 32 tests ciblés au vert.
 - Suite : réduire la complexité des extracteurs de sujets et résumés.
+
+### 2026-09-01 — dispatch compact simplifié
+
+- Refactor : `subjectFor` et `summarizeResult` délèguent à des extracteurs
+  spécialisés par tool ; les signatures internes n’emploient plus de `any` ni
+  d’argument inutilisé.
+- Qualité : les deux findings Fallow de `compact-tools/summary.ts` disparaissent
+  ; 32 tests ciblés, Oxfmt et Oxlint strict au vert.
+- Suite : simplifier le parsing de la forme canonique des éditions.

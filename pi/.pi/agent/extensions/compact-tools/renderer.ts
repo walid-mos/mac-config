@@ -25,7 +25,7 @@ export type NativeRendererResolver = (
 
 export interface CompactRenderers {
 	renderCall: (
-		args: any,
+		args: unknown,
 		theme: CompactTheme,
 		context: CompactRenderContext,
 	) => CompactComponent
@@ -144,11 +144,7 @@ export function createCompactRenderers(
 			) {
 				state.endedAt = Date.now()
 			}
-			state.summary = summarizeResult(
-				tool,
-				context.args as Record<string, unknown>,
-				normalizedResult,
-			)
+			state.summary = summarizeResult(tool, normalizedResult)
 			if (rendererOptions.resultBody) {
 				return rendererOptions.resultBody(
 					normalizedResult,

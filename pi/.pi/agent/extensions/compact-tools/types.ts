@@ -69,13 +69,13 @@ export interface CompactToolDefinition {
 	renderShell?: 'default' | 'self'
 	execute(
 		toolCallId: string,
-		params: any,
+		params: unknown,
 		signal: AbortSignal | undefined,
 		onUpdate: ((update: unknown) => void) | undefined,
 		ctx: { cwd: string },
 	): Promise<unknown>
 	renderCall?: (
-		args: any,
+		args: unknown,
 		theme: CompactTheme,
 		context: CompactRenderContext,
 	) => CompactComponent

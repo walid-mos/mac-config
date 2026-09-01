@@ -736,3 +736,12 @@ le hint `ctrl+o` ne pouvait donc pas agir.
 - Qualité : les deux findings Fallow de `compact-tools/summary.ts` disparaissent
   ; 32 tests ciblés, Oxfmt et Oxlint strict au vert.
 - Suite : simplifier le parsing de la forme canonique des éditions.
+
+### 2026-09-01 — arguments edit canoniques
+
+- Refactor : mutation-view valide exclusivement `path` + `edits[]`, avec des
+  chaînes strictes pour chaque remplacement ; les aliases et sérialisations
+  historiques ne sont plus interprétés.
+- Qualité : le dernier finding de complexité introduit disparaît de Fallow ;
+  14 tests mutation ciblés et lint source au vert.
+- Suite : éliminer la duplication structurelle des décorateurs d’éditeur.

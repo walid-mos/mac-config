@@ -14,41 +14,42 @@ import type {
 
 export type EditFrameComponent = MutationFrameComponent
 
-export function parseEditArgs(
-	args: Record<string, unknown> | undefined,
-):
-	| { path: string; edits: Array<{ oldText: string; newText: string }> }
-	| undefined {
-	if (typeof args !== 'object' || args === null) return undefined
-	const path = String(args.path ?? args.file_path ?? '')
-	let rawEdits: unknown = args.edits
-	if (typeof rawEdits === 'string') {
-		try {
-			rawEdits = JSON.parse(rawEdits)
-		} catch {
-			return undefined
-		}
-	}
-	const edits: Array<{ oldText: string; newText: string }> = []
-	if (Array.isArray(rawEdits)) {
-		for (const entry of rawEdits) {
-			if (typeof entry !== 'object' || entry === null) return undefined
-			const record = entry as Record<string, unknown>
-			edits.push({
-				oldText: String(record.oldText ?? ''),
-				newText: String(record.newText ?? ''),
-			})
-		}
-	} else if ('oldText' in args || 'newText' in args) {
-		edits.push({
-			oldText: String(args.oldText ?? ''),
-			newText: String(args.newText ?? ''),
-		})
-	} else {
+interface TextEdit {
+	oldText: string
+	newText: string
+}
+
+function parseTextEdit(value: unknown): TextEdit | undefined {
+	if (typeof value !== 'object' || value === null) return undefined
+	const candidate = value as Record<string, unknown>
+	if (
+		typeof candidate.oldText !== 'string' ||
+		typeof candidate.newText !== 'string'
+	)
 		return undefined
+	return { oldText: candidate.oldText, newText: candidate.newText }
+}
+
+function parseTextEdits(value: unknown): TextEdit[] | undefined {
+	if (!Array.isArray(value) || value.length === 0) return undefined
+	const edits: TextEdit[] = []
+	for (const valueEntry of value) {
+		const edit = parseTextEdit(valueEntry)
+		if (!edit) return undefined
+		edits.push(edit)
 	}
-	if (edits.length === 0) return undefined
-	return { path, edits }
+	return edits
+}
+
+export function parseEditArgs(
+	args: unknown,
+): { path: string; edits: TextEdit[] } | undefined {
+	if (typeof args !== 'object' || args === null) return undefined
+	const candidate = args as Record<string, unknown>
+	if (typeof candidate.path !== 'string' || candidate.path.length === 0)
+		return undefined
+	const edits = parseTextEdits(candidate.edits)
+	return edits ? { path: candidate.path, edits } : undefined
 }
 
 export function parseNativeEditDiff(diff: string): DiffLine[] {
@@ -57,7 +58,7 @@ export function parseNativeEditDiff(diff: string): DiffLine[] {
 		.split('\n')
 		.filter(line => line.length > 0)
 		.map(line => {
-			const match = /^([ +\-])\s*(\d+) (.*)$/.exec(line)
+			const match = /^([- +])\s*(\d+) (.*)$/.exec(line)
 			if (!match) return { kind: 'context', text: line.trim() }
 			const kind =
 				match[1] === '+'
@@ -124,9 +125,7 @@ export function editCollapsedBody(
 	theme: CompactTheme,
 	context: CompactRenderContext,
 ): CompactComponent {
-	const parsed = parseEditArgs(
-		context.args as Record<string, unknown> | undefined,
-	)
+	const parsed = parseEditArgs(context.args)
 	const details = result.details as { diff?: unknown } | undefined
 	if (!parsed || result.isError || typeof details?.diff !== 'string') {
 		return { render: () => [], invalidate: () => {} }

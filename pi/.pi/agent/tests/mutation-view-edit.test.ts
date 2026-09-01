@@ -64,34 +64,34 @@ test('diffLines borne les remplacements massifs sans table LCS', () => {
 	)
 })
 
-test('parseEditArgs accepte edits[], edits en JSON string et la paire legacy', () => {
+test('parseEditArgs valide strictement la forme canonique edits[]', () => {
 	assert.deepEqual(
 		parseEditArgs({
 			path: '/a/f.ts',
-			edits: [{ oldText: 'x', newText: 'y' }],
+			edits: [
+				{ oldText: 'x', newText: 'y' },
+				{ oldText: 'a', newText: 'b' },
+			],
 		}),
-		{ path: '/a/f.ts', edits: [{ oldText: 'x', newText: 'y' }] },
-	)
-	assert.deepEqual(
-		parseEditArgs({
-			path: '/a/f.ts',
-			edits: JSON.stringify([{ oldText: 'x', newText: 'y' }]),
-		}),
-		{ path: '/a/f.ts', edits: [{ oldText: 'x', newText: 'y' }] },
-	)
-	assert.deepEqual(
-		parseEditArgs({ path: '/a/f.ts', oldText: 'x', newText: 'y' }),
 		{
 			path: '/a/f.ts',
-			edits: [{ oldText: 'x', newText: 'y' }],
+			edits: [
+				{ oldText: 'x', newText: 'y' },
+				{ oldText: 'a', newText: 'b' },
+			],
 		},
 	)
-	assert.equal(parseEditArgs({ path: '/a/f.ts' }), undefined)
-	assert.equal(
-		parseEditArgs({ path: '/a/f.ts', edits: '{broken' }),
+	for (const invalid of [
+		{ path: '/a/f.ts' },
+		{ path: '/a/f.ts', edits: [] },
+		{ path: '/a/f.ts', edits: JSON.stringify([]) },
+		{ path: '/a/f.ts', oldText: 'x', newText: 'y' },
+		{ file_path: '/a/f.ts', edits: [{ oldText: 'x', newText: 'y' }] },
+		{ path: '/a/f.ts', edits: [{ oldText: 1, newText: 'y' }] },
 		undefined,
-	)
-	assert.equal(parseEditArgs(undefined), undefined)
+	]) {
+		assert.equal(parseEditArgs(invalid), undefined)
+	}
 })
 
 test('parseNativeEditDiff récupère type, numéro réel et indentation', () => {
@@ -300,7 +300,10 @@ test('les renderers edit gardent la DA mutation en vue étendue', () => {
 	assert.match(row.render(80)[0], /^✗ edit · f\.ts · oldText introuvable$/)
 
 	const expandedContext = fakeContext({
-		args: { path: '/a/f.ts', oldText: 'ancienne', newText: 'nouvelle' },
+		args: {
+			path: '/a/f.ts',
+			edits: [{ oldText: 'ancienne', newText: 'nouvelle' }],
+		},
 		expanded: true,
 	})
 	const expandedRow = renderers.renderCall(

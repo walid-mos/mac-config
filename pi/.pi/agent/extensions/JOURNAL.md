@@ -877,3 +877,11 @@ le hint `ctrl+o` ne pouvait donc pas agir.
 - Gate : `pi-notify-test` énumère explicitement les trois contrats ; les 20
   scénarios et Oxlint restent au vert.
 - Suite : séparer les tests compact-tools et working-loader par responsabilité.
+
+### 2026-09-01 — tests compact-tools par contrat
+
+- Tests : les 666 lignes sont redistribuées en suites summary/line, renderer et
+  stack, appuyées par des factories partagées de contexte natif.
+- Gate : les 32 scénarios restent explicitement énumérés par `pi-ui-test` et
+  passent avec Oxlint strict.
+- Suite : isoler transitions, primitives et intégration dans working-loader.

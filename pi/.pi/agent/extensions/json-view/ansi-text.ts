@@ -1,6 +1,6 @@
 import { LATTE } from '../footer/style.ts'
-
 import { blendHex } from '../ui/frame.ts'
+
 import { JSON_COLOR, jsonColorSequence } from './json-colors.ts'
 
 const ANSI = {

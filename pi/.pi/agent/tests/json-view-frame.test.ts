@@ -7,11 +7,11 @@ import {
 	tokenizeAnsiText,
 } from '../extensions/json-view/ansi-text.ts'
 import { renderJsonBox } from '../extensions/json-view/json-box.ts'
-import { blendHex } from '../extensions/ui/frame.ts'
 import { JSON_COLOR } from '../extensions/json-view/json-colors.ts'
 import { formatJsonBytes } from '../extensions/json-view/json-frame.ts'
 import { highlightJsonLine } from '../extensions/json-view/json-syntax.ts'
 import { transformMarkdown } from '../extensions/json-view/transform-markdown.ts'
+import { blendHex } from '../extensions/ui/frame.ts'
 
 import {
 	ansiColor,

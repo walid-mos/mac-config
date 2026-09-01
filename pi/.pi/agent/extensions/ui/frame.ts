@@ -118,7 +118,9 @@ export function frameDotsRow(width: number, palette: FramePalette): string {
 	const contentWidth = Math.max(0, width - GEOMETRY.ROW_CHROME_WIDTH)
 	const padding = Math.max(
 		0,
-		Math.floor((contentWidth - FADE.DOTS_VISIBLE_WIDTH) / FADE.CENTER_DIVISOR),
+		Math.floor(
+			(contentWidth - FADE.DOTS_VISIBLE_WIDTH) / FADE.CENTER_DIVISOR,
+		),
 	)
 	const content = truncateTerminalLine(
 		`${' '.repeat(padding)}${dots.join(' ')}`,

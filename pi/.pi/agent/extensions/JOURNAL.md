@@ -671,3 +671,12 @@ le hint `ctrl+o` ne pouvait donc pas agir.
 - Fichiers : `compact-tools/{stack,overrides}.ts`.
 - Tests : compact-tools 31/31 et Oxfmt au vert ; alertes Oxlint ciblées supprimées.
 - Suite : —
+
+### 2026-09-01 — format NextNode remis à niveau après la branche web
+
+- Maintenance : Oxfmt 0.65.0 a normalisé les sources et tests modifiés avec le
+  profil NextNode (tabs, sans points-virgules, quotes simples, imports triés).
+- Fichiers : sources/tests TUI modifiés depuis la précédente passe et nouveau
+  décorateur `top-line` encore hors commit.
+- Tests : contrôle Oxfmt ciblé au vert ; gate Pi complète à relancer.
+- Suite : audit et corrections P0-P2.

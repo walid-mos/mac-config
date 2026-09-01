@@ -19,6 +19,7 @@ import {
 } from './thinking-preview.ts'
 import { WORKING_WORDS } from './words.ts'
 
+import type { ThinkingPreviewTimeline } from './thinking-preview.ts'
 /**
  * Working loader: animates a sand spinner beside a shuffle-bag word line while
  * the agent is busy, without taking ownership of Pi's transcript rendering.
@@ -33,7 +34,6 @@ import type {
 	ExtensionAPI,
 	ExtensionContext,
 } from '@earendil-works/pi-coding-agent'
-import type { ThinkingPreviewTimeline } from './thinking-preview.ts'
 
 const SURFACE_ID = 'working-loader'
 const MIN_GAP = 2

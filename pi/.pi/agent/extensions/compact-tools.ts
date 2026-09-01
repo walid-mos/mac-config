@@ -13,24 +13,32 @@ import {
 	createReadToolDefinition,
 	type ExtensionAPI,
 	type ToolDefinition,
-} from "@earendil-works/pi-coding-agent";
-import { registerCompactStackLifecycle } from "./compact-tools/lifecycle.ts";
-import { COMPACT_TOOLS, createCompactOverrides } from "./compact-tools/overrides.ts";
+} from '@earendil-works/pi-coding-agent'
 
-const NATIVE_FACTORIES: Record<string, ((cwd: string) => ToolDefinition<any, any>) | undefined> = {
+import { registerCompactStackLifecycle } from './compact-tools/lifecycle.ts'
+import {
+	COMPACT_TOOLS,
+	createCompactOverrides,
+} from './compact-tools/overrides.ts'
+
+const NATIVE_FACTORIES: Record<
+	string,
+	((cwd: string) => ToolDefinition<any, any>) | undefined
+> = {
 	read: createReadToolDefinition,
 	grep: createGrepToolDefinition,
 	find: createFindToolDefinition,
 	ls: createLsToolDefinition,
-};
+	bash: createBashToolDefinition,
+}
 
 export default function compactTools(pi: ExtensionAPI): void {
-	registerCompactStackLifecycle(pi);
+	registerCompactStackLifecycle(pi)
 	const overrides = createCompactOverrides({
 		createBuiltin: (toolName, cwd) => NATIVE_FACTORIES[toolName]?.(cwd),
 		tools: COMPACT_TOOLS,
-	});
+	})
 	for (const definition of overrides) {
-		pi.registerTool(definition as ToolDefinition<any, any>);
+		pi.registerTool(definition as ToolDefinition<any, any>)
 	}
 }

@@ -59,6 +59,26 @@ def deploy_pi(home: Path, stow: str, make: str) -> None:
     )
     if (agent / "extensions").is_symlink():
         raise RuntimeError("legacy --no-folding fixture unexpectedly folded extensions")
+
+    # Reproduce both conflict forms seen when switching worktrees: real paths
+    # created outside Stow and symlinks still pointing at another package tree.
+    plain_conflicts = {
+        "keybindings.json": "must-be-replaced\n",
+        "settings.json": "must-be-replaced\n",
+    }
+    for name, contents in plain_conflicts.items():
+        path = agent / name
+        path.unlink()
+        path.write_text(contents, encoding="utf-8")
+    archived = agent / "archived"
+    shutil.rmtree(archived)
+    archived.mkdir()
+    (archived / "local-only.txt").write_text("must-be-replaced\n", encoding="utf-8")
+    stale_agents = home.parent / "stale-AGENTS.md"
+    stale_agents.write_text("must-be-replaced\n", encoding="utf-8")
+    (agent / "AGENTS.md").unlink()
+    (agent / "AGENTS.md").symlink_to(stale_agents)
+
     local_static_resources = (
         agent / "extensions" / "local-only.ts",
         agent / "prompts" / "local-only.md",
@@ -77,7 +97,19 @@ def deploy_pi(home: Path, stow: str, make: str) -> None:
 def require_expected_layout(home: Path) -> None:
     agent = home / ".pi" / "agent"
     external_skills = agent / "external" / "skills"
-    expected_links = (agent / "extensions", agent / "prompts", agent / "skills")
+    managed_names = (
+        "AGENTS.md",
+        "archived",
+        "background.json",
+        "extensions",
+        "keybindings.json",
+        "prompts",
+        "settings.json",
+        "skills",
+        "tests",
+        "themes",
+    )
+    expected_links = tuple(agent / name for name in managed_names)
     runtime_paths = (agent, agent / "sessions", agent / "agents", agent / "npm", agent / "auth.json", external_skills)
     missing_links = [str(path) for path in expected_links if not path.is_symlink()]
     linked_runtime_paths = [str(path) for path in runtime_paths if path.is_symlink()]

@@ -30,7 +30,7 @@ export type SpawnCall = {
 	child: FakeChild
 }
 
-export class FakeChild extends EventEmitter {
+class FakeChild extends EventEmitter {
 	readonly stdout = new EventEmitter()
 	unrefCalled = false
 

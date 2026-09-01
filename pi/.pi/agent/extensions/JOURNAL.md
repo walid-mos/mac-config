@@ -709,3 +709,13 @@ le hint `ctrl+o` ne pouvait donc pas agir.
 - Tests : assertions palette/RGB/ANSI, Oxlint ciblé et gate Pi complète au vert
   (166 tests UI).
 - Suite : étendre la gate UI aux suites actuellement orphelines.
+
+### 2026-09-01 — réponse web préservée hors curation
+
+- Correctif : le rendu étendu non-curated partage désormais le renderer de
+  détails de requête avec la branche curated ; réponse synthétisée, erreur et
+  sources restent toutes visibles.
+- Tests : le helper est extrait du patch versionné et bundlé en isolation ; une
+  régression couvre explicitement réponse + source. Application directe et
+  inverse du patch vérifiées, 167 tests UI au vert.
+- Suite : harmoniser l’état partiel des rows compactes avant la review finale.

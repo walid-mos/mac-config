@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { LATTE } from '../extensions/footer/style.ts'
 import { JSON_MAX_LINES } from '../extensions/json-view/json-frame.ts'
 import { transformMarkdown } from '../extensions/json-view/transform-markdown.ts'
+import { PI_PALETTE as LATTE } from '../extensions/ui/design-system/palette.ts'
 
 import {
 	ansiColor,

@@ -1,19 +1,14 @@
-import { LATTE, rgb } from '../footer/style.ts'
+import { PI_PALETTE } from '../ui/design-system/palette.ts'
 
 export const JSON_COLOR = {
-	BORDER: LATTE.overlay1,
-	PUNCTUATION: LATTE.overlay1,
-	KEY: LATTE.blue,
-	STRING: LATTE.green,
-	NUMBER: LATTE.peach,
-	LITERAL: LATTE.mauve,
-	TITLE: LATTE.mauve,
-	META: LATTE.subtext0,
-	LINK: LATTE.sapphire,
-	BASE: '#eff1f5',
+	BORDER: PI_PALETTE.overlay1,
+	PUNCTUATION: PI_PALETTE.overlay1,
+	KEY: PI_PALETTE.blue,
+	STRING: PI_PALETTE.green,
+	NUMBER: PI_PALETTE.peach,
+	LITERAL: PI_PALETTE.mauve,
+	TITLE: PI_PALETTE.mauve,
+	META: PI_PALETTE.subtext0,
+	LINK: PI_PALETTE.sapphire,
+	BASE: PI_PALETTE.base,
 } as const
-
-export function jsonColorSequence(hex: string): string {
-	const [red, green, blue] = rgb(hex)
-	return `\x1b[38;2;${red};${green};${blue}m`
-}

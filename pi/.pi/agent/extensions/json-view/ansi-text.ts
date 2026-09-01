@@ -1,7 +1,10 @@
-import { LATTE } from '../footer/style.ts'
-import { blendHex } from '../ui/frame.ts'
+import { PI_PALETTE } from '../ui/design-system/palette.ts'
+import {
+	blendHex,
+	foregroundColorSequence,
+} from '../ui/design-system/terminal-color.ts'
 
-import { JSON_COLOR, jsonColorSequence } from './json-colors.ts'
+import { JSON_COLOR } from './json-colors.ts'
 
 const ANSI = {
 	ESCAPE: '\x1b',
@@ -124,8 +127,8 @@ function fadeText(
 	hasActiveColor: boolean,
 ): string {
 	if (hasActiveColor || !text.trim()) return text
-	const color = jsonColorSequence(
-		blendHex(LATTE.text, JSON_COLOR.BASE, ratio),
+	const color = foregroundColorSequence(
+		blendHex(PI_PALETTE.text, JSON_COLOR.BASE, ratio),
 	)
 	return `${color}${text}${ANSI.FOREGROUND_RESET}`
 }
@@ -138,7 +141,7 @@ function fadeControl(
 	const activeHex = trueColorHex(control)
 	if (activeHex) {
 		return {
-			text: jsonColorSequence(
+			text: foregroundColorSequence(
 				blendHex(activeHex, JSON_COLOR.BASE, ratio),
 			),
 			hasActiveColor: true,

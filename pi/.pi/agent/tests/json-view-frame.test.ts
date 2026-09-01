@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { LATTE } from '../extensions/footer/style.ts'
 import {
 	escapeMarkdownOutsideAnsi,
 	tokenizeAnsiText,
@@ -11,7 +10,8 @@ import { JSON_COLOR } from '../extensions/json-view/json-colors.ts'
 import { formatJsonBytes } from '../extensions/json-view/json-frame.ts'
 import { highlightJsonLine } from '../extensions/json-view/json-syntax.ts'
 import { transformMarkdown } from '../extensions/json-view/transform-markdown.ts'
-import { blendHex } from '../extensions/ui/frame.ts'
+import { PI_PALETTE as LATTE } from '../extensions/ui/design-system/palette.ts'
+import { blendHex } from '../extensions/ui/design-system/terminal-color.ts'
 
 import {
 	ansiColor,

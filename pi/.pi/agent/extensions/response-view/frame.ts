@@ -1,3 +1,10 @@
+import {
+	ansi256ToRgb,
+	foregroundAnsi,
+	type RgbColor,
+	type TerminalColorMode,
+} from '../ui/design-system/terminal-color.ts'
+
 import type { Theme } from '@earendil-works/pi-coding-agent'
 
 export const RESPONSE_RIGHT_MARGIN = 8
@@ -20,12 +27,12 @@ const TRACE_FADE_END = '┈┈ '
 const GRADIENT_WIDTH = 24
 const EDGE_FADE_RATIO = 0.34
 const EDGE_FADE_MIN_WIDTH = 16
-const ANSI_FG_RESET = '\x1b[39m'
-const ANSI_256_LEVELS = [0, 95, 135, 175, 215, 255] as const
+const ANSI_FG_RESET = '\u001B[39m'
+const ANSI_PREFIX = '\u001B['
 
 interface TerminalColor {
-	rgb: [number, number, number]
-	mode: 'truecolor' | '256color'
+	rgb: RgbColor
+	mode: TerminalColorMode
 }
 
 function ruleWidth(width: number): number {
@@ -33,42 +40,14 @@ function ruleWidth(width: number): number {
 	return Math.max(1, Math.floor(width) - RESPONSE_RIGHT_MARGIN)
 }
 
-function ansi256Rgb(index: number): [number, number, number] {
-	if (index >= 232) {
-		const gray = 8 + Math.min(23, index - 232) * 10
-		return [gray, gray, gray]
-	}
-	if (index >= 16) {
-		const cube = index - 16
-		return [
-			ANSI_256_LEVELS[Math.floor(cube / 36)]!,
-			ANSI_256_LEVELS[Math.floor((cube % 36) / 6)]!,
-			ANSI_256_LEVELS[cube % 6]!,
-		]
-	}
-	const basic = [
-		[0, 0, 0],
-		[128, 0, 0],
-		[0, 128, 0],
-		[128, 128, 0],
-		[0, 0, 128],
-		[128, 0, 128],
-		[0, 128, 128],
-		[192, 192, 192],
-		[128, 128, 128],
-		[255, 0, 0],
-		[0, 255, 0],
-		[255, 255, 0],
-		[0, 0, 255],
-		[255, 0, 255],
-		[0, 255, 255],
-		[255, 255, 255],
-	] as const
-	return [...basic[Math.max(0, index)]!] as [number, number, number]
-}
-
 function parseTerminalColor(ansi: string): TerminalColor {
-	const truecolor = /\x1b\[(?:38|48);2;(\d+);(\d+);(\d+)m/u.exec(ansi)
+	if (!ansi.startsWith(ANSI_PREFIX)) {
+		throw new Error(
+			'response-view requires an ANSI color from the active theme',
+		)
+	}
+	const payload = ansi.slice(ANSI_PREFIX.length)
+	const truecolor = /^(?:38|48);2;(\d+);(\d+);(\d+)m$/u.exec(payload)
 	if (truecolor) {
 		return {
 			rgb: [
@@ -79,44 +58,12 @@ function parseTerminalColor(ansi: string): TerminalColor {
 			mode: 'truecolor',
 		}
 	}
-	const indexed = /\x1b\[(?:38|48);5;(\d+)m/u.exec(ansi)
+	const indexed = /^(?:38|48);5;(\d+)m$/u.exec(payload)
 	if (indexed)
-		return { rgb: ansi256Rgb(Number(indexed[1])), mode: '256color' }
+		return { rgb: ansi256ToRgb(Number(indexed[1])), mode: '256color' }
 	throw new Error(
 		'response-view requires an ANSI color from the active theme',
 	)
-}
-
-function nearestAnsi256(red: number, green: number, blue: number): number {
-	const nearest = (value: number): number =>
-		ANSI_256_LEVELS.reduce(
-			(best, level, index) =>
-				Math.abs(level - value) <
-				Math.abs(ANSI_256_LEVELS[best]! - value)
-					? index
-					: best,
-			0,
-		)
-	const cube = 16 + 36 * nearest(red) + 6 * nearest(green) + nearest(blue)
-	const grayIndex = Math.max(
-		0,
-		Math.min(23, Math.round((red + green + blue) / 30 - 0.8)),
-	)
-	const grayValue = 8 + grayIndex * 10
-	const cubeRgb = ansi256Rgb(cube)
-	const distance = (rgb: [number, number, number]): number =>
-		(rgb[0] - red) ** 2 + (rgb[1] - green) ** 2 + (rgb[2] - blue) ** 2
-	return distance([grayValue, grayValue, grayValue]) < distance(cubeRgb)
-		? 232 + grayIndex
-		: cube
-}
-
-function foregroundAnsi(
-	rgb: [number, number, number],
-	mode: TerminalColor['mode'],
-): string {
-	if (mode === '256color') return `\x1b[38;5;${nearestAnsi256(...rgb)}m`
-	return `\x1b[38;2;${rgb.join(';')}m`
 }
 
 function smoothstep(value: number): number {
@@ -136,14 +83,10 @@ function traceGlyphs(width: number): string {
 	return TRACE_LEAD + '─'.repeat(Math.max(0, solidWidth - 1)) + TRACE_FADE_END
 }
 
-function mixColor(
-	from: [number, number, number],
-	to: [number, number, number],
-	ratio: number,
-): [number, number, number] {
+function mixColor(from: RgbColor, to: RgbColor, ratio: number): RgbColor {
 	return from.map((channel, channelIndex) =>
 		Math.round(channel + (to[channelIndex]! - channel) * ratio),
-	) as [number, number, number]
+	) as RgbColor
 }
 
 function gradientTrace(width: number, theme: ResponseTheme): string {

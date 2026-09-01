@@ -1,4 +1,9 @@
-import { LATTE } from '../footer/style.ts'
+import { PI_PALETTE } from '../ui/design-system/palette.ts'
+import {
+	backgroundAnsi,
+	blendHex,
+	hexToRgb,
+} from '../ui/design-system/terminal-color.ts'
 import { terminalLineWidth, truncateTerminalLine } from '../ui/terminal-text.ts'
 
 import type { DiffLine } from './diff.ts'
@@ -21,7 +26,6 @@ const ROW_CHROME_WIDTH = 2
 const NUMBER_GUTTER_CHROME_WIDTH = 5
 const DIFF_BG_OPACITY = 0.15
 const DIFF_BG_FADE_OPACITY = [0.1, 0.06, 0.03] as const
-const DIFF_BG_BASE = '#eff1f5'
 const ANSI_BG_RESET = '\x1b[49m'
 
 export interface FrameTheme {
@@ -133,76 +137,14 @@ function titleRow(
 	return truncateTerminalLine(row, width, '…')
 }
 
-function parseHex(hex: string): [number, number, number] | undefined {
-	const match = /^#([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(hex)
-	if (!match) return undefined
-	return [
-		Number.parseInt(match[1], 16),
-		Number.parseInt(match[2], 16),
-		Number.parseInt(match[3], 16),
-	]
-}
-
-function blendHex(
-	base: string,
-	tint: string,
-	opacity: number,
-): string | undefined {
-	const baseRgb = parseHex(base)
-	const tintRgb = parseHex(tint)
-	if (!baseRgb || !tintRgb) return undefined
-	const channels = baseRgb.map((channel, index) =>
-		Math.round(channel + (tintRgb[index] - channel) * opacity),
-	)
-	return `#${channels.map(channel => channel.toString(16).padStart(2, '0')).join('')}`
-}
-
 function diffBackgrounds(theme: FrameTheme): DiffBackgrounds | undefined {
 	if (!theme.getColorMode) return undefined
 	return {
-		added: LATTE.green,
-		removed: LATTE.red,
-		base: DIFF_BG_BASE,
+		added: PI_PALETTE.green,
+		removed: PI_PALETTE.red,
+		base: PI_PALETTE.base,
 		mode: theme.getColorMode(),
 	}
-}
-
-function nearestAnsi256(red: number, green: number, blue: number): number {
-	const levels = [0, 95, 135, 175, 215, 255]
-	const nearest = (value: number): number =>
-		levels.reduce(
-			(best, level, index) =>
-				Math.abs(level - value) < Math.abs(levels[best] - value)
-					? index
-					: best,
-			0,
-		)
-	const cube = 16 + 36 * nearest(red) + 6 * nearest(green) + nearest(blue)
-	const grayIndex = Math.max(
-		0,
-		Math.min(23, Math.round((red + green + blue) / 3 / 10 - 0.8)),
-	)
-	const grayValue = 8 + grayIndex * 10
-	const cubeRed = levels[Math.floor((cube - 16) / 36)]
-	const cubeGreen = levels[Math.floor(((cube - 16) % 36) / 6)]
-	const cubeBlue = levels[(cube - 16) % 6]
-	const cubeDistance =
-		(cubeRed - red) ** 2 + (cubeGreen - green) ** 2 + (cubeBlue - blue) ** 2
-	const grayDistance =
-		(grayValue - red) ** 2 +
-		(grayValue - green) ** 2 +
-		(grayValue - blue) ** 2
-	return grayDistance < cubeDistance ? 232 + grayIndex : cube
-}
-
-function backgroundAnsi(
-	hex: string,
-	mode: DiffBackgrounds['mode'],
-): string | undefined {
-	const rgb = parseHex(hex)
-	if (!rgb) return undefined
-	if (mode === '256color') return `\x1b[48;5;${nearestAnsi256(...rgb)}m`
-	return `\x1b[48;2;${rgb.join(';')}m`
 }
 
 function railRow(
@@ -215,8 +157,7 @@ function railRow(
 	const body = truncateTerminalLine(content, width - ROW_CHROME_WIDTH, '…')
 	const rail = theme.fg('muted', '│')
 	if (!background) return `${rail} ${body}`
-	const start = backgroundAnsi(background.hex, background.mode)
-	if (!start) return `${rail} ${body}`
+	const start = backgroundAnsi(hexToRgb(background.hex), background.mode)
 	// Pi trims ordinary trailing spaces from component rows. Non-breaking spaces
 	// keep the pastel band rectangular while remaining visually blank.
 	const padding = '\u00a0'.repeat(

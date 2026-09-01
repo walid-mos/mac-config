@@ -1,4 +1,4 @@
-import { fgHex } from '../footer/style.ts'
+import { foregroundHex as fgHex } from '../ui/design-system/terminal-color.ts'
 
 import { JSON_COLOR } from './json-colors.ts'
 

@@ -697,3 +697,15 @@ le hint `ctrl+o` ne pouvait donc pas agir.
   décorateur `top-line` encore hors commit.
 - Tests : contrôle Oxfmt ciblé au vert ; gate Pi complète à relancer.
 - Suite : audit et corrections P0-P2.
+
+### 2026-09-01 — design system Pi centralisé
+
+- Architecture : la palette Catppuccin et les conversions terminal vivent
+  désormais sous `ui/design-system` ; footer, JSON, mutation et response-view
+  ne dépendent plus d’un module visuel voisin et partagent les mêmes primitives
+  RGB, blend et ANSI 256.
+- Correctif : les tokens `base` et `surface1` suivent leurs valeurs canoniques
+  du thème, avec un test de dérive entre le JSON Pi et la palette TypeScript.
+- Tests : assertions palette/RGB/ANSI, Oxlint ciblé et gate Pi complète au vert
+  (166 tests UI).
+- Suite : étendre la gate UI aux suites actuellement orphelines.

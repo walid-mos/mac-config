@@ -5,8 +5,10 @@
  * Catppuccin geometry. Colors are raw hex rendered with truecolor escapes.
  */
 
-import { fgHex, rgb } from '../footer/style.ts'
-
+import {
+	blendHex,
+	foregroundHex as fgHex,
+} from './design-system/terminal-color.ts'
 import { terminalLineWidth, truncateTerminalLine } from './terminal-text.ts'
 
 /** Solid rows shown before the fade + dots row when content exceeds the cap. */
@@ -28,25 +30,6 @@ const GEOMETRY = {
 	EDGE_CHROME_WIDTH: 5,
 	MIN_WIDTH: 1,
 } as const
-
-const COLOR_CHANNEL = {
-	HEX_RADIX: 16,
-	HEX_WIDTH: 2,
-} as const
-
-/** Linear blend of two #rrggbb colors; ratio 0 = from, 1 = to. */
-export function blendHex(from: string, to: string, ratio: number): string {
-	const [fromRed, fromGreen, fromBlue] = rgb(from)
-	const [toRed, toGreen, toBlue] = rgb(to)
-	const mixChannel = (fromChannel: number, toChannel: number): number =>
-		Math.round(fromChannel + (toChannel - fromChannel) * ratio)
-	const mixedChannels = [
-		mixChannel(fromRed, toRed),
-		mixChannel(fromGreen, toGreen),
-		mixChannel(fromBlue, toBlue),
-	]
-	return `#${mixedChannels.map(channel => channel.toString(COLOR_CHANNEL.HEX_RADIX).padStart(COLOR_CHANNEL.HEX_WIDTH, '0')).join('')}`
-}
 
 export interface FramePalette {
 	/** Border + chrome color (LATTE overlay1 in both consumers). */

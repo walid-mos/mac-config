@@ -654,3 +654,12 @@ le hint `ctrl+o` ne pouvait donc pas agir.
 - Fichiers : `working-loader/{index,thinking-preview}.ts`.
 - Tests : working-loader 18/18, esbuild et Fallow avec couverture au vert.
 - Suite : —
+
+### 2026-09-01 — format NextNode appliqué au périmètre revu
+
+- Maintenance : Oxfmt a normalisé les sources, tests et documents modifiés
+  depuis la précédente review avec la configuration NextNode externe.
+- Contrat : aucun fichier de configuration Oxfmt, Oxlint ou Fallow n'est ajouté
+  au dépôt.
+- Tests : contrôle Oxfmt 38/38 et `make pi-ui-test` 92/92 au vert.
+- Suite : —

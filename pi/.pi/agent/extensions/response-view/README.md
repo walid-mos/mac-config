@@ -6,7 +6,7 @@ la réponse et lance un trait accentué ; aucun rail inférieur ne referme le
 contenu. Le corps reste intact et prioritaire. La transformation est strictement visuelle :
 le message stocké en session et envoyé au modèle reste inchangé.
 
-> ◇  RÉPONSE  ╶────────────────────────────────────┈┈
+> ◇ RÉPONSE ╶────────────────────────────────────┈┈
 >
 > La réponse importante reste immédiatement identifiable dans le transcript.
 

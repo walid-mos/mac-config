@@ -5,7 +5,7 @@
  */
 
 /** Lifecycle of one tool row, shared between the call and result slots. */
-export type CompactRowStatus = "pending" | "ok" | "error";
+export type CompactRowStatus = 'pending' | 'ok' | 'error'
 
 /**
  * Row-local state stored in the tool renderer's shared `context.state`.
@@ -13,42 +13,42 @@ export type CompactRowStatus = "pending" | "ok" | "error";
  * native view keeps its elapsed-time display.
  */
 export interface CompactRowState {
-	status?: CompactRowStatus;
-	summary?: string;
-	startedAt?: number;
-	endedAt?: number;
+	status?: CompactRowStatus
+	summary?: string
+	startedAt?: number
+	endedAt?: number
 }
 
 /** Minimal component contract used by the compact rows. */
 export interface CompactComponent {
-	render(width: number): string[];
-	invalidate(): void;
+	render(width: number): string[]
+	invalidate(): void
 }
 
 /** Minimal theme surface used by the compact rows. */
 export interface CompactTheme {
-	fg(role: string, text: string): string;
-	bold(text: string): string;
+	fg(role: string, text: string): string
+	bold(text: string): string
 }
 
 /** Minimal tool result shape (subset of AgentToolResult). */
 export interface CompactToolResult {
-	content: ReadonlyArray<{ type: string; text?: string }>;
-	details?: unknown;
-	isError?: boolean;
+	content: ReadonlyArray<{ type: string; text?: string }>
+	details?: unknown
+	isError?: boolean
 }
 
 /** Render context handed to renderCall/renderResult (subset of ToolRenderContext). */
 export interface CompactRenderContext {
-	args?: unknown;
-	state: CompactRowState & Record<string, unknown>;
-	toolCallId?: string;
-	invalidate?: () => void;
-	cwd?: string;
-	executionStarted?: boolean;
-	expanded?: boolean;
-	isError?: boolean;
-	lastComponent?: CompactComponent | undefined;
+	args?: unknown
+	state: CompactRowState & Record<string, unknown>
+	toolCallId?: string
+	invalidate?: () => void
+	cwd?: string
+	executionStarted?: boolean
+	expanded?: boolean
+	isError?: boolean
+	lastComponent?: CompactComponent | undefined
 }
 
 /** Minimal tool definition shape (subset of ToolDefinition). */
@@ -57,29 +57,33 @@ export type CompactResultBodyRenderer = (
 	options: { expanded?: boolean; isPartial?: boolean },
 	theme: CompactTheme,
 	context: CompactRenderContext,
-) => CompactComponent;
+) => CompactComponent
 
 export interface CompactToolDefinition {
-	name: string;
-	label?: string;
-	description?: string;
-	parameters: unknown;
-	promptSnippet?: string;
-	promptGuidelines?: string[];
-	renderShell?: "default" | "self";
+	name: string
+	label?: string
+	description?: string
+	parameters: unknown
+	promptSnippet?: string
+	promptGuidelines?: string[]
+	renderShell?: 'default' | 'self'
 	execute(
 		toolCallId: string,
 		params: any,
 		signal: AbortSignal | undefined,
 		onUpdate: ((update: unknown) => void) | undefined,
 		ctx: { cwd: string },
-	): Promise<unknown>;
-	renderCall?: (args: any, theme: CompactTheme, context: CompactRenderContext) => CompactComponent;
+	): Promise<unknown>
+	renderCall?: (
+		args: any,
+		theme: CompactTheme,
+		context: CompactRenderContext,
+	) => CompactComponent
 	renderResult?: (
 		result: CompactToolResult,
 		options: { expanded?: boolean; isPartial?: boolean },
 		theme: CompactTheme,
 		context: CompactRenderContext,
-	) => CompactComponent;
-	[key: string]: unknown;
+	) => CompactComponent
+	[key: string]: unknown
 }

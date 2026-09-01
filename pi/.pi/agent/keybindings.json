@@ -1,6 +1,6 @@
 {
-  "tui.editor.cursorLeft": "left",
-  "app.thinking.toggle": "ctrl+`",
-  "app.tools.expand": "ctrl+o",
-  "app.suspend": []
+	"tui.editor.cursorLeft": "left",
+	"app.thinking.toggle": "ctrl+`",
+	"app.tools.expand": "ctrl+o",
+	"app.suspend": []
 }

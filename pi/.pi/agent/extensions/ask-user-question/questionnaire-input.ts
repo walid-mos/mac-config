@@ -6,8 +6,14 @@ import type {
 	QuestionnaireState,
 } from './questionnaire-state.ts'
 
+type SelectionAction =
+	| 'tui.select.up'
+	| 'tui.select.down'
+	| 'tui.select.confirm'
+	| 'tui.select.cancel'
+
 export interface SelectionKeybindings {
-	matches(data: string, action: 'tui.select.up' | 'tui.select.down'): boolean
+	matches(data: string, action: SelectionAction): boolean
 }
 
 type ApplyEffects = (effects: QuestionnaireEffect[]) => void
@@ -84,7 +90,7 @@ export class QuestionnaireInputController {
 	private handleEditorKey(data: string): void {
 		if (this.handleEditorTabKey(data)) return
 		if (this.handleEditorVerticalKey(data)) return
-		if (matchesKey(data, Key.escape)) {
+		if (this.keybindings.matches(data, 'tui.select.cancel')) {
 			this.applyEffects(this.state.escape())
 			return
 		}
@@ -153,9 +159,12 @@ export class QuestionnaireInputController {
 
 	private handleSubmitTabKey(data: string): boolean {
 		if (!this.state.isOnSubmitTab()) return false
-		if (matchesKey(data, Key.enter) && this.state.allAnswered()) {
+		if (
+			this.keybindings.matches(data, 'tui.select.confirm') &&
+			this.state.allAnswered()
+		) {
 			this.applyEffects(['submit'])
-		} else if (matchesKey(data, Key.escape)) {
+		} else if (this.keybindings.matches(data, 'tui.select.cancel')) {
 			this.applyEffects(['cancel'])
 		}
 		return true
@@ -194,7 +203,7 @@ export class QuestionnaireInputController {
 			this.applyEffects(this.state.toggleMultiOption(this.state.cursor))
 			return true
 		}
-		if (matchesKey(data, Key.enter)) {
+		if (this.keybindings.matches(data, 'tui.select.confirm')) {
 			const effects = this.state.isChatAction()
 				? this.state.requestChat()
 				: question.multiSelect
@@ -203,7 +212,7 @@ export class QuestionnaireInputController {
 			this.applyEffects(effects)
 			return true
 		}
-		if (matchesKey(data, Key.escape)) {
+		if (this.keybindings.matches(data, 'tui.select.cancel')) {
 			this.applyEffects(this.state.escape())
 			return true
 		}

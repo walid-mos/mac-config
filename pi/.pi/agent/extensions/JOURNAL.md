@@ -909,3 +909,19 @@ le hint `ctrl+o` ne pouvait donc pas agir.
   complexité ni duplication introduite dans les 171 fichiers modifiés.
 - Tests : gate complète au vert — 70 background, 20 notifications, 169 UI,
   Stow/startup, largeurs et filtres Git.
+
+### 2026-09-02 — outils rares différés et documentation Pi contextuelle
+
+- Fait : `load_tools` conserve uniquement les tools fichiers/shell au démarrage
+  et active additivement web, frontend, MCP ou Agents/Background à la demande ;
+  les schémas différés restent enregistrés pour le chargement natif Pi.
+- Prompt : le bloc documentaire Pi disparaît des tâches ordinaires ; pour une
+  tâche Pi, ses chemins restent disponibles mais la lecture est limitée aux
+  sections et références nécessaires, sans obligation de lire chaque `.md`.
+- Mesure : prompt neuf `gpt-5.6-sol` réduit de 8 148 à 2 645 tokens
+  d'entrée (-67,5 %), avec 8 tools actifs au lieu de 20.
+- Fichiers : `tool-loader.ts`, `prompt-policy.ts`, tests associés ; gate
+  `pi-prompt-test` ajoutée au `Makefile`.
+- Tests : esbuild des deux extensions, 7 tests ciblés, Oxlint et `make pi-test`
+  complet au vert (192 Agents, 80 Background, 20 notifications, 170 UI).
+- Suite : `/reload`, puis validation d'un chargement web et frontend réel.

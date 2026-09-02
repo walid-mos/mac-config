@@ -1,6 +1,6 @@
 import type { CompactResultBodyRenderer } from './types.ts'
 
-export type ToolViewOwner = 'compact-tools' | 'background' | 'mutation-view'
+export type ToolViewOwner = 'compact-tools' | 'mutation-view'
 export type ExpandedResultMode = 'native' | 'custom'
 
 export interface ToolViewSpec {

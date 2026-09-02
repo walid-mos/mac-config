@@ -41,7 +41,7 @@ POSTS :=  dev-dirs gh herdr hermes nvim pi rtk rust
 OBSIDIAN_VAULT_DIR := $(HOME)/Library/Mobile Documents/iCloud~md~obsidian/Documents/Brain
 OBSIDIAN_VAULT := $(OBSIDIAN_VAULT_DIR)/.obsidian
 
-.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs pi-update pi-test  pi-notify-test pi-twitter-fetch-test pi-ui-test  notifier-app notifier-app-test herdr-pi-smoke hermes-dirs hermes-gemma obsidian obsidian-save proxy-reset dev-dirs git-filters
+.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs pi-update pi-test   pi-notify-test pi-prompt-test pi-twitter-fetch-test pi-ui-test  notifier-app notifier-app-test herdr-pi-smoke hermes-dirs hermes-gemma obsidian obsidian-save proxy-reset dev-dirs git-filters
 
 help:
 	@echo "Targets:"
@@ -62,6 +62,7 @@ help:
 	@echo "  pi-update      Met à jour Pi et tous ses packages"
 	@echo "  pi-test        Gate complète : extensions Pi, Stow et démarrage réel"
 	@echo "  pi-notify-test Tests comportementaux isolés de l'extension de notifications"
+	@echo "  pi-prompt-test Tests du chargement différé et de la politique documentaire Pi"
 	@echo "  pi-twitter-fetch-test Tests de sécurité et d'intégration de Twitter Fetch"
 	@echo "  notifier-app-test Teste le build et l'invalidation de Pi Notifications.app dans un dossier temporaire"
 	@echo "  herdr-pi-smoke Isolated Herdr named-session smoke: 20+ rapid Pi pane starts"
@@ -247,7 +248,11 @@ nvim-post:
 # avant le restow : le package courant gagne aussi face à un fichier réel ou à un
 # lien Stow provenant d'un autre worktree. Les autres descendants (auth.json,
 # models-store.json, npm/, sessions/, external/, etc.) restent locaux hors repo.
+# Les configs qualité versionnées à la racine de ~/.pi (PI_DOT_CONFIGS) suivent
+# la même règle : un lien resté pointé vers un autre worktree est supprimé
+# avant le restow.
 PI_MANAGED := AGENTS.md archived background.json extensions keybindings.json npm-patches prompts settings.json skills tests themes
+PI_DOT_CONFIGS := .fallowrc.json .oxfmtrc.json .oxlintrc.json
 PI_OXFMT_VERSION := 0.65.0
 PI_OXLINT_VERSION := 1.80.0
 PI_FALLOW_VERSION := 3.21.0
@@ -256,10 +261,17 @@ PI_QUALITY_BASE ?= develop-pi
 pi: | pi-dirs
 	@$(STOW) --no-folding -D pi
 	@for path in $(PI_MANAGED); do rm -rf -- "$(HOME)/.pi/agent/$$path"; done
+	@for path in $(PI_DOT_CONFIGS); do rm -f -- "$(HOME)/.pi/$$path"; done
 	@$(STOW) -R pi
 	@for path in $(PI_MANAGED); do \
 		[ -L "$(HOME)/.pi/agent/$$path" ] || { \
 			echo "déploiement Pi incomplet: ~/.pi/agent/$$path n'est pas géré par Stow" >&2; \
+			exit 1; \
+		}; \
+	done
+	@for path in $(PI_DOT_CONFIGS); do \
+		[ -L "$(HOME)/.pi/$$path" ] || { \
+			echo "déploiement Pi incomplet: ~/.pi/$$path n'est pas géré par Stow" >&2; \
 			exit 1; \
 		}; \
 	done
@@ -331,7 +343,7 @@ pi-update:  pi-post
 # Gate unique du harness : suites des extensions Pi contre les dépendances installées,
 # validation isolée du déploiement Stow puis stress-test d'un vrai Pi. Aucun restow
 # du HOME réel, aucune réinstallation de Pi et aucun symlink manuel.
-pi-test: pi-quality-test  pi-notify-test pi-twitter-fetch-test pi-ui-test
+pi-test: pi-quality-test   pi-notify-test pi-prompt-test pi-twitter-fetch-test pi-ui-test
 	@python3 scripts/test-pi-config.py
 	@python3 scripts/test-pi-startup.py
 	@python3 scripts/test-git-filters.py
@@ -352,6 +364,11 @@ pi-notify-test:
 		pi/.pi/agent/tests/pi-notify-extension.test.ts \
 		pi/.pi/agent/tests/pi-notify-focus.test.ts \
 		pi/.pi/agent/tests/pi-notify-poster.test.ts
+
+pi-prompt-test:
+	@node --test \
+		pi/.pi/agent/tests/prompt-policy.test.ts \
+		pi/.pi/agent/tests/tool-loader.test.ts
 
 pi-ui-test:
 	@node --test \

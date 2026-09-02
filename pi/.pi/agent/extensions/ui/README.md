@@ -24,7 +24,7 @@ Deux emplacements existent, portés par pi et centralisés ici :
   registre est donc stocké sur `globalThis` sous un `Symbol.for(...)`, afin que
   toutes les instances isolées de module récupèrent exactement le même objet.
   Chaque extension déclare une entrée `{ id, placement, priority?, maxLines?,
-  render }` ; le rendu est agrégé, ordonné globalement, tronqué (`maxLines`,
+render }` ; le rendu est agrégé, ordonné globalement, tronqué (`maxLines`,
   défaut 10) et tolérant aux erreurs.
 - `ordered-widget-stack.ts` — hôte widget process-global unique par placement
   (monté via `setOrderedAboveEditorWidget` / `setOrderedSurfaceWidget`) qui
@@ -46,12 +46,12 @@ Deux emplacements existent, portés par pi et centralisés ici :
 
 ## Priorités ci-dessus l'éditeur (`ABOVE_EDITOR_PRIORITY`)
 
-| Clé | Valeur | Occuper par |
-|---|---:|---|
-| `working` | 50 | loader de travail (mots rotatifs) |
-| `goal` | 100 | boucle /goal |
-| `backgroundTasks` | 200 | tâches async |
-| `activity` | 300 | bandeau d'activité |
+| Clé               | Valeur | Occuper par                       |
+| ----------------- | -----: | --------------------------------- |
+| `working`         |     50 | loader de travail (mots rotatifs) |
+| `goal`            |    100 | boucle /goal                      |
+| `backgroundTasks` |    200 | tâches async                      |
+| `activity`        |    300 | bandeau d'activité                |
 
 ## Footer
 

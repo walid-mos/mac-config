@@ -7,7 +7,7 @@
  */
 
 import {
-	backgroundHex,
+	backgroundColorSequence,
 	foregroundHex as fgHex,
 } from '../ui/design-system/terminal-color.ts'
 import {
@@ -24,6 +24,8 @@ import {
 } from '../ui/frame.ts'
 
 import { boldAnsi, Q_COLOR } from './questionnaire-theme.ts'
+
+const SGR_RESET = '\x1b[0m'
 
 export const Q_FRAME: FramePalette = {
 	border: Q_COLOR.BORDER,
@@ -52,13 +54,18 @@ export function frameRowFor(line: string, width: number): string {
 }
 
 /** Full-row background band for the focused row; padded with non-breaking
- * spaces so the band stays rectangular (pi trims plain trailing spaces). */
+ * spaces so the band stays rectangular (pi trims plain trailing spaces).
+ * The truncation reset would cut the band short, so it is stripped and the
+ * band closes background + foreground itself. */
 export function innerBand(line: string, width: number): string {
 	const body = truncateTerminalLine(line, width, '…')
+	const bare = body.endsWith(SGR_RESET)
+		? body.slice(0, -SGR_RESET.length)
+		: body
 	const padding = '\u00a0'.repeat(
-		Math.max(0, width - terminalLineWidth(body)),
+		Math.max(0, width - terminalLineWidth(bare)),
 	)
-	return backgroundHex(Q_COLOR.SELECTED_BG, body + padding)
+	return `${backgroundColorSequence(Q_COLOR.SELECTED_BG)}${bare}${padding}\x1b[49m\x1b[39m`
 }
 
 /** Rounded block: labelled top edge, content rows, labelled bottom edge. */

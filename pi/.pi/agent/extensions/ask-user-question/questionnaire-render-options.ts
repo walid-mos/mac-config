@@ -117,6 +117,20 @@ function optionMarker(
 	)
 }
 
+function isSingleChecked(
+	state: QuestionnaireState,
+	question: Question,
+	option: { value: string; isOther?: boolean },
+	index: number,
+): boolean {
+	if (question.multiSelect) return false
+	const answer = state.answerFor(question.id)
+	if (!answer || answer.kind !== 'single') return false
+	if (option.isOther === true) return answer.wasCustom
+	if (answer.wasCustom) return false
+	return answer.index === index + 1 || answer.value === option.value
+}
+
 function renderOptionRow(
 	state: QuestionnaireState,
 	question: Question,
@@ -135,7 +149,9 @@ function renderOptionRow(
 ): void {
 	const isCursor = index === state.cursor
 	const isOther = option.isOther === true
-	const isChecked = state.isChecked(question, index, isOther)
+	const isChecked = question.multiSelect
+		? state.isChecked(question, index, isOther)
+		: isSingleChecked(state, question, option, index)
 	const marker = optionMarker(theme, question.multiSelect, isChecked)
 	const number = theme.fg('dim', `${index + 1}.`)
 	const rowPrefix = `${marker} ${number} `
@@ -190,17 +206,15 @@ function renderOtherRow(
 	const editorLines = editorBody(editor, width - visibleWidth(rowPrefix))
 	if (editor.getText().length === 0) {
 		sink(
-			innerBand(
-				`${rowPrefix}${theme.fg('dim', UI_TEXT.otherPlaceholder)}`,
-				width,
-			),
+			`${rowPrefix}${theme.fg('dim', UI_TEXT.otherPlaceholder)}`,
 		)
 		return
 	}
+	// No band while typing: multiline custom answers would carry a broken
+	// band on the first line only; the editor cursor marks focus instead.
 	const continuation = ' '.repeat(visibleWidth(rowPrefix))
 	for (let index = 0; index < editorLines.length; index++) {
-		const line = `${index === 0 ? rowPrefix : continuation}${editorLines[index] ?? ''}`
-		sink(index === 0 ? innerBand(line, width) : line)
+		sink(`${index === 0 ? rowPrefix : continuation}${editorLines[index] ?? ''}`)
 	}
 }
 

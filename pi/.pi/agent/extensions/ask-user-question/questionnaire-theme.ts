@@ -8,6 +8,7 @@
  * which leaves the render modules theme-agnostic.
  */
 
+import { blendHex } from '../ui/design-system/terminal-color.ts'
 import { PI_PALETTE } from '../ui/design-system/palette.ts'
 import {
 	backgroundHex,
@@ -26,7 +27,9 @@ export const Q_COLOR = {
 	SUCCESS: PI_PALETTE.green,
 	WARNING: PI_PALETTE.peach,
 	DANGER: PI_PALETTE.red,
-	SELECTED_BG: PI_PALETTE.surface0,
+	// Soft lilac: the cursor band reads as a tint of the accent rather than
+	// an opaque gray slab.
+	SELECTED_BG: blendHex(PI_PALETTE.mauve, PI_PALETTE.base, 0.85),
 } as const
 
 /** Shared glyph vocabulary: markers, badges, status icons. */

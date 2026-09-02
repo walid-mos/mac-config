@@ -113,46 +113,12 @@ function sectionHead(
 	)
 }
 
-function optionRows(
-	question: QuestionView,
-	width: number,
-	sink: (line: string) => void,
-): void {
-	question.options.forEach((option, index) => {
-		const badge = option.recommended
-			? success(` ${GLYPH.star} recommended`)
-			: ''
-		pushWrapped(
-			sink,
-			'   ',
-			`${marker(question.multiSelect, false)} ${dim(`${index + 1}.`)} ${body(option.label)}${badge}`,
-			width,
-		)
-		if (option.description) {
-			pushWrapped(
-				sink,
-				`   ${dim(GLYPH.desc)} `,
-				dim(option.description),
-				width,
-			)
-		}
-	})
-	if (question.allowOther && question.options.length > 0) {
-		pushWrapped(
-			sink,
-			'   ',
-			`${marker(question.multiSelect, false)} ${dim(`${question.options.length + 1}.`)} ${dim('Type something…')}`,
-			width,
-		)
-	}
-}
-
-/** Framed preview of the pending questions, from raw unvalidated call args. */
+/** Compact pending preview: one line of question labels — the option
+ * details live in the interactive dialog, not in the transcript. */
 export function renderCallLines(args: unknown, width: number): string[] {
 	const questions = coerceQuestions(
 		(args as { questions?: unknown } | null | undefined)?.questions,
 	)
-	const sink = (line: string) => inner.push(line)
 	const inner: string[] = []
 	if (questions.length === 0) {
 		inner.push(dim('waiting for questions…'))
@@ -163,17 +129,12 @@ export function renderCallLines(args: unknown, width: number): string[] {
 			dim('awaiting answer'),
 		)
 	}
-	inner.push('')
-	questions.forEach((question, index) => {
-		if (index > 0) inner.push('')
-		sectionHead(question, innerWidth(width), sink)
-		if (question.options.length === 0) {
-			inner.push(`   ${dim(`${GLYPH.pen} free-form answer`)}`)
-			return
-		}
-		optionRows(question, innerWidth(width), sink)
-	})
-	inner.push('')
+	pushWrapped(
+		line => inner.push(line),
+		' ',
+		body(questions.map(question => question.label).join('  ·  ')),
+		innerWidth(width),
+	)
 	return framedBlock(
 		width,
 		blockTitle(

@@ -171,7 +171,12 @@ export default function askUserQuestion(pi: ExtensionAPI) {
 
 		renderResult(result, _options, _theme, context) {
 			const state = context.state as { answered?: boolean }
-			state.answered = true
+			if (!state.answered) {
+				state.answered = true
+				// Collapse the pending preview on the next display pass; the
+				// replay frame below is the single block for this call.
+				context.invalidate()
+			}
 			const details = isAskResult(result.details)
 				? result.details
 				: undefined

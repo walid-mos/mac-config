@@ -78,18 +78,18 @@ const questions: Question[] = [
 	},
 ]
 
-test('call preview frames questions with unchecked markers and badges', () => {
+test('call preview stays compact: labels only, no option noise', () => {
 	const lines = renderCallLines(rawArgs, 100)
 	const plain = lines.map(stripAnsi).join('\n')
 
 	assertWithinWidth(lines, 100)
 	assert.match(plain, /ask · 2 questions/)
-	assert.match(plain, /\[Scope\]/)
-	assert.match(plain, /○ 1\. Focused/)
-	assert.match(plain, /★ recommended/)
-	assert.match(plain, /↳ Only the touched files/)
-	assert.match(plain, /☐ 1\. Yes/)
-	assert.match(plain, /Type something…/)
+	assert.match(plain, /Scope · Checks|Scope {2}· {2}Checks/)
+	assert.match(plain, /awaiting answer/)
+	assert.doesNotMatch(plain, /Focused/)
+	assert.doesNotMatch(plain, /★ recommended/)
+	assert.doesNotMatch(plain, /Whole repo/)
+	assert.doesNotMatch(plain, /↳/)
 })
 
 test('call preview survives malformed or streamed args', () => {

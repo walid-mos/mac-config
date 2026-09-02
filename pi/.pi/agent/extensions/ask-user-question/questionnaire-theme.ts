@@ -41,7 +41,7 @@ export const GLYPH = {
 	desc: '↳',
 	star: '★',
 	pen: '✎',
-	done: '✓',
+	done: '✔',
 	cancel: '✗',
 	chat: '⌨',
 	enter: '↵',

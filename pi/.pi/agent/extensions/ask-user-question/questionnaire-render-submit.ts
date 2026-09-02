@@ -66,7 +66,7 @@ function renderAnswerRows(
 		for (const label of answer.labels) {
 			pushWrappedWithPrefix(
 				sink,
-				`   ${theme.fg('success', GLYPH.checkOn)} `,
+				`   ${theme.fg('success', theme.bold(GLYPH.checkOn))} `,
 				theme.fg('text', label),
 				width,
 			)
@@ -75,7 +75,7 @@ function renderAnswerRows(
 	}
 	pushWrappedWithPrefix(
 		sink,
-		`   ${theme.fg('success', GLYPH.radioOn)} `,
+		`   ${theme.fg('success', theme.bold(GLYPH.radioOn))} `,
 		theme.fg('text', answer.label),
 		width,
 	)

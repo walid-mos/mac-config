@@ -175,7 +175,9 @@ export default function askUserQuestion(pi: ExtensionAPI) {
 				state.answered = true
 				// Collapse the pending preview on the next display pass; the
 				// replay frame below is the single block for this call.
-				context.invalidate()
+				// Async on purpose: a synchronous invalidate would re-enter
+				// the in-flight updateDisplay and render the replay twice.
+				queueMicrotask(() => context.invalidate())
 			}
 			const details = isAskResult(result.details)
 				? result.details

@@ -90,14 +90,16 @@ const strong = (line: string) => fgHex(Q_COLOR.TEXT, boldAnsi(line))
 const success = (line: string) => fgHex(Q_COLOR.SUCCESS, line)
 
 function marker(multiSelect: boolean, checked: boolean): string {
-	const glyph = multiSelect
-		? checked
-			? GLYPH.checkOn
-			: GLYPH.checkOff
-		: checked
-			? GLYPH.radioOn
-			: GLYPH.radioOff
-	return checked ? success(glyph) : dim(glyph)
+	// Same visibility rules as the interactive widget: bold + success when
+	// checked, muted unchecked boxes.
+	if (multiSelect) {
+		return checked
+			? success(boldAnsi(GLYPH.checkOn))
+			: fgHex(Q_COLOR.MUTED, GLYPH.checkOff)
+	}
+	return checked
+		? success(boldAnsi(GLYPH.radioOn))
+		: dim(GLYPH.radioOff)
 }
 
 function sectionHead(

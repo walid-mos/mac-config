@@ -27,7 +27,7 @@ export function renderTabBar(
 		const answered = state.answerFor(question.id) !== undefined
 		const active = index === state.tab
 		const status = answered
-			? theme.fg('success', GLYPH.done)
+			? theme.fg('success', theme.bold(GLYPH.done))
 			: theme.fg('dim', GLYPH.radioOff)
 		const label = ` ${status} ${question.label} `
 		if (active) {
@@ -105,15 +105,17 @@ function optionMarker(
 	multiSelect: boolean,
 	checked: boolean,
 ): string {
+	// Checked markers carry the selection: bold + success so the glyph reads
+	// at small terminal font sizes; unchecked boxes stay muted (dim radios
+	// read fine, thin unchecked boxes do not).
 	if (multiSelect) {
-		return theme.fg(
-			checked ? 'success' : 'dim',
-			checked ? GLYPH.checkOn : GLYPH.checkOff,
-		)
+		return checked
+			? theme.fg('success', theme.bold(GLYPH.checkOn))
+			: theme.fg('muted', GLYPH.checkOff)
 	}
 	return theme.fg(
 		checked ? 'success' : 'dim',
-		checked ? GLYPH.radioOn : GLYPH.radioOff,
+		checked ? theme.bold(GLYPH.radioOn) : GLYPH.radioOff,
 	)
 }
 
@@ -205,8 +207,13 @@ function renderOtherRow(
 	}
 	const editorLines = editorBody(editor, width - visibleWidth(rowPrefix))
 	if (editor.getText().length === 0) {
+		// Focus cue before typing starts; once text exists the band drops so
+		// the multiline answer stays clean.
 		sink(
-			`${rowPrefix}${theme.fg('dim', UI_TEXT.otherPlaceholder)}`,
+			innerBand(
+				`${rowPrefix}${theme.fg('dim', UI_TEXT.otherPlaceholder)}`,
+				width,
+			),
 		)
 		return
 	}

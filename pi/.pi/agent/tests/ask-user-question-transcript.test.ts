@@ -122,7 +122,7 @@ test('result replay fills markers for the selected options only', () => {
 	const plain = lines.map(stripAnsi).join('\n')
 
 	assertWithinWidth(lines, 100)
-	assert.match(plain, /✓ ask · 1 answer/)
+	assert.match(plain, /✔ ask · 1 answer/)
 	assert.match(plain, /◉ Focused/)
 	assert.match(plain, /○ Whole repo/)
 	assert.doesNotMatch(plain, /◉ Whole repo/)

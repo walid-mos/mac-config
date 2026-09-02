@@ -14,9 +14,9 @@ import {
 	type Answer,
 	type Question,
 	UI_TEXT,
-} from './questionnaire-model'
+} from './questionnaire-model.ts'
 
-import type { QuestionnaireState } from './questionnaire-state'
+import type { QuestionnaireState } from './questionnaire-state.ts'
 import type { Editor } from '@earendil-works/pi-tui'
 
 /** Minimal color surface this renderer needs — structurally compatible with

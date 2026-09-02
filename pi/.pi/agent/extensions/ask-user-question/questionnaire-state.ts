@@ -6,7 +6,7 @@
  * caller (the component) to apply. This keeps the logic unit-testable.
  */
 
-import { UI_TEXT } from './questionnaire-model'
+import { UI_TEXT } from './questionnaire-model.ts'
 
 import type {
 	Answer,
@@ -14,7 +14,7 @@ import type {
 	QuestionnaireChatRequest,
 	QuestionnaireInitialState,
 	RenderOption,
-} from './questionnaire-model'
+} from './questionnaire-model.ts'
 
 /** Editor operations the state machine needs — implemented by the TUI editor. */
 export interface EditorPort {
@@ -39,6 +39,8 @@ export class QuestionnaireState {
 
 	private currentTab = 0
 	private optionIndex = 0
+	private readonly questions: Question[]
+	private readonly editor: EditorPort
 	private readonly answers = new Map<string, Answer>()
 	private readonly multiSelections = new Map<string, Set<number>>()
 	private readonly drafts = new Map<string, string>()
@@ -48,10 +50,12 @@ export class QuestionnaireState {
 	private skipNextDraftSave = false
 
 	constructor(
-		private readonly questions: Question[],
-		private readonly editor: EditorPort,
+		questions: Question[],
+		editor: EditorPort,
 		initialState?: QuestionnaireInitialState,
 	) {
+		this.questions = questions
+		this.editor = editor
 		this.isMulti = questions.length > 1
 		this.totalTabs = questions.length + 1 // questions + Submit
 		this.restoreInitialState(initialState)
@@ -148,7 +152,10 @@ export class QuestionnaireState {
 	}
 
 	collectedAnswers(): Answer[] {
-		return Array.from(this.answers.values())
+		return this.questions.flatMap(question => {
+			const answer = this.answers.get(question.id)
+			return answer ? [answer] : []
+		})
 	}
 
 	initialState(): QuestionnaireInitialState {
@@ -243,11 +250,9 @@ export class QuestionnaireState {
 		}
 
 		if (q.multiSelect) {
-			// Save the submitted text (not typedText(): the Editor already cleared
-			// its buffer before onSubmit fired).
-			if (text) this.drafts.set(q.id, text)
-			else this.drafts.delete(q.id)
-			const effects = this.commitMultiSelection(q)
+			// Pass the submitted text explicitly: Editor cleared its buffer before
+			// onSubmit fired, so the live editor value is no longer available.
+			const effects = this.commitMultiSelection(q, text)
 			if (effects.includes('advance')) this.skipNextDraftSave = true
 			return effects
 		}
@@ -279,6 +284,10 @@ export class QuestionnaireState {
 			return this.requestChat()
 		const opt = this.currentOptions()[index]
 		if (!opt) return NO_EFFECT
+		if (opt.isOther) {
+			this.optionIndex = index
+			return RENDER
+		}
 		this.editor.setText('')
 		this.drafts.delete(q.id)
 		this.optionIndex = index
@@ -297,7 +306,12 @@ export class QuestionnaireState {
 	 * here: it has editor focus, so Space goes to the editor as a literal space. */
 	toggleMultiOption(index: number): QuestionnaireEffect[] {
 		const q = this.currentQuestion()
-		if (!q || index >= this.currentOptions().length) return NO_EFFECT
+		const option = this.currentOptions()[index]
+		if (!q || !option) return NO_EFFECT
+		if (option.isOther) {
+			this.optionIndex = index
+			return RENDER
+		}
 		let set = this.multiSelections.get(q.id)
 		if (!set) {
 			set = new Set<number>()
@@ -308,10 +322,15 @@ export class QuestionnaireState {
 		return RENDER
 	}
 
-	/** Enter in multiSelect mode: confirm checked options plus the typed text. */
-	commitMultiSelection(q: Question): QuestionnaireEffect[] {
+	/** Enter in multiSelect mode: confirm checked options plus the live typed text. */
+	commitMultiSelection(
+		q: Question,
+		draftText = this.typedText(),
+	): QuestionnaireEffect[] {
 		const selected = this.multiSelections.get(q.id) ?? new Set<number>()
-		const draft = this.drafts.get(q.id)?.trim()
+		const draft = draftText.trim()
+		if (draft) this.drafts.set(q.id, draft)
+		else this.drafts.delete(q.id)
 		if (selected.size === 0 && !draft) return NO_EFFECT
 		const picked = [...selected].toSorted((a, b) => a - b)
 		const opts = this.currentOptions()

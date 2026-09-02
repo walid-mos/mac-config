@@ -12,19 +12,19 @@ import {
 	matchesKey,
 } from '@earendil-works/pi-tui'
 
-import { renderQuestionnaire } from './questionnaire-render'
+import { renderQuestionnaire } from './questionnaire-render.ts'
 import {
 	type EditorPort,
 	type QuestionnaireEffect,
 	QuestionnaireState,
-} from './questionnaire-state'
+} from './questionnaire-state.ts'
 
 import type {
 	AskResult,
 	Question,
 	QuestionnaireInitialState,
-} from './questionnaire-model'
-import type { QuestionnairePalette } from './questionnaire-render'
+} from './questionnaire-model.ts'
+import type { QuestionnairePalette } from './questionnaire-render.ts'
 
 /** Loosened TUI surface: the real TUI has more, we only need re-rendering. */
 interface RenderHandle {

@@ -25,15 +25,15 @@
 
 import { Text } from '@earendil-works/pi-tui'
 
-import { runQuestionnaire } from './questionnaire-component'
-import { AskParams, normalizeQuestions } from './schema'
+import { runQuestionnaire } from './questionnaire-component.ts'
+import { AskParams, normalizeQuestions } from './schema.ts'
 
 import type {
 	Answer,
 	AskResult,
 	Question,
 	QuestionnaireInitialState,
-} from './questionnaire-model'
+} from './questionnaire-model.ts'
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent'
 
 type ToolText = {

@@ -5,7 +5,7 @@
 
 import { Type, type Static } from 'typebox'
 
-import type { Question } from './questionnaire-model'
+import type { Question } from './questionnaire-model.ts'
 
 const QuestionOptionSchema = Type.Object({
 	value: Type.Optional(

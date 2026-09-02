@@ -6,10 +6,13 @@
  */
 
 import {
+	type Component,
 	Editor,
 	type EditorTheme,
+	type Focusable,
 	Key,
 	matchesKey,
+	type TUI,
 } from '@earendil-works/pi-tui'
 
 import { renderQuestionnaire } from './questionnaire-render.ts'
@@ -26,14 +29,7 @@ import type {
 } from './questionnaire-model.ts'
 import type { QuestionnairePalette } from './questionnaire-render.ts'
 
-/** Loosened TUI surface: the real TUI has more, we only need re-rendering. */
-interface RenderHandle {
-	requestRender(): void
-}
-
-interface CustomComponent {
-	render(width: number): string[]
-	invalidate(): void
+interface CustomComponent extends Component, Focusable {
 	handleInput(data: string): void
 }
 
@@ -42,7 +38,7 @@ interface SelectionKeybindings {
 }
 
 type CustomFactory<T> = (
-	tui: RenderHandle,
+	tui: TUI,
 	theme: QuestionnairePalette,
 	keybindings: SelectionKeybindings,
 	done: (result: T) => void,
@@ -100,7 +96,7 @@ export function runQuestionnaire(
 				noMatch: t => theme.fg('warning', t),
 			},
 		}
-		const editor = new Editor(tui as never, editorTheme, { paddingX: 0 })
+		const editor = new Editor(tui, editorTheme, { paddingX: 0 })
 		const editorPort: EditorPort = {
 			getText: () => editor.getText(),
 			setText: text => editor.setText(text),
@@ -335,6 +331,12 @@ export function runQuestionnaire(
 		}
 
 		return {
+			get focused(): boolean {
+				return editor.focused
+			},
+			set focused(value: boolean) {
+				editor.focused = value
+			},
 			render(width: number): string[] {
 				if (!cachedLines || cachedWidth !== width) {
 					cachedLines = renderQuestionnaire(
@@ -349,6 +351,7 @@ export function runQuestionnaire(
 				return cachedLines
 			},
 			invalidate: () => {
+				editor.invalidate()
 				cachedLines = undefined
 				cachedWidth = undefined
 			},

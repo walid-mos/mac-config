@@ -140,7 +140,7 @@ function renderContent(
 		)
 		sink('')
 		if (state.isOpenEnded(q))
-			renderOpenEndedEditor(state, editor, theme, width, sink)
+			renderOpenEndedEditor(editor, theme, width, sink)
 		else renderOptions(state, q, editor, theme, width, sink)
 		renderChatAction(state, theme, width, sink)
 		return
@@ -296,7 +296,6 @@ function renderOtherRow(
 }
 
 function renderOpenEndedEditor(
-	state: QuestionnaireState,
 	editor: Editor,
 	theme: QuestionnairePalette,
 	width: number,
@@ -304,17 +303,21 @@ function renderOpenEndedEditor(
 ): void {
 	sink('')
 	pushWrappedWithPrefix(sink, ' ', theme.fg('accent', 'Your answer:'), width)
+	const prefix = theme.fg('accent', '> ')
+	const contentWidth = Math.max(1, width - visibleWidth(prefix))
+	const editorLines = editor
+		.render(contentWidth)
+		.slice(1, -1)
+		.map(line => line.replace(/ +$/, ''))
 	if (editor.getText().length === 0) {
-		pushWrappedWithPrefix(
-			sink,
-			theme.fg('accent', '> '),
-			theme.fg('dim', UI_TEXT.otherPlaceholder),
-			width,
+		sink(
+			`${prefix}${theme.fg('dim', UI_TEXT.otherPlaceholder)}${editorLines[0] ?? ''}`,
 		)
 		return
 	}
-	for (const line of editor.render(Math.max(1, width - 2))) {
-		sink(` ${line}`)
+	const continuation = ' '.repeat(visibleWidth(prefix))
+	for (let index = 0; index < editorLines.length; index++) {
+		sink(`${index === 0 ? prefix : continuation}${editorLines[index]}`)
 	}
 }
 

@@ -18,6 +18,7 @@ import {
 	type SelectionKeybindings,
 } from './questionnaire-input.ts'
 import { renderQuestionnaire } from './questionnaire-render.ts'
+import { createQuestionnairePalette } from './questionnaire-theme.ts'
 import {
 	type EditorPort,
 	type QuestionnaireEffect,
@@ -47,7 +48,10 @@ export function runQuestionnaire(
 	questions: Question[],
 	initialState?: QuestionnaireInitialState,
 ): Promise<AskResult> {
-	return custom<AskResult>((tui, theme, keybindings, done) => {
+	return custom<AskResult>((tui, _theme, keybindings, done) => {
+		// House tokens only: the interactive dialog matches the transcript
+		// frames, regardless of the runtime theme.
+		const theme = createQuestionnairePalette()
 		const editorTheme: EditorTheme = {
 			borderColor: s => theme.fg('accent', s),
 			selectList: {

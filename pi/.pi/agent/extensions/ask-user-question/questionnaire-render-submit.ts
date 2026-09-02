@@ -1,64 +1,84 @@
+import { GLYPH } from './questionnaire-theme.ts'
 import { pushWrappedWithPrefix } from './questionnaire-render-primitives.ts'
 
-import type { Answer, Question } from './questionnaire-model.ts'
+import type { Answer } from './questionnaire-model.ts'
 import type {
 	LineSink,
 	QuestionnairePalette,
 } from './questionnaire-render-primitives.ts'
 import type { QuestionnaireState } from './questionnaire-state.ts'
 
-export function renderSubmitScreen(
+export function renderSubmitBody(
 	state: QuestionnaireState,
 	questions: Question[],
 	theme: QuestionnairePalette,
 	width: number,
 	sink: LineSink,
 ): void {
-	pushWrappedWithPrefix(
-		sink,
-		' ',
-		theme.fg('accent', theme.bold('Ready to submit')),
-		width,
-	)
 	sink('')
-	for (const question of questions) {
-		const answer = state.answerFor(question.id)
-		if (!answer) continue
+	questions.forEach((question, index) => {
+		if (index > 0) sink('')
 		pushWrappedWithPrefix(
 			sink,
 			' ',
-			answerSummaryLine(question.label, answer, theme),
+			`${theme.fg('dim', `[${question.label}]`)} ${theme.fg('text', theme.bold(question.prompt))}`,
+			width,
+		)
+		const answer = state.answerFor(question.id)
+		if (!answer) {
+			sink(
+				`   ${theme.fg('warning', `${GLYPH.radioOff} unanswered`)}`,
+			)
+			return
+		}
+		renderAnswerRows(answer, theme, width, sink)
+	})
+	if (!state.allAnswered()) {
+		sink('')
+		pushWrappedWithPrefix(
+			sink,
+			' ',
+			theme.fg(
+				'warning',
+				`${GLYPH.cancel} unanswered: ${state.unansweredLabels().join(', ')}`,
+			),
 			width,
 		)
 	}
-	sink('')
-	if (state.allAnswered()) {
+}
+
+function renderAnswerRows(
+	answer: Answer,
+	theme: QuestionnairePalette,
+	width: number,
+	sink: LineSink,
+): void {
+	if (answer.wasCustom) {
 		pushWrappedWithPrefix(
 			sink,
-			' ',
-			theme.fg('success', 'Press Enter to submit'),
+			`   ${theme.fg('success', GLYPH.pen)} `,
+			theme.fg('text', answer.label),
 			width,
 		)
 		return
 	}
+	if (answer.kind === 'multi') {
+		for (const label of answer.labels) {
+			pushWrappedWithPrefix(
+				sink,
+				`   ${theme.fg('success', GLYPH.checkOn)} `,
+				theme.fg('text', label),
+				width,
+			)
+		}
+		return
+	}
 	pushWrappedWithPrefix(
 		sink,
-		' ',
-		theme.fg(
-			'warning',
-			`Unanswered: ${state.unansweredLabels().join(', ')}`,
-		),
+		`   ${theme.fg('success', GLYPH.radioOn)} `,
+		theme.fg('text', answer.label),
 		width,
 	)
-}
-
-function answerSummaryLine(
-	questionLabel: string,
-	answer: Answer,
-	theme: QuestionnairePalette,
-): string {
-	const prefix = answer.wasCustom ? '(wrote) ' : ''
-	return `${theme.fg('muted', `${questionLabel}: `)}${theme.fg('text', prefix + answer.label)}`
 }
 
 export function helpText(state: QuestionnaireState): string {
@@ -66,26 +86,26 @@ export function helpText(state: QuestionnaireState): string {
 	const navigation = state.isMulti
 		? state.editorHasFocus()
 			? state.canNavigateTabsFromInputEdges()
-				? 'Tab/Shift+Tab or ←→ at input edges navigate'
-				: 'Tab/Shift+Tab navigate'
-			: 'Tab/←→ navigate'
+				? 'tab or ←→ at input edges'
+				: 'tab navigate'
+			: '←→ navigate'
 		: undefined
 
 	let context: string
 	if (!question || state.isOnSubmitTab()) {
-		context = 'Enter submit • Esc cancel'
+		context = 'enter submit · esc cancel'
 	} else if (state.isOpenEnded(question)) {
-		context = 'Type your answer • Enter submit • Ctrl+G chat • Esc cancel'
+		context = 'type · enter submit · ctrl+g chat · esc cancel'
 	} else if (state.editorHasFocus()) {
 		context = question.multiSelect
-			? 'Type your answer • Enter confirm all • Ctrl+G chat • ↑↓ leave the input • Esc back to options'
-			: 'Type your answer • Enter submit • Ctrl+G chat • ↑↓ leave the input • Esc back to options'
+			? 'type · enter confirm all · ctrl+g chat · esc back'
+			: 'type · enter submit · ctrl+g chat · esc back'
 	} else if (question.multiSelect) {
 		context =
-			'j/k or ↑↓ move • Space toggle • 1-9 quick toggle • Enter confirm • Ctrl+G chat • Esc cancel'
+			'↑↓ move · space toggle · 1-9 toggle · enter confirm · ctrl+g chat · esc cancel'
 	} else {
 		context =
-			'j/k or ↑↓ navigate • 1-9 quick select • Enter select/chat • Ctrl+G chat • Esc cancel'
+			'↑↓ move · 1-9 select · enter select · ctrl+g chat · esc cancel'
 	}
-	return navigation ? `${navigation} • ${context}` : context
+	return navigation ? `${navigation} · ${context}` : context
 }

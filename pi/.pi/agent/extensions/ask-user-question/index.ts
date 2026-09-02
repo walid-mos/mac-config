@@ -1,9 +1,10 @@
 /**
- * Ask User Question Tool - Claude Code style AskUserQuestion, enhanced
+ * Ask User Question Tool - OMP-style AskUserQuestion
  *
  * Features:
- * - Single or multiple questions (tab bar navigation like CC headers)
- * - Options with descriptions + optional "(recommended)" badge
+ * - Single or multiple questions (chip tab bar navigation)
+ * - Options with descriptions + optional "★ recommended" badge
+ * - Radio ◉/○ markers for single-select, ☑/☐ checkboxes for multi-select
  * - Number keys 1-9 for instant selection
  * - multiSelect per question (Space to toggle, Enter to confirm)
  * - Claude Code style inline input: landing on "Type something." replaces the row
@@ -16,6 +17,12 @@
  * - Cursor pre-positioned on the recommended option
  * - Free-text drafts preserved when navigating between tabs
  * - Review/submit screen for multi-question flows
+ *
+ * Visual language: every surface — the interactive dialog, the pending call
+ * preview and the verbose answer replay — renders as a rounded Catppuccin
+ * block built on the shared design-system frame primitives, like json-view
+ * and mutation-view. The pending preview collapses once answers arrive, so
+ * the transcript shows exactly one block per tool call, OMP-style.
  *
  * Structure: schema/normalization at the boundary, focused navigation and
  * response state, pure render modules, input routing, and thin TUI wiring.
@@ -31,33 +38,43 @@ import {
 	formatAnswerLines,
 	questionnaireKey,
 } from './questionnaire-output.ts'
+import { renderCallLines, renderResultLines } from './questionnaire-transcript.ts'
 import { AskParams } from './schema.ts'
 
 import type {
 	AskResult,
 	QuestionnaireInitialState,
 } from './questionnaire-model.ts'
+import type { Component } from '@earendil-works/pi-tui'
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent'
 
-/** Narrow surface actually read from the raw call args (renderCall runs on
- * unvalidated input — verify, don't force). */
-type CallArgs = { questions?: { id: string; label?: string }[] }
+/** Width-aware component: builds its ANSI lines at the actual viewport
+ * width, unlike Text which is constructed from a fixed string. */
+class FrameComponent implements Component {
+	private build: (width: number) => string[]
 
-function isCallArgs(args: unknown): args is CallArgs {
-	if (typeof args !== 'object' || args === null) return false
-	if (!('questions' in args)) return true
-	const { questions } = args
-	if (questions === undefined) return true
-	return (
-		Array.isArray(questions) &&
-		questions.every(
-			(q: unknown) =>
-				typeof q === 'object' &&
-				q !== null &&
-				'id' in q &&
-				typeof (q as { id: unknown }).id === 'string',
-		)
-	)
+	constructor(build: (width: number) => string[]) {
+		this.build = build
+	}
+
+	setBuilder(build: (width: number) => string[]): void {
+		this.build = build
+	}
+
+	render(width: number): string[] {
+		return this.build(Math.max(1, Math.floor(width)))
+	}
+}
+
+function reusableFrame(
+	build: (width: number) => string[],
+	previous: unknown,
+): Component {
+	if (previous instanceof FrameComponent) {
+		previous.setBuilder(build)
+		return previous
+	}
+	return new FrameComponent(build)
 }
 
 function reusableText(content: string, previous: unknown): Text {
@@ -68,17 +85,12 @@ function reusableText(content: string, previous: unknown): Text {
 
 function isAskResult(details: unknown): details is AskResult {
 	if (typeof details !== 'object' || details === null) return false
-	if (
-		!('cancelled' in details) ||
-		typeof (details as { cancelled: unknown }).cancelled !== 'boolean'
+	const record = details as Record<string, unknown>
+	return (
+		typeof record.cancelled === 'boolean' &&
+		Array.isArray(record.answers) &&
+		Array.isArray(record.questions)
 	)
-		return false
-	if (
-		!('answers' in details) ||
-		!Array.isArray((details as { answers: unknown }).answers)
-	)
-		return false
-	return true
 }
 
 export default function askUserQuestion(pi: ExtensionAPI) {
@@ -92,6 +104,8 @@ export default function askUserQuestion(pi: ExtensionAPI) {
 			'Ask the user one or more questions with selectable options. ALWAYS prefer this tool over asking questions in plain text when the choices are discrete: clarifying requirements, choosing between approaches, confirming decisions, or getting preferences. The user can pick options (number keys), select multiple when multiSelect is true, or type a custom answer. Mark the best option with recommended: true when you have a preference. Omit options entirely for open-ended questions where you want a free-form answer.',
 		parameters: AskParams,
 		executionMode: 'sequential',
+		// The tool draws its own framed block; no default shell card.
+		renderShell: 'self',
 
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
 			if (ctx.mode !== 'tui') {
@@ -141,21 +155,23 @@ export default function askUserQuestion(pi: ExtensionAPI) {
 			}
 		},
 
-		renderCall(args, theme, context) {
-			const qs = isCallArgs(args) ? (args.questions ?? []) : []
-			const labels = qs.map(q => q.label ?? q.id).join(', ')
-			let text = theme.fg('toolTitle', theme.bold('ask_user_question '))
-			text += theme.fg(
-				'muted',
-				`${qs.length} question${qs.length !== 1 ? 's' : ''}`,
-			)
-			if (labels) {
-				text += theme.fg('dim', ` (${labels})`)
+		renderCall(args, _theme, context) {
+			// Shared per-tool-row state written by renderResult below: once
+			// answers exist, the preview collapses and the replay frame alone
+			// represents the call.
+			const state = context.state as { answered?: boolean }
+			if (state.answered) {
+				return reusableFrame(() => [], context.lastComponent)
 			}
-			return reusableText(text, context.lastComponent)
+			return reusableFrame(
+				width => renderCallLines(args, width),
+				context.lastComponent,
+			)
 		},
 
-		renderResult(result, _options, theme, context) {
+		renderResult(result, _options, _theme, context) {
+			const state = context.state as { answered?: boolean }
+			state.answered = true
 			const details = isAskResult(result.details)
 				? result.details
 				: undefined
@@ -166,31 +182,10 @@ export default function askUserQuestion(pi: ExtensionAPI) {
 					context.lastComponent,
 				)
 			}
-			if (details.cancelled) {
-				return reusableText(
-					theme.fg('warning', 'Cancelled'),
-					context.lastComponent,
-				)
-			}
-			if (details.chat) {
-				return reusableText(
-					theme.fg('muted', 'Chat paused'),
-					context.lastComponent,
-				)
-			}
-			const lines = details.answers.map(a => {
-				if (a.wasCustom) {
-					return `${theme.fg('success', '✓ ')}${theme.fg('accent', a.id)}: ${theme.fg('muted', '(wrote) ')}${a.label}`
-				}
-				const display =
-					a.kind === 'multi' && a.labels.length > 1
-						? a.labels.join(', ')
-						: a.kind === 'single' && a.index !== undefined
-							? `${a.index}. ${a.label}`
-							: a.label
-				return `${theme.fg('success', '✓ ')}${theme.fg('accent', a.id)}: ${display}`
-			})
-			return reusableText(lines.join('\n'), context.lastComponent)
+			return reusableFrame(
+				width => renderResultLines(details, width),
+				context.lastComponent,
+			)
 		},
 	})
 }

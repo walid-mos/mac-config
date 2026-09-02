@@ -17,6 +17,117 @@ export function terminalLineWidth(line: string): number {
 	)
 }
 
+interface WrapWord {
+	text: string
+	width: number
+	hasAnsi: boolean
+	isSpace: boolean
+	isBreak: boolean
+}
+
+/** ANSI-aware word wrap; each visual line is ≤ `width` visible columns.
+ * Words carrying ANSI never split (they keep their sequences intact), so a
+ * styled word alone wider than the budget is emitted overflowing — clip it
+ * downstream with `truncateTerminalLine`. Plain overlong words hard-break. */
+export function wrapTerminalLine(text: string, width: number): string[] {
+	const max = Number.isFinite(width) ? Math.max(1, Math.floor(width)) : 1
+	const words = collectWrapWords(text)
+	const lines: string[] = []
+	let line = ''
+	let lineWidth = 0
+	let hasAnsi = false
+	let pendingSpace = ''
+
+	const breakLine = () => {
+		lines.push(hasAnsi ? `${line}${SGR_RESET}` : line)
+		line = ''
+		lineWidth = 0
+		hasAnsi = false
+		pendingSpace = ''
+	}
+
+	for (const word of words) {
+		if (word.isBreak) {
+			if (line || hasAnsi) breakLine()
+			else lines.push('')
+			continue
+		}
+		if (word.isSpace) {
+			if (line) pendingSpace = ' '
+			continue
+		}
+		if (lineWidth + pendingSpace.length + word.width <= max) {
+			line += pendingSpace + word.text
+			lineWidth += pendingSpace.length + word.width
+			pendingSpace = ''
+			hasAnsi = hasAnsi || word.hasAnsi
+			continue
+		}
+		if (lineWidth > 0) breakLine()
+		if (word.width <= max || word.hasAnsi) {
+			line = word.text
+			lineWidth = word.width
+			hasAnsi = word.hasAnsi
+			continue
+		}
+		let chunk = ''
+		let chunkWidth = 0
+		for (const char of word.text) {
+			const charWidth = terminalCharWidth(char)
+			if (chunkWidth + charWidth > max) {
+				lines.push(chunk)
+				chunk = char
+				chunkWidth = charWidth
+				continue
+			}
+			chunk += char
+			chunkWidth += charWidth
+		}
+		line = chunk
+		lineWidth = chunkWidth
+	}
+	if (line || hasAnsi || lines.length === 0) breakLine()
+	return lines
+}
+
+function collectWrapWords(text: string): WrapWord[] {
+	const words: WrapWord[] = []
+	let word: WrapWord | undefined
+
+	const flush = () => {
+		if (word) words.push(word)
+		word = undefined
+	}
+
+	for (const token of tokenize(text)) {
+		if (isAnsiSequence(token)) {
+			word = word ?? emptyWrapWord()
+			word.text += token
+			word.hasAnsi = true
+			continue
+		}
+		if (token === ' ' || token === '\t') {
+			flush()
+			words.push({ text: ' ', width: 1, hasAnsi: false, isSpace: true, isBreak: false })
+			continue
+		}
+		if (token === '\n') {
+			flush()
+			words.push({ text: '\n', width: 0, hasAnsi: false, isSpace: false, isBreak: true })
+			continue
+		}
+		word = word ?? emptyWrapWord()
+		word.text += token
+		word.width += terminalCharWidth(token)
+	}
+	flush()
+	return words
+}
+
+function emptyWrapWord(): WrapWord {
+	return { text: '', width: 0, hasAnsi: false, isSpace: false, isBreak: false }
+}
+
 /** ANSI-safe truncation that never leaves an OSC 8 hyperlink open. */
 export function truncateTerminalLine(
 	line: string,

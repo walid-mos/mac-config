@@ -1,5 +1,7 @@
 import { visibleWidth } from '@earendil-works/pi-tui'
 
+import { innerBand } from './questionnaire-frame.ts'
+import { GLYPH } from './questionnaire-theme.ts'
 import {
 	ANSWER_PREVIEW_MAX_LENGTH,
 	type Question,
@@ -14,7 +16,66 @@ import type {
 import type { QuestionnaireState } from './questionnaire-state.ts'
 import type { Editor } from '@earendil-works/pi-tui'
 
-export function renderOptions(
+export function renderTabBar(
+	state: QuestionnaireState,
+	questions: Question[],
+	theme: QuestionnairePalette,
+	width: number,
+	sink: LineSink,
+): void {
+	const chips = questions.map((question, index) => {
+		const answered = state.answerFor(question.id) !== undefined
+		const active = index === state.tab
+		const status = answered
+			? theme.fg('success', GLYPH.done)
+			: theme.fg('dim', GLYPH.radioOff)
+		const label = ` ${status} ${question.label} `
+		if (active) {
+			return theme.bg('selectedBg', theme.fg('text', theme.bold(label)))
+		}
+		return theme.fg(answered ? 'muted' : 'dim', label)
+	})
+	const canSubmit = state.allAnswered()
+	const submitActive = state.isOnSubmitTab()
+	const submitLabel = ` ${theme.fg(canSubmit ? 'success' : 'dim', GLYPH.done)} submit `
+	const submitChip = submitActive
+		? theme.bg('selectedBg', theme.fg('text', theme.bold(submitLabel)))
+		: theme.fg(canSubmit ? 'muted' : 'dim', submitLabel)
+	pushWrappedWithPrefix(
+		sink,
+		' ',
+		[...chips, submitChip].join(theme.fg('dim', ' ')),
+		width,
+	)
+}
+
+export function renderQuestionBody(
+	state: QuestionnaireState,
+	editor: Editor,
+	theme: QuestionnairePalette,
+	width: number,
+	sink: LineSink,
+): void {
+	const question = state.currentQuestion()
+	if (!question) return
+	sink('')
+	pushWrappedWithPrefix(
+		sink,
+		' ',
+		theme.fg('text', theme.bold(question.prompt)) +
+			(question.multiSelect ? theme.fg('dim', '  ·  pick many') : ''),
+		width,
+	)
+	sink('')
+	if (state.isOpenEnded(question)) {
+		renderOpenEndedEditor(editor, theme, width, sink)
+	} else {
+		renderOptions(state, question, editor, theme, width, sink)
+	}
+	renderChatAction(state, theme, width, sink)
+}
+
+function renderOptions(
 	state: QuestionnaireState,
 	question: Question,
 	editor: Editor,
@@ -39,6 +100,23 @@ export function renderOptions(
 	}
 }
 
+function optionMarker(
+	theme: QuestionnairePalette,
+	multiSelect: boolean,
+	checked: boolean,
+): string {
+	if (multiSelect) {
+		return theme.fg(
+			checked ? 'success' : 'dim',
+			checked ? GLYPH.checkOn : GLYPH.checkOff,
+		)
+	}
+	return theme.fg(
+		checked ? 'success' : 'dim',
+		checked ? GLYPH.radioOn : GLYPH.radioOff,
+	)
+}
+
 function renderOptionRow(
 	state: QuestionnaireState,
 	question: Question,
@@ -58,39 +136,29 @@ function renderOptionRow(
 	const isCursor = index === state.cursor
 	const isOther = option.isOther === true
 	const isChecked = state.isChecked(question, index, isOther)
-	const prefix = isCursor ? theme.fg('accent', '> ') : '  '
-	const checkbox = question.multiSelect ? (isChecked ? '[x] ' : '[ ] ') : ''
-	const rowLabel = `${index + 1}. ${checkbox}`
-	const color = isCursor ? 'accent' : 'text'
+	const marker = optionMarker(theme, question.multiSelect, isChecked)
+	const number = theme.fg('dim', `${index + 1}.`)
+	const rowPrefix = `${marker} ${number} `
 
 	if (isOther) {
-		renderOtherRow(
-			state,
-			editor,
-			prefix,
-			rowLabel,
-			color,
-			theme,
-			width,
-			sink,
-		)
-	} else {
-		const badge = option.recommended
-			? theme.fg('success', ' (recommended)')
-			: ''
-		pushWrappedWithPrefix(
-			sink,
-			prefix,
-			theme.fg(color, rowLabel + option.label) + badge,
-			width,
-		)
+		renderOtherRow(state, editor, rowPrefix, isCursor, theme, width, sink)
+		return
 	}
-	if (!isOther && option.description) {
-		const descriptionIndent = question.multiSelect ? '         ' : '     '
+
+	const label = theme.fg(
+		'text',
+		isCursor ? theme.bold(option.label) : option.label,
+	)
+	const badge = option.recommended
+		? theme.fg('success', ` ${GLYPH.star} recommended`)
+		: ''
+	const row = `${rowPrefix}${label}${badge}`
+	sink(isCursor ? innerBand(row, width) : row)
+	if (option.description) {
 		pushWrappedWithPrefix(
 			sink,
-			descriptionIndent,
-			theme.fg('muted', option.description),
+			`   ${theme.fg('dim', GLYPH.desc)} `,
+			theme.fg('dim', option.description),
 			width,
 		)
 	}
@@ -99,38 +167,41 @@ function renderOptionRow(
 function renderOtherRow(
 	state: QuestionnaireState,
 	editor: Editor,
-	prefix: string,
-	rowLabel: string,
-	color: 'accent' | 'text',
+	rowPrefix: string,
+	isCursor: boolean,
 	theme: QuestionnairePalette,
 	width: number,
 	sink: LineSink,
 ): void {
-	if (
-		state.cursor !== state.currentOptions().length - 1 ||
-		!state.editorHasFocus()
-	) {
+	if (!state.editorHasFocus()) {
 		const preview = state.typedPreview(ANSWER_PREVIEW_MAX_LENGTH)
-		const shown = preview
+		const body = preview
 			? theme.fg('muted', preview)
-			: theme.fg(color, UI_TEXT.otherOptionLabel)
-		pushWrappedWithPrefix(
-			sink,
-			prefix,
-			theme.fg(color, rowLabel) + shown,
-			width,
-		)
+			: theme.fg(
+					isCursor ? 'text' : 'muted',
+					isCursor
+						? theme.bold(UI_TEXT.otherOptionLabel)
+						: UI_TEXT.otherOptionLabel,
+				)
+		const row = `${rowPrefix}${body}`
+		sink(isCursor ? innerBand(row, width) : row)
 		return
 	}
-	const rowPrefix = `${prefix}${theme.fg(color, rowLabel)}`
 	const editorLines = editorBody(editor, width - visibleWidth(rowPrefix))
 	if (editor.getText().length === 0) {
 		sink(
-			`${rowPrefix}${theme.fg('dim', UI_TEXT.otherPlaceholder)}${editorLines[0] ?? ''}`,
+			innerBand(
+				`${rowPrefix}${theme.fg('dim', UI_TEXT.otherPlaceholder)}`,
+				width,
+			),
 		)
 		return
 	}
-	pushEditorLines(sink, rowPrefix, editorLines)
+	const continuation = ' '.repeat(visibleWidth(rowPrefix))
+	for (let index = 0; index < editorLines.length; index++) {
+		const line = `${index === 0 ? rowPrefix : continuation}${editorLines[index] ?? ''}`
+		sink(index === 0 ? innerBand(line, width) : line)
+	}
 }
 
 export function renderOpenEndedEditor(
@@ -139,17 +210,30 @@ export function renderOpenEndedEditor(
 	width: number,
 	sink: LineSink,
 ): void {
-	sink('')
-	pushWrappedWithPrefix(sink, ' ', theme.fg('accent', 'Your answer:'), width)
-	const prefix = theme.fg('accent', '> ')
-	const editorLines = editorBody(editor, width - visibleWidth(prefix))
 	if (editor.getText().length === 0) {
-		sink(
-			`${prefix}${theme.fg('dim', UI_TEXT.otherPlaceholder)}${editorLines[0] ?? ''}`,
-		)
+		sink(theme.fg('dim', UI_TEXT.otherPlaceholder))
 		return
 	}
-	pushEditorLines(sink, prefix, editorLines)
+	for (const line of editorBody(editor, width)) sink(line)
+}
+
+function renderChatAction(
+	state: QuestionnaireState,
+	theme: QuestionnairePalette,
+	width: number,
+	sink: LineSink,
+): void {
+	sink('')
+	const isCursor = state.isChatAction()
+	const marker = theme.fg(
+		isCursor ? 'accent' : 'dim',
+		isCursor ? GLYPH.radioOn : GLYPH.radioOff,
+	)
+	const row =
+		`${marker} ` +
+		theme.fg(isCursor ? 'accent' : 'muted', 'Chat about this') +
+		theme.fg('dim', '  ·  ctrl+g')
+	sink(isCursor ? innerBand(row, width) : row)
 }
 
 function editorBody(editor: Editor, width: number): string[] {
@@ -157,34 +241,4 @@ function editorBody(editor: Editor, width: number): string[] {
 		.render(Math.max(1, width))
 		.slice(1, -1)
 		.map(line => line.replace(/ +$/, ''))
-}
-
-function pushEditorLines(
-	sink: LineSink,
-	prefix: string,
-	lines: string[],
-): void {
-	const continuation = ' '.repeat(visibleWidth(prefix))
-	for (let index = 0; index < lines.length; index++) {
-		sink(`${index === 0 ? prefix : continuation}${lines[index]}`)
-	}
-}
-
-export function renderChatAction(
-	state: QuestionnaireState,
-	theme: QuestionnairePalette,
-	width: number,
-	sink: LineSink,
-): void {
-	sink('')
-	sink(theme.fg('dim', '─'.repeat(width)))
-	const isCursor = state.isChatAction()
-	const prefix = isCursor ? theme.fg('accent', '> ') : '  '
-	const color = isCursor ? 'accent' : 'muted'
-	pushWrappedWithPrefix(
-		sink,
-		prefix,
-		theme.fg(color, 'Chat about this (Ctrl+G)'),
-		width,
-	)
 }

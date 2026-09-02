@@ -1,20 +1,19 @@
-/**
- * Typebox schema for the ask_user_question tool parameters, plus the
- * boundary mapping from the raw LLM payload to the domain Question type.
- */
+/** TypeBox schema for the ask_user_question tool parameters. */
 
-import { Type, type Static } from 'typebox'
-
-import type { Question } from './questionnaire-model.ts'
+import { Type } from 'typebox'
 
 const QuestionOptionSchema = Type.Object({
 	value: Type.Optional(
 		Type.String({
 			description:
 				'The value returned when selected (defaults to label when omitted)',
+			minLength: 1,
 		}),
 	),
-	label: Type.String({ description: 'Short display label for the option' }),
+	label: Type.String({
+		description: 'Short display label for the option',
+		minLength: 1,
+	}),
 	description: Type.Optional(
 		Type.String({ description: 'Optional explanation shown below label' }),
 	),
@@ -27,14 +26,21 @@ const QuestionOptionSchema = Type.Object({
 })
 
 const QuestionSchema = Type.Object({
-	id: Type.String({ description: 'Unique identifier for this question' }),
+	id: Type.String({
+		description: 'Unique identifier for this question',
+		minLength: 1,
+	}),
 	label: Type.Optional(
 		Type.String({
 			description:
 				"Short contextual label for tab bar, e.g. 'Scope', 'Priority' (defaults to Q1, Q2)",
+			minLength: 1,
 		}),
 	),
-	prompt: Type.String({ description: 'The full question text to display' }),
+	prompt: Type.String({
+		description: 'The full question text to display',
+		minLength: 1,
+	}),
 	options: Type.Optional(
 		Type.Array(QuestionOptionSchema, {
 			description:
@@ -58,27 +64,7 @@ export const AskParams = Type.Object({
 	questions: Type.Array(QuestionSchema, {
 		description:
 			"Questions to ask the user. Ask only what's needed: 2-3 is usually enough, 5 max.",
-		maxItems: 8,
+		minItems: 1,
+		maxItems: 5,
 	}),
 })
-
-export type AskParamsInput = Static<typeof AskParams>
-type RawQuestion = AskParamsInput['questions'][number]
-
-/** Apply defaults to the raw payload: empty option list, Q1/Q2 labels, allowOther on.
- * Options missing `value` (the LLM omits it often) fall back to their label so the
- * domain QuestionOption invariant (value: string) always holds. */
-export function normalizeQuestions(raw: RawQuestion[]): Question[] {
-	return raw.map((q, i) => ({
-		...q,
-		options: (q.options ?? []).map(option => ({
-			value: option.value ?? option.label,
-			label: option.label,
-			description: option.description,
-			recommended: option.recommended,
-		})),
-		label: q.label || `Q${i + 1}`,
-		allowOther: q.allowOther !== false,
-		multiSelect: q.multiSelect === true,
-	}))
-}

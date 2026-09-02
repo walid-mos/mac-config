@@ -26,7 +26,8 @@
 import { Text } from '@earendil-works/pi-tui'
 
 import { runQuestionnaire } from './questionnaire-component.ts'
-import { AskParams, normalizeQuestions } from './schema.ts'
+import { normalizeQuestions } from './questionnaire-normalization.ts'
+import { AskParams } from './schema.ts'
 
 import type {
 	Answer,
@@ -35,18 +36,6 @@ import type {
 	QuestionnaireInitialState,
 } from './questionnaire-model.ts'
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent'
-
-type ToolText = {
-	content: { type: 'text'; text: string }[]
-	details: AskResult
-}
-
-function errorResult(message: string): ToolText {
-	return {
-		content: [{ type: 'text', text: message }],
-		details: { questions: [], answers: [], cancelled: true },
-	}
-}
 
 function formatAnswerLine(qLabel: string, a: Answer): string {
 	if (a.wasCustom) return `${qLabel}: user wrote: ${a.label}`
@@ -131,12 +120,9 @@ export default function askUserQuestion(pi: ExtensionAPI) {
 
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
 			if (ctx.mode !== 'tui') {
-				return errorResult(
-					'Error: UI not available (running in non-interactive mode)',
+				throw new Error(
+					'ask_user_question requires interactive TUI mode',
 				)
-			}
-			if (params.questions.length === 0) {
-				return errorResult('Error: No questions provided')
 			}
 
 			const questions: Question[] = normalizeQuestions(params.questions)

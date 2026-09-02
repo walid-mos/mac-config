@@ -109,6 +109,7 @@ function isAskResult(details: unknown): details is AskResult {
 
 export default function askUserQuestion(pi: ExtensionAPI) {
 	const pendingResumeStates = new Map<string, QuestionnaireInitialState>()
+	pi.on('session_shutdown', () => pendingResumeStates.clear())
 
 	pi.registerTool({
 		name: 'ask_user_question',

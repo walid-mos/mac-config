@@ -28,10 +28,11 @@ PACKAGES := $(filter-out $(NONSTOW),$(patsubst %/,%,$(wildcard */)))
 # sessions, sa mémoire et ~/.hermes/.env (secrets) hors repo.
 NOFOLD := colima docker gh git herdr hermes homebrew languages rclone rtk
 
-# Hooks post-install chaînés par `make install` (cible <nom>-post ; rust et 
-# n'ont pas de package Stow — rustup gère ~/.rustup/~/.cargo).
-POSTS :=  dev-dirs gh herdr hermes nvim pi rtk rust
+# Hooks post-install chaînés par `make install` (cible <nom>-post). Rust
+# et Hex n'ont pas de package Stow : ils utilisent leurs installeurs officiels.
+POSTS :=  dev-dirs gh herdr hermes hex nvim pi rtk rust
 
+HEX_DMG_URL := https://pub-089d681d41754031a4aefa7017d8c2fb.r2.dev/releases/HEX-latest-arm64.dmg
 
 # Obsidian : le vault vit dans iCloud, seule la config .obsidian est stowée
 # (symlinks relatifs → portables entre machines). Les binaires (thème,
@@ -59,6 +60,7 @@ help:
 	@echo "  git-filters    Configure les clean filters git (.gitattributes) dans .git/config"
 	@echo ""
 	@echo "  proxy-reset    Retire le PAC proxy laissé par Zscaler (rétablit le relais Apple)"
+	@echo "  hex-post       Installe la réécriture Rust de Hex depuis le DMG officiel"
 	@echo "  pi-update      Met à jour Pi et tous ses packages"
 	@echo "  pi-test        Gate complète : extensions Pi, Stow et démarrage réel"
 	@echo "  pi-notify-test Tests comportementaux isolés de l'extension de notifications"
@@ -194,6 +196,43 @@ hermes-post:
 		echo "  \`hermes model\` pour le provider LLM"; \
 	else echo "hermes non installé — étape ignorée"; fi
 	@$(MAKE) hermes-gemma
+
+# La réécriture Rust n'est pas encore distribuée par Homebrew : le cask
+# kitlangton-hex pointe vers l'ancienne app Swift. Le DMG officiel est signé,
+# notarisé et utilise Sparkle pour ses mises à jour après la première installation.
+hex-post:
+	@bundle_id="$$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "/Applications/Hex.app/Contents/Info.plist" 2>/dev/null || true)"; \
+	if [[ "$$bundle_id" == "com.kitlangton.hex2" ]]; then \
+		version="$$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "/Applications/Hex.app/Contents/Info.plist")"; \
+		echo "Hex Rust déjà prêt: $$version"; \
+		exit 0; \
+	fi; \
+	[[ "$$(uname -s)" == "Darwin" && "$$(uname -m)" == "arm64" ]] \
+		|| { echo "Hex Rust requiert un Mac Apple Silicon" >&2; exit 1; }; \
+	tmpdir="$$(mktemp -d /tmp/hex-rust.XXXXXX)"; mount_point=""; \
+	cleanup() { \
+		[[ -z "$$mount_point" ]] || hdiutil detach "$$mount_point" >/dev/null 2>&1 || true; \
+		rm -rf "$$tmpdir"; \
+	}; \
+	trap cleanup EXIT; \
+	echo "→ téléchargement de Hex Rust"; \
+	curl --fail --location --silent --show-error "$(HEX_DMG_URL)" -o "$$tmpdir/Hex.dmg"; \
+	hdiutil verify "$$tmpdir/Hex.dmg" >/dev/null; \
+	hdiutil attach -nobrowse -readonly -plist "$$tmpdir/Hex.dmg" > "$$tmpdir/mount.plist"; \
+	mount_point="$$(plutil -extract system-entities json -o - "$$tmpdir/mount.plist" | python3 -c 'import json,sys; print(next(x["mount-point"] for x in json.load(sys.stdin) if "mount-point" in x))')"; \
+	app="$$mount_point/Hex.app"; \
+	[[ "$$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$$app/Contents/Info.plist")" == "com.kitlangton.hex2" ]] \
+		|| { echo "bundle Hex inattendu" >&2; exit 1; }; \
+	codesign --verify --deep --strict "$$app"; \
+	spctl --assess --type execute "$$app"; \
+	osascript -e 'tell application "Hex" to quit' >/dev/null 2>&1 || true; \
+	if command -v brew >/dev/null && brew list --cask kitlangton-hex >/dev/null 2>&1; then \
+		brew uninstall --cask kitlangton-hex; \
+	fi; \
+	rm -rf "/Applications/Hex.app"; \
+	ditto "$$app" "/Applications/Hex.app"; \
+	version="$$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "/Applications/Hex.app/Contents/Info.plist")"; \
+	echo "Hex Rust installé: $$version — lance l'app pour accorder les permissions"
 
 # Backend local Gemma 4 12B via MLX (multimodal). Hermes est un client HTTP :
 # il ne lance pas l'inférence. Un LaunchAgent supervise mlx_vlm.server et le

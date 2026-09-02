@@ -54,7 +54,6 @@ cask "visual-studio-code"
 cask "google-chrome"
 cask "obsidian"
 cask "iina"
-cask "kitlangton-hex"
 
 # Fonts (vault Obsidian)
 cask "font-ia-writer-quattro"

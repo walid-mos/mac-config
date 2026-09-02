@@ -283,15 +283,13 @@ nvim-post:
 		|| echo "ripgrep non installé — telescope live_grep échouera"
 
 # pi-dirs crée les répertoires runtime avant Stow : ~/.pi/agent reste réel car
-# sessions/ et npm/ existent. Tous les descendants versionnés sont remplacés
-# avant le restow : le package courant gagne aussi face à un fichier réel ou à un
-# lien Stow provenant d'un autre worktree. Les autres descendants (auth.json,
-# models-store.json, npm/, sessions/, external/, etc.) restent locaux hors repo.
-# Les configs qualité versionnées à la racine de ~/.pi (PI_DOT_CONFIGS) suivent
-# la même règle : un lien resté pointé vers un autre worktree est supprimé
-# avant le restow.
-PI_MANAGED := AGENTS.md archived background.json extensions keybindings.json npm-patches prompts settings.json skills tests themes
-PI_DOT_CONFIGS := .fallowrc.json .oxfmtrc.json .oxlintrc.json
+# sessions/ et npm/ existent. Les entrées versionnées sont découvertes depuis
+# le package lui-même puis remplacées avant le restow : ajouter une config suffit,
+# sans seconde liste à maintenir. Les autres descendants (auth.json, models-store.json,
+# npm/, sessions/, external/, etc.) restent locaux hors repo. Les liens orphelins
+# provenant de ce package ou de ses anciens worktrees sont également supprimés.
+PI_AGENT_MANAGED := $(sort $(notdir $(wildcard pi/.pi/agent/* pi/.pi/agent/.[!.]* pi/.pi/agent/..?*)))
+PI_ROOT_MANAGED := $(sort $(notdir $(filter-out pi/.pi/agent,$(wildcard pi/.pi/* pi/.pi/.[!.]* pi/.pi/..?*))))
 PI_OXFMT_VERSION := 0.65.0
 PI_OXLINT_VERSION := 1.80.0
 PI_FALLOW_VERSION := 3.21.0
@@ -299,16 +297,25 @@ PI_QUALITY_BASE ?= develop-pi
 
 pi: | pi-dirs
 	@$(STOW) --no-folding -D pi
-	@for path in $(PI_MANAGED); do rm -rf -- "$(HOME)/.pi/agent/$$path"; done
-	@for path in $(PI_DOT_CONFIGS); do rm -f -- "$(HOME)/.pi/$$path"; done
+	@for path in $(PI_AGENT_MANAGED); do rm -rf -- "$(HOME)/.pi/agent/$$path"; done
+	@for path in $(PI_ROOT_MANAGED); do rm -rf -- "$(HOME)/.pi/$$path"; done
+	@while IFS= read -r -d '' path; do \
+		[ -e "$$path" ] && continue; \
+		target=$$(readlink "$$path"); \
+		case "$$target" in \
+			*".stow_repository/pi/"*|*".stow_worktrees/"*"/pi/"*) \
+				echo "warning: suppression du lien Pi orphelin $$path -> $$target" >&2; \
+				rm -f -- "$$path" ;; \
+		esac; \
+	done < <(find "$(HOME)/.pi" -type l -print0)
 	@$(STOW) -R pi
-	@for path in $(PI_MANAGED); do \
+	@for path in $(PI_AGENT_MANAGED); do \
 		[ -L "$(HOME)/.pi/agent/$$path" ] || { \
 			echo "déploiement Pi incomplet: ~/.pi/agent/$$path n'est pas géré par Stow" >&2; \
 			exit 1; \
 		}; \
 	done
-	@for path in $(PI_DOT_CONFIGS); do \
+	@for path in $(PI_ROOT_MANAGED); do \
 		[ -L "$(HOME)/.pi/$$path" ] || { \
 			echo "déploiement Pi incomplet: ~/.pi/$$path n'est pas géré par Stow" >&2; \
 			exit 1; \

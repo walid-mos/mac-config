@@ -79,9 +79,26 @@ def deploy_pi(home: Path, stow: str, make: str) -> None:
     (agent / "AGENTS.md").unlink()
     (agent / "AGENTS.md").symlink_to(stale_agents)
 
+    # A newly versioned config must be reconciled automatically, without adding
+    # its name to a second Makefile inventory. The source deliberately does not
+    # exist, reproducing a link left behind by a deleted worktree.
+    deleted_package = home.parent / ".stow_worktrees" / "deleted" / "pi"
+    stale_agent_config = deleted_package / ".pi" / "agent" / "keybindings.json"
+    (agent / "keybindings.json").unlink()
+    (agent / "keybindings.json").symlink_to(stale_agent_config)
+    stale_root_config = deleted_package / ".pi" / ".oxlintrc.json"
+    (home / ".pi" / ".oxlintrc.json").unlink()
+    (home / ".pi" / ".oxlintrc.json").symlink_to(stale_root_config)
+
+    # Removed package resources cannot be repaired, but dangling Stow links must
+    # not survive in runtime directories and break later Pi discovery.
+    retired_resource = agent / "external" / "retired.md"
+    retired_resource.symlink_to(
+        deleted_package / ".pi" / "agent" / "external" / "retired.md"
+    )
+
     local_static_resources = (
         agent / "extensions" / "local-only.ts",
-        agent / "prompts" / "local-only.md",
         agent / "skills" / "local-only" / "SKILL.md",
         agent / "tests" / "local-only.test.ts",
         agent / "themes" / "local-only.json",
@@ -95,22 +112,24 @@ def deploy_pi(home: Path, stow: str, make: str) -> None:
 
 
 def require_expected_layout(home: Path) -> None:
-    agent = home / ".pi" / "agent"
+    pi_home = home / ".pi"
+    agent = pi_home / "agent"
     external_skills = agent / "external" / "skills"
-    managed_names = (
-        "AGENTS.md",
-        "archived",
-        "background.json",
-        "extensions",
-        "keybindings.json",
-        "prompts",
-        "settings.json",
-        "skills",
-        "tests",
-        "themes",
+    package_home = REPOSITORY_ROOT / "pi" / ".pi"
+    expected_links = tuple(
+        agent / source.name for source in (package_home / "agent").iterdir()
+    ) + tuple(
+        pi_home / source.name
+        for source in package_home.iterdir()
+        if source.name != "agent"
     )
-    expected_links = tuple(agent / name for name in managed_names)
-    runtime_paths = (agent, agent / "sessions", agent / "agents", agent / "npm", agent / "auth.json", external_skills)
+    runtime_paths = (
+        agent,
+        agent / "sessions",
+        agent / "npm",
+        agent / "auth.json",
+        external_skills,
+    )
     missing_links = [str(path) for path in expected_links if not path.is_symlink()]
     linked_runtime_paths = [str(path) for path in runtime_paths if path.is_symlink()]
     expected_versioned_skill = agent / "skills" / "coding" / "SKILL.md"
@@ -124,6 +143,11 @@ def require_expected_layout(home: Path) -> None:
         agent / "themes" / "local-only.json",
     )
     retained_static_resources = [str(path) for path in discarded_static_resources if path.exists()]
+    orphaned_stow_links = [
+        str(path)
+        for path in (agent / "external").iterdir()
+        if path.is_symlink() and not path.exists()
+    ]
     settings = json.loads((agent / "settings.json").read_text(encoding="utf-8"))
     preserved_runtime = {
         agent / "auth.json": '{"sentinel":"auth"}\n',
@@ -135,7 +159,18 @@ def require_expected_layout(home: Path) -> None:
         for path, expected in preserved_runtime.items()
         if not path.is_file() or path.read_text(encoding="utf-8") != expected
     ]
-    if missing_links or linked_runtime_paths or changed_runtime or retained_static_resources or not expected_versioned_skill.is_file() or not expected_review_prompt.is_file() or not expected_external_skill.is_file() or settings.get("skills") != ["~/.pi/agent/external/skills"]:
+    invalid_settings = settings.get("skills") != ["~/.pi/agent/external/skills"]
+    if (
+        missing_links
+        or linked_runtime_paths
+        or changed_runtime
+        or retained_static_resources
+        or orphaned_stow_links
+        or not expected_versioned_skill.is_file()
+        or not expected_review_prompt.is_file()
+        or not expected_external_skill.is_file()
+        or invalid_settings
+    ):
         details = []
         if missing_links:
             details.append(f"static Pi directories must be symlinks: {', '.join(missing_links)}")
@@ -145,13 +180,15 @@ def require_expected_layout(home: Path) -> None:
             details.append(f"runtime Pi contents changed during Stow: {', '.join(changed_runtime)}")
         if retained_static_resources:
             details.append(f"unversioned static resources survived Stow reset: {', '.join(retained_static_resources)}")
+        if orphaned_stow_links:
+            details.append(f"orphaned Pi Stow links survived reset: {', '.join(orphaned_stow_links)}")
         if not expected_versioned_skill.is_file():
             details.append(f"versioned coding skill missing: {expected_versioned_skill}")
         if not expected_review_prompt.is_file():
             details.append(f"versioned /review prompt missing: {expected_review_prompt}")
         if not expected_external_skill.is_file():
             details.append(f"external skill missing: {expected_external_skill}")
-        if settings.get("skills") != ["~/.pi/agent/external/skills"]:
+        if invalid_settings:
             details.append("settings.json must load ~/.pi/agent/external/skills")
         raise RuntimeError("; ".join(details))
 

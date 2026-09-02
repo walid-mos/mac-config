@@ -55,6 +55,10 @@ test('keeps above-editor widgets in priority order without remounting on updates
 			priority: ABOVE_EDITOR_PRIORITY.goal,
 			render: () => ['goal'],
 		})
+		setOrderedAboveEditorWidget(ui, 'agents', {
+			priority: ABOVE_EDITOR_PRIORITY.agents,
+			render: () => ['agents'],
+		})
 		setOrderedAboveEditorWidget(ui, 'background', {
 			priority: ABOVE_EDITOR_PRIORITY.backgroundTasks,
 			render: () => ['background'],
@@ -67,6 +71,7 @@ test('keeps above-editor widgets in priority order without remounting on updates
 		assert.equal(registrations, 1)
 		assert.deepEqual(component?.render(80), [
 			'goal',
+			'agents',
 			'background',
 			'activity',
 		])
@@ -78,10 +83,11 @@ test('keeps above-editor widgets in priority order without remounting on updates
 		assert.equal(registrations, 1)
 		assert.deepEqual(component?.render(80), [
 			'goal updated',
+			'agents',
 			'background',
 			'activity',
 		])
-		assert.equal(rendersRequested, 3)
+		assert.equal(rendersRequested, 4)
 
 		component?.dispose?.()
 		setOrderedAboveEditorWidget(ui, 'goal', {
@@ -91,12 +97,14 @@ test('keeps above-editor widgets in priority order without remounting on updates
 		assert.equal(registrations, 2)
 		assert.deepEqual(component?.render(80), [
 			'goal after remount',
+			'agents',
 			'background',
 			'activity',
 		])
 
 		setOrderedAboveEditorWidget(ui, 'goal', undefined)
 		setOrderedAboveEditorWidget(ui, 'activity', undefined)
+		setOrderedAboveEditorWidget(ui, 'agents', undefined)
 		setOrderedAboveEditorWidget(ui, 'background', undefined)
 		assert.equal(removals, 1)
 	} finally {

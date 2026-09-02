@@ -17,59 +17,27 @@
  * - Free-text drafts preserved when navigating between tabs
  * - Review/submit screen for multi-question flows
  *
- * Structure: schema.ts (tool params + normalization) / questionnaire-state.ts
- * (pure state machine) / questionnaire-render.ts (pure renderer) /
- * questionnaire-component.ts (TUI wiring). Based on the official pi
- * questionnaire.ts example.
+ * Structure: schema/normalization at the boundary, focused navigation and
+ * response state, pure render modules, input routing, and thin TUI wiring.
+ * Based on the official Pi questionnaire example.
  */
 
 import { Text } from '@earendil-works/pi-tui'
 
 import { runQuestionnaire } from './questionnaire-component.ts'
 import { normalizeQuestions } from './questionnaire-normalization.ts'
+import {
+	chatFollowUp,
+	formatAnswerLines,
+	questionnaireKey,
+} from './questionnaire-output.ts'
 import { AskParams } from './schema.ts'
 
 import type {
-	Answer,
 	AskResult,
-	Question,
 	QuestionnaireInitialState,
 } from './questionnaire-model.ts'
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent'
-
-function formatAnswerLine(qLabel: string, a: Answer): string {
-	if (a.wasCustom) return `${qLabel}: user wrote: ${a.label}`
-	if (a.kind === 'multi' && a.labels.length > 1)
-		return `${qLabel}: user selected multiple: ${a.labels.join(', ')}`
-	const prefix =
-		a.kind === 'single' && a.index !== undefined ? `${a.index}. ` : ''
-	return `${qLabel}: user selected: ${prefix}${a.label}`
-}
-
-function questionnaireKey(questions: Question[]): string {
-	return JSON.stringify(
-		questions.map(question => ({
-			id: question.id,
-			label: question.label,
-			prompt: question.prompt,
-			options: question.options.map(option => ({
-				value: option.value,
-				label: option.label,
-				description: option.description,
-				recommended: option.recommended,
-			})),
-			allowOther: question.allowOther,
-			multiSelect: question.multiSelect,
-		})),
-	)
-}
-
-function chatFollowUp(question: Question): string {
-	return [
-		`The user wants to chat about the question "${question.label}": ${question.prompt}`,
-		'Discuss it with the user. When they are ready to answer, call ask_user_question again with the same questionnaire to resume their saved responses.',
-	].join('\n')
-}
 
 /** Narrow surface actually read from the raw call args (renderCall runs on
  * unvalidated input — verify, don't force). */
@@ -90,6 +58,12 @@ function isCallArgs(args: unknown): args is CallArgs {
 				typeof (q as { id: unknown }).id === 'string',
 		)
 	)
+}
+
+function reusableText(content: string, previous: unknown): Text {
+	const component = previous instanceof Text ? previous : new Text('', 0, 0)
+	component.setText(content)
+	return component
 }
 
 function isAskResult(details: unknown): details is AskResult {
@@ -126,7 +100,7 @@ export default function askUserQuestion(pi: ExtensionAPI) {
 				)
 			}
 
-			const questions: Question[] = normalizeQuestions(params.questions)
+			const questions = normalizeQuestions(params.questions)
 			const key = questionnaireKey(questions)
 			const result = await runQuestionnaire(
 				factory => ctx.ui.custom(factory),
@@ -156,18 +130,18 @@ export default function askUserQuestion(pi: ExtensionAPI) {
 				}
 			}
 
-			const answerLines = result.answers.map(a => {
-				const qLabel = questions.find(q => q.id === a.id)?.label ?? a.id
-				return formatAnswerLine(qLabel, a)
-			})
-
 			return {
-				content: [{ type: 'text', text: answerLines.join('\n') }],
+				content: [
+					{
+						type: 'text',
+						text: formatAnswerLines(questions, result.answers),
+					},
+				],
 				details: result,
 			}
 		},
 
-		renderCall(args, theme, _context) {
+		renderCall(args, theme, context) {
 			const qs = isCallArgs(args) ? (args.questions ?? []) : []
 			const labels = qs.map(q => q.label ?? q.id).join(', ')
 			let text = theme.fg('toolTitle', theme.bold('ask_user_question '))
@@ -178,22 +152,31 @@ export default function askUserQuestion(pi: ExtensionAPI) {
 			if (labels) {
 				text += theme.fg('dim', ` (${labels})`)
 			}
-			return new Text(text, 0, 0)
+			return reusableText(text, context.lastComponent)
 		},
 
-		renderResult(result, _options, theme, _context) {
+		renderResult(result, _options, theme, context) {
 			const details = isAskResult(result.details)
 				? result.details
 				: undefined
 			if (!details) {
 				const text = result.content[0]
-				return new Text(text?.type === 'text' ? text.text : '', 0, 0)
+				return reusableText(
+					text?.type === 'text' ? text.text : '',
+					context.lastComponent,
+				)
 			}
 			if (details.cancelled) {
-				return new Text(theme.fg('warning', 'Cancelled'), 0, 0)
+				return reusableText(
+					theme.fg('warning', 'Cancelled'),
+					context.lastComponent,
+				)
 			}
 			if (details.chat) {
-				return new Text(theme.fg('muted', 'Chat paused'), 0, 0)
+				return reusableText(
+					theme.fg('muted', 'Chat paused'),
+					context.lastComponent,
+				)
 			}
 			const lines = details.answers.map(a => {
 				if (a.wasCustom) {
@@ -207,7 +190,7 @@ export default function askUserQuestion(pi: ExtensionAPI) {
 							: a.label
 				return `${theme.fg('success', '✓ ')}${theme.fg('accent', a.id)}: ${display}`
 			})
-			return new Text(lines.join('\n'), 0, 0)
+			return reusableText(lines.join('\n'), context.lastComponent)
 		},
 	})
 }

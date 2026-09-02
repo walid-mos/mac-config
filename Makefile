@@ -419,6 +419,7 @@ pi-prompt-test:
 pi-ui-test:
 	@node --test \
 		pi/.pi/agent/tests/ask-user-question-normalization.test.ts \
+		pi/.pi/agent/tests/ask-user-question-output.test.ts \
 		pi/.pi/agent/tests/ask-user-question-resume.test.ts \
 		pi/.pi/agent/tests/ask-user-question-state.test.ts \
 		pi/.pi/agent/tests/compact-tools-renderer.test.ts \

@@ -32,12 +32,15 @@ export const Q_COLOR = {
 	SELECTED_BG: blendHex(PI_PALETTE.mauve, PI_PALETTE.base, 0.85),
 } as const
 
-/** Shared glyph vocabulary: markers, badges, status icons. */
+/** Shared glyph vocabulary: markers, badges, status icons.
+ * Checkboxes are built from text-native characters ('[✓]' / '[ ]')
+ * because U+2610/U+2611 render much smaller than text in several mono
+ * fonts; box brackets always match the surrounding glyph size. */
 export const GLYPH = {
 	radioOn: '◉',
 	radioOff: '○',
-	checkOn: '☑',
-	checkOff: '☐',
+	checkOn: '[✓]',
+	checkOff: '[ ]',
 	desc: '↳',
 	star: '★',
 	pen: '✎',

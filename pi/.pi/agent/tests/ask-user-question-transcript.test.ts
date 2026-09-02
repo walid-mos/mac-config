@@ -146,8 +146,8 @@ test('result replay renders multi answers, custom text and long prompts safely',
 	const plain = lines.map(stripAnsi).join('\n')
 
 	assertWithinWidth(lines, 40)
-	assert.match(plain, /☑ Yes/)
-	assert.match(plain, /☐ No/)
+	assert.match(plain, /\[✓\] Yes/)
+	assert.match(plain, /\[ \] No/)
 	assert.match(plain, /✎ No, but keep coverage/)
 })
 

@@ -33,14 +33,14 @@ export const Q_COLOR = {
 } as const
 
 /** Shared glyph vocabulary: markers, badges, status icons.
- * Checkboxes are built from text-native characters ('[✓]' / '[ ]')
- * because U+2610/U+2611 render much smaller than text in several mono
- * fonts; box brackets always match the surrounding glyph size. */
+ * Checkbox glyphs come from the Geometric Shapes block (same family as
+ * the radios) because U+2610/U+2611 fall back to a tiny font in several
+ * monospace faces: '▣' filled square = checked, '□' hollow = unchecked. */
 export const GLYPH = {
 	radioOn: '◉',
 	radioOff: '○',
-	checkOn: '[✓]',
-	checkOff: '[ ]',
+	checkOn: '▣',
+	checkOff: '□',
 	desc: '↳',
 	star: '★',
 	pen: '✎',

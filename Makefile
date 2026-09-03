@@ -413,6 +413,7 @@ pi-notify-test:
 
 pi-prompt-test:
 	@node --test \
+		pi/.pi/agent/tests/exhaustive-review-scripts.test.ts \
 		pi/.pi/agent/tests/prompt-policy.test.ts \
 		pi/.pi/agent/tests/tool-loader.test.ts
 

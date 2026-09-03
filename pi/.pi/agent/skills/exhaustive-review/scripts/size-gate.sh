@@ -1,32 +1,91 @@
 #!/usr/bin/env bash
-# Size gate: exit 1 if any production file in the resolved scope exceeds the
-# line budget. Tests, docs and data files are exempt.
-# Usage: scripts/size-gate.sh [--budget N] <scope...>   (same resolution as inventory.sh)
+# Hard production-file size gate. Default and maximum budget: 250 lines.
+# Usage: size-gate.sh [--budget N] <scope-selectors...> (see scope.sh)
 set -euo pipefail
 . "$(dirname "$0")/scope.sh"
 
 budget=250
-if [ "${1:-}" = "--budget" ]; then
-    budget="${2:?usage: size-gate.sh [--budget N] <scope...>}"
-    shift 2
-fi
-
-fail=0
-while IFS= read -r f; do
-    [ -n "$f" ] || continue
-    case "$f" in
-        *test*|*spec*|*.md|*.csv|*JOURNAL*|*.json|*.patch) continue ;;
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --budget)
+            [ "$#" -ge 2 ] || { echo "size-gate: --budget requires a value" >&2; exit 2; }
+            budget="$2"
+            shift 2
+            ;;
+        *)
+            break
+            ;;
     esac
-    [ -f "$f" ] || continue
-    lines="$(wc -l < "$f" | tr -d ' ')"
-    if [ "$lines" -gt "$budget" ]; then
-        echo "size-gate: OVER BUDGET — $f ($lines > $budget)"
-        fail=1
-    fi
-done < <(resolve_scope "$@")
+done
 
-if [ "$fail" -eq 0 ]; then
-    echo "size-gate: OK (budget ${budget} lines)"
-else
-    exit 1
-fi
+[[ "$budget" =~ ^[1-9][0-9]*$ ]] && [ "$budget" -le 250 ] || {
+    echo "size-gate: budget must be an integer from 1 to 250" >&2
+    exit 2
+}
+parse_scope_arguments "$@"
+
+scope_file="$(mktemp "${TMPDIR:-/tmp}/pi-size-scope.XXXXXX")"
+trap 'rm -f -- "$scope_file"' EXIT
+materialize_scope "$scope_file" "${SCOPE_ARGS[@]}"
+root="$(git rev-parse --show-toplevel)"
+
+python3 - "$root" "$scope_file" "$budget" <<'PY'
+import json
+import os
+import re
+import sys
+from pathlib import Path, PurePosixPath
+
+root, scope_path, raw_budget = sys.argv[1:]
+budget = int(raw_budget)
+paths = json.loads(Path(scope_path).read_text())
+source_suffixes = {
+    ".bash", ".c", ".cc", ".cjs", ".cpp", ".cs", ".go", ".h", ".hpp",
+    ".java", ".js", ".jsx", ".kt", ".kts", ".lua", ".mjs", ".php", ".py",
+    ".rb", ".rs", ".scala", ".sh", ".swift", ".ts", ".tsx", ".zsh",
+}
+test_directories = {"test", "tests", "__tests__", "spec", "specs", "fixtures"}
+test_name = re.compile(r"(^test_|_(?:test|spec)$|\.(?:test|spec)$)")
+failed = False
+checked = 0
+
+for relative in paths:
+    file = Path(root, relative)
+    if not file.exists():
+        print(f"size-gate: SKIP deleted or absent — {relative}")
+        continue
+    if not file.is_file():
+        continue
+
+    pure = PurePosixPath(relative)
+    suffix = file.suffix.lower()
+    logical_name = pure.name.lower()
+    if suffix:
+        logical_name = logical_name[: -len(suffix)]
+    is_test = bool(test_directories.intersection(part.lower() for part in pure.parts[:-1]))
+    is_test = is_test or bool(test_name.search(logical_name))
+    if is_test:
+        continue
+
+    is_source = suffix in source_suffixes
+    if not suffix:
+        try:
+            is_source = file.read_bytes().startswith(b"#!")
+        except OSError as error:
+            raise SystemExit(f"size-gate: cannot read {relative}: {error}")
+    if not is_source:
+        continue
+
+    try:
+        lines = len(file.read_bytes().splitlines())
+    except OSError as error:
+        raise SystemExit(f"size-gate: cannot read {relative}: {error}")
+    checked += 1
+    if lines > budget:
+        print(f"size-gate: OVER BUDGET — {relative} ({lines} > {budget})")
+        failed = True
+
+if failed:
+    raise SystemExit(1)
+print(f"size-gate: OK — {checked} production files checked (hard budget {budget})")
+PY

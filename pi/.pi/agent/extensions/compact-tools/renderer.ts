@@ -78,6 +78,10 @@ function emptyComponent(): CompactComponent {
 export interface CompactRendererOptions {
 	/** Rich result body owned by the tool extension and used in both modes. */
 	resultBody?: CompactResultBodyRenderer
+	/** Subject override for tools without a registered args extractor. */
+	subject?: (args: unknown) => string
+	/** Summary override for tools without a registered result summarizer. */
+	summary?: (result: CompactToolResult) => string
 }
 
 export function createCompactRenderers(
@@ -111,7 +115,9 @@ export function createCompactRenderers(
 			state.compactRowComponent = component
 			component.view = {
 				tool,
-				subject: subjectFor(tool, args),
+				subject: rendererOptions.subject
+					? rendererOptions.subject(args)
+					: subjectFor(tool, args),
 				state,
 				theme,
 				expanded: context.expanded === true,
@@ -144,7 +150,9 @@ export function createCompactRenderers(
 			) {
 				state.endedAt = Date.now()
 			}
-			state.summary = summarizeResult(tool, normalizedResult)
+			state.summary = rendererOptions.summary
+			? rendererOptions.summary(normalizedResult)
+			: summarizeResult(tool, normalizedResult)
 			if (rendererOptions.resultBody) {
 				return rendererOptions.resultBody(
 					normalizedResult,
@@ -160,4 +168,36 @@ export function createCompactRenderers(
 				: emptyComponent()
 		},
 	}
+}
+
+/** Row content supplied by callers of the shared compact style facade. */
+export interface CompactRowContent {
+	/** Call identity shown between the tool label and the result summary. */
+	subject?: (args: unknown) => string
+	/** One-line result state appended after the subject. Empty when obvious. */
+	summary?: (result: CompactToolResult) => string
+	/** Body shown when the row is expanded (ctrl+o). Collapsed shows the row only. */
+	expanded?: CompactResultBodyRenderer
+}
+
+/**
+ * Renderers for a tool outside the registered set: a compact stacked row in
+ * both modes, with the caller's expanded body delegated on ctrl+o. This is the
+ * entrypoint every tool must use so no tool falls back to Pi's boxed default.
+ */
+export function createRowRenderers(
+	tool: string,
+	content: CompactRowContent = {},
+): CompactRenderers {
+	const expanded = content.expanded
+	return createCompactRenderers(tool, undefined, {
+		subject: content.subject,
+		summary: content.summary,
+		resultBody: expanded
+			? (result, options, theme, context) =>
+					options.expanded
+						? expanded(result, options, theme, context)
+						: emptyComponent()
+			: () => emptyComponent(),
+	})
 }

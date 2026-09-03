@@ -1,3 +1,5 @@
+import { createRowRenderers } from './compact-tools/renderer.ts'
+
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent'
 
 export const TOOL_GROUPS = {
@@ -22,10 +24,27 @@ function availableTools(pi: ExtensionAPI, group: ToolGroup): string[] {
 	return TOOL_GROUPS[group].filter(name => registered.has(name))
 }
 
+const loaderRows = createRowRenderers('load_tools', {
+	subject: args => {
+		const groups = (args as { groups?: unknown }).groups
+		return Array.isArray(groups) ? groups.join(' + ') : ''
+	},
+	summary: result => {
+		const added = (result.details as { added?: unknown[] } | undefined)
+			?.added
+		const count = Array.isArray(added) ? added.length : 0
+		return count > 0
+			? `+${count} tool${count > 1 ? 's' : ''}`
+			: 'déjà actifs'
+	},
+})
+
 export default function toolLoader(pi: ExtensionAPI): void {
 	pi.registerTool({
 		name: LOADER_TOOL_NAME,
 		label: 'Load Tools',
+		renderShell: 'self',
+		...loaderRows,
 		description:
 			'Load inactive tools by capability. Use before web research, browser UI testing, or MCP access.',
 		parameters: {

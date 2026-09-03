@@ -1,3 +1,4 @@
+import { alignIndent, ALIGN } from '../ui/align.ts'
 import { terminalLineWidth, truncateTerminalLine } from '../ui/terminal-text.ts'
 
 import type {
@@ -11,7 +12,7 @@ const STYLE = {
 	BOLD_OFF: '\x1b[22m',
 } as const
 const HEADER_CHROME_WIDTH = 6
-const ROW_CHROME_WIDTH = 2
+const ROW_CHROME_WIDTH = ALIGN.CONTENT
 const ANSI_BG_RESET = '\x1b[49m'
 
 export function titleRow(
@@ -87,7 +88,11 @@ export function footerRow(
 		: hiddenLineCount > 0
 			? `+${hiddenLineCount} lignes masquées · ctrl+o`
 			: `ctrl+o · ${nativeLabel}`
-	return truncateTerminalLine(`  ${theme.fg('muted', text)}`, width, '…')
+	return truncateTerminalLine(
+		`${alignIndent()}${theme.fg('muted', text)}`,
+		width,
+		'…',
+	)
 }
 
 function statsLabel(

@@ -1,3 +1,4 @@
+import { ALIGN } from '../ui/align.ts'
 import { terminalLineWidth } from '../ui/terminal-text.ts'
 
 import type {
@@ -6,7 +7,7 @@ import type {
 	RenderEntry,
 } from './frame-types.ts'
 
-const ROW_CHROME_WIDTH = 2
+const ROW_CHROME_WIDTH = ALIGN.CONTENT
 const NUMBER_GUTTER_CHROME_WIDTH = 5
 
 interface CodeRowState {

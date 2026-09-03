@@ -120,3 +120,11 @@ export function foregroundColorSequence(hex: string): string {
 export function foregroundHex(hex: string, text: string): string {
 	return `${foregroundColorSequence(hex)}${text}\x1b[39m`
 }
+
+export function backgroundColorSequence(hex: string): string {
+	return backgroundAnsi(hexToRgb(hex), 'truecolor')
+}
+
+export function backgroundHex(hex: string, text: string): string {
+	return `${backgroundColorSequence(hex)}${text}\x1b[49m`
+}

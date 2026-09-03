@@ -2,13 +2,15 @@
 
 ## Fraîcheur des infos
 
-- Toujours `web_search` en premier (faits, versions, APIs, prix, actualités). Jamais de mémoire.
-- Si échec : le dire, pas combler. Citer la source.
-- Pour du code : docs officielles à jour, pas la syntaxe mémorisée.
+- Pour les faits externes, versions, APIs, prix et actualités, utiliser `web_search` avant toute recherche ou affirmation ; seules une clarification de périmètre et l’inventaire obligatoire d’`exhaustive-review` peuvent le précéder.
+- Pour utiliser un outil ou une version installée, son schéma, son aide ou sa commande `spec` locale fait autorité ; utiliser le web pour les versions disponibles et les faits externes.
+- Si la recherche échoue : le dire, ne pas combler, et citer la source disponible.
+- Pour du code dépendant d’une API externe : consulter sa documentation officielle à jour, jamais une syntaxe mémorisée.
 
 ## Développement
 
-- Toujours traiter le code comme greenfield : ne jamais ajouter de rétrocompatibilité, migration, shim, fallback ou support d’un état historique, sauf demande explicite de l’utilisateur.
+- Avant toute écriture ou modification de code, charger le skill `coding`, quel que soit le skill ou workflow déjà actif.
+- Toujours traiter le code comme greenfield : ne jamais ajouter de rétrocompatibilité, migration, shim, fallback, API dépréciée, chemin legacy ou support d’un état historique, sauf demande explicite de l’utilisateur.
 
 ## Réponses
 
@@ -16,9 +18,7 @@
 
 ## Questions à l'utilisateur
 
-- TOUJOURS `ask_user_question` — jamais de question en texte libre.
-- Regrouper les questions liées en un appel. Question ouverte : pas suggérer tes réponses (mode sans options).
-- Si l'utilisateur annule (Esc) : trancher soi-même, option la plus raisonnable, et le signaler.
+- En TUI, TOUJOURS `ask_user_question` — jamais de question en texte libre. Si l’outil est indisponible ou la session non-TUI, interrompre la tâche et signaler que la clarification exige le TUI.
 
 ## Maintenance du harness
 
@@ -27,6 +27,7 @@
 
 ## Git
 
+- Ne jamais écraser ou supprimer des changements ou données non créés pour la tâche ; demander confirmation avant toute opération destructive ou irréversible.
 - Par défaut, créer une branche dédiée avant le premier commit. Si l’utilisateur demande explicitement de travailler sur la branche principale, y committer directement.
 - Par défaut, fusionner avec `git merge --no-ff` pour conserver un merge commit visible. Si l’utilisateur demande explicitement un fast-forward, utiliser `git merge --ff-only`, notamment pour une branche créée impromptument.
 - Ne pas pousser systématiquement.
@@ -40,4 +41,4 @@
 
 ## Fixtures locales
 
-- Pour couvrir un état de test, créer si nécessaire des fixtures uniquement dans les services locaux, puis les supprimer à la fin sauf demande explicite de l’utilisateur.
+- Supprimer à la fin les données de test temporaires créées dans des services locaux, sauf demande explicite de l’utilisateur. Les fixtures de test versionnées suivent la politique du skill `coding` et restent dans le dépôt lorsqu’elles verrouillent durablement un comportement.

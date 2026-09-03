@@ -7,7 +7,7 @@ description: Create and maintain Pi skills, extensions, and agent instructions (
 
 Guide pour créer des skills pi et maintenir les instructions de l'agent (AGENTS.md) de façon optimale et fiable.
 
-**À charger systématiquement avant toute création/modification de skill ou d'AGENTS.md.**
+**À charger systématiquement avant toute création/modification de skill, extension Pi ou `AGENTS.md`.**
 
 ## Matrice de décision : où va une instruction ?
 
@@ -30,7 +30,7 @@ Guide pour créer des skills pi et maintenir les instructions de l'agent (AGENTS
 
 - **Brevité** — l'AGENTS.md est payé en tokens à chaque tour de chaque session. Chaque ligne doit le mériter.
 - **Impératif, sans adoucisseur** — "Toujours X", "Jamais Y", pas "il serait bon de". Les règles molles sont ignorées.
-- **Négatif + alternative positive** — "Jamais de question en texte libre" suivi de "...utiliser `ask_user_question`". Une interdiction sans issue est mal suivie.
+- **Négatif + alternative positive** — interdire le mauvais comportement puis nommer l’action autorisée. Une interdiction sans issue est mal suivie.
 
 ## Template de base d'un skill
 

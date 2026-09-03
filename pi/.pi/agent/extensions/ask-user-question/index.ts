@@ -104,7 +104,7 @@ export default function askUserQuestion(pi: ExtensionAPI) {
 		name: 'ask_user_question',
 		label: 'Ask User Question',
 		description:
-			'Ask the user one or more questions with selectable options. ALWAYS prefer this tool over asking questions in plain text when the choices are discrete: clarifying requirements, choosing between approaches, confirming decisions, or getting preferences. The user can pick options (number keys), select multiple when multiSelect is true, or type a custom answer. Mark the best option with recommended: true when you have a preference. Omit options entirely for open-ended questions where you want a free-form answer.',
+			'Ask the user one or more questions with selectable options in interactive TUI mode. ALWAYS prefer this tool over questions in plain text; if TUI is unavailable, stop and report that clarification requires it. Group related questions in one call. The user can pick options (number keys), select multiple when multiSelect is true, or type a custom answer. Mark the best option with recommended: true when you have a preference. Omit options entirely for open-ended questions and do not suggest answers. If the user cancels, choose the most reasonable default and report that choice.',
 		parameters: AskParams,
 		executionMode: 'sequential',
 		// The tool draws its own framed block; no default shell card.

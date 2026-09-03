@@ -33,7 +33,7 @@ POSTS :=  dev-dirs gh herdr hermes hex nvim pi rtk rust
 
 HEX_DMG_URL := https://pub-089d681d41754031a4aefa7017d8c2fb.r2.dev/releases/HEX-latest-arm64.dmg
 
-.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs pi-update pi-test   pi-notify-test pi-prompt-test pi-twitter-fetch-test pi-ui-test  notifier-app notifier-app-test herdr-pi-smoke hermes-dirs hermes-gemma proxy-reset dev-dirs git-filters
+.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs pi-update pi-test  pi-goal-test  pi-notify-test pi-prompt-test pi-twitter-fetch-test pi-ui-test  notifier-app notifier-app-test herdr-pi-smoke hermes-dirs hermes-gemma proxy-reset dev-dirs git-filters
 
 help:
 	@echo "Targets:"
@@ -52,6 +52,7 @@ help:
 	@echo "  hex-post       Installe la réécriture Rust de Hex depuis le DMG officiel"
 	@echo "  pi-update      Met à jour Pi et tous ses packages"
 	@echo "  pi-test        Gate complète : extensions Pi, Stow et démarrage réel"
+	@echo "  pi-goal-test   Suite unitaire de la boucle /goal (évaluation, preuves, chrome)"
 	@echo "  pi-notify-test Tests comportementaux isolés de l'extension de notifications"
 	@echo "  pi-prompt-test Tests du chargement différé et de la politique documentaire Pi"
 	@echo "  pi-twitter-fetch-test Tests de sécurité et d'intégration de Twitter Fetch"
@@ -382,7 +383,7 @@ pi-update:  pi-post
 # Gate unique du harness : suites des extensions Pi contre les dépendances installées,
 # validation isolée du déploiement Stow puis stress-test d'un vrai Pi. Aucun restow
 # du HOME réel, aucune réinstallation de Pi et aucun symlink manuel.
-pi-test: pi-quality-test   pi-notify-test pi-prompt-test pi-twitter-fetch-test pi-ui-test
+pi-test: pi-quality-test  pi-goal-test  pi-notify-test pi-prompt-test pi-twitter-fetch-test pi-ui-test
 	@python3 scripts/test-pi-config.py
 	@python3 scripts/test-pi-startup.py
 	@python3 scripts/test-git-filters.py
@@ -397,6 +398,9 @@ pi-quality-test:
 	@cd pi/.pi && pnpm dlx fallow@$(PI_FALLOW_VERSION) audit \
 		--config .fallowrc.json \
 		--base "$${FALLOW_BASE_REF:-$(PI_QUALITY_BASE)}"
+
+pi-goal-test:
+	@node --test pi/.pi/agent/tests/goal.test.ts
 
 pi-notify-test:
 	@node --test \

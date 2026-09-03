@@ -10,10 +10,9 @@ export PATH := /opt/homebrew/bin:/usr/local/bin:$(PATH)
 STOW := stow -t $(HOME)
 
 # Chaque dossier à la racine du repo est un package Stow — ajouter un dossier
-# suffit à le rendre stowable. NONSTOW liste les seules exceptions : obsidian
-# (cible custom iCloud, stowé par sa propre cible), scripts (outillage git
-# interne) et claude (package conservé, non déployé).
-NONSTOW := obsidian scripts claude
+# suffit à le rendre stowable. NONSTOW liste les seules exceptions : scripts
+# (outillage git interne) et claude (package conservé, non déployé).
+NONSTOW := scripts claude
 PACKAGES := $(filter-out $(NONSTOW),$(patsubst %/,%,$(wildcard */)))
 
 # Packages dont le dossier cible reçoit aussi des fichiers écrits par l'outil
@@ -34,15 +33,7 @@ POSTS :=  dev-dirs gh herdr hermes hex nvim pi rtk rust
 
 HEX_DMG_URL := https://pub-089d681d41754031a4aefa7017d8c2fb.r2.dev/releases/HEX-latest-arm64.dmg
 
-# Obsidian : le vault vit dans iCloud, seule la config .obsidian est stowée
-# (symlinks relatifs → portables entre machines). Les binaires (thème,
-# plugins) vivent en fichiers réels dans le vault : iCloud les synchronise et
-# Obsidian réinstalle nativement les plugins manquants au premier lancement.
-# Les fonts système sont dans le Brewfile.
-OBSIDIAN_VAULT_DIR := $(HOME)/Library/Mobile Documents/iCloud~md~obsidian/Documents/Brain
-OBSIDIAN_VAULT := $(OBSIDIAN_VAULT_DIR)/.obsidian
-
-.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs pi-update pi-test   pi-notify-test pi-prompt-test pi-twitter-fetch-test pi-ui-test  notifier-app notifier-app-test herdr-pi-smoke hermes-dirs hermes-gemma obsidian obsidian-save proxy-reset dev-dirs git-filters
+.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs pi-update pi-test   pi-notify-test pi-prompt-test pi-twitter-fetch-test pi-ui-test  notifier-app notifier-app-test herdr-pi-smoke hermes-dirs hermes-gemma proxy-reset dev-dirs git-filters
 
 help:
 	@echo "Targets:"
@@ -54,8 +45,6 @@ help:
 	@echo "  restow       Restow every package"
 	@echo "  <package>    (Re)stow a single package (e.g. make nvim)"
 	@echo ""
-	@echo "  obsidian       Stow la config versionnée dans le vault Brain (iCloud)"
-	@echo "  obsidian-save  Ré-adopte (--adopt) les fichiers qu'Obsidian a dé-symlinkés"
 	@echo "  dev-dirs       Scaffolde ~/Development/{clients,tools,nextnode} (idempotent)"
 	@echo "  git-filters    Configure les clean filters git (.gitattributes) dans .git/config"
 	@echo ""
@@ -101,7 +90,7 @@ brew-bundle:
 	@echo "→ brew bundle (Brewfile)"
 	@brew bundle --file=Brewfile
 
-install all: git-filters notifier-app $(PACKAGES) $(addsuffix -post,$(POSTS)) obsidian
+install all: git-filters notifier-app $(PACKAGES) $(addsuffix -post,$(POSTS))
 
 # -R (restow) est idempotent : premier stow ou réparation de drift, même geste.
 # Seul point d'invocation de stow pour les packages — NOFOLD s'applique ici.
@@ -413,6 +402,7 @@ pi-notify-test:
 
 pi-prompt-test:
 	@node --test \
+		pi/.pi/agent/tests/exhaustive-review-scripts.test.ts \
 		pi/.pi/agent/tests/prompt-policy.test.ts \
 		pi/.pi/agent/tests/tool-loader.test.ts
 
@@ -475,14 +465,6 @@ rust-post:
 	fi
 	@[[ -f "$(HOME)/.cargo/env" ]] && echo "rust prêt: $$("$(HOME)/.cargo/bin/rustc" --version 2>/dev/null)" \
 		|| echo "rust non installé — étape ignorée"
-
-obsidian:
-	@stow -d obsidian -t "$(OBSIDIAN_VAULT_DIR)" -R Brain
-	@echo "config Obsidian stowée (symlinks) dans le vault Brain"
-
-obsidian-save:
-	@stow -d obsidian -t "$(OBSIDIAN_VAULT_DIR)" --adopt -R Brain
-	@echo "fichiers dé-symlinkés par Obsidian ré-adoptés dans le repo — vérifie git diff avant commit"
 
 # Dev directories scaffold — crée ~/Development/{clients,tools,nextnode} si absent.
 # Idempotent : mkdir -p ne fait rien si le dossier existe déjà.

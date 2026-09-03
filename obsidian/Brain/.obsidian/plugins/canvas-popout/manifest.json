@@ -1,9 +1,0 @@
-{
-	"id": "canvas-popout",
-	"name": "Canvas Popout",
-	"version": "1.0.0",
-	"minAppVersion": "1.4.0",
-	"description": "Un clic simple sur un lien vers un .canvas l'ouvre dans une fenêtre flottante au lieu de remplacer l'onglet.",
-	"author": "Walid Mostefaoui",
-	"isDesktopOnly": true
-}

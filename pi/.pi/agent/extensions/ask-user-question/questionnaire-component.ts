@@ -18,12 +18,12 @@ import {
 	type SelectionKeybindings,
 } from './questionnaire-input.ts'
 import { renderQuestionnaire } from './questionnaire-render.ts'
-import { createQuestionnairePalette } from './questionnaire-theme.ts'
 import {
 	type EditorPort,
 	type QuestionnaireEffect,
 	QuestionnaireState,
 } from './questionnaire-state.ts'
+import { createQuestionnairePalette } from './questionnaire-theme.ts'
 
 import type {
 	AskResult,

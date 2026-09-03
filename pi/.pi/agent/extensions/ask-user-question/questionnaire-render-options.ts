@@ -1,13 +1,13 @@
 import { visibleWidth } from '@earendil-works/pi-tui'
 
 import { innerBand } from './questionnaire-frame.ts'
-import { GLYPH } from './questionnaire-theme.ts'
 import {
 	ANSWER_PREVIEW_MAX_LENGTH,
 	type Question,
 	UI_TEXT,
 } from './questionnaire-model.ts'
 import { pushWrappedWithPrefix } from './questionnaire-render-primitives.ts'
+import { GLYPH } from './questionnaire-theme.ts'
 
 import type {
 	LineSink,
@@ -221,7 +221,9 @@ function renderOtherRow(
 	// band on the first line only; the editor cursor marks focus instead.
 	const continuation = ' '.repeat(visibleWidth(rowPrefix))
 	for (let index = 0; index < editorLines.length; index++) {
-		sink(`${index === 0 ? rowPrefix : continuation}${editorLines[index] ?? ''}`)
+		sink(
+			`${index === 0 ? rowPrefix : continuation}${editorLines[index] ?? ''}`,
+		)
 	}
 }
 

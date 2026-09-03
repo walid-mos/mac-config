@@ -1,51 +1,60 @@
 ---
 name: exhaustive-review
-description: Use when the user asks for an exhaustive review, audit, or simplification of a scope — a git range, commit(s), a feature folder, or explicit files. Enforces a mechanical file inventory, one objective per pass, and scriptable completion gates — never self-reported completeness.
+description: Use for an exhaustive review, audit, or simplification of an explicit git path, range, or commit. Requires one temporary manifest per objective, complete file coverage, and fail-closed gates before claiming completion.
 ---
 
 # Exhaustive Review
 
-L'exhaustivité ne se promet pas, elle se vérifie. Sans mécanisme, un agent travaille par saillance (les gros fichiers, les bugs évidents), laisse la longue traîne de côté, et déclare « fini » quand ça y ressemble. Ce skill ne fait pas le travail — il garantit qu'aucun fichier du périmètre n'est passé sous silence, qu'un objectif n'en dilue pas les autres, et que « fini » soit prouvé par un gate, pas déclaré.
+Exhaustiveness is proved by an enumerated scope and a gate, never by memory or a
+completion claim.
 
-## Phase 0 — Périmètre (obligatoire, avant toute autre action)
+## 0. Clarify and inventory
 
-```bash
-scripts/inventory.sh <scope...>        # voir scripts/scope.sh pour la résolution
-```
-
-- `<scope>` = tout mélange de : range git `A..B` (branches, commits, `HEAD~5..HEAD`), dossier (feature), fichier(s) explicites. Répétable et mixable.
-- Produit `.review-manifest.csv` : une ligne par fichier du périmètre. **Seule source de vérité.**
-- Périmètre ambigu (plusieurs candidats plausibles, base incertaine) : `ask_user_question`.
-- Ne jamais travailler « de mémoire » sur la liste des fichiers, ni l'estimer.
-
-## Phase 1 — Survey (lecture seule)
-
-- Remplir le manifeste : `fichier,verdict,note`, verdict ∈ `pending|done|skip` (skip = raison dans la note).
-- Un objectif d'évaluation par survey : si la mission porte plusieurs objectifs (bugs, SOLID, tokens…), les noter en une ligne chacun dans `note`, mais les **corriger** en passages séparés (phase 2).
-- Plus de 15 fichiers → lots de 8 maximum, dans l'ordre du manifeste, **à contexte frais** (nouvelle session ou sous-tâche déléguée par lot : un seul agent possède le manifeste, les lots ne font que relire et reporter). Pas de framework d'orchestration — cf. AGENTS.md.
-- Ne modifier aucun fichier pendant le survey.
-
-## Phase 2 — Un objectif par passage
-
-Une mission = un objectif. Jamais deux. Objectifs typiques, à traiter en passages séparés : lint/format, bugs P0-P2, SOLID/SRP, design tokens.
-
-- Chaque passage met à jour les verdicts du manifeste.
-- Les commits suivent les règles Git de l'AGENTS.md ; ce skill n'y déroge pas.
-
-## Phase 3 — Gates de fin (avant de dire « fini »)
+If the scope is ambiguous, resolve only that ambiguity with `ask_user_question`.
+Then inventory before web research, source inspection, or editing:
 
 ```bash
-scripts/coverage.sh <scope...>                 # exit 1 si un fichier du périmètre n'a pas de verdict
-scripts/size-gate.sh [--budget N] <scope...>   # exit 1 si un fichier production dépasse le budget (défaut 250)
+scripts/inventory.sh --objective <name> [--report-only] \
+  (--path <path> | --range <A..B> | --commit <ref>)...
 ```
 
-- Rejouer les gates avec **exactement le même scope** que `inventory.sh`.
-- Un gate en échec = pas fini, quel que soit le ressenti. Corriger, relancer.
-- `.review-manifest.csv` est un fichier de travail : ne jamais le committer.
-- Terminer par le rapport d'espace négatif : lister explicitement ce qui n'a PAS été examiné et pourquoi.
+Selectors are explicit, repeatable, and mixable. Ranges and commits include
+deleted paths. Inventory fails on invalid or empty selectors and creates a unique
+JSONL manifest under `$TMPDIR`; it prints a `review-id` and manifest path. Never
+choose or reuse a manifest path.
 
-## Interdits
+Create a separate inventory for every evaluation objective. Do not combine bugs,
+duplication, architecture, formatting, or another objective in one manifest.
 
-- Jamais déclarer un audit « exhaustif » ou « clos » sans `coverage.sh` en exit 0.
-- Jamais fusionner deux objectifs dans un même passage.
-- Jamais résumer ou juger un fichier non visité : verdict `pending` tant qu'il ne l'est pas.
+## 1. Survey without changing scoped sources
+
+Visit every manifest path. Change only its `verdict` and `note` fields:
+
+- `pending` — not yet visited;
+- `done` — evaluated for this manifest's objective;
+- `skip` — not evaluated; requires a non-empty reason in `note`.
+
+Do not modify files in the reviewed scope during the survey. A report-only review
+ends with findings and gates; it never requires remediation.
+
+For more than 15 files, review in batches of at most 8 in manifest order.
+Record evidence and verdicts directly in the manifest after each batch.
+
+## 2. Remediate one objective
+
+For a remediation review, make a separate pass for the manifest's sole objective.
+Keep unrelated findings in the report rather than fixing them. For any test-owned
+path, follow `coding` section 6; this workflow adds no ownership exception.
+
+## 3. Finish fail closed
+
+Using exactly the inventory selectors, run `scripts/size-gate.sh` and then the
+final `scripts/coverage.sh --review-id <id>`. Their usage comments own CLI details.
+
+The hard policy is at most 250 production lines; an explicit budget may only be
+stricter. A remediation is not complete while size fails. In report-only mode,
+report the violation without changing source and do not call the scope compliant.
+
+Coverage is the final operation and consumes its temporary review state. Record
+the negative space before running it. Any failure requires a fresh inventory.
+Never call an objective's audit exhaustive or complete unless coverage exits 0.

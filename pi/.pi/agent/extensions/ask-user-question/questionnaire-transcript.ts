@@ -13,6 +13,7 @@
  */
 
 import { foregroundHex as fgHex } from '../ui/design-system/terminal-color.ts'
+
 import {
 	blockTitle,
 	framedBlock,
@@ -21,11 +22,7 @@ import {
 } from './questionnaire-frame.ts'
 import { boldAnsi, GLYPH, Q_COLOR } from './questionnaire-theme.ts'
 
-import type {
-	AskResult,
-	Question,
-	QuestionOption,
-} from './questionnaire-model.ts'
+import type { AskResult } from './questionnaire-model.ts'
 
 interface OptionView {
 	label: string
@@ -97,9 +94,7 @@ function marker(multiSelect: boolean, checked: boolean): string {
 			? success(boldAnsi(GLYPH.checkOn))
 			: fgHex(Q_COLOR.MUTED, GLYPH.checkOff)
 	}
-	return checked
-		? success(boldAnsi(GLYPH.radioOn))
-		: dim(GLYPH.radioOff)
+	return checked ? success(boldAnsi(GLYPH.radioOn)) : dim(GLYPH.radioOff)
 }
 
 function sectionHead(
@@ -148,33 +143,16 @@ export function renderCallLines(args: unknown, width: number): string[] {
 	)
 }
 
-function questionToView(question: Question): QuestionView {
-	return {
-		label: question.label,
-		prompt: question.prompt,
-		options: question.options.map((option: QuestionOption) => ({
-			label: option.label,
-			description: option.description,
-			recommended: option.recommended,
-		})),
-		multiSelect: question.multiSelect,
-		allowOther: question.allowOther,
-	}
-}
-
 /** Framed answer replay: every question with its option markers filled in. */
-export function renderResultLines(
-	details: AskResult,
-	width: number,
-): string[] {
-	const innerWidth_ = innerWidth(width)
+export function renderResultLines(details: AskResult, width: number): string[] {
+	const contentWidth = innerWidth(width)
 	const sink = (line: string) => inner.push(line)
 	const inner: string[] = []
 
 	if (details.chat) {
 		inner.push('')
 		for (const question of details.questions) {
-			sectionHead(question, innerWidth_, sink)
+			sectionHead(question, contentWidth, sink)
 			inner.push(`   ${dim('· continuing in chat')}`)
 		}
 		inner.push('')
@@ -189,7 +167,7 @@ export function renderResultLines(
 	if (details.cancelled) {
 		inner.push('')
 		for (const question of details.questions) {
-			sectionHead(question, innerWidth_, sink)
+			sectionHead(question, contentWidth, sink)
 			inner.push(`   ${dim('· no answer')}`)
 		}
 		inner.push('')
@@ -204,7 +182,7 @@ export function renderResultLines(
 	inner.push('')
 	for (const question of details.questions) {
 		const answer = details.answers.find(entry => entry.id === question.id)
-		sectionHead(question, innerWidth_, sink)
+		sectionHead(question, contentWidth, sink)
 		if (!answer) {
 			inner.push(`   ${dim('· no answer')}`)
 			continue
@@ -214,7 +192,7 @@ export function renderResultLines(
 				sink,
 				`   ${success(GLYPH.pen)} `,
 				body(answer.label),
-				innerWidth_,
+				contentWidth,
 			)
 			continue
 		}
@@ -225,7 +203,7 @@ export function renderResultLines(
 					sink,
 					'   ',
 					`${marker(true, checked)} ${checked ? body(option.label) : dim(option.label)}`,
-					innerWidth_,
+					contentWidth,
 				)
 			}
 			if (answer.customText) {
@@ -233,7 +211,7 @@ export function renderResultLines(
 					sink,
 					`   ${success(GLYPH.pen)} `,
 					body(answer.customText),
-					innerWidth_,
+					contentWidth,
 				)
 			}
 			continue
@@ -245,7 +223,7 @@ export function renderResultLines(
 				sink,
 				'   ',
 				`${marker(false, checked)} ${checked ? body(option.label) : dim(option.label)}`,
-				innerWidth_,
+				contentWidth,
 			)
 		})
 	}

@@ -195,7 +195,7 @@ export function createRowRenderers(
 		summary: content.summary,
 		resultBody: expanded
 			? (result, options, theme, context) =>
-					options.expanded
+					options.expanded || options.isPartial
 						? expanded(result, options, theme, context)
 						: emptyComponent()
 			: () => emptyComponent(),

@@ -1,5 +1,5 @@
-import { GLYPH } from './questionnaire-theme.ts'
 import { pushWrappedWithPrefix } from './questionnaire-render-primitives.ts'
+import { GLYPH } from './questionnaire-theme.ts'
 
 import type { Answer } from './questionnaire-model.ts'
 import type {
@@ -26,9 +26,7 @@ export function renderSubmitBody(
 		)
 		const answer = state.answerFor(question.id)
 		if (!answer) {
-			sink(
-				`   ${theme.fg('warning', `${GLYPH.radioOff} unanswered`)}`,
-			)
+			sink(`   ${theme.fg('warning', `${GLYPH.radioOff} unanswered`)}`)
 			return
 		}
 		renderAnswerRows(answer, theme, width, sink)

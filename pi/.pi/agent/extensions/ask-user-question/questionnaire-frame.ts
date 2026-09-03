@@ -11,17 +11,17 @@ import {
 	foregroundHex as fgHex,
 } from '../ui/design-system/terminal-color.ts'
 import {
-	terminalLineWidth,
-	truncateTerminalLine,
-	wrapTerminalLine,
-} from '../ui/terminal-text.ts'
-import {
 	frameContentWidth,
 	frameEdge,
 	frameRow,
 	frameWidth,
 	type FramePalette,
 } from '../ui/frame.ts'
+import {
+	terminalLineWidth,
+	truncateTerminalLine,
+	wrapTerminalLine,
+} from '../ui/terminal-text.ts'
 
 import { boldAnsi, Q_COLOR } from './questionnaire-theme.ts'
 

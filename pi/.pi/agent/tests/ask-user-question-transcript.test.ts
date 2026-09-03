@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { renderCallLines, renderResultLines } from '../extensions/ask-user-question/questionnaire-transcript.ts'
+import {
+	renderCallLines,
+	renderResultLines,
+} from '../extensions/ask-user-question/questionnaire-transcript.ts'
 import { terminalLineWidth } from '../extensions/ui/terminal-text.ts'
 
 import type {
@@ -32,7 +35,11 @@ const rawArgs = {
 			label: 'Scope',
 			prompt: 'Which scope should this pass cover?',
 			options: [
-				{ label: 'Focused', description: 'Only the touched files', recommended: true },
+				{
+					label: 'Focused',
+					description: 'Only the touched files',
+					recommended: true,
+				},
 				{ label: 'Whole repo' },
 			],
 			multiSelect: false,
@@ -93,10 +100,7 @@ test('call preview stays compact: labels only, no option noise', () => {
 })
 
 test('call preview survives malformed or streamed args', () => {
-	const garbled = renderCallLines(
-		{ questions: 'not-an-array' },
-		80,
-	)
+	const garbled = renderCallLines({ questions: 'not-an-array' }, 80)
 	assertWithinWidth(garbled, 80)
 
 	const partial = renderCallLines(

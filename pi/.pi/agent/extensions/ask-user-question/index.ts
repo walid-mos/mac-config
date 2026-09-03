@@ -38,15 +38,18 @@ import {
 	formatAnswerLines,
 	questionnaireKey,
 } from './questionnaire-output.ts'
-import { renderCallLines, renderResultLines } from './questionnaire-transcript.ts'
+import {
+	renderCallLines,
+	renderResultLines,
+} from './questionnaire-transcript.ts'
 import { AskParams } from './schema.ts'
 
 import type {
 	AskResult,
 	QuestionnaireInitialState,
 } from './questionnaire-model.ts'
-import type { Component } from '@earendil-works/pi-tui'
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent'
+import type { Component } from '@earendil-works/pi-tui'
 
 /** Width-aware component: builds its ANSI lines at the actual viewport
  * width, unlike Text which is constructed from a fixed string. */

@@ -8,8 +8,8 @@
  * which leaves the render modules theme-agnostic.
  */
 
-import { blendHex } from '../ui/design-system/terminal-color.ts'
 import { PI_PALETTE } from '../ui/design-system/palette.ts'
+import { blendHex } from '../ui/design-system/terminal-color.ts'
 import {
 	backgroundHex,
 	foregroundHex as fgHex,

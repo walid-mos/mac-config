@@ -14,8 +14,8 @@ import { helpText, renderSubmitBody } from './questionnaire-render-submit.ts'
 import { GLYPH, Q_COLOR } from './questionnaire-theme.ts'
 
 import type { Question } from './questionnaire-model.ts'
-import type { QuestionnaireState } from './questionnaire-state.ts'
 import type { QuestionnairePalette } from './questionnaire-render-primitives.ts'
+import type { QuestionnaireState } from './questionnaire-state.ts'
 import type { Editor } from '@earendil-works/pi-tui'
 
 export type { QuestionnairePalette } from './questionnaire-render-primitives.ts'

@@ -108,12 +108,24 @@ function collectWrapWords(text: string): WrapWord[] {
 		}
 		if (token === ' ' || token === '\t') {
 			flush()
-			words.push({ text: ' ', width: 1, hasAnsi: false, isSpace: true, isBreak: false })
+			words.push({
+				text: ' ',
+				width: 1,
+				hasAnsi: false,
+				isSpace: true,
+				isBreak: false,
+			})
 			continue
 		}
 		if (token === '\n') {
 			flush()
-			words.push({ text: '\n', width: 0, hasAnsi: false, isSpace: false, isBreak: true })
+			words.push({
+				text: '\n',
+				width: 0,
+				hasAnsi: false,
+				isSpace: false,
+				isBreak: true,
+			})
 			continue
 		}
 		word = word ?? emptyWrapWord()
@@ -125,7 +137,13 @@ function collectWrapWords(text: string): WrapWord[] {
 }
 
 function emptyWrapWord(): WrapWord {
-	return { text: '', width: 0, hasAnsi: false, isSpace: false, isBreak: false }
+	return {
+		text: '',
+		width: 0,
+		hasAnsi: false,
+		isSpace: false,
+		isBreak: false,
+	}
 }
 
 /** ANSI-safe truncation that never leaves an OSC 8 hyperlink open. */

@@ -5,6 +5,7 @@
  * Catppuccin geometry. Colors are raw hex rendered with truecolor escapes.
  */
 
+import { ALIGN } from './align.ts'
 import {
 	blendHex,
 	foregroundHex as fgHex,
@@ -26,7 +27,8 @@ const FADE = {
 } as const
 
 const GEOMETRY = {
-	ROW_CHROME_WIDTH: 4,
+	/** `│ content │`: content gutter (see ALIGN) + closing space and rail. */
+	ROW_CHROME_WIDTH: ALIGN.CONTENT + 2,
 	EDGE_CHROME_WIDTH: 5,
 	MIN_WIDTH: 1,
 } as const

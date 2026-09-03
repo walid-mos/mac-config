@@ -21,6 +21,7 @@ const GLYPHS = {
 	pending: { glyph: '●', role: 'accent' },
 	ok: { glyph: '✓', role: 'success' },
 	error: { glyph: '✗', role: 'error' },
+	notice: { glyph: '◇', role: 'muted' },
 } as const
 
 export interface CompactRowView {

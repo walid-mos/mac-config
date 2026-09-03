@@ -925,3 +925,37 @@ le hint `ctrl+o` ne pouvait donc pas agir.
 - Tests : esbuild des deux extensions, 7 tests ciblés, Oxlint et `make pi-test`
   complet au vert (192 Agents, 80 Background, 20 notifications, 170 UI).
 - Suite : `/reload`, puis validation d'un chargement web et frontend réel.
+
+### 2026-09-03 — un seul style compact pour tous les tools
+
+- Fait : `compact-tools/api.ts` publie une façade process-global (slot
+  `piCompactStyle`) consommée par des bridges embarqués dans les patches npm ;
+  spec `external` par défaut au registre : tout tool sans style propre reçoit
+  la row compacte empilable, jamais la box Pi.
+- Fait : les quatre tools web (patch pi-web-access régénéré), `load_tools`,
+  les cinq tools frontend, les quatre tools pr-review et mcp/mcpScript/tools
+  directs MCP passent par la façade ; trois nouveaux patches pnpm.
+- Décision : style par défaut = façade partagée, pas de duplicate du style dans
+  les patches ; un nouveau package npm = un mini-patch branchant ses tools.
+- Limite : `[compaction]` et `[skill]` restent des composants codés en dur dans
+  le cœur Pi, non restylables par extension.
+- Tests : esbuild de tous les modules touchés, suites Agents/Background/UI au
+  vert, démarrage Pi réel (`test-pi-config`, `test-pi-startup`) ; nouveau patch
+  déployé via `pnpm patch`/`patch-commit` et `pi-post` étendu à 4 packages.
+
+### 2026-09-03 — response-view : réponses intermédiaires minimalistes
+
+- Fait : distinction réponse finale / sortie intermédiaire — un message suivi
+  de tool calls perd le diamant et le label « RÉPONSE » et n'ouvre plus qu'un
+  trait `muted` pleine largeur ; pendant le streaming tout reste minimal,
+  l'en-tête n'est révélé qu'au `message_end` si la réponse est finale.
+- Décision : qualification par empreinte SHA-256 des blocs texte, hydratée
+  depuis `getBranch()` au `session_start` et tenue à jour au `message_end` ;
+  l'API du transformer n'expose ni identité ni stopReason du message.
+- Fichiers : `response-view/index.ts`, `response-view/frame.ts`
+  (extraction `renderTrace`, ajout `intermediateTopRule` et
+  `frameIntermediateMarkdown`), `response-view/README.md`.
+- Tests : suite `response-view.test.ts` au vert sans modification (rendu final
+  inchangé), esbuild et typecheck strict contre les types pi-coding-agent
+  0.84.1, smoke du routage streaming/intermédiaire/final/thinking.
+- Suite : verrou comportemental du routage par l'agent de tests.

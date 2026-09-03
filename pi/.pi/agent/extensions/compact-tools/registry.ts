@@ -1,6 +1,6 @@
 import type { CompactResultBodyRenderer } from './types.ts'
 
-export type ToolViewOwner = 'compact-tools' | 'mutation-view'
+export type ToolViewOwner = 'compact-tools' | 'mutation-view' | 'external'
 export type ExpandedResultMode = 'native' | 'custom'
 
 export interface ToolViewSpec {
@@ -11,9 +11,23 @@ export interface ToolViewSpec {
 }
 
 /**
+ * Default view policy for tools registered outside this repository (npm
+ * packages bridged through the compact style facade). Every tool without a
+ * specific style therefore renders as a compact row and never falls back to
+ * Pi's boxed default: one stacked line, expanded body owned by the caller.
+ */
+export const EXTERNAL_TOOL_VIEW: ToolViewSpec = {
+	owner: 'external',
+	stackRows: true,
+	hideRowOnSuccess: false,
+	expandedResult: 'custom',
+}
+
+/**
  * Single source of truth for every tool using the shared compact call row.
  * Tool-owning extensions keep execution and rich-body code; this registry owns
  * presentation policy so expansion and stacking cannot drift between callers.
+ * Unregistered tool names resolve to the external default policy.
  */
 export const TOOL_VIEW_REGISTRY = {
 	read: {
@@ -67,10 +81,7 @@ export const COMPACT_TOOLS = (
 ).filter(tool => TOOL_VIEW_REGISTRY[tool].owner === 'compact-tools')
 
 export function toolViewSpec(tool: string): ToolViewSpec {
-	const spec = TOOL_VIEW_REGISTRY[tool as ToolViewName]
-	if (!spec)
-		throw new Error(`compact-tools: missing registry entry for "${tool}"`)
-	return spec
+	return TOOL_VIEW_REGISTRY[tool as ToolViewName] ?? EXTERNAL_TOOL_VIEW
 }
 
 /** Validate owner-provided rich bodies against the central expansion policy. */

@@ -4,8 +4,9 @@
  * override wiring with fakes.
  */
 
-/** Lifecycle of one tool row, shared between the call and result slots. */
-export type CompactRowStatus = 'pending' | 'ok' | 'error'
+/** Lifecycle of one tool row, shared between the call and result slots.
+ *  `notice` marks a passive background notice line (not a tool execution). */
+export type CompactRowStatus = 'pending' | 'ok' | 'error' | 'notice'
 
 /**
  * Row-local state stored in the tool renderer's shared `context.state`.

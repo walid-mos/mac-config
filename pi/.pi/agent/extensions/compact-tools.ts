@@ -15,6 +15,7 @@ import {
 	type ToolDefinition,
 } from '@earendil-works/pi-coding-agent'
 
+import { publishCompactStyle } from './compact-tools/api.ts'
 import { registerCompactStackLifecycle } from './compact-tools/lifecycle.ts'
 import {
 	COMPACT_TOOLS,
@@ -33,6 +34,7 @@ const NATIVE_FACTORIES: Record<
 }
 
 export default function compactTools(pi: ExtensionAPI): void {
+	publishCompactStyle()
 	registerCompactStackLifecycle(pi)
 	const overrides = createCompactOverrides({
 		createBuiltin: (toolName, cwd) => NATIVE_FACTORIES[toolName]?.(cwd),

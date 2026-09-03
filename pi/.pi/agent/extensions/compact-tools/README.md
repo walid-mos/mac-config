@@ -41,9 +41,17 @@ anciennes se replient dans un compteur qui conserve le nombre d'erreurs.
 - `overrides.ts` : factory d'overrides, `createBuiltin` injecté (testable sans
   résoudre les packages pi) ; gère délégation d'exécution et cache par cwd.
 - `registry.ts` : registre exhaustif de politique visuelle pour `read`, `grep`,
-  `find`, `ls`, `bash`, `background`, `edit` et `write`.
+  `find`, `ls`, `bash`, `edit` et
+  `write` ; tout nom inconnu résout vers la politique `external` par défaut
+  (row empilable, corps étendu fourni par l'appelant) afin qu'aucun tool ne
+  retombe sur la box Pi.
 - `renderer.ts` : renderers partagés (call compact / résultat riche ou natif
   étendu), validés contre le registre et réutilisables par chaque propriétaire.
+- `api.ts` : façade process-global (`piCompactStyle`) publiée par l'entrée
+  `compact-tools.ts` : `createRowRenderers` (rows pour tout tool hors registre,
+  sujet/résumé/corps fournis par l'appelant) et `composeRowLine` (ligne hors
+  tool). Les packages npm patchés (web-access, mcp-adapter, frontend-check) lisent ce slot via un bridge embarqué dans leur patch : le style
+  n'existe qu'ici, jamais dupliqué dans les patches.
 - `stack.ts` : état brut process-global partagé entre les graphes d'extensions,
   mais implémentation recréée à chaque chargement ; `/reload` prend donc toujours
   le code courant sans clé de cache versionnée. Il groupe les calls consécutifs
@@ -63,3 +71,5 @@ anciennes se replient dans un compteur qui conserve le nombre d'erreurs.
 2. Pas de hint keybinding sur la ligne (l'utilisateur connaît `ctrl+o`).
 3. Le résumé `read` compte les lignes du texte renvoyé, pas du fichier source
    (sauf `totalLines` présent dans `details.truncation`).
+4. `[compaction]` et `[skill]` sont rendus par des composants du cœur Pi, hors
+   de portée des extensions : ils ne suivent pas ce style.

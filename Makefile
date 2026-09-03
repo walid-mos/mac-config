@@ -329,12 +329,13 @@ pi-dirs:
 # les scripts de @google/genai et protobufjs ne sont pas nécessaires ici. Le fichier
 # est donc écrit de façon déterministe AVANT les pi install/update : toute nouvelle
 # dépendance avec un build échouera explicitement jusqu'à examen de cette politique.
-# patchedDependencies applique le patch de rendu compact de pi-web-access
-# (npm-patches/pi-web-access.patch, versionné et déployé via Stow) : rows compactes
-# pour les quatre tools web et leurs notifications/résultats asynchrones. Un bump
-# du package qui casse le patch échoue
-# bruyamment ici → régénérer avec `pnpm patch pi-web-access` + `pnpm patch-commit`,
-# recopier patches/pi-web-access.patch vers npm-patches/ et relancer pi-post
+# patchedDependencies applique le style compact partagé aux quatre packages
+# (npm-patches/*.patch, versionnés et déployés via Stow) : rows compactes de la
+# facade compact-tools pour les tools web (search, source check, fetch, get
+# content), mcp/mcpScript et tools directs MCP, frontend_*, et les tools
+# pr-review. Un bump d'un package qui casse son patch échoue
+# bruyamment ici → régénérer avec `pnpm patch <pkg>` + `pnpm patch-commit`,
+# recopier patches/<pkg>.patch vers npm-patches/ et relancer pi-post
 # (patch-commit réécrit le chemin vers patches/ dans pnpm-workspace.yaml).
 pi-post: export FNM_DIR := $(HOME)/.local/share/fnm
 pi-post: export PNPM_HOME := $(HOME)/.local/share/pnpm
@@ -358,6 +359,9 @@ pi-post:
 		'  protobufjs: false' \
 		'patchedDependencies:' \
 		'  pi-web-access: ../npm-patches/pi-web-access.patch' \
+		'  pi-frontend-check: ../npm-patches/pi-frontend-check.patch' \
+		'  pi-pr-review: ../npm-patches/pi-pr-review.patch' \
+		'  pi-mcp-adapter: ../npm-patches/pi-mcp-adapter.patch' \
 		> "$(HOME)/.pi/agent/npm/pnpm-workspace.yaml"
 	@echo "→ pnpm-workspace.yaml: node-pty approuvé ; builds @google/genai/protobufjs refusés"
 	@if command -v pi >/dev/null; then \

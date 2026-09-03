@@ -89,34 +89,46 @@ function mixColor(from: RgbColor, to: RgbColor, ratio: number): RgbColor {
 	) as RgbColor
 }
 
-function gradientTrace(width: number, theme: ResponseTheme): string {
+/** Per-column base color before the shared edge fade into the canvas. */
+type TraceColorAt = (index: number) => RgbColor
+
+function renderTrace(
+	width: number,
+	theme: ResponseTheme,
+	baseColorAt: TraceColorAt,
+): string {
 	const glyphs = traceGlyphs(width)
-	const accent = parseTerminalColor(theme.getFgAnsi('accent'))
-	const muted = parseTerminalColor(theme.getFgAnsi('muted'))
 	const canvas = parseTerminalColor(theme.getBgAnsi('userMessageBg'))
 	const mode = theme.getColorMode()
 	const fadeOutWidth = edgeFadeWidth(width)
-	const gradientWidth = Math.min(
-		GRADIENT_WIDTH,
-		Math.max(1, width - fadeOutWidth),
-	)
 	const fadeOutStart = width - fadeOutWidth
 	let trace = ''
 	for (let index = 0; index < width; index += 1) {
-		let rgb = muted.rgb
-		if (index < gradientWidth) {
-			const linear = gradientWidth === 1 ? 1 : index / (gradientWidth - 1)
-			rgb = mixColor(accent.rgb, muted.rgb, smoothstep(linear))
-		} else if (index >= fadeOutStart) {
+		let rgb = baseColorAt(index)
+		if (index >= fadeOutStart) {
 			const linear =
 				fadeOutWidth === 1
 					? 1
 					: (index - fadeOutStart) / (fadeOutWidth - 1)
-			rgb = mixColor(muted.rgb, canvas.rgb, smoothstep(linear))
+			rgb = mixColor(rgb, canvas.rgb, smoothstep(linear))
 		}
 		trace += `${foregroundAnsi(rgb, mode)}${glyphs[index]}`
 	}
 	return `${trace}${ANSI_FG_RESET}`
+}
+
+function accentGradientTrace(width: number, theme: ResponseTheme): string {
+	const accent = parseTerminalColor(theme.getFgAnsi('accent'))
+	const muted = parseTerminalColor(theme.getFgAnsi('muted'))
+	const gradientWidth = Math.min(
+		GRADIENT_WIDTH,
+		Math.max(1, width - edgeFadeWidth(width)),
+	)
+	return renderTrace(width, theme, index => {
+		if (index >= gradientWidth) return muted.rgb
+		const linear = gradientWidth === 1 ? 1 : index / (gradientWidth - 1)
+		return mixColor(accent.rgb, muted.rgb, smoothstep(linear))
+	})
 }
 
 /** A quiet label followed by a full-width accent-to-muted trace. */
@@ -134,7 +146,26 @@ export function responseTopRule(width: number, theme: ResponseTheme): string {
 	if (traceWidth <= 2) return `${label}${' '.repeat(traceWidth)}`
 
 	const lineWidth = traceWidth - 2
-	return `${label}  ${gradientTrace(lineWidth, theme)}`
+	return `${label}  ${accentGradientTrace(lineWidth, theme)}`
+}
+
+/** A labelless full-width muted trace marking an intermediate assistant output. */
+export function intermediateTopRule(
+	width: number,
+	theme: ResponseTheme,
+): string {
+	const muted = parseTerminalColor(theme.getFgAnsi('muted'))
+	return renderTrace(ruleWidth(width), theme, () => muted.rgb)
+}
+
+function frameWithRule(
+	markdown: string,
+	options: ResponseFrameOptions,
+	rule: (width: number, theme: ResponseTheme) => string,
+): string {
+	if (!markdown.trim().length) return markdown
+	const top = rule(options.width, options.theme)
+	return `${top}\n\n${markdown}`
 }
 
 /** Display-only decoration; the session and model context keep the original Markdown. */
@@ -142,7 +173,13 @@ export function frameAssistantMarkdown(
 	markdown: string,
 	options: ResponseFrameOptions,
 ): string {
-	if (!markdown.trim().length) return markdown
-	const top = responseTopRule(options.width, options.theme)
-	return `${top}\n\n${markdown}`
+	return frameWithRule(markdown, options, responseTopRule)
+}
+
+/** Quieter decoration for intermediate outputs followed by tool calls. */
+export function frameIntermediateMarkdown(
+	markdown: string,
+	options: ResponseFrameOptions,
+): string {
+	return frameWithRule(markdown, options, intermediateTopRule)
 }

@@ -25,11 +25,9 @@
   "enabledModels": [
     "openai-codex/gpt-5.6-sol",
     "xai/grok-4.6",
-    "kimi-coding/k3",
     "openrouter/z-ai/glm-5.3-flash",
-    "openrouter/deepseek/deepseek-v4-flash",
-    "openai-codex/gpt-5.6-luna",
-    "openai-codex/gpt-5.6-terra"
+    "openrouter/~deepseek/deepseek-v4-flash-latest",
+    "openai-codex/gpt-5.6-luna"
   ],
   "hideThinkingBlock": false
 }

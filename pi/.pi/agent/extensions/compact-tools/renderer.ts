@@ -151,8 +151,8 @@ export function createCompactRenderers(
 				state.endedAt = Date.now()
 			}
 			state.summary = rendererOptions.summary
-			? rendererOptions.summary(normalizedResult)
-			: summarizeResult(tool, normalizedResult)
+				? rendererOptions.summary(normalizedResult)
+				: summarizeResult(tool, normalizedResult)
 			if (rendererOptions.resultBody) {
 				return rendererOptions.resultBody(
 					normalizedResult,

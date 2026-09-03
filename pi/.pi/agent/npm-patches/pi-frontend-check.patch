@@ -1,0 +1,216 @@
+diff --git a/extensions/compact-bridge.ts b/extensions/compact-bridge.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..80d112e6112cdca6ecf86d0972830f80be1e94f2
+--- /dev/null
++++ b/extensions/compact-bridge.ts
+@@ -0,0 +1,95 @@
++import type { Component } from "@earendil-works/pi-tui";
++
++/**
++ * Bridge to the compact-tools style facade. The compact-tools extension
++ * publishes the shared row implementation on a process-global slot before npm
++ * packages load; this module only forwards this package's subject, summary and
++ * expanded bodies onto that facade. Row composition, glyphs, stacking and
++ * truncation live in compact-tools — this file holds no style of its own.
++ */
++
++const COMPACT_STYLE_SLOT = "piCompactStyle";
++
++export interface CompactComponent {
++	render(width: number): string[];
++	invalidate(): void;
++}
++
++export interface CompactTheme {
++	fg(role: string, text: string): string;
++	bold(text: string): string;
++}
++
++export interface CompactToolResult {
++	content: ReadonlyArray<{ type: string; text?: string }>;
++	isError?: boolean;
++}
++
++export interface RowOptions {
++	expanded?: boolean;
++	isPartial?: boolean;
++}
++
++export interface RowContext {
++	state: Record<string, unknown>;
++	[key: string]: unknown;
++}
++
++export interface CompactRowContent {
++	subject?: (args: unknown) => string;
++	summary?: (result: CompactToolResult) => string;
++	expanded?: (
++		result: CompactToolResult,
++		options: RowOptions,
++		theme: CompactTheme,
++		context: RowContext,
++	) => CompactComponent;
++}
++
++export interface RowRenderers {
++	renderCall: (args: unknown, theme: CompactTheme, context: RowContext) => CompactComponent;
++	renderResult: (
++		result: CompactToolResult,
++		options: RowOptions,
++		theme: CompactTheme,
++		context: RowContext,
++	) => CompactComponent;
++}
++
++interface StyleApi {
++	createRowRenderers(tool: string, content: CompactRowContent): RowRenderers;
++}
++
++function resolveStyle(): StyleApi {
++	const style = (globalThis as Record<string, unknown>)[COMPACT_STYLE_SLOT];
++	if (
++		typeof style !== "object" ||
++		style === null ||
++		typeof (style as StyleApi).createRowRenderers !== "function"
++	) {
++		throw new Error(
++			"compact-tools style facade is not published; the compact-tools extension must be enabled",
++		);
++	}
++	return style as StyleApi;
++}
++
++/** Shared compact rows for one tool; the facade is resolved on first render. */
++export function createBridgeRows(tool: string, content: CompactRowContent): RowRenderers {
++	let rows: RowRenderers | undefined;
++	const resolved = () => (rows ??= resolveStyle().createRowRenderers(tool, content));
++	return {
++		renderCall: (args, theme, context) => resolved().renderCall(args, theme, context),
++		renderResult: (result, options, theme, context) =>
++			resolved().renderResult(result, options, theme, context),
++	};
++}
++
++export function firstText(content: ReadonlyArray<{ type: string; text?: string }>): string {
++	return content.find((entry) => entry.type === "text" && typeof entry.text === "string")?.text ?? "";
++}
++
++export function firstLine(text: string): string {
++	const index = text.indexOf("\n");
++	return (index === -1 ? text : text.slice(0, index)).trim();
++}
+diff --git a/extensions/index.ts b/extensions/index.ts
+index a3644d996cffb16d0ab4296be5b6f4a8cdae1027..75fc2b87c0f8bf3a9a6271dccbbec36b94448241 100644
+--- a/extensions/index.ts
++++ b/extensions/index.ts
+@@ -11,6 +11,7 @@ import {
+   type Cfg,
+ } from "./browser.ts";
+ import { formatLog } from "./report.ts";
++import { createBridgeRows, firstLine, firstText, emptyComponent, type CompactComponent, type CompactTheme } from "./compact-bridge.ts";
+ import { existsSync, readFileSync, writeFileSync } from "node:fs";
+ import { dirname, join } from "node:path";
+ import { fileURLToPath } from "node:url";
+@@ -68,8 +69,66 @@ async function autoShot(): Promise<Shot | null> {
+ }
+ 
+ export default function (pi: ExtensionAPI) {
++  const fullTextBody = (
++    result: { content: ReadonlyArray<{ type: string; text?: string }> },
++    options: { expanded?: boolean; isPartial?: boolean },
++  ): CompactComponent => {
++    if (options.isPartial && !options.expanded) return emptyComponent();
++    return {
++      render: (width: number) => firstText(result.content).split("\n").map((line) => line.slice(0, width)),
++      invalidate: () => {},
++    };
++  };
++
++  const openRows = createBridgeRows("frontend_open", {
++    subject: (args) => String((args as { url?: string }).url ?? ""),
++    summary: (result) => firstLine(firstText(result.content)),
++    expanded: fullTextBody,
++  });
++
++  const actRows = createBridgeRows("frontend_act", {
++    subject: (args) => {
++      const a = args as { action?: string; target?: string; text?: string; key?: string };
++      const target = a.target ?? a.text ?? a.key ?? "";
++      return [a.action, target].filter(Boolean).join(" · ");
++    },
++    summary: (result) => firstLine(firstText(result.content)),
++    expanded: fullTextBody,
++  });
++
++  const screenshotRows = createBridgeRows("frontend_screenshot", {
++    subject: (args) => {
++      const a = args as { full_page?: boolean; selector?: string; width?: number; height?: number };
++      const viewport = a.width && a.height ? ` · ${a.width}x${a.height}` : "";
++      return [a.selector ?? (a.full_page ? "pleine page" : "viewport"), viewport.trim()].filter(Boolean).join("");
++    },
++    summary: (result) => firstLine(firstText(result.content)),
++    expanded: fullTextBody,
++  });
++
++  const consoleRows = createBridgeRows("frontend_console", {
++    subject: (args) => String((args as { level?: string }).level ?? "all"),
++    summary: (result) => {
++      const text = firstText(result.content);
++      const lines = text.split("\n").filter((line) => line.trim().length > 0);
++      return lines.length > 0 ? `${lines.length} entrées` : "vide";
++    },
++    expanded: fullTextBody,
++  });
++
++  const evalRows = createBridgeRows("frontend_eval", {
++    subject: (args) => {
++      const expression = String((args as { expression?: string }).expression ?? "");
++      return expression.length > 60 ? expression.slice(0, 57) + "…" : expression;
++    },
++    summary: (result) => firstLine(firstText(result.content)),
++    expanded: fullTextBody,
++  });
++
+   pi.registerTool({
+     name: "frontend_open",
++    renderShell: "self",
++    ...openRows,
+     label: "Frontend Open",
+     description:
+       "Open a frontend page in headless Chromium for testing: a dev-server URL (localhost:5173), " +
+@@ -101,6 +160,8 @@ export default function (pi: ExtensionAPI) {
+ 
+   pi.registerTool({
+     name: "frontend_act",
++    renderShell: "self",
++    ...actRows,
+     label: "Frontend Act",
+     description:
+       "Interact with the open page: click, type, press a key, hover, select an option, scroll, " +
+@@ -136,6 +197,8 @@ export default function (pi: ExtensionAPI) {
+ 
+   pi.registerTool({
+     name: "frontend_screenshot",
++    renderShell: "self",
++    ...screenshotRows,
+     label: "Frontend Screenshot",
+     description:
+       "Capture a screenshot of the open page: the viewport, the full scrollable page, or a single " +
+@@ -179,6 +242,8 @@ export default function (pi: ExtensionAPI) {
+ 
+   pi.registerTool({
+     name: "frontend_console",
++    renderShell: "self",
++    ...consoleRows,
+     label: "Frontend Console",
+     description:
+       "Read the collected browser console log for the open page: console messages, uncaught page " +
+@@ -205,6 +270,8 @@ export default function (pi: ExtensionAPI) {
+ 
+   pi.registerTool({
+     name: "frontend_eval",
++    renderShell: "self",
++    ...evalRows,
+     label: "Frontend Eval",
+     description:
+       "Evaluate a JavaScript expression in the open page and return the JSON-serialized result. " +

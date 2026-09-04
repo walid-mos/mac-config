@@ -8,7 +8,7 @@ const JSON_ASSIGNMENT = new RegExp(
 	'giu',
 )
 const JSON_LITERAL_ASSIGNMENT = new RegExp(
-	`(["']${SECRET_NAME}["']\\s*:\\s*)(?:-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?|true|false|null)`,
+	`(["']${SECRET_NAME}["']\\s*:\\s*)(?!["'])[^,\\s}\\]]+`,
 	'giu',
 )
 const SHELL_SECRET_PREFIX = new RegExp(

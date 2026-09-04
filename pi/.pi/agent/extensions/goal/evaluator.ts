@@ -134,6 +134,30 @@ export function selectEvaluatorAttempts<T extends EvaluatorModelIdentity>(
 		: attempts
 }
 
+const TERMINAL_EVALUATOR_TEXT =
+	/quota|usage[-_\s]?limit|rate[-_\s]?limit|too many requests|resource[-_\s]?exhausted|billing|insufficient credits/iu
+
+function isTerminalEvaluatorError(
+	error: unknown,
+	seen = new Set<unknown>(),
+): boolean {
+	if (error === null || seen.has(error)) return false
+	if (error === 402 || error === 429 || error === '402' || error === '429')
+		return true
+	if (typeof error === 'string') return TERMINAL_EVALUATOR_TEXT.test(error)
+	if (typeof error !== 'object') return false
+	seen.add(error)
+	const value = error as Record<string, unknown>
+	return [
+		value.status,
+		value.statusCode,
+		value.code,
+		value.message,
+		value.cause,
+		value.error,
+	].some(field => isTerminalEvaluatorError(field, seen))
+}
+
 export async function evaluateWithFallback<T extends EvaluatorModelIdentity>(
 	models: readonly T[],
 	evaluate: (model: T) => Promise<ParsedEvaluatorReply>,
@@ -153,6 +177,7 @@ export async function evaluateWithFallback<T extends EvaluatorModelIdentity>(
 			const reason =
 				error instanceof Error ? error.message : 'evaluator failed'
 			failures.push(formatEvaluatorFailure(index, model, reason))
+			if (isTerminalEvaluatorError(error)) break
 		}
 	}
 	return {

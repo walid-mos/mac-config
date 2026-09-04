@@ -86,6 +86,7 @@ export function decideEvaluatedGoal(
 		return {
 			action: 'pause',
 			reason: 'Evaluator returned met without verified proofs.',
+			proofs,
 		}
 	}
 	if (judged.verdict !== 'not_yet') {
@@ -121,7 +122,12 @@ export function nextGoalState(
 	decision: GoalLoopDecision,
 ): GoalState {
 	if (decision.action === 'pause') {
-		return { ...current, ...counters, lastReason: decision.reason }
+		return {
+			...current,
+			...counters,
+			lastReason: decision.reason,
+			proofs: decision.proofs ?? current.proofs,
+		}
 	}
 	if (decision.action === 'continue') {
 		return {

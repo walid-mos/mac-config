@@ -41,6 +41,7 @@ const {
 const { parseEvaluatorReply } =
 	await import('../extensions/goal/evaluation-reply.ts')
 const { formatStatus } = await import('../extensions/goal/presentation.ts')
+const { nextGoalState } = await import('../extensions/goal/state.ts')
 const { collectTranscriptExcerpt } =
 	await import('../extensions/goal/transcript.ts')
 
@@ -471,21 +472,24 @@ test('decideEvaluatedGoal pauses on evaluator failure', () => {
 	)
 })
 
-test('decideEvaluatedGoal pauses met without verified proofs', () => {
-	assert.deepEqual(
-		decideEvaluatedGoal(
-			activeGoal({ proofs: [] }),
-			{ turnsEvaluated: 1, noToolTurns: 0 },
-			validReply({
-				verdict: 'met',
-				reason: 'Done.',
-			}),
-		),
-		{
-			action: 'pause',
-			reason: 'Evaluator returned met without verified proofs.',
-		},
+test('decideEvaluatedGoal pauses met without retaining invalidated proofs', () => {
+	const current = activeGoal({ proofs: ['stale proof'] })
+	const counters = { turnsEvaluated: 1, noToolTurns: 0 }
+	const decision = decideEvaluatedGoal(
+		current,
+		counters,
+		validReply({
+			verdict: 'met',
+			reason: 'Done.',
+			invalidatedProofs: ['stale proof'],
+		}),
 	)
+	assert.deepEqual(decision, {
+		action: 'pause',
+		reason: 'Evaluator returned met without verified proofs.',
+		proofs: [],
+	})
+	assert.deepEqual(nextGoalState(current, counters, decision).proofs, [])
 })
 
 test('evaluateWithFallback returns the first success without a fallback', async () => {
@@ -1407,6 +1411,8 @@ test('evaluator-bound condition and transcript redact credential-like secrets', 
 	const privateKeyBody = 'cHJpdmF0ZS1rZXktbWF0ZXJpYWw='
 	const quotedPassword = 'correct horse battery staple'
 	const multilinePassword = 'line one\nline two'
+	const escapedQuotePassword = 'hunter\\"still secret'
+	const unterminatedPassword = 'unterminated secret'
 	const splitToken = 'a'.repeat(500)
 	const privateKey = [
 		'-----BEGIN PRIVATE KEY-----',
@@ -1456,6 +1462,8 @@ test('evaluator-bound condition and transcript redact credential-like secrets', 
 										`password=${password}`,
 										`password='${quotedPassword}'`,
 										`password="${multilinePassword}"`,
+										`password="${escapedQuotePassword}"`,
+										`password="${unterminatedPassword}`,
 										`Authorization: Basic ${basicCredential}`,
 										privateKey,
 									].join('\n'),
@@ -1489,7 +1497,10 @@ test('evaluator-bound condition and transcript redact credential-like secrets', 
 	assert.equal(bound.includes(basicCredential), false)
 	assert.equal(bound.includes(privateKeyBody), false)
 	assert.equal(bound.includes(quotedPassword), false)
-	assert.doesNotMatch(bound, /line one|line two/)
+	assert.doesNotMatch(
+		bound,
+		/line one|line two|hunter|still secret|unterminated secret/,
+	)
 	assert.doesNotMatch(bound, /a{100}/)
 	assert.doesNotMatch(bound, /BEGIN PRIVATE KEY/)
 	assert.match(bound, /\[REDACTED\]/)

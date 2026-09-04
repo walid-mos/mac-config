@@ -46,7 +46,7 @@ export type GoalTurnCounters = {
 
 export type GoalLoopDecision =
 	| { action: 'continue'; reason: string; proofs: string[] }
-	| { action: 'pause'; reason: string }
+	| { action: 'pause'; reason: string; proofs?: string[] }
 	| {
 			action: 'stop'
 			verdict: Exclude<GoalVerdict, 'not_yet'>

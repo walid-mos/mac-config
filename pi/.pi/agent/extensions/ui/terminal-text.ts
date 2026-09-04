@@ -1,5 +1,5 @@
 const TERMINAL_TOKEN_PATTERN =
-	/\u001b\[[0-?]*[ -/]*[@-~]|\u001b\]8;;[^\u0007]*\u0007|\u001b\]8;;\u0007|\u001b_[^\u0007]*\u0007|./gu
+	/\u001b_G.*?\u001b\\|\u001b\]1337;[^\u0007]*\u0007|\u001b\[[0-?]*[ -/]*[@-~]|\u001b\]8;;[^\u0007]*\u0007|\u001b\]8;;\u0007|\u001b_[^\u0007]*\u0007|./gu
 const ANSI_SEQUENCE_PATTERN = /^\u001b(\[|\]|_)/u
 const OSC_8_CLOSE = '\u001b]8;;\u0007'
 const SGR_RESET = '\u001b[0m'

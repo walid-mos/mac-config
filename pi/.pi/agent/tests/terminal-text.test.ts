@@ -52,3 +52,11 @@ test('wrap keeps APC sequences glued to their word at zero width', () => {
 	assert.ok(lines[0]!.includes('one'))
 	assert.ok(lines[0]!.includes(CURSOR_MARKER))
 })
+
+test('Kitty graphics APC terminated by ESC-backslash is zero-width and uncut', () => {
+	const kitty = '\u001b_Gf=100,s=1,v=1;PAYLOAD\u001b\\'
+	assert.equal(terminalLineWidth(`ab${kitty}cd`), 4)
+	const truncated = truncateTerminalLine(`ab${kitty}${'x'.repeat(40)}`, 5)
+	assert.ok(truncated.includes(kitty))
+	assert.equal(terminalLineWidth(truncated), 5)
+})

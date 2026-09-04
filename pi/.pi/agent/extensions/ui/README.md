@@ -47,15 +47,16 @@ render }` ; le rendu est agrégé, ordonné globalement, tronqué (`maxLines`,
 
 ## Priorités ci-dessus l'éditeur (`ABOVE_EDITOR_PRIORITY`)
 
-| Clé               | Valeur | Occuper par                       |
-| ----------------- | -----: | --------------------------------- |
-| `thinking`        |      0 | loader avec aperçu du thinking    |
-| `sessionStatus`   |     10 | ligne de statut minimaliste       |
-| `working`         |     50 | autres indicateurs de travail     |
-| `goal`            |    100 | boucle /goal                      |
-| `agents`          |    150 | salves d’agents                   |
-| `backgroundTasks` |    200 | tâches async                      |
-| `activity`        |    300 | bandeau d’activité détaillé        |
+| Clé               | Valeur | Occuper par                    |
+| ----------------- | -----: | ------------------------------ |
+| `thinking`        |      0 | loader avec aperçu du thinking |
+| `sessionStatus`   |     10 | ligne de statut minimaliste    |
+| `working`         |     50 | autres indicateurs de travail  |
+| `goal`            |    100 | boucle /goal                   |
+| `agents`          |    150 | salves d’agents                |
+| `backgroundTasks` |    200 | tâches async                   |
+| `activity`        |    300 | bandeau d’activité détaillé    |
+| `attachments`     |    400 | miniatures jointes au prompt   |
 
 ## Footer
 

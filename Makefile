@@ -424,6 +424,7 @@ pi-ui-test:
 		pi/.pi/agent/tests/compact-tools-renderer.test.ts \
 		pi/.pi/agent/tests/compact-tools-stack.test.ts \
 		pi/.pi/agent/tests/compact-tools-summary.test.ts \
+		pi/.pi/agent/tests/capture-prompt.test.ts \
 		pi/.pi/agent/tests/design-system.test.ts \
 		pi/.pi/agent/tests/double-escape-pacer.test.ts \
 		pi/.pi/agent/tests/editor-decorator.test.ts \

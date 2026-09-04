@@ -7,15 +7,8 @@ const JSON_ASSIGNMENT = new RegExp(
 	`(["']${SECRET_NAME}["']\\s*:\\s*)(["'])(?:\\\\.|(?!\\2)[\\s\\S])*(?:\\2|$)`,
 	'giu',
 )
-const SECRET_PREFIX = `\\b${SECRET_NAME}\\b(?:\\s*(?:=|:)\\s*|\\s+)`
-const SHELL_QUOTED_FRAGMENT = `(?:\\$?'(?:\\\\.|[^'\\\\])*'|\\$?"(?:\\\\.|[^"\\\\])*")`
-const SHELL_WORD = `(?:${SHELL_QUOTED_FRAGMENT}|\\\\.|[^\\s"'\\\\,;|&()<>]+)+`
-const SHELL_SECRET_ASSIGNMENT = new RegExp(
-	`(${SECRET_PREFIX})${SHELL_WORD}`,
-	'giu',
-)
-const UNTERMINATED_SECRET_ASSIGNMENT = new RegExp(
-	`(${SECRET_PREFIX})(?:\\$?)(["'])(?:\\\\.|(?!\\2)[\\s\\S])*$`,
+const SHELL_SECRET_PREFIX = new RegExp(
+	`\\b${SECRET_NAME}\\b(?:\\s*(?:=|:)\\s*|\\s+)`,
 	'giu',
 )
 const BEARER = /(\bBearer\s+)[A-Za-z0-9._~+/=-]+/giu
@@ -26,15 +19,58 @@ const KNOWN_TOKEN =
 const PRIVATE_KEY_BLOCK =
 	/-----BEGIN ([A-Z0-9 ]*PRIVATE KEY)-----[\s\S]*?(?:-----END \1-----|$)/gu
 
+function isShellDelimiter(character: string): boolean {
+	return /[\s;|&()<>]/u.test(character)
+}
+
+function updatedQuote(current: string, character: string): string {
+	if (current) return character === current ? '' : current
+	return character === '"' || character === "'" ? character : ''
+}
+
+function shellWordEnd(text: string, start: number): number {
+	let index = start
+	let quote = ''
+	while (index < text.length) {
+		const character = text[index] ?? ''
+		if (character === '\\') {
+			index += index + 1 < text.length ? 2 : 1
+			continue
+		}
+		if (!quote && isShellDelimiter(character)) break
+		quote = updatedQuote(quote, character)
+		index += 1
+	}
+	return index
+}
+
+function redactShellSecrets(text: string): string {
+	let redacted = ''
+	let cursor = 0
+	SHELL_SECRET_PREFIX.lastIndex = 0
+	for (
+		let match = SHELL_SECRET_PREFIX.exec(text);
+		match;
+		match = SHELL_SECRET_PREFIX.exec(text)
+	) {
+		const valueStart = match.index + match[0].length
+		const valueEnd = shellWordEnd(text, valueStart)
+		if (valueEnd === valueStart) continue
+		redacted += `${text.slice(cursor, valueStart)}${REDACTED}`
+		cursor = valueEnd
+		SHELL_SECRET_PREFIX.lastIndex = valueEnd
+	}
+	return `${redacted}${text.slice(cursor)}`
+}
+
 /** Redacts only high-confidence credential forms to avoid damaging normal logs. */
 export function redactSecrets(text: string): string {
-	return text
+	const structured = text
 		.replace(BEARER, `$1${REDACTED}`)
 		.replace(BASIC_AUTHORIZATION, `$1${REDACTED}`)
 		.replace(URL_PASSWORD, `$1${REDACTED}$3`)
 		.replace(JSON_ASSIGNMENT, `$1$2${REDACTED}$2`)
-		.replace(SHELL_SECRET_ASSIGNMENT, `$1${REDACTED}`)
-		.replace(UNTERMINATED_SECRET_ASSIGNMENT, `$1${REDACTED}`)
 		.replace(KNOWN_TOKEN, REDACTED)
 		.replace(PRIVATE_KEY_BLOCK, REDACTED)
+	return redactShellSecrets(structured)
 }

@@ -389,6 +389,14 @@ test('updateProofLedger removes invalidated proofs, appends, and normalizes whit
 	)
 })
 
+test('updateProofLedger applies every invalidation before bounding output', () => {
+	const invalidated = [
+		'stale proof',
+		...Array.from({ length: 32 }, (_, index) => `other ${index}`),
+	]
+	assert.deepEqual(updateProofLedger(['stale proof'], [], invalidated), [])
+})
+
 test('createGoal accepts a singular turn cap directive', () => {
 	assert.equal(createGoal('ship safely; stop after 1 turn').maxTurns, 1)
 })
@@ -1423,7 +1431,7 @@ test('evaluator-bound condition and transcript redact credential-like secrets', 
 	const quotedPassword = 'correct horse battery staple'
 	const multilinePassword = 'line one\nline two'
 	const escapedQuotePassword = 'hunter\\"still secret'
-	const unterminatedPassword = 'unterminated secret'
+	const unterminatedPassword = 'mixedprefix unterminated secret'
 	const ansiQuotedPassword = 'ansi quoted secret'
 	const optionPassword = 'option secret with spaces'
 	const posixPassword = "don'\\''t leak"
@@ -1490,7 +1498,7 @@ test('evaluator-bound condition and transcript redact credential-like secrets', 
 										`-----BEGIN \u001b]0;hidden\u0007PRIVATE KEY-----\n${privateKeySecret}\n-----END PRIVATE KEY-----`,
 										`Authorization: Basic ${basicCredential}`,
 										privateKey,
-										`password="${unterminatedPassword}`,
+										`password=${unterminatedPassword.replace(' ', '"')}`,
 									].join('\n'),
 								},
 							],
@@ -1524,7 +1532,7 @@ test('evaluator-bound condition and transcript redact credential-like secrets', 
 	assert.equal(bound.includes(quotedPassword), false)
 	assert.doesNotMatch(
 		bound,
-		/line one|line two|hunter|still secret|unterminated secret|ansi quoted secret|option secret|t leak|escaped secret|dXNlcjpwYXNz|private key secret|aws secret/,
+		/line one|line two|hunter|still secret|mixedprefix|unterminated secret|ansi quoted secret|option secret|t leak|escaped secret|dXNlcjpwYXNz|private key secret|aws secret/,
 	)
 	assert.doesNotMatch(bound, /a{100}/)
 	assert.match(bound, /status=failed/)

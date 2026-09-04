@@ -37,7 +37,11 @@ export function updateProofLedger(
 	added: readonly string[],
 	invalidated: readonly string[],
 ): string[] {
-	const removed = new Set(normalizeProofs(invalidated))
+	const removed = new Set<string>()
+	for (const proof of invalidated) {
+		const normalized = normalizeBoundedText(proof, MAX_PROOF_ITEM_CHARS)
+		if (normalized) removed.add(normalized)
+	}
 	return normalizeProofs([
 		...current.filter(proof => !removed.has(proof)),
 		...added,

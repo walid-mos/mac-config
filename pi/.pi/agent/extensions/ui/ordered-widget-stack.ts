@@ -13,6 +13,8 @@ export const HOST_WIDGET_IDS: Readonly<Record<SurfacePlacement, string>> = {
 }
 
 export const ABOVE_EDITOR_PRIORITY = {
+	thinking: 0,
+	sessionStatus: 10,
 	working: 50,
 	goal: 100,
 	agents: 150,

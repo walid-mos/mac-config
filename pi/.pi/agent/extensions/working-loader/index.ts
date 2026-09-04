@@ -83,7 +83,7 @@ export default function workingLoader(pi: ExtensionAPI): void {
 	function paint(): void {
 		if (ui === undefined) return
 		setOrderedAboveEditorWidget(ui, SURFACE_ID, {
-			priority: ABOVE_EDITOR_PRIORITY.working,
+			priority: ABOVE_EDITOR_PRIORITY.thinking,
 			render: (width, theme) => {
 				const left = theme.fg('dim', `${spinnerFrame} ${word}...`)
 				if (!thinkingTimeline.isVisible()) return [left]

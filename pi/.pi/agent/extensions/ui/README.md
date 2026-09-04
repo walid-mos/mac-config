@@ -40,7 +40,8 @@ render }` ; le rendu est agrégé, ordonné globalement, tronqué (`maxLines`,
    registre process-global** — jamais de `ctx.ui.setWidget()` direct hors de
    `ordered-widget-stack.ts`.
 2. Une priorité = un rang stable dans `ABOVE_EDITOR_PRIORITY` ; ne pas inventer
-   des nombres magiques hors de cette constante. Rang bas = proche du prompt.
+   des nombres magiques hors de cette constante. Rang bas = plus haut dans la
+   pile ; `thinking` précède immédiatement `sessionStatus`.
 3. Un rendu doit être pur et dépendre uniquement de `{ width, theme }`.
 4. Respecter `maxLines` : les surfaces ne repoussent pas le transcript.
 
@@ -48,10 +49,13 @@ render }` ; le rendu est agrégé, ordonné globalement, tronqué (`maxLines`,
 
 | Clé               | Valeur | Occuper par                       |
 | ----------------- | -----: | --------------------------------- |
-| `working`         |     50 | loader de travail (mots rotatifs) |
+| `thinking`        |      0 | loader avec aperçu du thinking    |
+| `sessionStatus`   |     10 | ligne de statut minimaliste       |
+| `working`         |     50 | autres indicateurs de travail     |
 | `goal`            |    100 | boucle /goal                      |
+| `agents`          |    150 | salves d’agents                   |
 | `backgroundTasks` |    200 | tâches async                      |
-| `activity`        |    300 | bandeau d'activité                |
+| `activity`        |    300 | bandeau d’activité détaillé        |
 
 ## Footer
 

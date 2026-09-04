@@ -14,7 +14,7 @@ travaille, sans modifier le rendu natif du thinking dans le transcript :
 ## Intégration
 
 - La ligne est rendue **via le registre surface** (`../ui/surface.ts`) avec la
-  priorité `ABOVE_EDITOR_PRIORITY.working` (50, donc collée au prompt).
+  priorité réservée `ABOVE_EDITOR_PRIORITY.thinking` (0), tout en haut de la pile.
 - Le spinner `sand` et les spinners des jobs Background commencent tous en
   colonne 0, avec leur libellé en colonne 2 ; seuls les enfants d'un groupe
   Background restent indentés.

@@ -959,3 +959,102 @@ le hint `ctrl+o` ne pouvait donc pas agir.
   inchangé), esbuild et typecheck strict contre les types pi-coding-agent
   0.84.1, smoke du routage streaming/intermédiaire/final/thinking.
 - Suite : verrou comportemental du routage par l'agent de tests.
+
+### 2026-09-04 — ligne de statut de session minimaliste
+
+- Fait : restauration de l’activity strip archivée sous forme d’une ligne
+  française discrète (durée, tours, outils, agents appelés/actifs), avec accent
+  limité aux activités en cours.
+- Placement : le registre reste une simple échelle ; `sessionStatus: 0` réserve
+  la première ligne, avant le loader, Agents et Background.
+- Fichiers : `activity-strip.ts`, `activity-strip/state.ts`,
+  `activity-strip/README.md`, `ui/ordered-widget-stack.ts`, `ui/README.md`.
+- Tests : smokes état/lifecycle/priorité, esbuild, Oxlint, Fallow et `make
+pi-test` complet au vert (194 Agents, 83 Background, 20 notifications, 187 UI).
+- Suite : `/reload` pour activer l’extension dans la session courante.
+
+### 2026-09-04 — statut en retrait sous le thinking
+
+- Fait : ligne davantage atténuée (`dim` majoritaire, aucun accent) et décalée
+  de deux colonnes pour ne plus coller au bord gauche.
+- Placement : `working: 0`, puis `sessionStatus: 10` ; le loader/thinking est le
+  seul widget au-dessus du statut, Goal, Agents et Background restent dessous.
+- Fichiers : `activity-strip.ts`, `activity-strip/README.md`,
+  `ui/ordered-widget-stack.ts`, `ui/README.md`.
+- Tests : première gate rejetée par le verrou historique `working: 50`, puis
+  relance complète au vert à 50/75 ; retour final appliqué à 0/10, prouvé par
+  smoke d’ordre, esbuild, Oxfmt, Oxlint et Fallow.
+- Suite : `/reload` puis validation visuelle utilisateur.
+
+### 2026-09-04 — rail de télémétrie fonctionnel du prompt
+
+- Fait : le statut devient un rail adaptatif gauche/droite : durée, tours,
+  outils, commandes, erreurs, fichiers lus/modifiés, churn, tokens
+  input/output/cache et débit output, face à l’activité courante.
+- Périmètre : métriques remises à zéro par prompt ; seules les opérations
+  réussies alimentent fichiers/churn, les erreurs tools/provider restent
+  visibles, puis le bilan disparaît vingt secondes après `agent_settled`.
+- Style : une ligne sans cadre ni accent, uniquement `muted`/`dim`, avec quatre
+  niveaux de dégradation responsive et thinking/statut aux priorités 0/10.
+- Fichiers : `activity-strip.ts`, `activity-strip/{state,render}.ts`,
+  `activity-strip/README.md`.
+- Tests : smoke lifecycle et métriques au vert à 120 colonnes, disparition à
+  20 000 ms prouvée ; esbuild, Oxfmt et Oxlint ciblés au vert.
+- Suite : `/reload` puis validation visuelle utilisateur.
+
+### 2026-09-04 — validation du rail de télémétrie
+
+- Fait : le loader utilise le rang dédié `thinking: 0`, le statut reste à 10 ;
+  `working: 50` demeure le rang des autres indicateurs de travail.
+- Preuve visuelle : à 120 colonnes, tous les groupes tiennent sur une ligne et
+  l’activité courante reste justifiée à droite ; le délai de retrait mesuré est
+  exactement 20 000 ms.
+- Tests : `make pi-test` complet au vert — 194 Agents, 83 Background,
+  20 notifications, 187 UI, Stow, démarrage réel et filtres Git.
+- Suite : `/reload` puis validation visuelle utilisateur.
+
+### 2026-09-04 — trois îlots sémantiques sans pseudo-console
+
+- Fait : suppression des commandes et de l’activité courante déjà visibles dans
+  le transcript ; la ligne est recomposée en trois îlots explicites `PROMPT`,
+  `TRAVAIL` et `TOKENS`.
+- Style : aucun rail ni suite d’abréviations opaques ; micro-labels `dim`,
+  valeurs `muted` et espace terminal distribué équitablement entre les groupes.
+- Responsive : versions éditoriale, compacte et minimale validées à 160, 120,
+  78 et 60 colonnes ; les tokens du prompt et le travail produit restent
+  prioritaires.
+- Fichiers : `activity-strip/state.ts`, `activity-strip/render.ts`,
+  `activity-strip/README.md` et `activity-strip.ts`.
+- Tests : smoke métriques/lifecycle au vert, disparition à 20 s confirmée et
+  `make pi-test` complet au vert (187 tests UI).
+- Suite : `/reload` puis validation visuelle utilisateur.
+
+### 2026-09-04 — timeline réellement animée
+
+- Fait : suppression complète des outils, commandes, fichiers et churn ; la
+  surface ne conserve que le temps de traitement et les tokens du prompt.
+- Dynamique : horloge rotative et tête de lecture à 250 ms ; l’output avance
+  pendant le stream via une estimation signalée par `~`, puis l’usage provider
+  exact remplace l’estimation à la fin du tour.
+- Style : timeline `dim` avec impulsion `muted`, aucune couleur d’accent ; état
+  final figé avec `✓` pendant vingt secondes.
+- Fichiers : `activity-strip.ts`, `activity-strip/state.ts`,
+  `activity-strip/render.ts`, `activity-strip/README.md`.
+- Tests : smoke animation/stream/réconciliation/lifecycle au vert ; esbuild,
+  Oxfmt, Oxlint et `make pi-test` complet au vert (187 tests UI).
+- Suite : `/reload` puis validation visuelle utilisateur.
+
+### 2026-09-04 — piste courte et débit de génération
+
+- Fait : piste animée plafonnée à 24 colonnes ; l’espace restant est laissé
+  respirer avant les tokens au lieu d’allonger artificiellement le trait.
+- Mesure : `tok/s` utilise maintenant l’output cumulé sur le seul temps de
+  streaming modèle mesuré localement ; outils et attentes n’abaissent plus le
+  débit affiché.
+- Exactitude : estimation `~` pendant les deltas, puis numérateur provider exact
+  et durée cumulée des fenêtres de stream à chaque fin de tour.
+- Fichiers : `activity-strip/state.ts`, `activity-strip/render.ts`,
+  `activity-strip.ts`, `activity-strip/README.md`.
+- Tests : smoke multi-tour à 30 tok/s exact et piste ≤ 24 colonnes ; `make
+pi-test` complet au vert (187 tests UI).
+- Suite : `/reload` puis validation visuelle utilisateur.

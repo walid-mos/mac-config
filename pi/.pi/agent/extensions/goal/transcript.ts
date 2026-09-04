@@ -1,3 +1,7 @@
+import {
+	GOAL_CONTINUE_PROMPT_PREFIX,
+	GOAL_KICKOFF_PROMPT_PREFIX,
+} from './presentation.ts'
 import { sanitizeResultText } from './sanitize.ts'
 import { isRecord } from './values.ts'
 
@@ -12,8 +16,12 @@ import type { SessionEntry } from '@earendil-works/pi-coding-agent'
 
 const TRANSCRIPT_ENTRY_BUDGET = 30
 const TRANSCRIPT_CHAR_BUDGET = 20_000
+const TOOL_CALL_CHAR_BUDGET = 2_000
 const TOOL_RESULT_CHAR_BUDGET = 4_000
-const INTERNAL_GOAL_PROMPTS = ['Goal actif:', 'Goal toujours actif:']
+const INTERNAL_GOAL_PROMPTS = [
+	GOAL_KICKOFF_PROMPT_PREFIX,
+	GOAL_CONTINUE_PROMPT_PREFIX,
+]
 
 export type TranscriptExcerpt = {
 	text: string
@@ -54,31 +62,56 @@ function countToolCalls(message: AgentMessage): number {
 }
 
 function transcriptChunk(message: AgentMessage): string | undefined {
-	if (isAssistantMessage(message)) {
-		const text = assistantText(message)
-		return text ? `ASSISTANT:\n${sanitizeResultText(text)}` : undefined
+	if (isAssistantMessage(message)) return assistantTranscriptChunk(message)
+	if (isToolResultMessage(message)) return toolResultTranscriptChunk(message)
+	if (!isUserMessage(message)) return undefined
+	const text = userText(message.content)
+	return text && !isInternalGoalPrompt(text)
+		? `USER:\n${clipHead(sanitizeResultText(text), 400)}`
+		: undefined
+}
+
+function assistantTranscriptChunk(
+	message: AssistantMessage,
+): string | undefined {
+	const chunks: string[] = []
+	const text = assistantText(message)
+	if (text) chunks.push(`ASSISTANT:\n${sanitizeResultText(text)}`)
+	for (const part of message.content) {
+		if (part.type !== 'toolCall') continue
+		const identity = `${sanitizeResultText(part.name)} (${sanitizeResultText(part.id)})`
+		chunks.push(
+			`TOOL CALL ${identity}:\n${clipHead(
+				sanitizeResultText(serializeToolArguments(part.arguments)),
+				TOOL_CALL_CHAR_BUDGET,
+			)}`,
+		)
 	}
-	if (isToolResultMessage(message)) {
-		const text = textParts(message.content)
-			.map(part => part.text)
-			.join('\n')
-		return text
-			? `TOOL ${sanitizeResultText(message.toolName)}:\n${clipTail(
-					sanitizeResultText(text),
-					TOOL_RESULT_CHAR_BUDGET,
-				)}`
-			: undefined
-	}
-	if (isUserMessage(message)) {
-		const text = userText(message.content)
-		if (text && !isInternalGoalPrompt(text))
-			return `USER:\n${clipHead(sanitizeResultText(text), 400)}`
-	}
-	return undefined
+	return chunks.join('\n') || undefined
+}
+
+function toolResultTranscriptChunk(message: ToolResultMessage): string {
+	const text = textParts(message.content)
+		.map(part => part.text)
+		.join('\n')
+	const identity = `${sanitizeResultText(message.toolName)} (${sanitizeResultText(message.toolCallId)})`
+	const status = message.isError ? 'ERROR' : 'OK'
+	const output = text
+		? clipTail(sanitizeResultText(text), TOOL_RESULT_CHAR_BUDGET)
+		: '(empty output)'
+	return `TOOL RESULT ${status} ${identity}:\n${output}`
 }
 
 function isInternalGoalPrompt(text: string): boolean {
 	return INTERNAL_GOAL_PROMPTS.some(prefix => text.startsWith(prefix))
+}
+
+function serializeToolArguments(value: unknown): string {
+	try {
+		return JSON.stringify(value) ?? '{}'
+	} catch {
+		return '[unserializable arguments]'
+	}
 }
 
 function clipHead(value: string, max: number): string {

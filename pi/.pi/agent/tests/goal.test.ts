@@ -1,9 +1,18 @@
 import assert from 'node:assert/strict'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { registerHooks } from 'node:module'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 import { loadEvaluatorCandidates } from '../extensions/goal/config.ts'
+
+import type {
+	GoalState,
+	ParsedEvaluatorReply,
+} from '../extensions/goal/contracts.ts'
+import type { AssistantMessage, StopReason } from '@earendil-works/pi-ai'
 
 const typeboxStub = `data:text/javascript,${encodeURIComponent(
 	'export const Type = { Object: properties => ({ properties }), String: options => options }',
@@ -18,6 +27,7 @@ registerHooks({
 })
 
 const {
+	countCurrentTurnToolCalls,
 	decideEvaluatedGoal,
 	default: goalExtension,
 	evaluateWithFallback,
@@ -28,32 +38,15 @@ const {
 	selectEvaluatorAttempts,
 	updateProofLedger,
 } = await import('../extensions/goal.ts')
+const { parseEvaluatorReply } =
+	await import('../extensions/goal/evaluation-reply.ts')
+const { formatStatus } = await import('../extensions/goal/presentation.ts')
+const { collectTranscriptExcerpt } =
+	await import('../extensions/goal/transcript.ts')
 
+const agentDirectory = fileURLToPath(new URL('..', import.meta.url))
+process.env.PI_CODING_AGENT_DIR = agentDirectory
 const configPath = fileURLToPath(new URL('../goal.json', import.meta.url))
-
-type GoalStatus = 'active' | 'met' | 'impossible' | 'cleared' | 'stuck'
-
-type GoalState = {
-	condition: string
-	startedAt: string
-	turnsEvaluated: number
-	noToolTurns: number
-	maxTurns: number
-	lastVerdict: string | null
-	lastReason: string
-	proofs?: string[]
-	status: GoalStatus
-}
-
-type ParsedEvaluatorReply =
-	| {
-			ok: true
-			verdict: 'not_yet' | 'met' | 'impossible'
-			reason: string
-			proofs: string[]
-			invalidatedProofs: string[]
-	  }
-	| { ok: false; reason: string }
 
 type FakeUi = {
 	notify: () => void
@@ -110,13 +103,32 @@ function fakeUi(): FakeUi {
 	}
 }
 
-function assistantReply(payload: unknown): {
-	role: 'assistant'
-	content: Array<{ type: 'text'; text: string }>
-} {
+function assistantReply(
+	payload: unknown,
+	stopReason: StopReason = 'stop',
+): AssistantMessage {
 	return {
 		role: 'assistant',
 		content: [{ type: 'text', text: JSON.stringify(payload) }],
+		api: 'openai-responses',
+		provider: 'openai',
+		model: 'test-evaluator',
+		usage: {
+			input: 0,
+			output: 0,
+			cacheRead: 0,
+			cacheWrite: 0,
+			totalTokens: 0,
+			cost: {
+				input: 0,
+				output: 0,
+				cacheRead: 0,
+				cacheWrite: 0,
+				total: 0,
+			},
+		},
+		stopReason,
+		timestamp: 0,
 	}
 }
 
@@ -153,12 +165,17 @@ function installGoal(): {
 }
 
 function evaluatorContext(
-	complete: () => Promise<unknown>,
+	complete: (
+		model?: { provider?: string; id?: string },
+		context?: unknown,
+		options?: Record<string, unknown>,
+	) => Promise<unknown>,
 	ui: FakeUi,
-	extra: { abort?: () => void } = {},
+	extra: { abort?: () => void; getBranch?: () => unknown[] } = {},
 ): Record<string, unknown> {
+	const { getBranch, ...rest } = extra
 	return {
-		...extra,
+		...rest,
 		modelRegistry: {
 			complete,
 			find(provider: string, id: string) {
@@ -170,10 +187,23 @@ function evaluatorContext(
 		},
 		scopedModels: [],
 		sessionManager: {
-			getBranch: () => [],
+			getBranch: getBranch ?? (() => []),
 		},
 		ui,
 	}
+}
+
+function ignoreResolution<T>(_value: T | PromiseLike<T>): void {}
+
+function pendingValue<T = unknown>(): {
+	promise: Promise<T>
+	resolve: (value: T | PromiseLike<T>) => void
+} {
+	let resolve: (value: T | PromiseLike<T>) => void = ignoreResolution
+	const promise = new Promise<T>(release => {
+		resolve = release
+	})
+	return { promise, resolve }
 }
 
 test('parseEvaluatorText accepts proofs and invalidatedProofs', () => {
@@ -281,6 +311,29 @@ test('parseEvaluatorText failures: no JSON, bad JSON, unknown verdict, non-objec
 		ok: false,
 		reason: 'Evaluator returned no JSON.',
 	})
+})
+
+test('parseEvaluatorReply rejects every non-success stop reason', () => {
+	const payload = {
+		verdict: 'met',
+		reason: 'Looks complete.',
+		proofs: ['test passed'],
+		invalidatedProofs: [],
+	}
+	const nonSuccessReasons: StopReason[] = [
+		'pending',
+		'length',
+		'toolUse',
+		'error',
+		'aborted',
+		'deferred',
+	]
+	for (const stopReason of nonSuccessReasons) {
+		const result = parseEvaluatorReply(assistantReply(payload, stopReason))
+		assert.equal(result.ok, false)
+		if (!result.ok) assert.match(result.reason, new RegExp(stopReason))
+	}
+	assert.equal(parseEvaluatorReply(assistantReply(payload)).ok, true)
 })
 
 test('updateProofLedger removes invalidated proofs, appends, and normalizes whitespace', () => {
@@ -573,14 +626,22 @@ test('goalChromeLines returns three lines truncated to width', () => {
 	)
 })
 
+test('formatStatus distinguishes active and terminal elapsed time', () => {
+	assert.match(formatStatus(activeGoal()), /\nRunning /)
+	const terminal = formatStatus(activeGoal({ status: 'met' }))
+	assert.match(terminal, /Goal \(met\):/)
+	assert.match(terminal, /\nElapsed /)
+	assert.doesNotMatch(terminal, /\nRunning /)
+})
+
 test('goal.json configures the evaluator independently', () => {
-	const config = loadEvaluatorCandidates(configPath)
-	const [first] = config
+	const candidates = loadEvaluatorCandidates(configPath)
+	const [first] = candidates
 	assert.ok(first)
 	assert.equal(first.provider, 'openai-codex')
 	assert.equal(first.id, 'gpt-5.6-luna')
 	assert.deepEqual(
-		config.map(candidate => `${candidate.provider}/${candidate.id}`),
+		candidates.map(candidate => `${candidate.provider}/${candidate.id}`),
 		['openai-codex/gpt-5.6-luna', 'openrouter/z-ai/glm-5.3-flash'],
 	)
 })
@@ -700,4 +761,477 @@ test('goal extension registers goal_set and goal, without turn_start', async t =
 		assert.equal(sentMessages.length, 0)
 		assert.equal(aborts, 0)
 	})
+
+	await t.test(
+		'branch navigation aborts stale evaluation and restores current ancestry',
+		async () => {
+			const { handlers, persisted } = installGoal()
+			const sessionStart = handlers.get('session_start')?.[0]
+			const sessionTree = handlers.get('session_tree')?.[0]
+			const settled = handlers.get('agent_settled')?.[0]
+			assert.ok(sessionStart)
+			assert.ok(sessionTree)
+			assert.ok(settled)
+
+			const abandonedBranch = [
+				{
+					type: 'custom',
+					customType: 'goal-state',
+					data: activeGoal({ condition: 'abandoned branch goal' }),
+				},
+			]
+			const currentBranch = [
+				{
+					type: 'custom',
+					customType: 'goal-state',
+					data: activeGoal({ condition: 'current branch goal' }),
+				},
+			]
+			const staleReply = pendingValue<unknown>()
+			let staleOptions: Record<string, unknown> | undefined
+			const abandonedContext = evaluatorContext(
+				async (_model, _context, options) => {
+					staleOptions = options
+					return staleReply.promise
+				},
+				ui,
+				{ getBranch: () => abandonedBranch },
+			)
+			await sessionStart({}, abandonedContext)
+			const staleSettling = settled({}, abandonedContext)
+			assert.ok(staleOptions?.signal instanceof AbortSignal)
+
+			await sessionTree(
+				{},
+				evaluatorContext(async () => staleReply.promise, ui, {
+					getBranch: () => currentBranch,
+				}),
+			)
+			assert.equal((staleOptions.signal as AbortSignal).aborted, true)
+			staleReply.resolve(
+				assistantReply({
+					verdict: 'met',
+					reason: 'Stale branch completed.',
+					proofs: ['stale proof'],
+					invalidatedProofs: [],
+				}),
+			)
+			await staleSettling
+			assert.equal(persisted.length, 0)
+
+			let evaluatorInput = ''
+			await settled(
+				{},
+				evaluatorContext(
+					async (_model, context) => {
+						evaluatorInput = JSON.stringify(context)
+						return assistantReply({
+							verdict: 'met',
+							reason: 'Current branch completed.',
+							proofs: ['current proof'],
+							invalidatedProofs: [],
+						})
+					},
+					ui,
+					{ getBranch: () => currentBranch },
+				),
+			)
+			assert.match(evaluatorInput, /current branch goal/)
+			assert.doesNotMatch(evaluatorInput, /abandoned branch goal/)
+			assert.equal(persisted.length, 1)
+			assert.match(JSON.stringify(persisted[0]), /current branch goal/)
+		},
+	)
+})
+
+test('transcript preserves tool arguments, result identity, errors, and empty output', () => {
+	const excerpt = collectTranscriptExcerpt([
+		{
+			type: 'message',
+			message: {
+				role: 'user',
+				content: '/skill:goal\n\nGoal actif: tests pass',
+			},
+		},
+		{
+			type: 'message',
+			message: {
+				role: 'assistant',
+				content: [
+					{
+						type: 'toolCall',
+						id: 'call-empty',
+						name: 'bash',
+						arguments: { command: 'git grep forbidden' },
+					},
+					{
+						type: 'toolCall',
+						id: 'call-error',
+						name: 'read',
+						arguments: { path: 'missing.txt' },
+					},
+				],
+			},
+		},
+		{
+			type: 'message',
+			message: {
+				role: 'toolResult',
+				toolCallId: 'call-empty',
+				toolName: 'bash',
+				content: [],
+				isError: false,
+			},
+		},
+		{
+			type: 'message',
+			message: {
+				role: 'toolResult',
+				toolCallId: 'call-error',
+				toolName: 'read',
+				content: [{ type: 'text', text: 'not found' }],
+				isError: true,
+			},
+		},
+	])
+	assert.doesNotMatch(excerpt.text, /skill:goal|Goal actif:/)
+	assert.match(
+		excerpt.text,
+		/TOOL CALL bash \(call-empty\):\n{"command":"git grep forbidden"}/,
+	)
+	assert.match(
+		excerpt.text,
+		/TOOL RESULT OK bash \(call-empty\):\n\(empty output\)/,
+	)
+	assert.match(
+		excerpt.text,
+		/TOOL RESULT ERROR read \(call-error\):\nnot found/,
+	)
+	assert.equal(excerpt.toolCallCount, 2)
+})
+
+test('countCurrentTurnToolCalls examines only the current user turn', () => {
+	const historical = {
+		type: 'message',
+		message: {
+			role: 'assistant',
+			content: [
+				{ type: 'toolCall', id: 'old-1', name: 'bash' },
+				{ type: 'toolCall', id: 'old-2', name: 'read' },
+			],
+		},
+	}
+	const currentUser = {
+		type: 'message',
+		message: { role: 'user', content: 'continue' },
+	}
+	const currentAssistant = {
+		type: 'message',
+		message: {
+			role: 'assistant',
+			content: [
+				{ type: 'text', text: 'working' },
+				{ type: 'toolCall', id: 'now-1', name: 'bash' },
+			],
+		},
+	}
+	assert.equal(
+		countCurrentTurnToolCalls([
+			{
+				type: 'message',
+				message: { role: 'user', content: 'start' },
+			},
+			historical,
+			{ type: 'custom', customType: 'ignored' },
+			currentUser,
+			currentAssistant,
+			{
+				type: 'message',
+				message: {
+					role: 'assistant',
+					content: [{ type: 'toolCall', id: 'now-2', name: 'read' }],
+				},
+			},
+		]),
+		2,
+	)
+	assert.equal(
+		countCurrentTurnToolCalls([
+			historical,
+			currentUser,
+			{
+				type: 'message',
+				message: {
+					role: 'assistant',
+					content: [{ type: 'text', text: 'no tools this turn' }],
+				},
+			},
+		]),
+		0,
+	)
+})
+
+test('goal replacement and session_shutdown abort in-flight evaluation', async t => {
+	const ui = fakeUi()
+	const staleContinue = assistantReply({
+		verdict: 'not_yet',
+		reason: 'Stale evaluation should not continue.',
+		proofs: ['stale proof'],
+		invalidatedProofs: [],
+	})
+	const failedReply = {
+		role: 'assistant' as const,
+		content: [{ type: 'text' as const, text: 'not json' }],
+		stopReason: 'stop' as const,
+	}
+
+	async function runUntilFirstComplete(
+		tool: GoalTool,
+		handlers: Map<string, EventHandler[]>,
+	) {
+		await tool.execute(
+			'goal-set',
+			{ condition: 'obsolete goal' },
+			new AbortController().signal,
+			() => {},
+			{ ui },
+		)
+		const gate = pendingValue<unknown>()
+		const calls: Array<Record<string, unknown> | undefined> = []
+		const settled = handlers.get('agent_settled')?.[0]
+		assert.ok(settled)
+		const settling = settled(
+			{},
+			evaluatorContext(async (_model, _context, options) => {
+				calls.push(options)
+				if (calls.length === 1) {
+					return gate.promise
+				}
+				return staleContinue
+			}, ui),
+		)
+		assert.equal(calls.length, 1)
+		const [options] = calls
+		assert.ok(options)
+		return { gate, options, settling }
+	}
+
+	await t.test(
+		'replacement aborts the evaluator, skips fallback, and emits no stale state',
+		async () => {
+			const { handlers, persisted, sentMessages, tool } = installGoal()
+			assert.ok(tool)
+			const { gate, options, settling } = await runUntilFirstComplete(
+				tool,
+				handlers,
+			)
+
+			await tool.execute(
+				'goal-set-new',
+				{ condition: 'replacement goal' },
+				new AbortController().signal,
+				() => {},
+				{ ui },
+			)
+			assert.ok(options.signal instanceof AbortSignal)
+			assert.equal(options.signal.aborted, true)
+
+			gate.resolve(failedReply)
+			await settling
+
+			assert.equal(sentMessages.length, 0)
+			assert.equal(persisted.length, 2)
+			assert.match(JSON.stringify(persisted[0]), /obsolete goal/)
+			assert.match(JSON.stringify(persisted[1]), /replacement goal/)
+			assert.equal(
+				JSON.stringify(persisted).includes(
+					'Stale evaluation should not continue.',
+				),
+				false,
+			)
+		},
+	)
+
+	await t.test(
+		'session_shutdown aborts the evaluator, skips fallback, and emits no stale state',
+		async () => {
+			const { handlers, persisted, sentMessages, tool } = installGoal()
+			assert.ok(tool)
+			const { gate, options, settling } = await runUntilFirstComplete(
+				tool,
+				handlers,
+			)
+			const shutdown = handlers.get('session_shutdown')?.[0]
+			assert.ok(shutdown)
+			await shutdown(
+				{},
+				evaluatorContext(async () => failedReply, ui),
+			)
+			assert.ok(options.signal instanceof AbortSignal)
+			assert.equal(options.signal.aborted, true)
+
+			gate.resolve(failedReply)
+			await settling
+
+			assert.equal(sentMessages.length, 0)
+			assert.equal(persisted.length, 1)
+			assert.match(JSON.stringify(persisted[0]), /obsolete goal/)
+			assert.equal(
+				JSON.stringify(persisted).includes(
+					'Stale evaluation should not continue.',
+				),
+				false,
+			)
+		},
+	)
+})
+
+test('evaluator request options carry routed thinking, abort, timeout, no retries, and bounded tokens', async () => {
+	const ui = fakeUi()
+	const { handlers, tool } = installGoal()
+	assert.ok(tool)
+	await tool.execute(
+		'goal-set',
+		{ condition: 'tests pass' },
+		new AbortController().signal,
+		() => {},
+		{ ui },
+	)
+	let captured: Record<string, unknown> | undefined
+	const settled = handlers.get('agent_settled')?.[0]
+	assert.ok(settled)
+	await settled(
+		{},
+		evaluatorContext(async (_model, _context, options) => {
+			captured = options
+			return assistantReply({
+				verdict: 'not_yet',
+				reason: 'Still missing proof.',
+				proofs: [],
+				invalidatedProofs: [],
+			})
+		}, ui),
+	)
+	assert.ok(captured)
+	const [first] = loadEvaluatorCandidates(configPath)
+	assert.ok(first)
+	assert.equal(
+		captured.reasoningEffort,
+		first.thinkingLevel === 'off' ? undefined : first.thinkingLevel,
+	)
+	assert.equal(captured.signal instanceof AbortSignal, true)
+	assert.equal(typeof captured.timeoutMs, 'number')
+	assert.equal(Number.isFinite(captured.timeoutMs), true)
+	assert.ok((captured.timeoutMs as number) > 0)
+	assert.equal(captured.maxRetries, 0)
+	assert.equal(typeof captured.maxTokens, 'number')
+	assert.equal(Number.isFinite(captured.maxTokens), true)
+	assert.ok((captured.maxTokens as number) > 0)
+	assert.ok((captured.maxTokens as number) <= 8192)
+})
+
+test('evaluator-bound condition and transcript redact credential-like secrets', async () => {
+	const ui = fakeUi()
+	const { handlers, tool } = installGoal()
+	assert.ok(tool)
+	const apiKey = 'sk-abcdefghijklmnopqrstuvwxyz'
+	const password = 'hunter2-credential'
+	await tool.execute(
+		'goal-set',
+		{ condition: `tests pass OPENAI_API_KEY=${apiKey}` },
+		new AbortController().signal,
+		() => {},
+		{ ui },
+	)
+	let bound = ''
+	const settled = handlers.get('agent_settled')?.[0]
+	assert.ok(settled)
+	await settled(
+		{},
+		evaluatorContext(
+			async (_model, context) => {
+				bound = JSON.stringify(context)
+				return assistantReply({
+					verdict: 'not_yet',
+					reason: 'Still missing proof.',
+					proofs: [],
+					invalidatedProofs: [],
+				})
+			},
+			ui,
+			{
+				getBranch: () => [
+					{
+						type: 'message',
+						message: {
+							role: 'user',
+							content: `token=${apiKey}`,
+						},
+					},
+					{
+						type: 'message',
+						message: {
+							role: 'assistant',
+							content: [
+								{
+									type: 'text',
+									text: `password=${password}`,
+								},
+							],
+						},
+					},
+				],
+			},
+		),
+	)
+	assert.ok(bound.includes('Condition:'))
+	assert.ok(bound.includes('Recent transcript excerpt:'))
+	assert.equal(bound.includes(apiKey), false)
+	assert.equal(bound.includes(password), false)
+	assert.match(bound, /\[REDACTED\]/)
+})
+
+test('goalChromeLines renders multiline and control-containing state as safe single terminal lines', () => {
+	const lines = goalChromeLines(
+		activeGoal({
+			condition: 'fix\nALL\r\nthe\tthings\u001b[31mRED\u001b[0m\u0007',
+			lastReason:
+				'waiting\nfor\rproof\u001b]8;;https://evil.example\u0007click',
+		}),
+		80,
+	)
+	assert.equal(lines.length, 3)
+	for (const line of lines) {
+		assert.equal(line.includes('\n'), false)
+		assert.equal(line.includes('\r'), false)
+		assert.equal(line.includes('\t'), false)
+		assert.equal(
+			/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(line),
+			false,
+		)
+	}
+	assert.match(lines[1] ?? '', /fix ALL the thingsRED/)
+	assert.match(lines[2] ?? '', /waiting forproofclick/)
+})
+
+test('whitespace-only goal_set is rejected', async () => {
+	const ui = fakeUi()
+	const { persisted, sentMessages, tool } = installGoal()
+	assert.ok(tool)
+	await assert.rejects(
+		() =>
+			tool.execute(
+				'goal-set-blank',
+				{ condition: ' \n\t ' },
+				new AbortController().signal,
+				() => {},
+				{ ui },
+			),
+		{
+			name: 'Error',
+			message: 'Goal condition must not be empty.',
+		},
+	)
+	assert.equal(persisted.length, 0)
+	assert.equal(sentMessages.length, 0)
 })

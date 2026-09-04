@@ -149,10 +149,18 @@ export default function goalExtension(pi: ExtensionAPI): void {
 		},
 	})
 
-	pi.on('session_start', async (_event, ctx) => {
+	function restoreBranchGoal(ctx: ExtensionContext): void {
 		cancelEvaluation()
-		active = restoreActiveGoal(ctx.sessionManager.getEntries())
+		active = restoreActiveGoal(ctx.sessionManager.getBranch())
 		chrome.render(ctx, active)
+	}
+
+	pi.on('session_start', async (_event, ctx) => {
+		restoreBranchGoal(ctx)
+	})
+
+	pi.on('session_tree', async (_event, ctx) => {
+		restoreBranchGoal(ctx)
 	})
 
 	pi.on('session_shutdown', async (_event, ctx) => {

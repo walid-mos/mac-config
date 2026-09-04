@@ -6,6 +6,9 @@ import type {
 	ExtensionContext,
 } from '@earendil-works/pi-coding-agent'
 
+export const GOAL_KICKOFF_PROMPT_PREFIX = '/skill:goal'
+export const GOAL_CONTINUE_PROMPT_PREFIX = 'Goal toujours actif:'
+
 export function enactGoalDecision(
 	pi: ExtensionAPI,
 	ctx: ExtensionContext,
@@ -30,9 +33,10 @@ export function enactGoalDecision(
 export function formatStatus(state: GoalState | null): string {
 	if (!state) return 'No goal set'
 	const reason = state.lastReason ? `\nLast: ${state.lastReason}` : ''
+	const durationLabel = state.status === 'active' ? 'Running' : 'Elapsed'
 	return [
 		`Goal (${state.status}): ${state.condition}`,
-		`Running ${formatElapsed(state.startedAt)}, ${state.turnsEvaluated} evaluated turns, cap ${state.maxTurns}`,
+		`${durationLabel} ${formatElapsed(state.startedAt)}, ${state.turnsEvaluated} evaluated turns, cap ${state.maxTurns}`,
 		reason,
 	]
 		.filter(Boolean)
@@ -41,7 +45,7 @@ export function formatStatus(state: GoalState | null): string {
 
 export function kickoffPrompt(state: GoalState): string {
 	return [
-		'/skill:goal',
+		GOAL_KICKOFF_PROMPT_PREFIX,
 		'',
 		`Goal actif: ${state.condition}`,
 		'',
@@ -52,7 +56,7 @@ export function kickoffPrompt(state: GoalState): string {
 
 function continuePrompt(state: GoalState): string {
 	return [
-		`Goal toujours actif: ${state.condition}`,
+		`${GOAL_CONTINUE_PROMPT_PREFIX} ${state.condition}`,
 		`Dernier verdict: not_yet — ${state.lastReason}`,
 		`Tours évalués: ${state.turnsEvaluated}/${state.maxTurns}.`,
 		'Continue. Ne demande rien. Prouve la condition par une sortie de commande.',

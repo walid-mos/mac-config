@@ -16,11 +16,20 @@ import type { AssistantMessage } from '@earendil-works/pi-ai'
 export function parseEvaluatorReply(
 	reply: AssistantMessage,
 ): ParsedEvaluatorReply {
-	const parsed = parseEvaluatorText(assistantText(reply))
-	if (parsed.ok) return parsed
 	const contentTypes =
 		[...new Set(reply.content.map(part => part.type))].join(',') || 'none'
 	const stopReason = reply.stopReason ?? 'unknown'
+	if (stopReason !== 'stop') {
+		return {
+			ok: false,
+			reason: normalizeBoundedText(
+				`Evaluator did not complete. content=${contentTypes}, stop=${stopReason}`,
+				MAX_EVALUATOR_DIAGNOSTIC_CHARS,
+			),
+		}
+	}
+	const parsed = parseEvaluatorText(assistantText(reply))
+	if (parsed.ok) return parsed
 	return {
 		ok: false,
 		reason: normalizeBoundedText(

@@ -2,8 +2,7 @@ import {
 	GOAL_CONTINUE_PROMPT_PREFIX,
 	GOAL_KICKOFF_PROMPT_PREFIX,
 } from './presentation.ts'
-import { sanitizeResultText } from './sanitize.ts'
-import { isRecord } from './values.ts'
+import { isRecord, sanitizeEvaluatorText } from './values.ts'
 
 import type { AgentMessage } from '@earendil-works/pi-agent-core'
 import type {
@@ -16,12 +15,16 @@ import type { SessionEntry } from '@earendil-works/pi-coding-agent'
 
 const TRANSCRIPT_ENTRY_BUDGET = 30
 const TRANSCRIPT_CHAR_BUDGET = 20_000
+const USER_TEXT_CHAR_BUDGET = 800
+const ASSISTANT_TEXT_CHAR_BUDGET = 4_000
 const TOOL_CALL_CHAR_BUDGET = 2_000
 const TOOL_RESULT_CHAR_BUDGET = 4_000
 const INTERNAL_GOAL_PROMPTS = [
 	GOAL_KICKOFF_PROMPT_PREFIX,
 	GOAL_CONTINUE_PROMPT_PREFIX,
 ]
+const EXPANDED_GOAL_PROMPT = /^<skill\s+name=(?:"goal"|'goal')(?:\s|>)/u
+const CONTENT_OMISSION = '\n… [content omitted] …\n'
 
 export type TranscriptExcerpt = {
 	text: string
@@ -38,7 +41,7 @@ export function collectTranscriptExcerpt(
 		if (chunk) chunks.push(chunk)
 	}
 	return {
-		text: clipTail(chunks.join('\n\n'), TRANSCRIPT_CHAR_BUDGET),
+		text: clipEvidence(chunks.join('\n\n'), TRANSCRIPT_CHAR_BUDGET),
 		toolCallCount: countCurrentTurnToolCalls(branch),
 	}
 }
@@ -67,7 +70,7 @@ function transcriptChunk(message: AgentMessage): string | undefined {
 	if (!isUserMessage(message)) return undefined
 	const text = userText(message.content)
 	return text && !isInternalGoalPrompt(text)
-		? `USER:\n${clipHead(sanitizeResultText(text), 400)}`
+		? `USER:\n${boundedSanitizedEvidence(text, 400)}`
 		: undefined
 }
 
@@ -75,14 +78,14 @@ function assistantTranscriptChunk(
 	message: AssistantMessage,
 ): string | undefined {
 	const chunks: string[] = []
-	const text = assistantText(message)
-	if (text) chunks.push(`ASSISTANT:\n${sanitizeResultText(text)}`)
+	const text = boundedTextParts(message.content, ASSISTANT_TEXT_CHAR_BUDGET)
+	if (text) chunks.push(`ASSISTANT:\n${sanitizeEvaluatorText(text).trim()}`)
 	for (const part of message.content) {
 		if (part.type !== 'toolCall') continue
-		const identity = `${sanitizeResultText(part.name)} (${sanitizeResultText(part.id)})`
+		const identity = `${sanitizeEvaluatorText(part.name)} (${sanitizeEvaluatorText(part.id)})`
 		chunks.push(
-			`TOOL CALL ${identity}:\n${clipHead(
-				sanitizeResultText(serializeToolArguments(part.arguments)),
+			`TOOL CALL ${identity}:\n${boundedSanitizedEvidence(
+				serializeToolArguments(part.arguments),
 				TOOL_CALL_CHAR_BUDGET,
 			)}`,
 		)
@@ -91,19 +94,40 @@ function assistantTranscriptChunk(
 }
 
 function toolResultTranscriptChunk(message: ToolResultMessage): string {
-	const text = textParts(message.content)
-		.map(part => part.text)
-		.join('\n')
-	const identity = `${sanitizeResultText(message.toolName)} (${sanitizeResultText(message.toolCallId)})`
+	const text = boundedTextParts(message.content, TOOL_RESULT_CHAR_BUDGET)
+	const identity = `${sanitizeEvaluatorText(message.toolName)} (${sanitizeEvaluatorText(message.toolCallId)})`
 	const status = message.isError ? 'ERROR' : 'OK'
-	const output = text
-		? clipTail(sanitizeResultText(text), TOOL_RESULT_CHAR_BUDGET)
-		: '(empty output)'
+	const output = text ? sanitizeEvaluatorText(text) : '(empty output)'
 	return `TOOL RESULT ${status} ${identity}:\n${output}`
 }
 
 function isInternalGoalPrompt(text: string): boolean {
-	return INTERNAL_GOAL_PROMPTS.some(prefix => text.startsWith(prefix))
+	return (
+		EXPANDED_GOAL_PROMPT.test(text) ||
+		INTERNAL_GOAL_PROMPTS.some(prefix => text.startsWith(prefix))
+	)
+}
+
+function boundedTextParts(
+	content: ReadonlyArray<{ type: string }>,
+	max: number,
+): string {
+	const parts = textParts(content)
+	if (parts.length === 0) return ''
+	if (parts.length === 1) return clipEvidence(parts[0]?.text ?? '', max)
+	const joinedLength = parts.reduce(
+		(total, part) => total + part.text.length,
+		parts.length - 1,
+	)
+	if (joinedLength <= max) return parts.map(part => part.text).join('\n')
+	const available = Math.max(0, max - CONTENT_OMISSION.length)
+	const headLength = Math.ceil(available / 2)
+	const tailLength = available - headLength
+	return `${clipHead(parts[0]?.text ?? '', headLength)}${CONTENT_OMISSION}${clipTail(parts.at(-1)?.text ?? '', tailLength)}`
+}
+
+function boundedSanitizedEvidence(value: string, max: number): string {
+	return sanitizeEvaluatorText(clipEvidence(value, max))
 }
 
 function serializeToolArguments(value: unknown): string {
@@ -112,6 +136,17 @@ function serializeToolArguments(value: unknown): string {
 	} catch {
 		return '[unserializable arguments]'
 	}
+}
+
+function clipEvidence(value: string, max: number): string {
+	if (value.length <= max) return value
+	const omission = '\n… [evidence omitted] …\n'
+	const available = Math.max(0, max - omission.length)
+	const headLength = Math.ceil(available / 2)
+	return `${clipHead(value, headLength)}${omission}${clipTail(
+		value,
+		available - headLength,
+	)}`
 }
 
 function clipHead(value: string, max: number): string {
@@ -143,17 +178,16 @@ function textParts(content: ReadonlyArray<{ type: string }>): TextContent[] {
 }
 
 function userText(content: unknown): string {
-	if (typeof content === 'string') return content
+	if (typeof content === 'string')
+		return clipEvidence(content, USER_TEXT_CHAR_BUDGET)
 	if (!Array.isArray(content)) return ''
-	return content
-		.filter(
-			(part): part is TextContent =>
-				isRecord(part) &&
-				part.type === 'text' &&
-				typeof part.text === 'string',
-		)
-		.map(part => part.text)
-		.join('\n')
+	const text = content.filter(
+		(part): part is TextContent =>
+			isRecord(part) &&
+			part.type === 'text' &&
+			typeof part.text === 'string',
+	)
+	return boundedTextParts(text, USER_TEXT_CHAR_BUDGET)
 }
 
 function isAssistantMessage(value: AgentMessage): value is AssistantMessage {

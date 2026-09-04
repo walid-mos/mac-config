@@ -16,6 +16,7 @@ import {
 	formatStatus,
 	kickoffPrompt,
 } from './goal/presentation.ts'
+import { sanitizeDisplayLine } from './goal/sanitize.ts'
 import {
 	createGoal,
 	decideEvaluatedGoal,
@@ -73,7 +74,10 @@ export default function goalExtension(pi: ExtensionAPI): void {
 		persist(next)
 		active = next
 		chrome.render(ctx, next)
-		ctx.ui.notify(`Goal set: ${next.condition}`, 'info')
+		ctx.ui.notify(
+			`Goal set: ${sanitizeDisplayLine(next.condition)}`,
+			'info',
+		)
 		return next
 	}
 
@@ -84,6 +88,17 @@ export default function goalExtension(pi: ExtensionAPI): void {
 		persist(closed)
 		active = status === 'cleared' ? null : closed
 		chrome.render(ctx, active)
+	}
+
+	function rollbackGoalStart(
+		previous: GoalState | null,
+		started: GoalState,
+		ctx: ExtensionContext,
+	): void {
+		cancelEvaluation()
+		persist(previous ?? { ...started, status: 'cleared' })
+		active = previous
+		chrome.render(ctx, previous)
 	}
 
 	pi.registerCommand('goal', {
@@ -113,10 +128,17 @@ export default function goalExtension(pi: ExtensionAPI): void {
 				return
 			}
 			try {
+				const previous = active
 				const next = setGoal(input, ctx)
-				pi.sendUserMessage(kickoffPrompt(next), {
-					expandPromptTemplates: true,
-				})
+				try {
+					pi.sendUserMessage(kickoffPrompt(next), {
+						deliverAs: 'followUp',
+						expandPromptTemplates: true,
+					})
+				} catch (error: unknown) {
+					rollbackGoalStart(previous, next, ctx)
+					throw error
+				}
 			} catch (error: unknown) {
 				ctx.ui.notify(errorMessage(error), 'error')
 			}
@@ -157,6 +179,10 @@ export default function goalExtension(pi: ExtensionAPI): void {
 
 	pi.on('session_start', async (_event, ctx) => {
 		restoreBranchGoal(ctx)
+	})
+
+	pi.on('agent_start', async () => {
+		cancelEvaluation()
 	})
 
 	pi.on('session_tree', async (_event, ctx) => {

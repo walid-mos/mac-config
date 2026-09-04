@@ -743,17 +743,19 @@ test('restoreGoalState normalizes unknown lastVerdict to null', () => {
 	assert.equal(restored.lastReason, 'One gate remains.')
 })
 
+function actionOf(result: unknown): unknown {
+	return result && typeof result === 'object' && 'action' in result
+		? result.action
+		: undefined
+}
+
+function textOf(result: unknown): string {
+	return result && typeof result === 'object' && 'text' in result
+		? String(result.text)
+		: ''
+}
+
 test('natural-language resume reactivates a restored paused or stuck goal', async () => {
-	function actionOf(result: unknown): unknown {
-		return result && typeof result === 'object' && 'action' in result
-			? result.action
-			: undefined
-	}
-	function textOf(result: unknown): string {
-		return result && typeof result === 'object' && 'text' in result
-			? String(result.text)
-			: ''
-	}
 	async function restoreAndInput(
 		state: GoalState,
 		text: string,

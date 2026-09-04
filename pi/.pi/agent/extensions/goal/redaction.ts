@@ -40,6 +40,8 @@ function nestedClosing(text: string, index: number, quote: string): string {
 	if (quote !== "'" && character === '$')
 		return SHELL_NESTING_PAIRS[text[index + 1] ?? ''] ?? ''
 	if (quote !== "'" && character === '`') return '`'
+	if (!quote && (character === '<' || character === '>'))
+		return text[index + 1] === '(' ? ')' : ''
 	if (quote) return ''
 	return SHELL_NESTING_PAIRS[character] ?? ''
 }
@@ -56,6 +58,19 @@ function isQuote(character: string): boolean {
 
 function isWordBoundary(scan: ShellScan, character: string): boolean {
 	return scan.contexts.length === 1 && isShellDelimiter(character)
+}
+
+function isFailClosedNesting(character: string): boolean {
+	return (
+		character === '$' ||
+		character === '`' ||
+		character === '<' ||
+		character === '>'
+	)
+}
+
+function nestingWidth(character: string): number {
+	return character === '`' || SHELL_NESTING_PAIRS[character] ? 1 : 2
 }
 
 function consumeQuotedCharacter(
@@ -81,9 +96,9 @@ function advanceShellCharacter(text: string, scan: ShellScan): boolean {
 	}
 	const closing = nestedClosing(text, scan.index, active.quote)
 	if (closing) {
-		if (character === '$' || character === '`') scan.failClosed = true
+		if (isFailClosedNesting(character)) scan.failClosed = true
 		scan.contexts.push({ closing, quote: '' })
-		scan.index += character === '$' ? 2 : 1
+		scan.index += nestingWidth(character)
 		return true
 	}
 	if (consumeQuotedCharacter(active, character)) {

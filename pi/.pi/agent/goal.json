@@ -1,0 +1,12 @@
+[
+	{
+		"provider": "openai-codex",
+		"id": "gpt-5.6-luna",
+		"thinkingLevel": "medium"
+	},
+	{
+		"provider": "openrouter",
+		"id": "z-ai/glm-5.3-flash",
+		"thinkingLevel": "high"
+	}
+]

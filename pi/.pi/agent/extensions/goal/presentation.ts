@@ -15,26 +15,31 @@ export function enactGoalDecision(
 	ctx: ExtensionContext,
 	next: GoalState,
 	decision: GoalLoopDecision,
-): void {
+): string | null {
 	if (decision.action === 'continue') {
+		try {
+			pi.sendUserMessage(continuePrompt(next), { deliverAs: 'followUp' })
+		} catch (error: unknown) {
+			return errorMessage(error)
+		}
 		ctx.ui.notify(
 			`◎ goal not yet: ${sanitizeDisplayLine(decision.reason)}`,
 			'info',
 		)
-		pi.sendUserMessage(continuePrompt(next), { deliverAs: 'followUp' })
-		return
+		return null
 	}
 	if (decision.action === 'pause') {
 		ctx.ui.notify(
 			`Goal paused: ${sanitizeDisplayLine(decision.reason)}`,
 			'warning',
 		)
-		return
+		return null
 	}
 	ctx.ui.notify(
 		`Goal ${decision.verdict}: ${sanitizeDisplayLine(decision.reason)}`,
 		decision.verdict === 'met' ? 'info' : 'warning',
 	)
+	return null
 }
 
 export function formatStatus(state: GoalState | null): string {

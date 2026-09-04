@@ -3,12 +3,19 @@ import { sanitizeResultText } from './sanitize.ts'
 
 const REDACTED = '[REDACTED]'
 const BASIC_AUTHORIZATION = /(\bAuthorization\s*:\s*Basic\s+)[A-Za-z0-9+/=]+/giu
+const EVALUATOR_SECRET_KIND =
+	'(?:api[_-]?key|private[_-]?key|access[_-]?token|auth[_-]?token|refresh[_-]?token|id[_-]?token|token|password|passwd|secret|client[_-]?secret)'
+const QUOTED_SECRET_ASSIGNMENT = new RegExp(
+	`(\\b(?:[a-z0-9]+[_-])*${EVALUATOR_SECRET_KIND}\\b\\s*(?:=|:)\\s*)(["']).*?\\2`,
+	'giu',
+)
 const PRIVATE_KEY_BLOCK =
 	/-----BEGIN ([A-Z0-9 ]*PRIVATE KEY)-----[\s\S]*?(?:-----END \1-----|$)/gu
 
 export function sanitizeEvaluatorText(value: string): string {
 	return sanitizeResultText(value)
 		.replaceAll(BASIC_AUTHORIZATION, `$1${REDACTED}`)
+		.replaceAll(QUOTED_SECRET_ASSIGNMENT, `$1$2${REDACTED}$2`)
 		.replaceAll(PRIVATE_KEY_BLOCK, REDACTED)
 }
 

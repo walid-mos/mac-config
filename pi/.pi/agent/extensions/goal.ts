@@ -227,7 +227,19 @@ export default function goalExtension(pi: ExtensionAPI): void {
 			persist(next)
 			active = next
 			chrome.render(ctx, next)
-			enactGoalDecision(pi, ctx, next, decision)
+			const dispatchError = enactGoalDecision(pi, ctx, next, decision)
+			if (dispatchError) {
+				const stopped: GoalState = {
+					...next,
+					lastVerdict: 'stuck',
+					lastReason: `Continuation failed: ${dispatchError}`,
+					status: 'stuck',
+				}
+				persist(stopped)
+				active = stopped
+				chrome.render(ctx, stopped)
+				ctx.ui.notify(stopped.lastReason, 'error')
+			}
 		} finally {
 			if (evaluation === controller) evaluation = null
 		}

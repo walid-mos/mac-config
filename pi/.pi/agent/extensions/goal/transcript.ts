@@ -24,7 +24,10 @@ const INTERNAL_GOAL_PROMPTS = [
 	GOAL_CONTINUE_PROMPT_PREFIX,
 ]
 const EXPANDED_GOAL_PROMPT = /^<skill\s+name=(?:"goal"|'goal')(?:\s|>)/u
+const PRIVATE_KEY_BEGIN = /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/u
+const SECRET_CONTEXT_CHARS = 256
 const CONTENT_OMISSION = '\n… [content omitted] …\n'
+const EVIDENCE_OMISSION = '\n… [evidence omitted] …\n'
 
 export type TranscriptExcerpt = {
 	text: string
@@ -79,7 +82,7 @@ function assistantTranscriptChunk(
 ): string | undefined {
 	const chunks: string[] = []
 	const text = boundedTextParts(message.content, ASSISTANT_TEXT_CHAR_BUDGET)
-	if (text) chunks.push(`ASSISTANT:\n${sanitizeEvaluatorText(text).trim()}`)
+	if (text) chunks.push(`ASSISTANT:\n${text.trim()}`)
 	for (const part of message.content) {
 		if (part.type !== 'toolCall') continue
 		const identity = `${sanitizeEvaluatorText(part.name)} (${sanitizeEvaluatorText(part.id)})`
@@ -97,7 +100,7 @@ function toolResultTranscriptChunk(message: ToolResultMessage): string {
 	const text = boundedTextParts(message.content, TOOL_RESULT_CHAR_BUDGET)
 	const identity = `${sanitizeEvaluatorText(message.toolName)} (${sanitizeEvaluatorText(message.toolCallId)})`
 	const status = message.isError ? 'ERROR' : 'OK'
-	const output = text ? sanitizeEvaluatorText(text) : '(empty output)'
+	const output = text || '(empty output)'
 	return `TOOL RESULT ${status} ${identity}:\n${output}`
 }
 
@@ -114,20 +117,40 @@ function boundedTextParts(
 ): string {
 	const parts = textParts(content)
 	if (parts.length === 0) return ''
-	if (parts.length === 1) return clipEvidence(parts[0]?.text ?? '', max)
+	if (parts.length === 1)
+		return boundedSanitizedEvidence(parts[0]?.text ?? '', max)
 	const joinedLength = parts.reduce(
 		(total, part) => total + part.text.length,
 		parts.length - 1,
 	)
-	if (joinedLength <= max) return parts.map(part => part.text).join('\n')
+	if (joinedLength <= max)
+		return sanitizeEvaluatorText(parts.map(part => part.text).join('\n'))
 	const available = Math.max(0, max - CONTENT_OMISSION.length)
 	const headLength = Math.ceil(available / 2)
 	const tailLength = available - headLength
-	return `${clipHead(parts[0]?.text ?? '', headLength)}${CONTENT_OMISSION}${clipTail(parts.at(-1)?.text ?? '', tailLength)}`
+	const boundedRaw = `${clipHead(parts[0]?.text ?? '', headLength)}${CONTENT_OMISSION}${clipTail(
+		parts.at(-1)?.text ?? '',
+		tailLength + SECRET_CONTEXT_CHARS,
+	)}`
+	return clipEvidence(sanitizeEvaluatorText(boundedRaw), max)
 }
 
 function boundedSanitizedEvidence(value: string, max: number): string {
-	return sanitizeEvaluatorText(clipEvidence(value, max))
+	if (value.length <= max) return sanitizeEvaluatorText(value)
+	const available = Math.max(0, max - EVIDENCE_OMISSION.length)
+	const headLength = Math.ceil(available / 2)
+	const tailLength = available - headLength
+	const head = clipHead(value, headLength)
+	if (PRIVATE_KEY_BEGIN.test(head)) {
+		return `${clipHead(sanitizeEvaluatorText(head), headLength)}${EVIDENCE_OMISSION}[REDACTED]`
+	}
+	const tail = sanitizeEvaluatorText(
+		clipTail(value, tailLength + SECRET_CONTEXT_CHARS),
+	)
+	return `${sanitizeEvaluatorText(head)}${EVIDENCE_OMISSION}${clipTail(
+		tail,
+		tailLength,
+	)}`
 }
 
 function serializeToolArguments(value: unknown): string {
@@ -140,10 +163,9 @@ function serializeToolArguments(value: unknown): string {
 
 function clipEvidence(value: string, max: number): string {
 	if (value.length <= max) return value
-	const omission = '\n… [evidence omitted] …\n'
-	const available = Math.max(0, max - omission.length)
+	const available = Math.max(0, max - EVIDENCE_OMISSION.length)
 	const headLength = Math.ceil(available / 2)
-	return `${clipHead(value, headLength)}${omission}${clipTail(
+	return `${clipHead(value, headLength)}${EVIDENCE_OMISSION}${clipTail(
 		value,
 		available - headLength,
 	)}`
@@ -178,8 +200,7 @@ function textParts(content: ReadonlyArray<{ type: string }>): TextContent[] {
 }
 
 function userText(content: unknown): string {
-	if (typeof content === 'string')
-		return clipEvidence(content, USER_TEXT_CHAR_BUDGET)
+	if (typeof content === 'string') return content
 	if (!Array.isArray(content)) return ''
 	const text = content.filter(
 		(part): part is TextContent =>

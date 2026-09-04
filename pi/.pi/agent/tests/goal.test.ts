@@ -1304,6 +1304,44 @@ test('evaluator request options carry routed thinking, abort, timeout, no retrie
 	assert.ok((captured.maxTokens as number) <= 8192)
 })
 
+test('failed continuation enqueue stops the active goal', async () => {
+	const notifications: string[] = []
+	const ui = fakeUi(notifications)
+	const { handlers, persisted, sentMessages, tool } = installGoal({
+		sendError: new Error('follow-up queue unavailable'),
+	})
+	assert.ok(tool)
+	await tool.execute(
+		'goal-set',
+		{ condition: 'tests pass' },
+		new AbortController().signal,
+		() => {},
+		{ ui },
+	)
+	const settled = handlers.get('agent_settled')?.[0]
+	assert.ok(settled)
+	await settled(
+		{},
+		evaluatorContext(
+			async () =>
+				assistantReply({
+					verdict: 'not_yet',
+					reason: 'One check remains.',
+					proofs: [],
+					invalidatedProofs: [],
+				}),
+			ui,
+		),
+	)
+	assert.equal(sentMessages.length, 0)
+	assert.match(JSON.stringify(persisted.at(-1)), /"status":"stuck"/)
+	assert.match(
+		JSON.stringify(persisted.at(-1)),
+		/Continuation failed: follow-up queue unavailable/,
+	)
+	assert.match(notifications.at(-1) ?? '', /Continuation failed/)
+})
+
 test('evaluator reason cannot inject follow-up instructions or terminal controls', async () => {
 	const notifications: string[] = []
 	const ui = fakeUi(notifications)
@@ -1355,6 +1393,8 @@ test('evaluator-bound condition and transcript redact credential-like secrets', 
 	const password = 'hunter2-credential'
 	const basicCredential = 'dXNlcjpwYXNz'
 	const privateKeyBody = 'cHJpdmF0ZS1rZXktbWF0ZXJpYWw='
+	const quotedPassword = 'correct horse battery staple'
+	const splitToken = 'a'.repeat(500)
 	const privateKey = [
 		'-----BEGIN PRIVATE KEY-----',
 		privateKeyBody,
@@ -1401,11 +1441,27 @@ test('evaluator-bound condition and transcript redact credential-like secrets', 
 									type: 'text',
 									text: [
 										`password=${password}`,
+										`password='${quotedPassword}'`,
 										`Authorization: Basic ${basicCredential}`,
 										privateKey,
 									].join('\n'),
 								},
 							],
+						},
+					},
+					{
+						type: 'message',
+						message: {
+							role: 'toolResult',
+							toolCallId: 'split-secret',
+							toolName: 'read',
+							content: [
+								{
+									type: 'text',
+									text: `${'x'.repeat(3_000)}\ntoken=${splitToken}${'z'.repeat(1_486)}`,
+								},
+							],
+							isError: false,
 						},
 					},
 				],
@@ -1418,6 +1474,8 @@ test('evaluator-bound condition and transcript redact credential-like secrets', 
 	assert.equal(bound.includes(password), false)
 	assert.equal(bound.includes(basicCredential), false)
 	assert.equal(bound.includes(privateKeyBody), false)
+	assert.equal(bound.includes(quotedPassword), false)
+	assert.doesNotMatch(bound, /a{100}/)
 	assert.doesNotMatch(bound, /BEGIN PRIVATE KEY/)
 	assert.match(bound, /\[REDACTED\]/)
 })

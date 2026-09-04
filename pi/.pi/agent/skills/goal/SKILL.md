@@ -35,14 +35,14 @@ A goal is active, or the user just set one. Work until the condition is
 4. **One verifiable step per turn.** Prefer a command result over a
    paragraph. `list`, `wait`, repeated reviews and cancellations are not
    progress unless they produce materially new proof.
-5. **Bound work.** Complete only the smallest slice needed for the next
-   proof. Never rerun an exhaustive review after every small correction;
-   finish a coherent implementation slice, ingest existing findings, then
-   run one final fresh review.
-6. **Stop on resource failure.** A provider quota, usage limit, exhausted
-   root budget or failed assistant turn pauses the goal. Do not retry through
-   another continuation or substitute provider unless the user starts a new
-   goal after resources are available.
+5. **Keep review lanes stable.** Use one persistent reviewer per independent
+   domain and send it every later batch. Never launch a replacement review
+   wave after a fix. Each confirmed finding gets a fresh implementer
+   immediately; parallelize only disjoint file ownership.
+6. **Stop on resource failure.** A provider quota, uncached-token limit or
+   failed assistant turn pauses the goal. Do not retry automatically. Once
+   resources are available, a natural-language request to resume reactivates
+   the interrupted goal; the user need not repeat `/goal` or its condition.
 7. **Do not stop because you feel done.** Stop because the condition's
    stated check just succeeded in this transcript, or because it cannot
    succeed (missing access, contradictory constraint, red lock you cannot

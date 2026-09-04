@@ -12,7 +12,7 @@ const JSON_LITERAL_ASSIGNMENT = new RegExp(
 	'giu',
 )
 const SHELL_SECRET_PREFIX = new RegExp(
-	`\\b${SECRET_NAME}\\b(?:\\s*(?:=|:)\\s*|\\s+)`,
+	`\\b${SECRET_NAME}\\b(?:\\s*(?:\\+?=|:)\\s*|\\s+)`,
 	'giu',
 )
 const BEARER = /(\bBearer\s+)[A-Za-z0-9._~+/=-]+/giu

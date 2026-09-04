@@ -37,14 +37,18 @@ type ShellContext = { closing: string; quote: string }
 
 function nestedClosing(text: string, index: number, quote: string): string {
 	const character = text[index] ?? ''
-	if (quote !== "'" && character === '$' && text[index + 1] === '(')
-		return ')'
+	if (quote !== "'" && character === '$')
+		return SHELL_NESTING_PAIRS[text[index + 1] ?? ''] ?? ''
 	if (quote !== "'" && character === '`') return '`'
 	if (quote) return ''
 	return SHELL_NESTING_PAIRS[character] ?? ''
 }
 
-type ShellScan = { contexts: ShellContext[]; index: number }
+type ShellScan = {
+	contexts: ShellContext[]
+	failClosed: boolean
+	index: number
+}
 
 function isQuote(character: string): boolean {
 	return character === '"' || character === "'"
@@ -52,6 +56,15 @@ function isQuote(character: string): boolean {
 
 function isWordBoundary(scan: ShellScan, character: string): boolean {
 	return scan.contexts.length === 1 && isShellDelimiter(character)
+}
+
+function consumeQuotedCharacter(
+	active: ShellContext,
+	character: string,
+): boolean {
+	if (!active.quote) return false
+	if (character === active.quote) active.quote = ''
+	return true
 }
 
 function advanceShellCharacter(text: string, scan: ShellScan): boolean {
@@ -68,12 +81,12 @@ function advanceShellCharacter(text: string, scan: ShellScan): boolean {
 	}
 	const closing = nestedClosing(text, scan.index, active.quote)
 	if (closing) {
+		if (character === '$' || character === '`') scan.failClosed = true
 		scan.contexts.push({ closing, quote: '' })
 		scan.index += character === '$' ? 2 : 1
 		return true
 	}
-	if (active.quote) {
-		if (character === active.quote) active.quote = ''
+	if (consumeQuotedCharacter(active, character)) {
 		scan.index += 1
 		return true
 	}
@@ -90,12 +103,13 @@ function advanceShellCharacter(text: string, scan: ShellScan): boolean {
 function shellWordEnd(text: string, start: number): number {
 	const scan: ShellScan = {
 		contexts: [{ closing: '', quote: '' }],
+		failClosed: false,
 		index: start,
 	}
 	while (scan.index < text.length && advanceShellCharacter(text, scan)) {
 		// The scanner advances one complete shell token at a time.
 	}
-	return scan.index
+	return scan.failClosed ? text.length : scan.index
 }
 
 function redactShellSecrets(text: string): string {

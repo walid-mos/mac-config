@@ -118,7 +118,7 @@ export default function goalExtension(pi: ExtensionAPI): void {
 				ctx.ui.notify(formatStatus(active), 'info')
 				return
 			}
-			if (CLEAR_ALIASES.has(input.split(/\s+/u)[0] ?? '')) {
+			if (CLEAR_ALIASES.has(input)) {
 				if (!active || active.status !== 'active') {
 					ctx.ui.notify('No goal set', 'info')
 					return

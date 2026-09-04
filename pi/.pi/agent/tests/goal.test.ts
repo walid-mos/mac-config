@@ -764,19 +764,26 @@ test('goal extension registers goal_set and goal, without turn_start', async t =
 		},
 	)
 
-	await t.test('command kickoff is queued as a follow-up', async () => {
-		const { command, handlers, sentMessages } = installGoal()
-		assert.ok(command)
-		await command.handler('tests pass', { ui })
-		assert.equal(sentMessages.length, 1)
-		assert.deepEqual(sentMessages[0]?.options, {
-			deliverAs: 'followUp',
-			expandPromptTemplates: true,
-		})
-		const shutdown = handlers.get('session_shutdown')?.[0]
-		assert.ok(shutdown)
-		await shutdown({}, { ui })
-	})
+	await t.test(
+		'multiword alias prefix sets a goal and queues its kickoff',
+		async () => {
+			const { command, handlers, persisted, sentMessages } = installGoal()
+			assert.ok(command)
+			await command.handler('stop after deployment succeeds', { ui })
+			assert.match(
+				JSON.stringify(persisted.at(-1)),
+				/stop after deployment succeeds/,
+			)
+			assert.equal(sentMessages.length, 1)
+			assert.deepEqual(sentMessages[0]?.options, {
+				deliverAs: 'followUp',
+				expandPromptTemplates: true,
+			})
+			const shutdown = handlers.get('session_shutdown')?.[0]
+			assert.ok(shutdown)
+			await shutdown({}, { ui })
+		},
+	)
 
 	await t.test(
 		'stale evaluation does not overwrite a replacement goal',

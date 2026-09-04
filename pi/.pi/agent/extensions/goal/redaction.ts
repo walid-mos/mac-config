@@ -21,7 +21,7 @@ const URL_PASSWORD = /(\b[a-z][a-z0-9+.-]*:\/\/[^\s/:@]+:)([^\s@/]+)(@)/giu
 const KNOWN_TOKEN =
 	/\b(?:github_pat_[A-Za-z0-9_]+|gh[pousr]_[A-Za-z0-9_]+|sk-[A-Za-z0-9_-]{12,}|xox[a-z]-[A-Za-z0-9-]{10,})\b/gu
 const PRIVATE_KEY_BLOCK =
-	/-----BEGIN ([A-Z0-9 ]*PRIVATE KEY)-----[\s\S]*?(?:-----END \1-----|$)/gu
+	/-----BEGIN ([A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?)-----[\s\S]*?(?:-----END \1-----|$)/gu
 
 const SHELL_NESTING_PAIRS: Readonly<Record<string, string>> = {
 	'(': ')',
@@ -40,7 +40,7 @@ function nestedClosing(text: string, index: number, quote: string): string {
 	if (quote !== "'" && character === '$')
 		return SHELL_NESTING_PAIRS[text[index + 1] ?? ''] ?? ''
 	if (quote !== "'" && character === '`') return '`'
-	if (!quote && (character === '<' || character === '>'))
+	if (!quote && (character === '<' || character === '>' || character === '='))
 		return text[index + 1] === '(' ? ')' : ''
 	if (quote) return ''
 	return SHELL_NESTING_PAIRS[character] ?? ''
@@ -65,7 +65,8 @@ function isFailClosedNesting(character: string): boolean {
 		character === '$' ||
 		character === '`' ||
 		character === '<' ||
-		character === '>'
+		character === '>' ||
+		character === '='
 	)
 }
 

@@ -176,6 +176,7 @@ export default function goalExtension(pi: ExtensionAPI): void {
 	pi.on('agent_settled', async (_event, ctx) => {
 		const current = active
 		if (!current || current.status !== 'active' || evaluation) return
+
 		const controller = new AbortController()
 		evaluation = controller
 		try {

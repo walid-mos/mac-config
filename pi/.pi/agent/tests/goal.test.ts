@@ -1426,6 +1426,7 @@ test('evaluator-bound condition and transcript redact credential-like secrets', 
 	const optionPassword = 'option secret with spaces'
 	const basicSecret = 'dXNlcjpwYXNz'
 	const privateKeySecret = 'private key secret'
+	const awsSecret = 'aws secret with spaces'
 	const splitToken = 'a'.repeat(500)
 	const privateKey = [
 		'-----BEGIN PRIVATE KEY-----',
@@ -1479,6 +1480,7 @@ test('evaluator-bound condition and transcript redact credential-like secrets', 
 										`password="${unterminatedPassword}`,
 										`password=$'${ansiQuotedPassword}'`,
 										`--password '${optionPassword}'`,
+										`AWS_SECRET_ACCESS_KEY='${awsSecret}'`,
 										`Authorization\u001b[31m: Basic ${basicSecret}`,
 										`-----BEGIN \u001b]0;hidden\u0007PRIVATE KEY-----\n${privateKeySecret}\n-----END PRIVATE KEY-----`,
 										`Authorization: Basic ${basicCredential}`,
@@ -1516,7 +1518,7 @@ test('evaluator-bound condition and transcript redact credential-like secrets', 
 	assert.equal(bound.includes(quotedPassword), false)
 	assert.doesNotMatch(
 		bound,
-		/line one|line two|hunter|still secret|unterminated secret|ansi quoted secret|option secret|dXNlcjpwYXNz|private key secret/,
+		/line one|line two|hunter|still secret|unterminated secret|ansi quoted secret|option secret|dXNlcjpwYXNz|private key secret|aws secret/,
 	)
 	assert.doesNotMatch(bound, /a{100}/)
 	assert.doesNotMatch(bound, /BEGIN PRIVATE KEY/)

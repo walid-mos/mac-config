@@ -4,7 +4,7 @@ import { sanitizeResultText, sanitizeTerminalText } from './sanitize.ts'
 const REDACTED = '[REDACTED]'
 const BASIC_AUTHORIZATION = /(\bAuthorization\s*:\s*Basic\s+)[A-Za-z0-9+/=]+/giu
 const EVALUATOR_SECRET_KIND =
-	'(?:api[_-]?key|private[_-]?key|access[_-]?token|auth[_-]?token|refresh[_-]?token|id[_-]?token|token|password|passwd|secret|client[_-]?secret)'
+	'(?:api[_-]?key|secret[_-]?access[_-]?key|private[_-]?key|access[_-]?token|auth[_-]?token|refresh[_-]?token|id[_-]?token|token|password|passwd|secret|client[_-]?secret)'
 const QUOTED_SECRET_ASSIGNMENT = new RegExp(
 	`(\\b(?:[a-z0-9]+[_-])*${EVALUATOR_SECRET_KIND}\\b(?:\\s*(?:=|:)\\s*|\\s+))(\\$?)(["'])(?:\\\\.|(?!\\3)[\\s\\S])*(?:\\3|$)`,
 	'gisu',

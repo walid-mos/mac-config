@@ -7,6 +7,7 @@ import {
 	isRecord,
 	isStringArray,
 	normalizeBoundedText,
+	normalizeProofItems,
 	normalizeProofs,
 } from './values.ts'
 
@@ -76,7 +77,7 @@ function parseEvaluatorPayload(value: unknown): ParsedEvaluatorReply {
 		verdict: value.verdict,
 		reason: reason || value.verdict,
 		proofs: normalizeProofs(value.proofs),
-		invalidatedProofs: normalizeProofs(value.invalidatedProofs),
+		invalidatedProofs: normalizeProofItems(value.invalidatedProofs),
 	}
 }
 

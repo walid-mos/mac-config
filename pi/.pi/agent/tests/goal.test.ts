@@ -389,12 +389,30 @@ test('updateProofLedger removes invalidated proofs, appends, and normalizes whit
 	)
 })
 
-test('updateProofLedger applies every invalidation before bounding output', () => {
-	const invalidated = [
-		'stale proof',
-		...Array.from({ length: 32 }, (_, index) => `other ${index}`),
-	]
-	assert.deepEqual(updateProofLedger(['stale proof'], [], invalidated), [])
+test('parsed evaluator replies apply every invalidation before bounding output', () => {
+	const parsed = parseEvaluatorText(
+		JSON.stringify({
+			verdict: 'met',
+			reason: 'Done.',
+			proofs: [],
+			invalidatedProofs: [
+				'stale proof',
+				...Array.from({ length: 32 }, (_, index) => `other ${index}`),
+			],
+		}),
+	)
+	assert.equal(parsed.ok, true)
+	if (!parsed.ok) return
+	const decision = decideEvaluatedGoal(
+		activeGoal({ proofs: ['stale proof'] }),
+		{ turnsEvaluated: 1, noToolTurns: 0 },
+		parsed,
+	)
+	assert.deepEqual(decision, {
+		action: 'pause',
+		reason: 'Evaluator returned met without verified proofs.',
+		proofs: [],
+	})
 })
 
 test('createGoal accepts a singular turn cap directive', () => {

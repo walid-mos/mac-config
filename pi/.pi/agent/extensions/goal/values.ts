@@ -20,7 +20,7 @@ export function normalizeBoundedText(value: string, max: number): string {
 	)
 }
 
-export function normalizeProofs(proofs: readonly string[]): string[] {
+export function normalizeProofItems(proofs: readonly string[]): string[] {
 	const unique: string[] = []
 	for (const proof of proofs) {
 		const normalized = normalizeBoundedText(proof, MAX_PROOF_ITEM_CHARS)
@@ -29,7 +29,11 @@ export function normalizeProofs(proofs: readonly string[]): string[] {
 		if (previous >= 0) unique.splice(previous, 1)
 		unique.push(normalized)
 	}
-	return unique.slice(-MAX_PROOF_ITEMS)
+	return unique
+}
+
+export function normalizeProofs(proofs: readonly string[]): string[] {
+	return normalizeProofItems(proofs).slice(-MAX_PROOF_ITEMS)
 }
 
 export function updateProofLedger(
@@ -37,11 +41,7 @@ export function updateProofLedger(
 	added: readonly string[],
 	invalidated: readonly string[],
 ): string[] {
-	const removed = new Set<string>()
-	for (const proof of invalidated) {
-		const normalized = normalizeBoundedText(proof, MAX_PROOF_ITEM_CHARS)
-		if (normalized) removed.add(normalized)
-	}
+	const removed = new Set(normalizeProofItems(invalidated))
 	return normalizeProofs([
 		...current.filter(proof => !removed.has(proof)),
 		...added,

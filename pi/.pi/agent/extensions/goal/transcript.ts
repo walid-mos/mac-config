@@ -24,8 +24,6 @@ const INTERNAL_GOAL_PROMPTS = [
 	GOAL_CONTINUE_PROMPT_PREFIX,
 ]
 const EXPANDED_GOAL_PROMPT = /^<skill\s+name=(?:"goal"|'goal')(?:\s|>)/u
-const PRIVATE_KEY_BEGIN = /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/u
-const SECRET_CONTEXT_CHARS = 256
 const CONTENT_OMISSION = '\n… [content omitted] …\n'
 const EVIDENCE_OMISSION = '\n… [evidence omitted] …\n'
 
@@ -128,29 +126,18 @@ function boundedTextParts(
 	const available = Math.max(0, max - CONTENT_OMISSION.length)
 	const headLength = Math.ceil(available / 2)
 	const tailLength = available - headLength
-	const boundedRaw = `${clipHead(parts[0]?.text ?? '', headLength)}${CONTENT_OMISSION}${clipTail(
-		parts.at(-1)?.text ?? '',
-		tailLength + SECRET_CONTEXT_CHARS,
+	const bounded = `${clipHead(
+		sanitizeEvaluatorText(parts[0]?.text ?? ''),
+		headLength,
+	)}${CONTENT_OMISSION}${clipTail(
+		sanitizeEvaluatorText(parts.at(-1)?.text ?? ''),
+		tailLength,
 	)}`
-	return clipEvidence(sanitizeEvaluatorText(boundedRaw), max)
+	return sanitizeEvaluatorText(bounded)
 }
 
 function boundedSanitizedEvidence(value: string, max: number): string {
-	if (value.length <= max) return sanitizeEvaluatorText(value)
-	const available = Math.max(0, max - EVIDENCE_OMISSION.length)
-	const headLength = Math.ceil(available / 2)
-	const tailLength = available - headLength
-	const head = clipHead(value, headLength)
-	if (PRIVATE_KEY_BEGIN.test(head)) {
-		return `${clipHead(sanitizeEvaluatorText(head), headLength)}${EVIDENCE_OMISSION}[REDACTED]`
-	}
-	const tail = sanitizeEvaluatorText(
-		clipTail(value, tailLength + SECRET_CONTEXT_CHARS),
-	)
-	return `${sanitizeEvaluatorText(head)}${EVIDENCE_OMISSION}${clipTail(
-		tail,
-		tailLength,
-	)}`
+	return clipEvidence(sanitizeEvaluatorText(value), max)
 }
 
 function serializeToolArguments(value: unknown): string {

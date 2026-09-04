@@ -7,7 +7,7 @@ const EVALUATOR_SECRET_KIND =
 	'(?:api[_-]?key|private[_-]?key|access[_-]?token|auth[_-]?token|refresh[_-]?token|id[_-]?token|token|password|passwd|secret|client[_-]?secret)'
 const QUOTED_SECRET_ASSIGNMENT = new RegExp(
 	`(\\b(?:[a-z0-9]+[_-])*${EVALUATOR_SECRET_KIND}\\b\\s*(?:=|:)\\s*)(["']).*?\\2`,
-	'giu',
+	'gisu',
 )
 const PRIVATE_KEY_BLOCK =
 	/-----BEGIN ([A-Z0-9 ]*PRIVATE KEY)-----[\s\S]*?(?:-----END \1-----|$)/gu

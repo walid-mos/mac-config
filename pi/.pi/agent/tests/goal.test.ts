@@ -969,6 +969,7 @@ test('goal extension registers goal_set and goal, without turn_start', async t =
 
 test('transcript preserves bounded, attributed, and complete-enough tool evidence', () => {
 	const longOutput = `CONTRADICTION near start\n${'x'.repeat(5_000)}\nclean tail`
+	const serializedSecret = 's'.repeat(3_000)
 	const excerpt = collectTranscriptExcerpt([
 		{
 			type: 'message',
@@ -1004,7 +1005,10 @@ test('transcript preserves bounded, attributed, and complete-enough tool evidenc
 						type: 'toolCall',
 						id: 'call-long',
 						name: 'read',
-						arguments: { path: 'long.txt' },
+						arguments: {
+							path: 'long.txt',
+							token: serializedSecret,
+						},
 					},
 				],
 			},
@@ -1056,6 +1060,7 @@ test('transcript preserves bounded, attributed, and complete-enough tool evidenc
 	assert.match(excerpt.text, /CONTRADICTION near start/)
 	assert.match(excerpt.text, /evidence omitted/)
 	assert.match(excerpt.text, /clean tail/)
+	assert.doesNotMatch(excerpt.text, /s{100}/)
 	assert.equal(excerpt.toolCallCount, 3)
 })
 
@@ -1394,6 +1399,7 @@ test('evaluator-bound condition and transcript redact credential-like secrets', 
 	const basicCredential = 'dXNlcjpwYXNz'
 	const privateKeyBody = 'cHJpdmF0ZS1rZXktbWF0ZXJpYWw='
 	const quotedPassword = 'correct horse battery staple'
+	const multilinePassword = 'line one\nline two'
 	const splitToken = 'a'.repeat(500)
 	const privateKey = [
 		'-----BEGIN PRIVATE KEY-----',
@@ -1442,6 +1448,7 @@ test('evaluator-bound condition and transcript redact credential-like secrets', 
 									text: [
 										`password=${password}`,
 										`password='${quotedPassword}'`,
+										`password="${multilinePassword}"`,
 										`Authorization: Basic ${basicCredential}`,
 										privateKey,
 									].join('\n'),
@@ -1475,6 +1482,7 @@ test('evaluator-bound condition and transcript redact credential-like secrets', 
 	assert.equal(bound.includes(basicCredential), false)
 	assert.equal(bound.includes(privateKeyBody), false)
 	assert.equal(bound.includes(quotedPassword), false)
+	assert.doesNotMatch(bound, /line one|line two/)
 	assert.doesNotMatch(bound, /a{100}/)
 	assert.doesNotMatch(bound, /BEGIN PRIVATE KEY/)
 	assert.match(bound, /\[REDACTED\]/)

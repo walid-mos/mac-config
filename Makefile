@@ -29,11 +29,11 @@ NOFOLD := colima docker gh git herdr hermes homebrew languages rclone rtk
 
 # Hooks post-install chaînés par `make install` (cible <nom>-post). Rust
 # et Hex n'ont pas de package Stow : ils utilisent leurs installeurs officiels.
-POSTS :=  dev-dirs gh herdr hermes hex nvim pi rtk rust
+POSTS := dev-dirs gh herdr hermes hex nvim pi rtk rust
 
 HEX_DMG_URL := https://pub-089d681d41754031a4aefa7017d8c2fb.r2.dev/releases/HEX-latest-arm64.dmg
 
-.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs pi-update pi-test  pi-goal-test  pi-notify-test pi-prompt-test pi-twitter-fetch-test pi-ui-test  notifier-app notifier-app-test herdr-pi-smoke hermes-dirs hermes-gemma proxy-reset dev-dirs git-filters
+.PHONY: help bootstrap xcode-clt brew-install brew-bundle install all unstow restow $(PACKAGES) $(addsuffix -post,$(POSTS)) pi-dirs pi-update pi-test pi-quality-test pi-goal-test pi-notify-test pi-prompt-test pi-twitter-fetch-test pi-ui-test notifier-app notifier-app-test herdr-pi-smoke hermes-dirs hermes-gemma proxy-reset dev-dirs git-filters
 
 help:
 	@echo "Targets:"

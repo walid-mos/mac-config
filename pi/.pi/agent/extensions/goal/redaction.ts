@@ -7,6 +7,10 @@ const JSON_ASSIGNMENT = new RegExp(
 	`(["']${SECRET_NAME}["']\\s*:\\s*)(["'])(?:\\\\.|(?!\\2)[\\s\\S])*(?:\\2|$)`,
 	'giu',
 )
+const JSON_LITERAL_ASSIGNMENT = new RegExp(
+	`(["']${SECRET_NAME}["']\\s*:\\s*)(?:-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?|true|false|null)`,
+	'giu',
+)
 const SHELL_SECRET_PREFIX = new RegExp(
 	`\\b${SECRET_NAME}\\b(?:\\s*(?:=|:)\\s*|\\s+)`,
 	'giu',
@@ -70,6 +74,7 @@ export function redactSecrets(text: string): string {
 		.replace(BASIC_AUTHORIZATION, `$1${REDACTED}`)
 		.replace(URL_PASSWORD, `$1${REDACTED}$3`)
 		.replace(JSON_ASSIGNMENT, `$1$2${REDACTED}$2`)
+		.replace(JSON_LITERAL_ASSIGNMENT, `$1${REDACTED}`)
 		.replace(KNOWN_TOKEN, REDACTED)
 		.replace(PRIVATE_KEY_BLOCK, REDACTED)
 	return redactShellSecrets(structured)

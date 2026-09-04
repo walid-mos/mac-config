@@ -1423,6 +1423,9 @@ test('evaluator-bound condition and transcript redact credential-like secrets', 
 	const escapedQuotePassword = 'hunter\\"still secret'
 	const unterminatedPassword = 'unterminated secret'
 	const ansiQuotedPassword = 'ansi quoted secret'
+	const optionPassword = 'option secret with spaces'
+	const basicSecret = 'dXNlcjpwYXNz'
+	const privateKeySecret = 'private key secret'
 	const splitToken = 'a'.repeat(500)
 	const privateKey = [
 		'-----BEGIN PRIVATE KEY-----',
@@ -1475,6 +1478,9 @@ test('evaluator-bound condition and transcript redact credential-like secrets', 
 										`password="${escapedQuotePassword}"`,
 										`password="${unterminatedPassword}`,
 										`password=$'${ansiQuotedPassword}'`,
+										`--password '${optionPassword}'`,
+										`Authorization\u001b[31m: Basic ${basicSecret}`,
+										`-----BEGIN \u001b]0;hidden\u0007PRIVATE KEY-----\n${privateKeySecret}\n-----END PRIVATE KEY-----`,
 										`Authorization: Basic ${basicCredential}`,
 										privateKey,
 									].join('\n'),
@@ -1510,7 +1516,7 @@ test('evaluator-bound condition and transcript redact credential-like secrets', 
 	assert.equal(bound.includes(quotedPassword), false)
 	assert.doesNotMatch(
 		bound,
-		/line one|line two|hunter|still secret|unterminated secret|ansi quoted secret/,
+		/line one|line two|hunter|still secret|unterminated secret|ansi quoted secret|option secret|dXNlcjpwYXNz|private key secret/,
 	)
 	assert.doesNotMatch(bound, /a{100}/)
 	assert.doesNotMatch(bound, /BEGIN PRIVATE KEY/)

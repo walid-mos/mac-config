@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { DoubleEscapeEditor } from '../extensions/double-escape/editor.ts'
+import { createDoubleEscapeEditor } from '../extensions/double-escape/editor.ts'
 import {
 	DOUBLE_ESCAPE_WINDOW_MS,
 	EscapePacer,
@@ -96,14 +96,15 @@ test('fires at exactly the window boundary, not one ms later', () => {
 
 test("editor wrapper refuse un éditeur sans surface d'actions plutôt que de réimplémenter ses raccourcis", () => {
 	assert.throws(
-		() => new DoubleEscapeEditor(new RecordingEditor(), escapeKeybindings),
+		() =>
+			createDoubleEscapeEditor(new RecordingEditor(), escapeKeybindings),
 		/CustomEditor action surface/,
 	)
 })
 
 test('editor wrapper preserves input handled by the previously installed editor', () => {
 	const base = new ActionRecordingEditor()
-	const editor = new DoubleEscapeEditor(base, escapeKeybindings)
+	const editor = createDoubleEscapeEditor(base, escapeKeybindings)
 
 	editor.handleInput('left')
 
@@ -112,7 +113,7 @@ test('editor wrapper preserves input handled by the previously installed editor'
 
 test('editor wrapper exposes the wrapped CustomEditor action surface', () => {
 	const base = new ActionRecordingEditor()
-	const editor = new DoubleEscapeEditor(base, escapeKeybindings)
+	const editor = createDoubleEscapeEditor(base, escapeKeybindings)
 	let expanded = false
 
 	// Mirrors InteractiveMode.setCustomEditorComponent wiring app actions onto
@@ -129,7 +130,7 @@ test('editor wrapper exposes the wrapped CustomEditor action surface', () => {
 test('editor wrapper clears the base editor on double escape', () => {
 	const base = new ActionRecordingEditor()
 	const times = [0, 100]
-	const editor = new DoubleEscapeEditor(
+	const editor = createDoubleEscapeEditor(
 		base,
 		escapeKeybindings,
 		() => times.shift() ?? 100,

@@ -13,12 +13,12 @@ import {
 
 import { registerEditorDecorator } from '../ui/editor-decorator.ts'
 
-import { DoubleEscapeEditor } from './editor.ts'
+import { createDoubleEscapeEditor } from './editor.ts'
 
 export default function doubleEscapeClear(pi: ExtensionAPI): void {
 	registerEditorDecorator(
 		pi,
 		(tui, theme, keybindings) => new CustomEditor(tui, theme, keybindings),
-		(base, keybindings) => new DoubleEscapeEditor(base, keybindings),
+		createDoubleEscapeEditor,
 	)
 }

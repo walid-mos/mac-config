@@ -64,6 +64,11 @@ class FrameComponent implements Component {
 		this.build = build
 	}
 
+	// Required by the Component contract: MouseRegion.invalidate() calls its
+	// child's invalidate() unconditionally. Nothing is cached here — lines are
+	// rebuilt from `build` on every render — so invalidation is a no-op.
+	invalidate(): void {}
+
 	render(width: number): string[] {
 		return this.build(Math.max(1, Math.floor(width)))
 	}

@@ -1058,3 +1058,66 @@ pi-test` complet au vert (194 Agents, 83 Background, 20 notifications, 187 UI).
 - Tests : smoke multi-tour à 30 tok/s exact et piste ≤ 24 colonnes ; `make
 pi-test` complet au vert (187 tests UI).
 - Suite : `/reload` puis validation visuelle utilisateur.
+
+### 2026-09-04 — captures compactes dans le prompt
+
+- Fait : les PNG/JPEG/GIF/WebP collés ou déposés sont remplacés dans l’éditeur
+  par `[img:N]`, puis joints au message comme images multimodales ; le chemin
+  temporaire macOS avec espaces échappés est pris en charge.
+- Vue : miniatures horizontales de 10 colonnes, label sous chaque image,
+  défilement `Ctrl+Shift+←/→` et repli texte hors terminal graphique.
+- Fichiers : `capture-prompt/`, `ui/editor-proxy.ts`,
+  `ui/ordered-widget-stack.ts`, `ui/terminal-text.ts`, `double-escape/editor.ts`,
+  tests et cible `pi-ui-test`.
+- Tests : 23 tests ciblés au vert, esbuild et Oxlint au vert, Fallow sans nouveau
+  finding, chargement réel `pi --list-models` au vert ; `make pi-test` bloqué
+  avant les suites par le format préexistant de `agents/resource-governor.ts`.
+- Suite : déployer avec `make pi`, puis `/reload` et validation visuelle dans
+  Ghostty.
+
+### 2026-09-04 — déploiement et smoke de capture-prompt
+
+- Fait : package Pi restowé depuis le worktree ; `capture-prompt` est désormais
+  découvert automatiquement dans `~/.pi/agent/extensions`.
+- Tests : 24 tests ciblés au vert après ajout du verrou Kitty `ESC\\` ; smoke
+  réel Pi au vert sur 60/78/120 colonnes et trois timings de démarrage.
+- Gate : `make pi-test` reste bloqué uniquement par le format préexistant et
+  hors diff de `agents/resource-governor.ts` ; les fichiers de cette tâche sont
+  conformes Oxfmt/Oxlint et Fallow n’y relève aucun nouveau finding.
+- Suite : `/reload`, puis coller ou déposer une capture pour la voir devenir
+  `[img:1]` avec sa miniature.
+
+### 2026-09-04 — cadre et accent des captures
+
+- Fait : chaque miniature reçoit un cadre `borderMuted` pour se détacher du
+  fond ; son label et toute référence `[img:N]` dans l’éditeur passent en
+  couleur d’accent et en gras.
+- Fichiers : `capture-prompt/render.ts`, `capture-prompt/editor.ts`,
+  `capture-prompt/index.ts`, `capture-prompt/README.md` et test dédié.
+- Tests : 22 tests ciblés au vert ; esbuild, Oxfmt et Oxlint au vert.
+- Suite : restow puis `/reload` pour validation visuelle utilisateur.
+
+### 2026-09-04 — ingestion fiable et suppression atomique des images
+
+- Cause : l’ingestion rare échouait lorsque le chemin déposé touchait déjà du
+  texte ou se terminait par une ponctuation ; le token shell complet n’était
+  alors plus un chemin de fichier valide.
+- Fix : recherche du chemin image à l’intérieur du token et conservation du
+  préfixe/suffixe ; Backspace juste après un `[img:N]` retire désormais toute la
+  référence et sa miniature.
+- Fichiers : `capture-prompt/store.ts`, `capture-prompt/editor.ts`,
+  `capture-prompt/index.ts` et tests dédiés.
+- Tests : 24 tests ciblés, esbuild, Oxfmt et Oxlint au vert ; `make pi-test`
+  toujours bloqué uniquement par le format préexistant hors diff de
+  `agents/resource-governor.ts`.
+- Suite : restow puis `/reload`.
+
+### 2026-09-06 — retrait de la délégation et de la supervision
+
+- Fichiers : `goal/`, `goal.ts`, `compact-tools/`, `compact-tools.ts`,
+  `tool-loader.ts`, configuration, skills et tests associés.
+- Fait : évaluateur `/goal` autonome, configuré par `goal.json` ; protection
+  des preuves et des affichages conservée sans runtime enfant.
+- Tests : `make pi-test` au vert dans le clone isolé avec les dépendances Pi
+  installées exposées via `NODE_PATH` ; Stow et neuf démarrages TUI validés.
+- Suite : réécriture de l’historique dans le clone isolé.

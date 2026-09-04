@@ -23,8 +23,14 @@ const KNOWN_TOKEN =
 const PRIVATE_KEY_BLOCK =
 	/-----BEGIN ([A-Z0-9 ]*PRIVATE KEY)-----[\s\S]*?(?:-----END \1-----|$)/gu
 
+const SHELL_NESTING_PAIRS: Readonly<Record<string, string>> = {
+	'(': ')',
+	'[': ']',
+	'{': '}',
+}
+
 function isShellDelimiter(character: string): boolean {
-	return /[\s;|&()<>]/u.test(character)
+	return /[\s;|&<>]/u.test(character)
 }
 
 function updatedQuote(current: string, character: string): string {
@@ -32,17 +38,37 @@ function updatedQuote(current: string, character: string): string {
 	return character === '"' || character === "'" ? character : ''
 }
 
+function updateNesting(nesting: string[], character: string): boolean {
+	const closing = SHELL_NESTING_PAIRS[character]
+	if (closing) {
+		nesting.push(closing)
+		return true
+	}
+	if (character !== nesting.at(-1)) return false
+	nesting.pop()
+	return true
+}
+
 function shellWordEnd(text: string, start: number): number {
 	let index = start
 	let quote = ''
+	const nesting: string[] = []
 	while (index < text.length) {
 		const character = text[index] ?? ''
 		if (character === '\\') {
 			index += index + 1 < text.length ? 2 : 1
 			continue
 		}
-		if (!quote && isShellDelimiter(character)) break
-		quote = updatedQuote(quote, character)
+		if (quote || character === '"' || character === "'") {
+			quote = updatedQuote(quote, character)
+			index += 1
+			continue
+		}
+		if (updateNesting(nesting, character)) {
+			index += 1
+			continue
+		}
+		if (nesting.length === 0 && isShellDelimiter(character)) break
 		index += 1
 	}
 	return index

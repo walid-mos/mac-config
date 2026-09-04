@@ -57,7 +57,7 @@ export function createGoal(condition: string): GoalState {
 }
 
 function parseMaxTurns(condition: string): number {
-	const match = condition.match(/stop after (\d+) turns/i)
+	const match = condition.match(/stop after (\d+) turns?/i)
 	if (!match) return DEFAULT_MAX_TURNS
 	const parsed = Number(match[1])
 	if (!Number.isSafeInteger(parsed) || parsed < 1) return DEFAULT_MAX_TURNS

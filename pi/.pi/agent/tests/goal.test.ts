@@ -41,7 +41,8 @@ const {
 const { parseEvaluatorReply } =
 	await import('../extensions/goal/evaluation-reply.ts')
 const { formatStatus } = await import('../extensions/goal/presentation.ts')
-const { nextGoalState } = await import('../extensions/goal/state.ts')
+const { createGoal, nextGoalState } =
+	await import('../extensions/goal/state.ts')
 const { collectTranscriptExcerpt } =
 	await import('../extensions/goal/transcript.ts')
 
@@ -386,6 +387,10 @@ test('updateProofLedger removes invalidated proofs, appends, and normalizes whit
 		updateProofLedger(current, ['new\nproof', 'keep proof'], ['old proof']),
 		['new proof', 'keep proof'],
 	)
+})
+
+test('createGoal accepts a singular turn cap directive', () => {
+	assert.equal(createGoal('ship safely; stop after 1 turn').maxTurns, 1)
 })
 
 test('isTurnCapReached uses evaluated cycles', () => {
@@ -979,7 +984,7 @@ test('goal extension registers goal_set and goal, without turn_start', async t =
 })
 
 test('transcript preserves bounded, attributed, and complete-enough tool evidence', () => {
-	const longOutput = `CONTRADICTION near start\n${'x'.repeat(5_000)}\nclean tail`
+	const longTail = `${'x'.repeat(5_000)}\nclean tail`
 	const serializedSecret = 's'.repeat(3_000)
 	const excerpt = collectTranscriptExcerpt([
 		{
@@ -1050,7 +1055,10 @@ test('transcript preserves bounded, attributed, and complete-enough tool evidenc
 				role: 'toolResult',
 				toolCallId: 'call-long',
 				toolName: 'read',
-				content: [{ type: 'text', text: longOutput }],
+				content: [
+					{ type: 'text', text: 'CONTRADICTION near start' },
+					{ type: 'text', text: longTail },
+				],
 				isError: false,
 			},
 		},
@@ -1069,8 +1077,9 @@ test('transcript preserves bounded, attributed, and complete-enough tool evidenc
 		/TOOL RESULT ERROR read \(call-error\):\nnot found/,
 	)
 	assert.match(excerpt.text, /CONTRADICTION near start/)
-	assert.match(excerpt.text, /evidence omitted/)
+	assert.match(excerpt.text, /content omitted/)
 	assert.match(excerpt.text, /clean tail/)
+	assert.match(excerpt.text, /x{3500}/)
 	assert.doesNotMatch(excerpt.text, /s{100}/)
 	assert.equal(excerpt.toolCallCount, 3)
 })
@@ -1413,6 +1422,7 @@ test('evaluator-bound condition and transcript redact credential-like secrets', 
 	const multilinePassword = 'line one\nline two'
 	const escapedQuotePassword = 'hunter\\"still secret'
 	const unterminatedPassword = 'unterminated secret'
+	const ansiQuotedPassword = 'ansi quoted secret'
 	const splitToken = 'a'.repeat(500)
 	const privateKey = [
 		'-----BEGIN PRIVATE KEY-----',
@@ -1464,6 +1474,7 @@ test('evaluator-bound condition and transcript redact credential-like secrets', 
 										`password="${multilinePassword}"`,
 										`password="${escapedQuotePassword}"`,
 										`password="${unterminatedPassword}`,
+										`password=$'${ansiQuotedPassword}'`,
 										`Authorization: Basic ${basicCredential}`,
 										privateKey,
 									].join('\n'),
@@ -1499,7 +1510,7 @@ test('evaluator-bound condition and transcript redact credential-like secrets', 
 	assert.equal(bound.includes(quotedPassword), false)
 	assert.doesNotMatch(
 		bound,
-		/line one|line two|hunter|still secret|unterminated secret/,
+		/line one|line two|hunter|still secret|unterminated secret|ansi quoted secret/,
 	)
 	assert.doesNotMatch(bound, /a{100}/)
 	assert.doesNotMatch(bound, /BEGIN PRIVATE KEY/)

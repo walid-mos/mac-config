@@ -124,13 +124,13 @@ function boundedTextParts(
 	if (joinedLength <= max)
 		return sanitizeEvaluatorText(parts.map(part => part.text).join('\n'))
 	const available = Math.max(0, max - CONTENT_OMISSION.length)
-	const headLength = Math.ceil(available / 2)
-	const tailLength = available - headLength
-	const bounded = `${clipHead(
-		sanitizeEvaluatorText(parts[0]?.text ?? ''),
-		headLength,
-	)}${CONTENT_OMISSION}${clipTail(
-		sanitizeEvaluatorText(parts.at(-1)?.text ?? ''),
+	const first = sanitizeEvaluatorText(parts[0]?.text ?? '')
+	const last = sanitizeEvaluatorText(parts.at(-1)?.text ?? '')
+	let headLength = Math.min(first.length, Math.ceil(available / 2))
+	const tailLength = Math.min(last.length, available - headLength)
+	headLength = Math.min(first.length, available - tailLength)
+	const bounded = `${clipHead(first, headLength)}${CONTENT_OMISSION}${clipTail(
+		last,
 		tailLength,
 	)}`
 	return sanitizeEvaluatorText(bounded)

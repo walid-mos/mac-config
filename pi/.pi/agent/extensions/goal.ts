@@ -5,11 +5,6 @@ import { judgeCondition } from './goal/evaluator.ts'
 import { enactGoalDecision } from './goal/presentation.ts'
 import { registerGoalInputs } from './goal/registration.ts'
 import { restoreResumableGoal } from './goal/restoration.ts'
-import {
-	isGoalResumeIntent,
-	resumedGoalPrompt,
-	resumeGoal,
-} from './goal/resume.ts'
 /**
  * /goal — session-scoped completion loop.
  *
@@ -23,6 +18,7 @@ import {
 	collectTranscriptExcerpt,
 	settledTurnFailure,
 } from './goal/transcript.ts'
+import { bindGoalUserPause } from './goal/user-pause.ts'
 import { hasProofLedgerProgress } from './goal/values.ts'
 
 import type { GoalState, GoalStatus } from './goal/contracts.ts'
@@ -126,32 +122,23 @@ export default function goalExtension(pi: ExtensionAPI): void {
 		armDispatch,
 	})
 
+	const userPause = bindGoalUserPause(pi, {
+		active: () => active,
+		setActive: next => {
+			active = next
+		},
+		pauseGoal,
+		persist,
+		chrome,
+	})
+
 	function restoreBranchGoal(ctx: ExtensionContext): void {
 		dispatchWatchdog.cancel()
 		cancelEvaluation()
+		userPause.reset()
 		active = restoreResumableGoal(ctx.sessionManager.getBranch())
 		chrome.render(ctx, active)
 	}
-
-	pi.on('input', (event, ctx) => {
-		const current = active
-		if (
-			event.source === 'extension' ||
-			!current ||
-			(current.status !== 'paused' && current.status !== 'stuck') ||
-			!isGoalResumeIntent(event.text)
-		)
-			return { action: 'continue' }
-		const resumed = resumeGoal(current)
-		persist(resumed)
-		active = resumed
-		chrome.render(ctx, resumed)
-		ctx.ui.notify('Goal resumed', 'info')
-		return {
-			action: 'transform',
-			text: resumedGoalPrompt(event.text, resumed),
-		}
-	})
 
 	pi.on('session_start', async (_event, ctx) => {
 		restoreBranchGoal(ctx)
@@ -169,6 +156,7 @@ export default function goalExtension(pi: ExtensionAPI): void {
 	pi.on('session_shutdown', async (_event, ctx) => {
 		dispatchWatchdog.cancel()
 		cancelEvaluation()
+		userPause.reset()
 		active = null
 		chrome.clear(ctx.ui)
 	})
@@ -176,7 +164,6 @@ export default function goalExtension(pi: ExtensionAPI): void {
 	pi.on('agent_settled', async (_event, ctx) => {
 		const current = active
 		if (!current || current.status !== 'active' || evaluation) return
-
 		const controller = new AbortController()
 		evaluation = controller
 		try {

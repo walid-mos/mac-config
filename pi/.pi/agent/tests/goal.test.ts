@@ -106,7 +106,7 @@ type GoalTool = {
 	) => Promise<unknown>
 }
 
-type EventHandler = (event: unknown, context: unknown) => Promise<void>
+type EventHandler = (event: unknown, context: unknown) => unknown
 
 function activeGoal(overrides: Partial<GoalState> = {}): GoalState {
 	return {
@@ -530,7 +530,7 @@ test('decideEvaluatedGoal pauses on evaluator failure', () => {
 	)
 })
 
-test('paused decisions persist a non-revivable goal status', () => {
+test('paused and stuck goals restore as resumable and keep their proofs', () => {
 	const current = activeGoal()
 	const counters = { turnsEvaluated: 3, noProgressTurns: 1 }
 	const paused = nextGoalState(current, counters, {
@@ -538,7 +538,25 @@ test('paused decisions persist a non-revivable goal status', () => {
 		reason: 'Evaluator unavailable.',
 	})
 	assert.equal(paused.status, 'paused')
-	assert.equal(restoreGoalState(paused), null)
+	const restoredPaused = restoreGoalState(paused)
+	assert.ok(restoredPaused)
+	assert.equal(restoredPaused.status, 'paused')
+	assert.equal(restoredPaused.turnsEvaluated, 3)
+	assert.equal(restoredPaused.noProgressTurns, 1)
+	assert.deepEqual(restoredPaused.proofs, ['one gate checked'])
+
+	const stuck = activeGoal({
+		status: 'stuck',
+		lastVerdict: 'stuck',
+		turnsEvaluated: 4,
+		noProgressTurns: 2,
+		proofs: ['kept proof'],
+	})
+	const restoredStuck = restoreGoalState(stuck)
+	assert.ok(restoredStuck)
+	assert.equal(restoredStuck.status, 'stuck')
+	assert.equal(restoredStuck.turnsEvaluated, 4)
+	assert.deepEqual(restoredStuck.proofs, ['kept proof'])
 })
 
 test('decideEvaluatedGoal pauses met without retaining invalidated proofs', () => {
@@ -699,14 +717,13 @@ test('restoreGoalState restores a valid active goal and normalizes proofs', () =
 	assert.equal(restored.proofs?.[1]?.length, 300)
 })
 
-test('restoreGoalState returns null for non-active statuses and malformed shapes', () => {
+test('restoreGoalState returns null for terminal statuses and malformed shapes', () => {
 	assert.equal(restoreGoalState(null), null)
 	assert.equal(restoreGoalState('active'), null)
 	assert.equal(restoreGoalState({}), null)
 	assert.equal(restoreGoalState(activeGoal({ status: 'met' })), null)
 	assert.equal(restoreGoalState(activeGoal({ status: 'impossible' })), null)
 	assert.equal(restoreGoalState(activeGoal({ status: 'cleared' })), null)
-	assert.equal(restoreGoalState(activeGoal({ status: 'stuck' })), null)
 	assert.equal(
 		restoreGoalState({
 			...activeGoal(),
@@ -724,6 +741,96 @@ test('restoreGoalState normalizes unknown lastVerdict to null', () => {
 	assert.equal(restored.lastVerdict, null)
 	assert.equal(restored.status, 'active')
 	assert.equal(restored.lastReason, 'One gate remains.')
+})
+
+test('natural-language resume reactivates a restored paused or stuck goal', async () => {
+	function actionOf(result: unknown): unknown {
+		return result && typeof result === 'object' && 'action' in result
+			? result.action
+			: undefined
+	}
+	function textOf(result: unknown): string {
+		return result && typeof result === 'object' && 'text' in result
+			? String(result.text)
+			: ''
+	}
+	async function restoreAndInput(
+		state: GoalState,
+		text: string,
+		source: 'interactive' | 'extension',
+	) {
+		const ui = fakeUi()
+		const { handlers, persisted, sentMessages } = installGoal()
+		const sessionStart = handlers.get('session_start')?.[0]
+		const input = handlers.get('input')?.[0]
+		assert.ok(sessionStart)
+		assert.ok(input)
+		const context = evaluatorContext(async () => assistantReply({}), ui, {
+			getBranch: () => [
+				{
+					type: 'custom',
+					customType: 'goal-state',
+					data: state,
+				},
+			],
+		})
+		await sessionStart({}, context)
+		return {
+			persisted,
+			result: await input({ text, source }, context),
+			sentMessages,
+		}
+	}
+	function assertResumed(result: unknown, persisted: unknown[]) {
+		assert.equal(actionOf(result), 'transform')
+		assert.match(textOf(result), /tests pass; stop after 3 turns/)
+		assert.match(JSON.stringify(persisted.at(-1)), /"status":"active"/)
+		assert.match(JSON.stringify(persisted.at(-1)), /"turnsEvaluated":0/)
+		assert.match(JSON.stringify(persisted.at(-1)), /"noProgressTurns":0/)
+		assert.match(JSON.stringify(persisted.at(-1)), /kept proof/)
+	}
+
+	const paused = activeGoal({
+		status: 'paused',
+		turnsEvaluated: 5,
+		noProgressTurns: 2,
+		proofs: ['kept proof'],
+	})
+	const stuck = activeGoal({
+		status: 'stuck',
+		lastVerdict: 'stuck',
+		turnsEvaluated: 6,
+		noProgressTurns: 2,
+		proofs: ['kept proof'],
+	})
+	for (const phrase of [
+		'reprends',
+		'tu peux reprendre là où tu t’étais arrêté',
+		'n’hésite pas à reprendre',
+	]) {
+		const { persisted, result, sentMessages } = await restoreAndInput(
+			paused,
+			phrase,
+			'interactive',
+		)
+		assert.equal(sentMessages.length, 0)
+		assertResumed(result, persisted)
+	}
+	const stuckResume = await restoreAndInput(stuck, 'reprends', 'interactive')
+	assert.equal(stuckResume.sentMessages.length, 0)
+	assertResumed(stuckResume.result, stuckResume.persisted)
+
+	const denied = await restoreAndInput(
+		paused,
+		'ne reprends pas',
+		'interactive',
+	)
+	assert.notEqual(actionOf(denied.result), 'transform')
+	assert.equal(denied.persisted.length, 0)
+
+	const fromExtension = await restoreAndInput(paused, 'reprends', 'extension')
+	assert.notEqual(actionOf(fromExtension.result), 'transform')
+	assert.equal(fromExtension.persisted.length, 0)
 })
 
 test('goalChromeLines returns three lines truncated to width', () => {

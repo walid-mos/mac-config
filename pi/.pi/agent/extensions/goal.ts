@@ -4,6 +4,12 @@ import { GoalDispatchWatchdog } from './goal/dispatch-watchdog.ts'
 import { judgeCondition } from './goal/evaluator.ts'
 import { enactGoalDecision } from './goal/presentation.ts'
 import { registerGoalInputs } from './goal/registration.ts'
+import { restoreResumableGoal } from './goal/restoration.ts'
+import {
+	isGoalResumeIntent,
+	resumedGoalPrompt,
+	resumeGoal,
+} from './goal/resume.ts'
 /**
  * /goal — session-scoped completion loop.
  *
@@ -12,12 +18,7 @@ import { registerGoalInputs } from './goal/registration.ts'
  * /goal clear        clear (aliases: stop, off, reset, none, cancel)
  */
 import { sanitizeDisplayLine } from './goal/sanitize.ts'
-import {
-	createGoal,
-	decideEvaluatedGoal,
-	nextGoalState,
-	restoreActiveGoal,
-} from './goal/state.ts'
+import { createGoal, decideEvaluatedGoal, nextGoalState } from './goal/state.ts'
 import {
 	collectTranscriptExcerpt,
 	settledTurnFailure,
@@ -36,12 +37,10 @@ export {
 	evaluateWithFallback,
 	selectEvaluatorAttempts,
 } from './goal/evaluator.ts'
+export { restoreGoalState } from './goal/restoration.ts'
+export { isGoalResumeIntent, resumeGoal } from './goal/resume.ts'
 export { updateProofLedger } from './goal/values.ts'
-export {
-	decideEvaluatedGoal,
-	isTurnCapReached,
-	restoreGoalState,
-} from './goal/state.ts'
+export { decideEvaluatedGoal, isTurnCapReached } from './goal/state.ts'
 export { countCurrentTurnToolCalls } from './goal/transcript.ts'
 
 export default function goalExtension(pi: ExtensionAPI): void {
@@ -130,9 +129,29 @@ export default function goalExtension(pi: ExtensionAPI): void {
 	function restoreBranchGoal(ctx: ExtensionContext): void {
 		dispatchWatchdog.cancel()
 		cancelEvaluation()
-		active = restoreActiveGoal(ctx.sessionManager.getBranch())
+		active = restoreResumableGoal(ctx.sessionManager.getBranch())
 		chrome.render(ctx, active)
 	}
+
+	pi.on('input', (event, ctx) => {
+		const current = active
+		if (
+			event.source === 'extension' ||
+			!current ||
+			(current.status !== 'paused' && current.status !== 'stuck') ||
+			!isGoalResumeIntent(event.text)
+		)
+			return { action: 'continue' }
+		const resumed = resumeGoal(current)
+		persist(resumed)
+		active = resumed
+		chrome.render(ctx, resumed)
+		ctx.ui.notify('Goal resumed', 'info')
+		return {
+			action: 'transform',
+			text: resumedGoalPrompt(event.text, resumed),
+		}
+	})
 
 	pi.on('session_start', async (_event, ctx) => {
 		restoreBranchGoal(ctx)

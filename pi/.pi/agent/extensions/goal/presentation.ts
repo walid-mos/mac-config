@@ -1,3 +1,5 @@
+import { formatElapsed } from './chrome.ts'
+
 import type { GoalLoopDecision, GoalState } from './contracts.ts'
 import type {
 	ExtensionAPI,
@@ -30,7 +32,7 @@ export function formatStatus(state: GoalState | null): string {
 	const reason = state.lastReason ? `\nLast: ${state.lastReason}` : ''
 	return [
 		`Goal (${state.status}): ${state.condition}`,
-		`${state.turnsEvaluated} evaluated turns, cap ${state.maxTurns}`,
+		`Running ${formatElapsed(state.startedAt)}, ${state.turnsEvaluated} evaluated turns, cap ${state.maxTurns}`,
 		reason,
 	]
 		.filter(Boolean)

@@ -378,19 +378,20 @@ pi-post:
 		echo "pi prêt et à jour — package web-access — \`pi\` puis /login pour l'auth"; \
 	else echo "pi non installé — étape ignorée"; fi
 
-pi-update:  pi-post
+pi-update: pi-post
 
 # Gate unique du harness : suites des extensions Pi contre les dépendances installées,
 # validation isolée du déploiement Stow puis stress-test d'un vrai Pi. Aucun restow
 # du HOME réel, aucune réinstallation de Pi et aucun symlink manuel.
-pi-test: pi-quality-test  pi-goal-test  pi-notify-test pi-prompt-test pi-twitter-fetch-test pi-ui-test
+pi-test: pi-quality-test pi-goal-test pi-notify-test pi-prompt-test pi-twitter-fetch-test pi-ui-test
 	@python3 scripts/test-pi-config.py
 	@python3 scripts/test-pi-startup.py
 	@python3 scripts/test-git-filters.py
 
 pi-quality-test:
-	@{ printf '%s\0' pi/.pi/.fallowrc.json pi/.pi/.oxfmtrc.json pi/.pi/.oxlintrc.json; \
+	@{ printf '%s\0' pi/.pi/.fallowrc.json pi/.pi/.oxfmtrc.json pi/.pi/.oxlintrc.json pi/.pi/agent/goal.json; \
 		find pi/.pi/agent/extensions pi/.pi/agent/tests -type f -name '*.ts' -print0; \
+		git diff --name-only -z --diff-filter=ACMR "$(PI_QUALITY_BASE)" -- 'pi/.pi/**/*.md'; \
 	} | xargs -0 pnpm dlx oxfmt@$(PI_OXFMT_VERSION) \
 			--config pi/.pi/.oxfmtrc.json --check
 	@cd pi/.pi && pnpm dlx oxlint@$(PI_OXLINT_VERSION) \

@@ -3,7 +3,7 @@ name: goal
 description: >-
     Keep working toward a verifiable completion condition across turns, without
     asking the user between steps. Pair with the /goal extension (auto-continue
-    loop, evaluator routed via the `evaluator` role of local execution). Trigger on
+    loop, evaluator configured in goal.json). Trigger on
     /goal, "travaille jusqu'à", "jusqu'à ce que les tests passent", "implémente
     jusqu'à ce que". Use for substantial work with a checkable end state, not
     one-shot questions.

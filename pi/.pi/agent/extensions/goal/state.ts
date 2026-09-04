@@ -4,7 +4,7 @@ import {
 	MAX_CONDITION_CHARS,
 	MAX_EVALUATOR_REASON_CHARS,
 	MAX_TURNS,
-	STUCK_NO_TOOL_TURNS,
+	STUCK_NO_PROGRESS_TURNS,
 } from './contracts.ts'
 import {
 	isRecord,
@@ -28,7 +28,7 @@ const GOAL_STATE_KEYS = new Set([
 	'condition',
 	'startedAt',
 	'turnsEvaluated',
-	'noToolTurns',
+	'noProgressTurns',
 	'maxTurns',
 	'lastVerdict',
 	'lastReason',
@@ -47,7 +47,7 @@ export function createGoal(condition: string): GoalState {
 		condition: normalized,
 		startedAt: new Date().toISOString(),
 		turnsEvaluated: 0,
-		noToolTurns: 0,
+		noProgressTurns: 0,
 		maxTurns: parseMaxTurns(normalized),
 		lastVerdict: null,
 		lastReason: '',
@@ -105,11 +105,11 @@ export function decideEvaluatedGoal(
 			proofs,
 		}
 	}
-	if (counters.noToolTurns >= STUCK_NO_TOOL_TURNS) {
+	if (counters.noProgressTurns >= STUCK_NO_PROGRESS_TURNS) {
 		return {
 			action: 'stop',
 			verdict: 'stuck',
-			reason: `No tool use for ${counters.noToolTurns} turns — loop stopped, goal still set.`,
+			reason: `No verifiable proof progress for ${counters.noProgressTurns} turns.`,
 			proofs,
 		}
 	}
@@ -127,6 +127,7 @@ export function nextGoalState(
 			...counters,
 			lastReason: decision.reason,
 			proofs: decision.proofs ?? current.proofs,
+			status: 'paused',
 		}
 	}
 	if (decision.action === 'continue') {
@@ -167,7 +168,7 @@ export function restoreGoalState(value: unknown): GoalState | null {
 		condition: value.condition.trim(),
 		startedAt: value.startedAt,
 		turnsEvaluated: value.turnsEvaluated,
-		noToolTurns: value.noToolTurns,
+		noProgressTurns: value.noProgressTurns,
 		maxTurns: value.maxTurns,
 		lastVerdict: isGoalVerdict(value.lastVerdict)
 			? value.lastVerdict
@@ -182,24 +183,22 @@ export function restoreGoalState(value: unknown): GoalState | null {
 }
 
 function isGoalState(value: unknown): value is GoalState {
-	if (!isRecord(value) || !hasExactGoalStateKeys(value)) return false
+	if (!isRecord(value)) return false
+	const keys = Object.keys(value)
+	if (
+		keys.length !== GOAL_STATE_KEYS.size ||
+		keys.some(key => !GOAL_STATE_KEYS.has(key))
+	)
+		return false
 	return (
 		isCondition(value.condition) &&
 		isTimestamp(value.startedAt) &&
 		isCounter(value.turnsEvaluated) &&
-		isCounter(value.noToolTurns) &&
+		isCounter(value.noProgressTurns) &&
 		isMaxTurns(value.maxTurns) &&
 		typeof value.lastReason === 'string' &&
 		isStringArray(value.proofs) &&
 		isGoalStatus(value.status)
-	)
-}
-
-function hasExactGoalStateKeys(value: Record<string, unknown>): boolean {
-	const keys = Object.keys(value)
-	return (
-		keys.length === GOAL_STATE_KEYS.size &&
-		keys.every(key => GOAL_STATE_KEYS.has(key))
 	)
 }
 
@@ -242,6 +241,7 @@ function isGoalVerdict(value: unknown): value is GoalVerdict {
 function isGoalStatus(value: unknown): value is GoalStatus {
 	return (
 		value === 'active' ||
+		value === 'paused' ||
 		value === 'met' ||
 		value === 'impossible' ||
 		value === 'cleared' ||

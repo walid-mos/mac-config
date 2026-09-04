@@ -43,8 +43,11 @@ const { parseEvaluatorReply } =
 const { formatStatus } = await import('../extensions/goal/presentation.ts')
 const { createGoal, nextGoalState } =
 	await import('../extensions/goal/state.ts')
-const { collectTranscriptExcerpt } =
+const { collectTranscriptExcerpt, settledTurnFailure } =
 	await import('../extensions/goal/transcript.ts')
+const { GoalDispatchWatchdog } =
+	await import('../extensions/goal/dispatch-watchdog.ts')
+const { hasProofLedgerProgress } = await import('../extensions/goal/values.ts')
 
 const agentDirectory = fileURLToPath(new URL('..', import.meta.url))
 process.env.PI_CODING_AGENT_DIR = agentDirectory
@@ -110,7 +113,7 @@ function activeGoal(overrides: Partial<GoalState> = {}): GoalState {
 		condition: 'tests pass; stop after 3 turns',
 		startedAt: '2026-08-21T00:00:00.000Z',
 		turnsEvaluated: 2,
-		noToolTurns: 0,
+		noProgressTurns: 0,
 		maxTurns: 3,
 		lastVerdict: 'not_yet',
 		lastReason: 'One gate remains.',
@@ -389,6 +392,29 @@ test('updateProofLedger removes invalidated proofs, appends, and normalizes whit
 	)
 })
 
+test('proof progress rejects paraphrased churn but accepts new outcomes', () => {
+	assert.equal(
+		hasProofLedgerProgress(
+			['make pi-goal-test failed with one assertion'],
+			['make pi-goal-test failed with one assertion at line 400'],
+			[],
+		),
+		false,
+	)
+	assert.equal(
+		hasProofLedgerProgress(
+			['make pi-goal-test failed with one assertion'],
+			['make pi-goal-test passed with exit code 0'],
+			[],
+		),
+		true,
+	)
+	assert.equal(
+		hasProofLedgerProgress(['stale proof'], [], ['stale proof']),
+		true,
+	)
+})
+
 test('parsed evaluator replies apply every invalidation before bounding output', () => {
 	const parsed = parseEvaluatorText(
 		JSON.stringify({
@@ -405,7 +431,7 @@ test('parsed evaluator replies apply every invalidation before bounding output',
 	if (!parsed.ok) return
 	const decision = decideEvaluatedGoal(
 		activeGoal({ proofs: ['stale proof'] }),
-		{ turnsEvaluated: 1, noToolTurns: 0 },
+		{ turnsEvaluated: 1, noProgressTurns: 0 },
 		parsed,
 	)
 	assert.deepEqual(decision, {
@@ -415,7 +441,8 @@ test('parsed evaluator replies apply every invalidation before bounding output',
 	})
 })
 
-test('createGoal accepts a singular turn cap directive', () => {
+test('createGoal defaults to a bounded loop and accepts a singular cap', () => {
+	assert.equal(createGoal('ship safely').maxTurns, 12)
 	assert.equal(createGoal('ship safely; stop after 1 turn').maxTurns, 1)
 })
 
@@ -429,7 +456,7 @@ test('decideEvaluatedGoal continues not_yet below the cap with merged proofs', (
 	assert.deepEqual(
 		decideEvaluatedGoal(
 			activeGoal(),
-			{ turnsEvaluated: 2, noToolTurns: 0 },
+			{ turnsEvaluated: 2, noProgressTurns: 0 },
 			validReply(),
 		),
 		{
@@ -444,7 +471,7 @@ test('decideEvaluatedGoal marks not_yet at the cap as stuck', () => {
 	assert.deepEqual(
 		decideEvaluatedGoal(
 			activeGoal(),
-			{ turnsEvaluated: 3, noToolTurns: 0 },
+			{ turnsEvaluated: 3, noProgressTurns: 0 },
 			validReply({ proofs: ['latest check ran'] }),
 		),
 		{
@@ -460,7 +487,7 @@ test('decideEvaluatedGoal lets met and impossible win over the cap', () => {
 	assert.deepEqual(
 		decideEvaluatedGoal(
 			activeGoal(),
-			{ turnsEvaluated: 3, noToolTurns: 0 },
+			{ turnsEvaluated: 3, noProgressTurns: 0 },
 			validReply({
 				verdict: 'met',
 				reason: 'All gates pass.',
@@ -477,7 +504,7 @@ test('decideEvaluatedGoal lets met and impossible win over the cap', () => {
 	assert.deepEqual(
 		decideEvaluatedGoal(
 			activeGoal(),
-			{ turnsEvaluated: 3, noToolTurns: 0 },
+			{ turnsEvaluated: 3, noProgressTurns: 0 },
 			validReply({
 				verdict: 'impossible',
 				reason: 'Required access is unavailable.',
@@ -496,16 +523,27 @@ test('decideEvaluatedGoal pauses on evaluator failure', () => {
 	assert.deepEqual(
 		decideEvaluatedGoal(
 			activeGoal(),
-			{ turnsEvaluated: 3, noToolTurns: 0 },
+			{ turnsEvaluated: 3, noProgressTurns: 0 },
 			{ ok: false, reason: 'Evaluator returned no JSON.' },
 		),
 		{ action: 'pause', reason: 'Evaluator returned no JSON.' },
 	)
 })
 
+test('paused decisions persist a non-revivable goal status', () => {
+	const current = activeGoal()
+	const counters = { turnsEvaluated: 3, noProgressTurns: 1 }
+	const paused = nextGoalState(current, counters, {
+		action: 'pause',
+		reason: 'Evaluator unavailable.',
+	})
+	assert.equal(paused.status, 'paused')
+	assert.equal(restoreGoalState(paused), null)
+})
+
 test('decideEvaluatedGoal pauses met without retaining invalidated proofs', () => {
 	const current = activeGoal({ proofs: ['stale proof'] })
-	const counters = { turnsEvaluated: 1, noToolTurns: 0 }
+	const counters = { turnsEvaluated: 1, noProgressTurns: 0 }
 	const decision = decideEvaluatedGoal(
 		current,
 		counters,
@@ -623,7 +661,7 @@ test('evaluateWithFallback returns a bounded diagnostic naming both attempts', a
 	assert.deepEqual(
 		decideEvaluatedGoal(
 			activeGoal(),
-			{ turnsEvaluated: 3, noToolTurns: 0 },
+			{ turnsEvaluated: 3, noProgressTurns: 0 },
 			result,
 		),
 		{ action: 'pause', reason: result.reason },
@@ -651,7 +689,7 @@ test('restoreGoalState restores a valid active goal and normalizes proofs', () =
 	assert.equal(restored.condition, 'tests pass; stop after 3 turns')
 	assert.equal(restored.startedAt, '2026-08-21T00:00:00.000Z')
 	assert.equal(restored.turnsEvaluated, 2)
-	assert.equal(restored.noToolTurns, 0)
+	assert.equal(restored.noProgressTurns, 0)
 	assert.equal(restored.maxTurns, 3)
 	assert.equal(restored.lastReason, 'One gate remains.')
 	assert.equal(restored.lastVerdict, 'not_yet')
@@ -800,6 +838,51 @@ test('goal extension registers goal_set and goal, without turn_start', async t =
 	)
 
 	await t.test(
+		'quota failure pauses the goal without invoking or relaunching the evaluator',
+		async () => {
+			const { handlers, persisted, sentMessages, tool } = installGoal()
+			assert.ok(tool)
+			await tool.execute(
+				'goal-set',
+				{ condition: 'tests pass' },
+				new AbortController().signal,
+				() => {},
+				{ ui },
+			)
+			let requests = 0
+			const settled = handlers.get('agent_settled')?.[0]
+			assert.ok(settled)
+			await settled(
+				{},
+				evaluatorContext(
+					async () => {
+						requests += 1
+						return assistantReply({})
+					},
+					ui,
+					{
+						getBranch: () => [
+							{
+								type: 'message',
+								message: {
+									role: 'assistant',
+									content: [],
+									stopReason: 'error',
+									errorMessage:
+										'Codex error: The usage limit has been reached',
+								},
+							},
+						],
+					},
+				),
+			)
+			assert.equal(requests, 0)
+			assert.equal(sentMessages.length, 0)
+			assert.match(JSON.stringify(persisted.at(-1)), /"status":"paused"/)
+		},
+	)
+
+	await t.test(
 		'multiword alias prefix sets a goal and queues its kickoff',
 		async () => {
 			const { command, handlers, persisted, sentMessages } = installGoal()
@@ -871,6 +954,63 @@ test('goal extension registers goal_set and goal, without turn_start', async t =
 			assert.equal(persisted.length, 2)
 			assert.match(JSON.stringify(persisted[0]), /obsolete goal/)
 			assert.match(JSON.stringify(persisted[1]), /replacement goal/)
+		},
+	)
+
+	await t.test(
+		'repeated tool churn without new proof stops after two cycles',
+		async () => {
+			const { handlers, persisted, sentMessages, tool } = installGoal()
+			assert.ok(tool)
+			await tool.execute(
+				'goal-set',
+				{ condition: 'tests pass; stop after 10 turns' },
+				new AbortController().signal,
+				() => {},
+				{ ui },
+			)
+			const branch = [
+				{
+					type: 'message',
+					message: { role: 'user', content: 'continue' },
+				},
+				{
+					type: 'message',
+					message: {
+						role: 'assistant',
+						content: [
+							{
+								type: 'toolCall',
+								id: 'wait-1',
+								name: 'read',
+							},
+						],
+						stopReason: 'stop',
+					},
+				},
+			]
+			const eventContext = evaluatorContext(
+				async () =>
+					assistantReply({
+						verdict: 'not_yet',
+						reason: 'Same result.',
+						proofs: ['same check failed with one assertion'],
+						invalidatedProofs: [],
+					}),
+				ui,
+				{ getBranch: () => branch },
+			)
+			const settled = handlers.get('agent_settled')?.[0]
+			assert.ok(settled)
+			await settled({}, eventContext)
+			await settled({}, eventContext)
+			await settled({}, eventContext)
+			assert.equal(sentMessages.length, 2)
+			assert.match(JSON.stringify(persisted.at(-1)), /"status":"stuck"/)
+			assert.match(
+				JSON.stringify(persisted.at(-1)),
+				/"noProgressTurns":2/,
+			)
 		},
 	)
 
@@ -1007,6 +1147,53 @@ test('goal extension registers goal_set and goal, without turn_start', async t =
 			assert.match(JSON.stringify(persisted[0]), /current branch goal/)
 		},
 	)
+})
+
+test('settled assistant quota errors are terminal turn failures', () => {
+	assert.match(
+		settledTurnFailure([
+			{
+				type: 'message',
+				message: {
+					role: 'assistant',
+					content: [],
+					stopReason: 'error',
+					errorMessage:
+						'Codex error: The usage limit has been reached',
+				},
+			},
+		]) ?? '',
+		/usage limit has been reached/,
+	)
+})
+
+test('dispatch watchdog times out only an unstarted continuation', () => {
+	const callbacks: Array<() => void> = []
+	const cleared: unknown[] = []
+	const timer = { unref() {} }
+	const watchdog = new GoalDispatchWatchdog({
+		setTimer(callback) {
+			callbacks.push(callback)
+			return timer as ReturnType<typeof setTimeout>
+		},
+		clearTimer(value) {
+			cleared.push(value)
+		},
+	})
+	let pauses = 0
+	watchdog.arm(() => {
+		pauses += 1
+	})
+	watchdog.started()
+	callbacks[0]?.()
+	assert.equal(pauses, 0)
+	assert.deepEqual(cleared, [timer])
+
+	watchdog.arm(() => {
+		pauses += 1
+	})
+	callbacks[1]?.()
+	assert.equal(pauses, 1)
 })
 
 test('transcript preserves bounded, attributed, and complete-enough tool evidence', () => {

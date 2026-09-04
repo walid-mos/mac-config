@@ -1,8 +1,13 @@
+import { MAX_EVALUATOR_REASON_CHARS } from './contracts.ts'
 import {
 	GOAL_CONTINUE_PROMPT_PREFIX,
 	GOAL_KICKOFF_PROMPT_PREFIX,
 } from './presentation.ts'
-import { isRecord, sanitizeEvaluatorText } from './values.ts'
+import {
+	isRecord,
+	normalizeBoundedText,
+	sanitizeEvaluatorText,
+} from './values.ts'
 
 import type { AgentMessage } from '@earendil-works/pi-agent-core'
 import type {
@@ -172,6 +177,30 @@ function clipTail(value: string, max: number): string {
 	const firstCodeUnit = value.charCodeAt(start)
 	if (firstCodeUnit >= 0xdc00 && firstCodeUnit <= 0xdfff) start += 1
 	return value.slice(start)
+}
+
+export function settledTurnFailure(
+	branch: readonly SessionEntry[],
+): string | undefined {
+	for (let index = branch.length - 1; index >= 0; index -= 1) {
+		const entry = branch[index]
+		if (entry?.type !== 'message' || !isAssistantMessage(entry.message))
+			continue
+		if (
+			entry.message.stopReason === 'stop' ||
+			entry.message.stopReason === undefined
+		)
+			return undefined
+		const reason =
+			typeof entry.message.errorMessage === 'string'
+				? entry.message.errorMessage
+				: `assistant stopped with ${entry.message.stopReason ?? 'unknown status'}`
+		return normalizeBoundedText(
+			`Goal paused after assistant failure: ${reason}`,
+			MAX_EVALUATOR_REASON_CHARS,
+		)
+	}
+	return undefined
 }
 
 export function assistantText(message: AssistantMessage): string {

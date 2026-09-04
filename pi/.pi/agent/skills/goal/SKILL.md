@@ -33,8 +33,17 @@ A goal is active, or the user just set one. Work until the condition is
 3. **Follow the active skills.** Code work follows `coding`; the goal
    loop itself is never a reason to bypass it.
 4. **One verifiable step per turn.** Prefer a command result over a
-   paragraph. The evaluator is a small model with no tools.
-5. **Do not stop because you feel done.** Stop because the condition's
+   paragraph. `list`, `wait`, repeated reviews and cancellations are not
+   progress unless they produce materially new proof.
+5. **Bound work.** Complete only the smallest slice needed for the next
+   proof. Never rerun an exhaustive review after every small correction;
+   finish a coherent implementation slice, ingest existing findings, then
+   run one final fresh review.
+6. **Stop on resource failure.** A provider quota, usage limit, exhausted
+   root budget or failed assistant turn pauses the goal. Do not retry through
+   another continuation or substitute provider unless the user starts a new
+   goal after resources are available.
+7. **Do not stop because you feel done.** Stop because the condition's
    stated check just succeeded in this transcript, or because it cannot
    succeed (missing access, contradictory constraint, red lock you cannot
    fix without widening scope).

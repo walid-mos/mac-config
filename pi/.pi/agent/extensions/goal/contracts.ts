@@ -3,9 +3,9 @@ import type { Api, Model } from '@earendil-works/pi-ai'
 
 export const GOAL_ENTRY_TYPE = 'goal-state'
 export const MAX_CONDITION_CHARS = 4000
-export const DEFAULT_MAX_TURNS = 25
+export const DEFAULT_MAX_TURNS = 12
 export const MAX_TURNS = 100
-export const STUCK_NO_TOOL_TURNS = 2
+export const STUCK_NO_PROGRESS_TURNS = 2
 export const MAX_PROOF_ITEMS = 32
 export const MAX_PROOF_ITEM_CHARS = 300
 export const MAX_EVALUATOR_DIAGNOSTIC_CHARS = 500
@@ -17,7 +17,13 @@ export const EVALUATOR_TIMEOUT_MS = 120_000
 
 export type GoalVerdict = 'not_yet' | 'met' | 'impossible' | 'stuck'
 
-export type GoalStatus = 'active' | 'met' | 'impossible' | 'cleared' | 'stuck'
+export type GoalStatus =
+	| 'active'
+	| 'paused'
+	| 'met'
+	| 'impossible'
+	| 'cleared'
+	| 'stuck'
 
 export type EvaluatorModelIdentity = {
 	readonly provider: string
@@ -41,7 +47,7 @@ export type ParsedEvaluatorReply =
 
 export type GoalTurnCounters = {
 	turnsEvaluated: number
-	noToolTurns: number
+	noProgressTurns: number
 }
 
 export type GoalLoopDecision =
@@ -59,7 +65,7 @@ export type GoalState = {
 	startedAt: string
 	/** Completed /goal cycles evaluated after the agent settles. */
 	turnsEvaluated: number
-	noToolTurns: number
+	noProgressTurns: number
 	maxTurns: number
 	lastVerdict: GoalVerdict | null
 	lastReason: string

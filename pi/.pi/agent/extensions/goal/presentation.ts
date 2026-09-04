@@ -15,9 +15,11 @@ export function enactGoalDecision(
 	ctx: ExtensionContext,
 	next: GoalState,
 	decision: GoalLoopDecision,
+	onDispatch?: () => void,
 ): string | null {
 	if (decision.action === 'continue') {
 		try {
+			onDispatch?.()
 			pi.sendUserMessage(continuePrompt(next), { deliverAs: 'followUp' })
 		} catch (error: unknown) {
 			return errorMessage(error)

@@ -48,6 +48,62 @@ export function updateProofLedger(
 	])
 }
 
+const OUTCOME_WORDS = new Set([
+	'error',
+	'fail',
+	'failed',
+	'failure',
+	'pass',
+	'passed',
+	'success',
+	'succeeded',
+])
+
+function proofTokens(proof: string): ReadonlySet<string> {
+	return new Set(proof.toLowerCase().match(/[\p{L}\p{N}_-]+/gu) ?? [])
+}
+
+function hasDifferentOutcome(
+	left: ReadonlySet<string>,
+	right: ReadonlySet<string>,
+): boolean {
+	const leftOutcomes = [...left].filter(token => OUTCOME_WORDS.has(token))
+	const rightOutcomes = [...right].filter(token => OUTCOME_WORDS.has(token))
+	return (
+		leftOutcomes.some(token => !right.has(token)) ||
+		rightOutcomes.some(token => !left.has(token))
+	)
+}
+
+function isSimilarProof(left: string, right: string): boolean {
+	const leftTokens = proofTokens(left)
+	const rightTokens = proofTokens(right)
+	if (hasDifferentOutcome(leftTokens, rightTokens)) return false
+	const smallest = Math.min(leftTokens.size, rightTokens.size)
+	if (smallest === 0) return true
+	const shared = [...leftTokens].filter(token =>
+		rightTokens.has(token),
+	).length
+	return shared / smallest >= 0.8
+}
+
+/** True only for an invalidation or a materially new verified fact. */
+export function hasProofLedgerProgress(
+	current: readonly string[],
+	added: readonly string[],
+	invalidated: readonly string[],
+): boolean {
+	const normalizedCurrent = normalizeProofItems(current)
+	const removed = new Set(normalizeProofItems(invalidated))
+	if (normalizedCurrent.some(proof => removed.has(proof))) return true
+	return normalizeProofItems(added).some(
+		proof =>
+			!normalizedCurrent.some(previous =>
+				isSimilarProof(previous, proof),
+			),
+	)
+}
+
 export function formatProofLedger(proofs: readonly string[]): string {
 	if (proofs.length === 0) return '(empty)'
 	return proofs.map(proof => `- ${proof}`).join('\n')

@@ -1,17 +1,8 @@
 import { MAX_PROOF_ITEM_CHARS, MAX_PROOF_ITEMS } from './contracts.ts'
-import { sanitizeResultText, sanitizeTerminalText } from './sanitize.ts'
-
-const REDACTED = '[REDACTED]'
-const BASIC_AUTHORIZATION = /(\bAuthorization\s*:\s*Basic\s+)[A-Za-z0-9+/=]+/giu
-const PRIVATE_KEY_BLOCK =
-	/-----BEGIN ([A-Z0-9 ]*PRIVATE KEY)-----[\s\S]*?(?:-----END \1-----|$)/gu
+import { sanitizeResultText } from './sanitize.ts'
 
 export function sanitizeEvaluatorText(value: string): string {
-	return sanitizeResultText(
-		sanitizeTerminalText(value)
-			.replaceAll(BASIC_AUTHORIZATION, `$1${REDACTED}`)
-			.replaceAll(PRIVATE_KEY_BLOCK, REDACTED),
-	)
+	return sanitizeResultText(value)
 }
 
 function truncateCodeUnits(value: string, max: number): string {

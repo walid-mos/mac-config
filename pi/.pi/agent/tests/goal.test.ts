@@ -1427,6 +1427,7 @@ test('evaluator-bound condition and transcript redact credential-like secrets', 
 	const ansiQuotedPassword = 'ansi quoted secret'
 	const optionPassword = 'option secret with spaces'
 	const posixPassword = "don'\\''t leak"
+	const escapedPassword = 'escaped secret'
 	const basicSecret = 'dXNlcjpwYXNz'
 	const privateKeySecret = 'private key secret'
 	const awsSecret = 'aws secret with spaces'
@@ -1483,6 +1484,7 @@ test('evaluator-bound condition and transcript redact credential-like secrets', 
 										`password=$'${ansiQuotedPassword}'`,
 										`--password '${optionPassword}'`,
 										`password='${posixPassword}'`,
+										`password=${escapedPassword.replace(' ', '\\ ')} evidence=kept`,
 										`AWS_SECRET_ACCESS_KEY='${awsSecret}'`,
 										`Authorization\u001b[31m: Basic ${basicSecret}`,
 										`-----BEGIN \u001b]0;hidden\u0007PRIVATE KEY-----\n${privateKeySecret}\n-----END PRIVATE KEY-----`,
@@ -1522,10 +1524,11 @@ test('evaluator-bound condition and transcript redact credential-like secrets', 
 	assert.equal(bound.includes(quotedPassword), false)
 	assert.doesNotMatch(
 		bound,
-		/line one|line two|hunter|still secret|unterminated secret|ansi quoted secret|option secret|t leak|dXNlcjpwYXNz|private key secret|aws secret/,
+		/line one|line two|hunter|still secret|unterminated secret|ansi quoted secret|option secret|t leak|escaped secret|dXNlcjpwYXNz|private key secret|aws secret/,
 	)
 	assert.doesNotMatch(bound, /a{100}/)
 	assert.match(bound, /status=failed/)
+	assert.match(bound, /evidence=kept/)
 	assert.doesNotMatch(bound, /BEGIN PRIVATE KEY/)
 	assert.match(bound, /\[REDACTED\]/)
 })

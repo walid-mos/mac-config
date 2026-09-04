@@ -33,45 +33,69 @@ function isShellDelimiter(character: string): boolean {
 	return /[\s;|&<>]/u.test(character)
 }
 
-function updatedQuote(current: string, character: string): string {
-	if (current) return character === current ? '' : current
-	return character === '"' || character === "'" ? character : ''
+type ShellContext = { closing: string; quote: string }
+
+function nestedClosing(text: string, index: number, quote: string): string {
+	const character = text[index] ?? ''
+	if (quote !== "'" && character === '$' && text[index + 1] === '(')
+		return ')'
+	if (quote !== "'" && character === '`') return '`'
+	if (quote) return ''
+	return SHELL_NESTING_PAIRS[character] ?? ''
 }
 
-function updateNesting(nesting: string[], character: string): boolean {
-	const closing = SHELL_NESTING_PAIRS[character]
-	if (closing) {
-		nesting.push(closing)
+type ShellScan = { contexts: ShellContext[]; index: number }
+
+function isQuote(character: string): boolean {
+	return character === '"' || character === "'"
+}
+
+function isWordBoundary(scan: ShellScan, character: string): boolean {
+	return scan.contexts.length === 1 && isShellDelimiter(character)
+}
+
+function advanceShellCharacter(text: string, scan: ShellScan): boolean {
+	const character = text[scan.index] ?? ''
+	const active = scan.contexts.at(-1) ?? scan.contexts[0]!
+	if (character === '\\') {
+		scan.index = Math.min(text.length, scan.index + 2)
 		return true
 	}
-	if (character !== nesting.at(-1)) return false
-	nesting.pop()
+	if (!active.quote && active.closing === character) {
+		scan.contexts.pop()
+		scan.index += 1
+		return true
+	}
+	const closing = nestedClosing(text, scan.index, active.quote)
+	if (closing) {
+		scan.contexts.push({ closing, quote: '' })
+		scan.index += character === '$' ? 2 : 1
+		return true
+	}
+	if (active.quote) {
+		if (character === active.quote) active.quote = ''
+		scan.index += 1
+		return true
+	}
+	if (isQuote(character)) {
+		active.quote = character
+		scan.index += 1
+		return true
+	}
+	if (isWordBoundary(scan, character)) return false
+	scan.index += 1
 	return true
 }
 
 function shellWordEnd(text: string, start: number): number {
-	let index = start
-	let quote = ''
-	const nesting: string[] = []
-	while (index < text.length) {
-		const character = text[index] ?? ''
-		if (character === '\\') {
-			index += index + 1 < text.length ? 2 : 1
-			continue
-		}
-		if (quote || character === '"' || character === "'") {
-			quote = updatedQuote(quote, character)
-			index += 1
-			continue
-		}
-		if (updateNesting(nesting, character)) {
-			index += 1
-			continue
-		}
-		if (nesting.length === 0 && isShellDelimiter(character)) break
-		index += 1
+	const scan: ShellScan = {
+		contexts: [{ closing: '', quote: '' }],
+		index: start,
 	}
-	return index
+	while (scan.index < text.length && advanceShellCharacter(text, scan)) {
+		// The scanner advances one complete shell token at a time.
+	}
+	return scan.index
 }
 
 function redactShellSecrets(text: string): string {

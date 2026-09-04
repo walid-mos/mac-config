@@ -27,6 +27,8 @@ const RESUME_SIGNALS = new Set([
 	'vas-y',
 ])
 const STOP_SIGNALS = new Set(['annule', 'annuler', 'stop'])
+const NEGATION_AFTER = new Set(['jamais', 'pas'])
+const NEGATION_BEFORE = new Set(['never', 'not'])
 
 function intentWords(text: string): readonly string[] {
 	return (
@@ -35,6 +37,25 @@ function intentWords(text: string): readonly string[] {
 			.replace(/\p{M}/gu, '')
 			.toLowerCase()
 			.match(/[\p{L}\p{N}]+(?:-[\p{L}\p{N}]+)?/gu) ?? []
+	)
+}
+
+function hasResumeNegation(
+	words: readonly string[],
+	signalIndex: number,
+): boolean {
+	const previous = words[signalIndex - 1]
+	const leading = words.slice(Math.max(0, signalIndex - 3), signalIndex)
+	const trailing = words.slice(signalIndex + 1, signalIndex + 4)
+	if (
+		words[0] === 'pas' ||
+		(previous !== undefined && NEGATION_BEFORE.has(previous)) ||
+		trailing.some(word => NEGATION_AFTER.has(word))
+	)
+		return true
+	return (
+		trailing.includes('plus') &&
+		leading.some(word => word === 'n' || word === 'ne')
 	)
 }
 
@@ -49,17 +70,7 @@ export function isGoalResumeIntent(text: string): boolean {
 	)
 		return false
 	const signalIndex = words.findIndex(word => RESUME_SIGNALS.has(word))
-	if (signalIndex < 0) return false
-	const trailingNegation = words
-		.slice(signalIndex + 1, signalIndex + 4)
-		.includes('pas')
-	const leadingNegation =
-		words[0] === 'pas' ||
-		(words
-			.slice(0, signalIndex)
-			.some(word => word === 'ne' || word === 'n') &&
-			trailingNegation)
-	return !leadingNegation && !trailingNegation
+	return signalIndex >= 0 && !hasResumeNegation(words, signalIndex)
 }
 
 export function resumeGoal(previous: GoalState): GoalState {

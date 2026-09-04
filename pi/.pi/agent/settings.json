@@ -23,7 +23,7 @@
     "npm:pi-mcp-adapter"
   ],
   "enabledModels": [
-    "openai-codex/gpt-5.6-sol",
+    "openai-codex/gpt-6-astra",
     "xai/grok-4.6",
     "openrouter/z-ai/glm-5.3-flash",
     "openrouter/deepseek/deepseek-v4-flash",

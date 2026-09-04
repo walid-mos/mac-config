@@ -986,6 +986,7 @@ test('goal extension registers goal_set and goal, without turn_start', async t =
 test('transcript preserves bounded, attributed, and complete-enough tool evidence', () => {
 	const longTail = `${'x'.repeat(5_000)}\nclean tail`
 	const serializedSecret = 's'.repeat(3_000)
+	const jsonQuotedSecret = 'json "still secret'
 	const excerpt = collectTranscriptExcerpt([
 		{
 			type: 'message',
@@ -1022,6 +1023,7 @@ test('transcript preserves bounded, attributed, and complete-enough tool evidenc
 						id: 'call-long',
 						name: 'read',
 						arguments: {
+							password: jsonQuotedSecret,
 							path: 'long.txt',
 							token: serializedSecret,
 						},
@@ -1080,7 +1082,7 @@ test('transcript preserves bounded, attributed, and complete-enough tool evidenc
 	assert.match(excerpt.text, /content omitted/)
 	assert.match(excerpt.text, /clean tail/)
 	assert.match(excerpt.text, /x{3500}/)
-	assert.doesNotMatch(excerpt.text, /s{100}/)
+	assert.doesNotMatch(excerpt.text, /s{100}|still secret/)
 	assert.equal(excerpt.toolCallCount, 3)
 })
 
@@ -1475,7 +1477,7 @@ test('evaluator-bound condition and transcript redact credential-like secrets', 
 									type: 'text',
 									text: [
 										`password=${password}`,
-										`password='${quotedPassword}'`,
+										`password='${quotedPassword}' status=failed`,
 										`password="${multilinePassword}"`,
 										`password="${escapedQuotePassword}"`,
 										`password=$'${ansiQuotedPassword}'`,
@@ -1523,6 +1525,7 @@ test('evaluator-bound condition and transcript redact credential-like secrets', 
 		/line one|line two|hunter|still secret|unterminated secret|ansi quoted secret|option secret|t leak|dXNlcjpwYXNz|private key secret|aws secret/,
 	)
 	assert.doesNotMatch(bound, /a{100}/)
+	assert.match(bound, /status=failed/)
 	assert.doesNotMatch(bound, /BEGIN PRIVATE KEY/)
 	assert.match(bound, /\[REDACTED\]/)
 })

@@ -1,16 +1,8 @@
 import { MAX_PROOF_ITEM_CHARS, MAX_PROOF_ITEMS } from './contracts.ts'
-import {
-	sanitizeResultText,
-	sanitizeTerminalText,
-	SECRET_KIND_PATTERN,
-} from './sanitize.ts'
+import { sanitizeResultText, sanitizeTerminalText } from './sanitize.ts'
 
 const REDACTED = '[REDACTED]'
 const BASIC_AUTHORIZATION = /(\bAuthorization\s*:\s*Basic\s+)[A-Za-z0-9+/=]+/giu
-const QUOTED_SECRET_ASSIGNMENT = new RegExp(
-	`(\\b(?:[a-z0-9]+[_-])*(?:${SECRET_KIND_PATTERN})\\b(?:\\s*(?:=|:)\\s*|\\s+))(\\$?)(["'])(?:\\\\.|(?!\\3)[\\s\\S])*(?:\\3[^\\r\\n]*|$)`,
-	'gisu',
-)
 const PRIVATE_KEY_BLOCK =
 	/-----BEGIN ([A-Z0-9 ]*PRIVATE KEY)-----[\s\S]*?(?:-----END \1-----|$)/gu
 
@@ -18,7 +10,6 @@ export function sanitizeEvaluatorText(value: string): string {
 	return sanitizeResultText(
 		sanitizeTerminalText(value)
 			.replaceAll(BASIC_AUTHORIZATION, `$1${REDACTED}`)
-			.replaceAll(QUOTED_SECRET_ASSIGNMENT, `$1$2$3${REDACTED}$3`)
 			.replaceAll(PRIVATE_KEY_BLOCK, REDACTED),
 	)
 }

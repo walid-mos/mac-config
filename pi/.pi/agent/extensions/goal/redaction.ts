@@ -7,155 +7,39 @@ const JSON_ASSIGNMENT = new RegExp(
 	`(["']${SECRET_NAME}["']\\s*:\\s*)(["'])(?:\\\\.|(?!\\2)[\\s\\S])*(?:\\2|$)`,
 	'giu',
 )
-const JSON_LITERAL_ASSIGNMENT = new RegExp(
-	`(["']${SECRET_NAME}["']\\s*:\\s*)(?!["'])[^,\\s}\\]]+`,
+const SECRET_PREFIX = `\\b${SECRET_NAME}\\b(?:\\s*(?:=|:)\\s*|\\s+)`
+const SHELL_QUOTED_FRAGMENT = `(?:\\$?'(?:\\\\.|[^'])*'|\\$?"(?:\\\\.|[^"])*")`
+const SHELL_WORD_FRAGMENT = `(?:${SHELL_QUOTED_FRAGMENT}|\\\\.|[^\\s"'\\\\]+)`
+const QUOTED_SECRET_ASSIGNMENT = new RegExp(
+	`(${SECRET_PREFIX})${SHELL_QUOTED_FRAGMENT}(?:${SHELL_WORD_FRAGMENT})*`,
 	'giu',
 )
-const SHELL_SECRET_PREFIX = new RegExp(
-	`(?:\\b${SECRET_NAME}\\b\\s*(?:\\+?=|:)\\s*|(?:^|[^\\w-])--?${SECRET_NAME}\\b\\s+)`,
+const UNTERMINATED_SECRET_ASSIGNMENT = new RegExp(
+	`(${SECRET_PREFIX})(?:\\$?)(["'])(?:\\\\.|(?!\\2)[\\s\\S])*$`,
+	'giu',
+)
+const ASSIGNMENT = new RegExp(
+	`(\\b${SECRET_NAME}\\b\\s*(?:=|:)\\s*)(["']?)([^\\s"',;]+)(\\2)`,
+	'giu',
+)
+const OPTION = new RegExp(
+	`(--${SECRET_NAME}(?:=|\\s+))(["']?)([^\\s"']+)(\\2)`,
 	'giu',
 )
 const BEARER = /(\bBearer\s+)[A-Za-z0-9._~+/=-]+/giu
-const BASIC_AUTHORIZATION = /(\bAuthorization\s*:\s*Basic\s+)[A-Za-z0-9+/=]+/giu
 const URL_PASSWORD = /(\b[a-z][a-z0-9+.-]*:\/\/[^\s/:@]+:)([^\s@/]+)(@)/giu
 const KNOWN_TOKEN =
 	/\b(?:github_pat_[A-Za-z0-9_]+|gh[pousr]_[A-Za-z0-9_]+|sk-[A-Za-z0-9_-]{12,}|xox[a-z]-[A-Za-z0-9-]{10,})\b/gu
-const PRIVATE_KEY_BLOCK =
-	/-----BEGIN ([A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?)-----[\s\S]*?(?:-----END \1-----|$)/gu
-
-const SHELL_NESTING_PAIRS: Readonly<Record<string, string>> = {
-	'(': ')',
-	'[': ']',
-	'{': '}',
-}
-
-function isShellDelimiter(character: string): boolean {
-	return /[\s;|&<>]/u.test(character)
-}
-
-type ShellContext = { closing: string; quote: string }
-
-function nestedClosing(text: string, index: number, quote: string): string {
-	const character = text[index] ?? ''
-	if (quote !== "'" && character === '$')
-		return SHELL_NESTING_PAIRS[text[index + 1] ?? ''] ?? ''
-	if (quote !== "'" && character === '`') return '`'
-	if (!quote && (character === '<' || character === '>' || character === '='))
-		return text[index + 1] === '(' ? ')' : ''
-	if (quote) return ''
-	return SHELL_NESTING_PAIRS[character] ?? ''
-}
-
-type ShellScan = {
-	contexts: ShellContext[]
-	failClosed: boolean
-	index: number
-}
-
-function isQuote(character: string): boolean {
-	return character === '"' || character === "'"
-}
-
-function isWordBoundary(scan: ShellScan, character: string): boolean {
-	return scan.contexts.length === 1 && isShellDelimiter(character)
-}
-
-function isFailClosedNesting(character: string): boolean {
-	return (
-		character === '$' ||
-		character === '`' ||
-		character === '<' ||
-		character === '>' ||
-		character === '='
-	)
-}
-
-function nestingWidth(character: string): number {
-	return character === '`' || SHELL_NESTING_PAIRS[character] ? 1 : 2
-}
-
-function consumeQuotedCharacter(
-	active: ShellContext,
-	character: string,
-): boolean {
-	if (!active.quote) return false
-	if (character === active.quote) active.quote = ''
-	return true
-}
-
-function advanceShellCharacter(text: string, scan: ShellScan): boolean {
-	const character = text[scan.index] ?? ''
-	const active = scan.contexts.at(-1) ?? scan.contexts[0]!
-	if (character === '\\') {
-		scan.index = Math.min(text.length, scan.index + 2)
-		return true
-	}
-	if (!active.quote && active.closing === character) {
-		scan.contexts.pop()
-		scan.index += 1
-		return true
-	}
-	const closing = nestedClosing(text, scan.index, active.quote)
-	if (closing) {
-		if (isFailClosedNesting(character)) scan.failClosed = true
-		scan.contexts.push({ closing, quote: '' })
-		scan.index += nestingWidth(character)
-		return true
-	}
-	if (consumeQuotedCharacter(active, character)) {
-		scan.index += 1
-		return true
-	}
-	if (isQuote(character)) {
-		active.quote = character
-		scan.index += 1
-		return true
-	}
-	if (isWordBoundary(scan, character)) return false
-	scan.index += 1
-	return true
-}
-
-function shellWordEnd(text: string, start: number): number {
-	const scan: ShellScan = {
-		contexts: [{ closing: '', quote: '' }],
-		failClosed: false,
-		index: start,
-	}
-	while (scan.index < text.length && advanceShellCharacter(text, scan)) {
-		// The scanner advances one complete shell token at a time.
-	}
-	return scan.failClosed ? text.length : scan.index
-}
-
-function redactShellSecrets(text: string): string {
-	let redacted = ''
-	let cursor = 0
-	SHELL_SECRET_PREFIX.lastIndex = 0
-	for (
-		let match = SHELL_SECRET_PREFIX.exec(text);
-		match;
-		match = SHELL_SECRET_PREFIX.exec(text)
-	) {
-		const valueStart = match.index + match[0].length
-		const valueEnd = shellWordEnd(text, valueStart)
-		if (valueEnd === valueStart) continue
-		redacted += `${text.slice(cursor, valueStart)}${REDACTED}`
-		cursor = valueEnd
-		SHELL_SECRET_PREFIX.lastIndex = valueEnd
-	}
-	return `${redacted}${text.slice(cursor)}`
-}
 
 /** Redacts only high-confidence credential forms to avoid damaging normal logs. */
 export function redactSecrets(text: string): string {
-	const structured = text
+	return text
 		.replace(BEARER, `$1${REDACTED}`)
-		.replace(BASIC_AUTHORIZATION, `$1${REDACTED}`)
 		.replace(URL_PASSWORD, `$1${REDACTED}$3`)
 		.replace(JSON_ASSIGNMENT, `$1$2${REDACTED}$2`)
-		.replace(JSON_LITERAL_ASSIGNMENT, `$1${REDACTED}`)
+		.replace(QUOTED_SECRET_ASSIGNMENT, `$1${REDACTED}`)
+		.replace(UNTERMINATED_SECRET_ASSIGNMENT, `$1${REDACTED}`)
+		.replace(OPTION, `$1$2${REDACTED}$4`)
+		.replace(ASSIGNMENT, `$1$2${REDACTED}$4`)
 		.replace(KNOWN_TOKEN, REDACTED)
-		.replace(PRIVATE_KEY_BLOCK, REDACTED)
-	return redactShellSecrets(structured)
 }
